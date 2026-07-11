@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -898,6 +898,42 @@
       filter: saturate(1.02) contrast(1.03);
       -webkit-font-smoothing: antialiased;
       text-rendering: geometricPrecision;
+      transition: transform var(--move-speed) cubic-bezier(.2, .85, .25, 1), filter var(--move-speed) ease;
+    }
+
+    .piece-symbol.white-piece[data-material],
+    .piece-symbol.black-piece[data-material] {
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      background-image: var(--piece-material-fill);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    .piece-symbol.white-piece[data-material] {
+      --finish-light: #fffdf7;
+      --finish-mid: var(--piece-white-fill, #f8f6f0);
+      --finish-deep: color-mix(in srgb, var(--piece-white-fill, #f8f6f0) 72%, #92795e);
+    }
+
+    .piece-symbol.black-piece[data-material] {
+      --finish-light: color-mix(in srgb, var(--piece-black-fill, #1d1814) 68%, #a9b0b8);
+      --finish-mid: var(--piece-black-fill, #1d1814);
+      --finish-deep: color-mix(in srgb, var(--piece-black-fill, #1d1814) 78%, #030405);
+    }
+
+    .piece-symbol[data-material="matte"] { --piece-material-fill: linear-gradient(160deg, var(--finish-light), var(--finish-mid) 48%, var(--finish-deep)); }
+    .piece-symbol[data-material="glossy"] { --piece-material-fill: linear-gradient(145deg, var(--finish-light) 0 19%, var(--finish-mid) 31% 56%, var(--finish-light) 66%, var(--finish-deep) 100%); }
+    .piece-symbol[data-material="metallic"] { --piece-material-fill: linear-gradient(100deg, var(--finish-deep), var(--finish-light) 23%, var(--finish-mid) 43%, var(--finish-light) 61%, var(--finish-deep)); }
+    .piece-symbol[data-material="marble"] { --piece-material-fill: repeating-linear-gradient(112deg, var(--finish-light) 0 10%, var(--finish-mid) 10% 25%, var(--finish-deep) 25% 28%, var(--finish-mid) 28% 46%); }
+    .piece-symbol[data-material="crystal"] { --piece-material-fill: linear-gradient(135deg, var(--finish-light) 0 28%, var(--finish-mid) 28% 58%, var(--finish-light) 58% 65%, var(--finish-deep) 65%); }
+    .piece-symbol[data-material="obsidian"] { --piece-material-fill: linear-gradient(150deg, var(--finish-light), var(--finish-mid) 35%, var(--finish-deep) 72%, #020303); }
+    .piece-symbol[data-material="wooden"] { --piece-material-fill: repeating-linear-gradient(102deg, var(--finish-light) 0 8%, var(--finish-mid) 8% 21%, var(--finish-deep) 21% 25%, var(--finish-mid) 25% 39%); }
+
+    .piece-symbol[data-material="glossy"],
+    .piece-symbol[data-material="metallic"],
+    .piece-symbol[data-material="crystal"] {
+      filter: saturate(1.08) contrast(1.05) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.26));
     }
 
     .piece-symbol[data-rarity="Legendary"],
@@ -8060,6 +8096,17 @@
       0% { opacity: 0; transform: scale(.84); }
       38% { opacity: .95; transform: scale(1); }
       100% { opacity: 0; transform: scale(1.08); }
+    }
+
+    body.reduced-motion .play-square.in-check,
+    body.reduced-motion .play-square.capture-impact,
+    body.reduced-motion .play-square.capture-impact .piece-symbol,
+    body.reduced-motion .play-square.promotion-bloom .piece-symbol,
+    body.low-performance .play-square.in-check,
+    body.low-performance .play-square.capture-impact,
+    body.low-performance .play-square.capture-impact .piece-symbol,
+    body.low-performance .play-square.promotion-bloom .piece-symbol {
+      animation: none;
     }
 
     .play-square.threat {
@@ -19187,7 +19234,7 @@
             <p class="section-kicker">Friendly rankings</p>
             <h2 id="leaderboards-title">Leaderboards</h2>
           </div>
-          <p class="section-intro">Compare your puzzle growth and AI victories against friendly offline benchmarks. No pressure, just visible progress.</p>
+          <p class="section-intro">Compare puzzle growth and AI victories with registered players. Offline builds clearly show a local-only fallback.</p>
         </div>
 
         <div class="leaderboard-grid" aria-live="polite">
@@ -19198,7 +19245,7 @@
                 <h3 id="puzzleLeaderboardTitle">Puzzle Trainers</h3>
                 <p class="trainer-note">Ranked by puzzle rating, solved puzzles, accuracy, and streak.</p>
               </div>
-              <span class="badge" id="puzzleLeaderboardBadge">Local</span>
+              <span class="badge" id="puzzleLeaderboardBadge">Syncing</span>
             </div>
             <div class="leaderboard-list" id="puzzleLeaderboardList"></div>
           </article>
@@ -19210,7 +19257,7 @@
                 <h3 id="aiLeaderboardTitle">AI Beaters</h3>
                 <p class="trainer-note">Ranked by game rating, AI wins, clean games, and boss progress.</p>
               </div>
-              <span class="badge" id="aiLeaderboardBadge">Local</span>
+              <span class="badge" id="aiLeaderboardBadge">Syncing</span>
             </div>
             <div class="leaderboard-list" id="aiLeaderboardList"></div>
           </article>
@@ -19831,6 +19878,11 @@
       galaxy: "space", cyber: "tech", cyberpunk: "cyberpunk", space: "space", divine: "divine", cosmic: "cosmic"
     };
 
+    const pieceMaterialBySet = {
+      classic: "matte", glass: "glossy", metal: "metallic", marble: "marble",
+      crystal: "crystal", shadow: "obsidian", wooden: "wooden"
+    };
+
     function pieceAttrs(fill, stroke, width = 3) {
       return `fill="${fill}" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"`;
     }
@@ -20034,8 +20086,9 @@
       const resolvedStyle = forceClassic ? "classic" : (pieceSetThemes?.[style] ? style : "classic");
       const symbol = getCleanPieceSymbol(info, forceClassic);
       const theme = getPieceSvgTheme(resolvedStyle);
+      const material = pieceMaterialBySet[resolvedStyle] || "matte";
       if (document.body.dataset.pieceRenderer !== "svg") {
-        return `<span class="piece-symbol ${colorClass}" aria-hidden="true" data-piece="${info.color}${info.type}" data-symbol="${symbol}" data-style="classic-glyph" data-rarity="${theme.rarity}">${symbol}</span>`;
+        return `<span class="piece-symbol ${colorClass}" aria-hidden="true" data-piece="${info.color}${info.type}" data-symbol="${symbol}" data-style="classic-glyph" data-material="${material}" data-rarity="${theme.rarity}">${symbol}</span>`;
       }
       const cacheKey = `${resolvedStyle}:${info.color}:${info.type}`;
       const cached = pieceSvgMarkupCache.get(cacheKey);
@@ -23462,15 +23515,20 @@
     // BoardBorder style module: configurable CSS variables only; chess rules and board logic stay separate.
     const boardBorderThemes = {
       classic: { label: "Classic Wood", cost: 0, tag: "Board border", description: "The clean starter frame: warm, readable, and always unlocked.", vars: { gradient: "linear-gradient(135deg, rgba(255, 248, 237, 0.3), rgba(231, 182, 93, 0.64), rgba(127, 166, 80, 0.42))", glow: "rgba(231, 182, 93, 0.18)", hoverGlow: "rgba(231, 182, 93, 0.24)", outline: "rgba(255, 248, 237, 0.08)" }, preview: { soft: "rgba(181, 136, 99, 0.2)", glow: "rgba(231, 182, 93, 0.2)" } },
+      platinum: { label: "Platinum League", cost: 68, tag: "Board border", description: "A crisp silver-metal frame for clean competition boards.", vars: { gradient: "linear-gradient(135deg, rgba(255,255,255,.92), rgba(167,181,191,.94), rgba(73,87,100,.8))", glow: "rgba(205,225,235,.3)", hoverGlow: "rgba(235,248,255,.44)", outline: "rgba(235,248,255,.18)" }, preview: { soft: "rgba(205,225,235,.18)", glow: "rgba(205,225,235,.28)" } },
       royal: { label: "Royal Gold", cost: 85, tag: "Board border", description: "A premium gold edge that gently lifts the board during puzzles and Play AI.", vars: { gradient: "linear-gradient(135deg, rgba(255, 248, 214, 0.72), rgba(255, 211, 107, 0.98), rgba(127, 166, 80, 0.5))", glow: "rgba(255, 211, 107, 0.32)", hoverGlow: "rgba(255, 211, 107, 0.42)", outline: "rgba(255, 211, 107, 0.16)" }, preview: { soft: "rgba(255, 211, 107, 0.2)", glow: "rgba(255, 211, 107, 0.28)" } },
+      tournament: { label: "Tournament Slate", cost: 76, tag: "Board border", description: "A restrained charcoal edge that keeps long games focused.", vars: { gradient: "linear-gradient(135deg, rgba(225,231,235,.76), rgba(87,100,110,.96), rgba(32,39,45,.96))", glow: "rgba(136,160,175,.24)", hoverGlow: "rgba(196,214,224,.32)", outline: "rgba(223,233,239,.14)" }, preview: { soft: "rgba(136,160,175,.14)", glow: "rgba(136,160,175,.24)" } },
       neon: { label: "Neon Blue", cost: 115, tag: "Board border", description: "A bright tactical glow for fast puzzle streaks and night-mode play.", vars: { gradient: "linear-gradient(135deg, rgba(216, 255, 244, 0.72), rgba(92, 255, 224, 0.98), rgba(111, 168, 220, 0.72))", glow: "rgba(92, 255, 224, 0.34)", hoverGlow: "rgba(92, 255, 224, 0.44)", outline: "rgba(92, 255, 224, 0.16)" }, preview: { soft: "rgba(92, 255, 224, 0.18)", glow: "rgba(92, 255, 224, 0.34)" } },
+      sakura: { label: "Sakura Bloom", cost: 132, tag: "Board border", description: "A refined rose-gold frame with a soft blossom shimmer.", vars: { gradient: "linear-gradient(135deg, rgba(255,240,246,.9), rgba(244,151,188,.9), rgba(135,78,111,.86))", glow: "rgba(255,159,203,.3)", hoverGlow: "rgba(255,198,224,.44)", outline: "rgba(255,216,233,.18)" }, preview: { soft: "rgba(255,159,203,.18)", glow: "rgba(255,159,203,.3)" } },
       emerald: { label: "Emerald", cost: 95, tag: "Board border", description: "A calm green frame for defended pieces and daily practice.", vars: { gradient: "linear-gradient(135deg, rgba(225, 255, 226, 0.74), rgba(80, 214, 126, 0.95), rgba(31, 122, 83, 0.7))", glow: "rgba(80, 214, 126, 0.3)", hoverGlow: "rgba(80, 214, 126, 0.4)", outline: "rgba(80, 214, 126, 0.16)" }, preview: { soft: "rgba(80, 214, 126, 0.18)", glow: "rgba(80, 214, 126, 0.3)" } },
       crystal: { label: "Crystal", cost: 110, tag: "Board border", description: "A cool glassy frame for board-vision training.", vars: { gradient: "linear-gradient(135deg, rgba(244, 255, 255, 0.84), rgba(143, 220, 255, 0.92), rgba(174, 135, 255, 0.56))", glow: "rgba(143, 220, 255, 0.3)", hoverGlow: "rgba(143, 220, 255, 0.4)", outline: "rgba(143, 220, 255, 0.16)" }, preview: { soft: "rgba(143, 220, 255, 0.18)", glow: "rgba(143, 220, 255, 0.3)" } },
       cosmic: { label: "Cosmic", cost: 135, tag: "Board border", description: "A starry frame for late-night calculation sessions.", vars: { gradient: "linear-gradient(135deg, rgba(255, 230, 251, 0.74), rgba(151, 115, 255, 0.92), rgba(55, 43, 105, 0.84))", glow: "rgba(151, 115, 255, 0.34)", hoverGlow: "rgba(151, 115, 255, 0.44)", outline: "rgba(151, 115, 255, 0.16)" }, preview: { soft: "rgba(151, 115, 255, 0.18)", glow: "rgba(151, 115, 255, 0.34)" } },
       dragon: { label: "Dragon Fire", cost: 150, tag: "Board border", description: "A boss-style flame border for players who want their board to feel legendary.", vars: { gradient: "linear-gradient(135deg, rgba(255, 220, 180, 0.72), rgba(255, 112, 67, 0.98), rgba(231, 182, 93, 0.64))", glow: "rgba(255, 112, 67, 0.34)", hoverGlow: "rgba(255, 112, 67, 0.44)", outline: "rgba(255, 112, 67, 0.16)" }, preview: { soft: "rgba(255, 112, 67, 0.18)", glow: "rgba(255, 112, 67, 0.34)" } },
       ice: { label: "Ice", cost: 120, tag: "Board border", description: "A crisp blue-white frame for cool, careful moves.", vars: { gradient: "linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(143, 214, 255, 0.9), rgba(92, 137, 196, 0.66))", glow: "rgba(143, 214, 255, 0.28)", hoverGlow: "rgba(143, 214, 255, 0.38)", outline: "rgba(143, 214, 255, 0.16)" }, preview: { soft: "rgba(143, 214, 255, 0.18)", glow: "rgba(143, 214, 255, 0.28)" } },
       shadow: { label: "Shadow", cost: 105, tag: "Board border", description: "A quiet dark frame for focus without distractions.", vars: { gradient: "linear-gradient(135deg, rgba(230, 230, 230, 0.45), rgba(79, 82, 91, 0.92), rgba(18, 20, 24, 0.96))", glow: "rgba(255, 255, 255, 0.14)", hoverGlow: "rgba(255, 255, 255, 0.2)", outline: "rgba(255, 255, 255, 0.12)" }, preview: { soft: "rgba(255, 255, 255, 0.12)", glow: "rgba(255, 255, 255, 0.14)" } },
+      carbon: { label: "Carbon Precision", cost: 185, tag: "Premium board border", description: "A graphite competition frame with a precise blue-steel edge.", vars: { gradient: "linear-gradient(135deg, rgba(191,211,222,.7), rgba(53,67,78,.98) 42%, rgba(13,18,23,.98) 72%, rgba(103,142,162,.72))", glow: "rgba(122,177,206,.3)", hoverGlow: "rgba(154,208,235,.42)", outline: "rgba(184,219,236,.16)" }, preview: { soft: "rgba(122,177,206,.16)", glow: "rgba(122,177,206,.3)" } },
       rainbow: { label: "Rainbow rare", cost: 240, tag: "Rare border", description: "A rare celebration frame for players who keep showing up.", vars: { gradient: "conic-gradient(from 35deg, #ff6b6b, #ffd166, #7fa650, #6fa8dc, #ae87ff, #ff6b6b)", glow: "rgba(255, 211, 107, 0.34)", hoverGlow: "rgba(174, 135, 255, 0.42)", outline: "rgba(255, 255, 255, 0.16)", solution: "conic-gradient(from 0deg, #ff6b6b, #ffd166, #7fa650, #6fa8dc, #ae87ff, #ff6b6b)" }, preview: { soft: "rgba(255, 211, 107, 0.2)", glow: "rgba(255, 211, 107, 0.34)" } },
+      aurora: { label: "Aurora Prism", cost: 280, tag: "Premium board border", description: "A rare flowing prism frame with calm northern-light color shifts.", vars: { gradient: "linear-gradient(110deg, rgba(111,255,224,.82), rgba(111,168,220,.9), rgba(174,135,255,.88), rgba(111,255,224,.82))", glow: "rgba(118,231,255,.36)", hoverGlow: "rgba(174,135,255,.5)", outline: "rgba(215,250,255,.2)", solution: "conic-gradient(from 20deg, #6fffe0, #6fa8dc, #ae87ff, #6fffe0)" }, preview: { soft: "rgba(118,231,255,.2)", glow: "rgba(174,135,255,.36)" } },
       legendary: { label: "Legendary Crown", cost: 5000, tag: "Legendary border", description: "The final campaign crown border, awarded after defeating the Chess Master.", vars: { gradient: "conic-gradient(from 20deg, #fff7c2, #ffd166, #f6a623, #7fa650, #fff7c2)", glow: "rgba(255, 211, 107, 0.46)", hoverGlow: "rgba(255, 211, 107, 0.56)", outline: "rgba(255, 248, 214, 0.22)", solution: "conic-gradient(from 0deg, #fff7c2, #ffd166, #f6a623, #7fa650, #fff7c2)" }, preview: { soft: "rgba(255, 211, 107, 0.24)", glow: "rgba(255, 211, 107, 0.44)" } }
     };
     const boardBorderStoreItems = Object.entries(boardBorderThemes).map(([value, theme]) => ({
@@ -23499,25 +23557,25 @@
       };
     }
     const pieceSetThemes = {
-      classic: makePieceSet("Classic Staunton", "Free", 0, "#fff8ed", "rgba(93, 64, 42, 0.72)", "#1d1814", "rgba(255, 248, 237, 0.42)", "rgba(231, 182, 93, 0.18)", "The clean starter collection: elegant, readable, and always unlocked."),
+      classic: makePieceSet("Matte Classic", "Free", 0, "#fff8ed", "rgba(93, 64, 42, 0.72)", "#1d1814", "rgba(255, 248, 237, 0.42)", "rgba(231, 182, 93, 0.18)", "The clean starter finish: elegant, readable, and always unlocked."),
       staunton: makePieceSet("Royal Staunton", "Common", 120, "#fffaf0", "rgba(88, 61, 39, 0.74)", "#181412", "rgba(255, 248, 237, 0.44)", "rgba(231, 182, 93, 0.2)", "A polished tournament upgrade with a premium showcase feel."),
-      wooden: makePieceSet("Carved Oak", "Common", 180, "#f7ddb2", "rgba(96, 58, 29, 0.78)", "#5a351d", "rgba(248, 221, 178, 0.5)", "rgba(181, 136, 99, 0.34)", "Warm hand-carved pieces for classic table games."),
-      marble: makePieceSet("Marble Court", "Common", 220, "#f6f2e8", "rgba(97, 91, 83, 0.72)", "#46423e", "rgba(246, 242, 232, 0.48)", "rgba(255, 248, 237, 0.28)", "Smooth stone pieces with calm high-contrast silhouettes."),
-      glass: makePieceSet("Glass Palace", "Common", 260, "#ecfbff", "rgba(71, 129, 153, 0.7)", "#244d5a", "rgba(236, 251, 255, 0.48)", "rgba(143, 220, 255, 0.34)", "Clear blue-tinted pieces for a clean modern board."),
+      wooden: makePieceSet("Wooden Grain", "Common", 180, "#f7ddb2", "rgba(96, 58, 29, 0.78)", "#5a351d", "rgba(248, 221, 178, 0.5)", "rgba(181, 136, 99, 0.34)", "A warm woodgrain finish on the same clear piece set."),
+      marble: makePieceSet("Marble Polish", "Common", 220, "#f6f2e8", "rgba(97, 91, 83, 0.72)", "#46423e", "rgba(246, 242, 232, 0.48)", "rgba(255, 248, 237, 0.28)", "A light marble finish with calm high-contrast edges."),
+      glass: makePieceSet("Glossy Glass", "Common", 260, "#ecfbff", "rgba(71, 129, 153, 0.7)", "#244d5a", "rgba(236, 251, 255, 0.48)", "rgba(143, 220, 255, 0.34)", "A polished glass highlight without changing piece silhouettes."),
       stone: makePieceSet("Stone Titans", "Common", 300, "#ddd6c8", "rgba(64, 59, 53, 0.78)", "#2b2926", "rgba(221, 214, 200, 0.48)", "rgba(150, 143, 130, 0.32)", "Heavy fortress pieces for focused, quiet games."),
       minimal: makePieceSet("Minimal Masters", "Common", 160, "#fffaf0", "rgba(93, 64, 42, 0.58)", "#171717", "rgba(255, 248, 237, 0.34)", "rgba(255, 248, 237, 0.22)", "Ultra-readable pieces for phones and fast practice."),
       modern: makePieceSet("Modern Elite", "Common", 240, "#f5f7fb", "rgba(68, 83, 99, 0.72)", "#26313c", "rgba(245, 247, 251, 0.5)", "rgba(111, 168, 220, 0.28)", "Sharp contemporary pieces with a professional board feel."),
       tournament: makePieceSet("Tournament Pro", "Common", 320, "#fffaf0", "rgba(58, 48, 40, 0.78)", "#181614", "rgba(255, 248, 237, 0.5)", "rgba(231, 182, 93, 0.24)", "A tall, balanced competition set with clear silhouettes at every board size."),
       pixel: makePieceSet("Pixel Arcade", "Common", 280, "#fff0b8", "rgba(75, 53, 27, 0.84)", "#282018", "rgba(255, 240, 184, 0.5)", "rgba(255, 211, 107, 0.36)", "Retro quest pieces with bold readable shapes."),
-      crystal: makePieceSet("Crystal Order", "Rare", 520, "#eafcff", "rgba(38, 103, 142, 0.78)", "#12364d", "rgba(220, 251, 255, 0.62)", "rgba(111, 168, 220, 0.48)", "Bright collectible pieces for board-vision practice."),
+      crystal: makePieceSet("Crystal Finish", "Rare", 520, "#eafcff", "rgba(38, 103, 142, 0.78)", "#12364d", "rgba(220, 251, 255, 0.62)", "rgba(111, 168, 220, 0.48)", "A clean faceted finish for board-vision practice."),
       emerald: makePieceSet("Jade Dynasty", "Rare", 650, "#e7ffe8", "rgba(22, 96, 63, 0.8)", "#073b2e", "rgba(188, 255, 207, 0.58)", "rgba(88, 214, 141, 0.44)", "Green defender pieces for safe, steady improvement."),
       ruby: makePieceSet("Fire Warriors", "Rare", 700, "#ffe0e0", "rgba(124, 31, 45, 0.8)", "#421016", "rgba(255, 198, 198, 0.58)", "rgba(216, 111, 98, 0.48)", "Red attacking pieces built for bold tactical missions."),
       sapphire: makePieceSet("Sapphire Order", "Rare", 650, "#e0f0ff", "rgba(37, 82, 153, 0.78)", "#10284f", "rgba(207, 231, 255, 0.58)", "rgba(74, 144, 226, 0.42)", "Deep blue pieces for calm calculation and defense."),
-      metal: makePieceSet("Steampunk Era", "Rare", 720, "#f1f5f7", "rgba(87, 96, 102, 0.76)", "#30373d", "rgba(241, 245, 247, 0.5)", "rgba(210, 225, 235, 0.34)", "Mechanical metal pieces with strong tournament contrast."),
+      metal: makePieceSet("Metallic Steel", "Rare", 720, "#f1f5f7", "rgba(87, 96, 102, 0.76)", "#30373d", "rgba(241, 245, 247, 0.5)", "rgba(210, 225, 235, 0.34)", "A brushed-steel finish with strong tournament contrast."),
       neo: makePieceSet("Neo Stream", "Rare", 760, "#e9fff7", "rgba(35, 122, 128, 0.78)", "#102f39", "rgba(190, 255, 240, 0.56)", "rgba(92, 255, 224, 0.38)", "Soft future-tech pieces for a fresh board feel."),
       neon: makePieceSet("Neon Arena", "Rare", 820, "#e8fff8", "rgba(0, 153, 170, 0.82)", "#071e2a", "rgba(111, 255, 224, 0.62)", "rgba(92, 255, 224, 0.54)", "Bright cyber edges that stay readable during fast play."),
       gold: makePieceSet("Golden Royalty", "Epic", 1000, "#fff3bf", "rgba(104, 66, 20, 0.8)", "#4b2b13", "rgba(255, 232, 157, 0.62)", "rgba(231, 182, 93, 0.52)", "A milestone collection for wins, streaks, and level-ups."),
-      shadow: makePieceSet("Onyx Guardians", "Epic", 900, "#f4ead9", "rgba(34, 27, 23, 0.86)", "#090706", "rgba(244, 234, 217, 0.5)", "rgba(0, 0, 0, 0.42)", "Dark polished pieces with thick, confident silhouettes."),
+      shadow: makePieceSet("Obsidian", "Epic", 900, "#f4ead9", "rgba(34, 27, 23, 0.86)", "#090706", "rgba(244, 234, 217, 0.5)", "rgba(0, 0, 0, 0.42)", "A deep obsidian finish that keeps both sides easy to read."),
       ice: makePieceSet("Ice Dynasty", "Epic", 850, "#f3fdff", "rgba(86, 153, 190, 0.78)", "#1d5068", "rgba(225, 250, 255, 0.56)", "rgba(143, 214, 255, 0.44)", "Cool royal pieces for careful endgames and clean wins."),
       samurai: makePieceSet("Samurai Legends", "Epic", 1200, "#fff1df", "rgba(121, 53, 36, 0.82)", "#351515", "rgba(255, 221, 194, 0.56)", "rgba(255, 112, 67, 0.42)", "Sharp warrior pieces for tactical battles and boss clears."),
       medieval: makePieceSet("Medieval Kingdom", "Epic", 1200, "#f6e6c8", "rgba(101, 68, 38, 0.84)", "#2b2118", "rgba(246, 230, 200, 0.54)", "rgba(181, 136, 99, 0.44)", "Castle-style pieces for story battles and campaign wins."),
@@ -28339,19 +28397,126 @@
       return Array.isArray(bossBattleState?.cleared) ? bossBattleState.cleared.length : 0;
     }
 
+    const leaderboardRuntime = { accounts: null, status: "local", lastRefresh: 0, refreshPromise: null, lastSyncSignature: "", subscribed: false, localListener: false };
+
+    function getLeaderboardAccountId(account = {}) {
+      return String(account.publicId || account.id || account.userId || account.email || "").trim().toLowerCase();
+    }
+
+    function getLeaderboardProvider() {
+      const provider = getAuthProvider();
+      return provider && (typeof provider.getLeaderboard === "function" || typeof provider.listLeaderboard === "function") ? provider : null;
+    }
+
+    function normalizeGlobalLeaderboardAccounts(payload) {
+      const records = Array.isArray(payload) ? payload : (payload?.accounts || payload?.players || payload?.entries || []);
+      const seen = new Set();
+      return records.map((account) => {
+        const id = getLeaderboardAccountId(account);
+        if (!id || seen.has(id)) return null;
+        seen.add(id);
+        return { ...account, publicId: id, __globalLeaderboard: true };
+      }).filter(Boolean);
+    }
+
     function isRealLeaderboardAccount(account) {
       const name = normalizeAuthUsername(account?.username);
-      const email = normalizeAuthEmail(account?.email);
-      if (!name || !email || !account?.hash || !account?.salt) return false;
+      const id = getLeaderboardAccountId(account);
+      if (!name || !id || (!account?.__globalLeaderboard && (!account?.hash || !account?.salt))) return false;
       const blockedName = /(bot|npc|test|dummy|campaign|rival|guest)/i.test(name) || /(^|[-_\s])ai([-_\s]|$)/i.test(name);
-      const blockedEmail = /(^|[._+\-@])(bot|npc|test|dummy|campaign|rival|guest)([._+\-@]|$)/i.test(email);
-      return !blockedName && !blockedEmail;
+      const blockedId = /(^|[._+\-@])(bot|npc|test|dummy|campaign|rival|guest)([._+\-@]|$)/i.test(id);
+      return !blockedName && !blockedId;
+    }
+
+    function getCurrentLeaderboardSnapshot() {
+      const profile = readLearnerProfile();
+      const snapshot = getUserProfileSnapshot(getDragonProfileSnapshot());
+      const username = normalizeAuthUsername(snapshot.username || profile.name);
+      return {
+        publicId: username.toLowerCase(),
+        username,
+        countryFlag: normalizeCountryFlagValue(profile.countryFlag),
+        title: snapshot.title || "",
+        puzzleRating: snapshot.puzzleRating,
+        gameRating: snapshot.gameRating,
+        achievements: snapshot.achievements,
+        statistics: { ...snapshot.statistics, cleanGames: gameStats.cleanGames, bossClears: getBossClearCount() },
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    async function syncSharedLeaderboardEntry() {
+      const provider = getLeaderboardProvider();
+      const upsert = provider?.upsertLeaderboardEntry || provider?.saveLeaderboardEntry;
+      const entry = getCurrentLeaderboardSnapshot();
+      if (!provider || typeof upsert !== "function" || !entry.username) return;
+      const signature = JSON.stringify({ ...entry, updatedAt: "" });
+      if (signature === leaderboardRuntime.lastSyncSignature) return;
+      leaderboardRuntime.lastSyncSignature = signature;
+      try {
+        await upsert.call(provider, entry);
+        await refreshSharedLeaderboards(true);
+      } catch {
+        leaderboardRuntime.lastSyncSignature = "";
+      }
+    }
+
+    async function refreshSharedLeaderboards(force = false) {
+      const provider = getLeaderboardProvider();
+      const fetchRows = provider?.getLeaderboard || provider?.listLeaderboard;
+      if (!provider || typeof fetchRows !== "function") {
+        leaderboardRuntime.status = "local";
+        leaderboardRuntime.accounts = null;
+        return;
+      }
+      if (leaderboardRuntime.refreshPromise) return leaderboardRuntime.refreshPromise;
+      if (!force && Date.now() - leaderboardRuntime.lastRefresh < 5000) return;
+      leaderboardRuntime.status = "syncing";
+      leaderboardRuntime.refreshPromise = Promise.resolve(fetchRows.call(provider, { limit: 100, cursor: null, include: ["puzzles", "ai"] }))
+        .then((payload) => {
+          leaderboardRuntime.accounts = normalizeGlobalLeaderboardAccounts(payload);
+          leaderboardRuntime.status = "global";
+          leaderboardRuntime.lastRefresh = Date.now();
+          renderLeaderboards();
+        })
+        .catch(() => {
+          leaderboardRuntime.accounts = null;
+          leaderboardRuntime.status = "offline";
+          renderLeaderboards();
+        })
+        .finally(() => { leaderboardRuntime.refreshPromise = null; });
+      return leaderboardRuntime.refreshPromise;
+    }
+
+    function ensureSharedLeaderboardSync() {
+      if (!leaderboardRuntime.localListener) {
+        leaderboardRuntime.localListener = true;
+        window.addEventListener("storage", (event) => {
+          if (event.key === authRegistryStorageKey) renderLeaderboards();
+        });
+      }
+      const provider = getLeaderboardProvider();
+      if (provider?.subscribeLeaderboard && !leaderboardRuntime.subscribed) {
+        leaderboardRuntime.subscribed = true;
+        try {
+          provider.subscribeLeaderboard((payload) => {
+            leaderboardRuntime.accounts = normalizeGlobalLeaderboardAccounts(payload);
+            leaderboardRuntime.status = "global";
+            leaderboardRuntime.lastRefresh = Date.now();
+            renderLeaderboards();
+          });
+        } catch {
+          leaderboardRuntime.subscribed = false;
+        }
+      }
+      void refreshSharedLeaderboards();
     }
 
     function syncCurrentPlayerStatsToRegistry() {
       const profile = readLearnerProfile();
       const name = normalizeAuthUsername(profile.name);
       if (!name) return;
+      void syncSharedLeaderboardEntry();
       const registry = readAuthRegistry();
       const currentEmail = normalizeAuthEmail(readJsonStorage(authPreferencesStorageKey, {}).currentEmail);
       const index = registry.accounts.findIndex((account) =>
@@ -28379,13 +28544,13 @@
     }
 
     function buildLeaderboardEntries(type = "puzzles") {
-      syncCurrentPlayerStatsToRegistry();
       const currentName = normalizeAuthUsername(readLearnerProfile().name).toLowerCase();
       const seen = new Set();
-      return readAuthRegistry().accounts
+      const accounts = getLeaderboardProvider() ? (leaderboardRuntime.accounts || []) : readAuthRegistry().accounts;
+      return accounts
         .filter(isRealLeaderboardAccount)
         .map((account) => {
-          const id = normalizeAuthEmail(account.email);
+          const id = getLeaderboardAccountId(account);
           if (seen.has(id)) return null;
           seen.add(id);
           const stats = account.statistics && typeof account.statistics === "object" ? account.statistics : {};
@@ -28434,7 +28599,11 @@
       const list = document.getElementById(targetId);
       if (!list) return;
       if (!entries.length) {
-        list.replaceChildren(createBookText("p", "trainer-note", "No registered players yet. Create an account to appear here."));
+        const message = leaderboardRuntime.status === "syncing" ? "Loading shared rankings..."
+          : leaderboardRuntime.status === "offline" ? "The shared leaderboard is unavailable right now."
+            : getLeaderboardProvider() ? "No registered players have ranked yet."
+              : "Local-only rankings. Connect the account service for global standings.";
+        list.replaceChildren(createBookText("p", "trainer-note", message));
         return;
       }
       list.replaceChildren(...entries.map((entry, index) => {
@@ -28481,12 +28650,20 @@
     }
 
     function renderLeaderboards() {
-      renderLeaderboardList("puzzleLeaderboardList", buildLeaderboardEntries("puzzles"));
-      renderLeaderboardList("aiLeaderboardList", buildLeaderboardEntries("ai"));
+      syncCurrentPlayerStatsToRegistry();
+      ensureSharedLeaderboardSync();
+      const puzzleEntries = buildLeaderboardEntries("puzzles");
+      const aiEntries = buildLeaderboardEntries("ai");
+      renderLeaderboardList("puzzleLeaderboardList", puzzleEntries);
+      renderLeaderboardList("aiLeaderboardList", aiEntries);
       const puzzleBadge = document.getElementById("puzzleLeaderboardBadge");
       const aiBadge = document.getElementById("aiLeaderboardBadge");
-      if (puzzleBadge) puzzleBadge.textContent = `${solvedPuzzles.size} solved`;
-      if (aiBadge) aiBadge.textContent = `${gameStats.wins} AI wins`;
+      const label = leaderboardRuntime.status === "global" ? "Global"
+        : leaderboardRuntime.status === "syncing" ? "Syncing"
+          : leaderboardRuntime.status === "offline" ? "Offline"
+            : "Local only";
+      if (puzzleBadge) puzzleBadge.textContent = `${label} ${puzzleEntries.length ? `• ${puzzleEntries.length}` : ""}`.trim();
+      if (aiBadge) aiBadge.textContent = `${label} ${aiEntries.length ? `• ${aiEntries.length}` : ""}`.trim();
       renderStyledUsernames(getDragonProfileSnapshot().name);
     }
 
