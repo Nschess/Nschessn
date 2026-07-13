@@ -35488,7 +35488,8 @@
 
       const authDebug = (message, detail = {}) => {
         try {
-          if (localStorage.getItem("checkmateQuest.authDebug") === "1") console.debug("[Checkmate Quest Auth]", message, detail);
+          const enabled = localStorage.getItem("checkmateQuest.authDebug") === "1" || new URLSearchParams(location.search).get("authDebug") === "1";
+          if (enabled) console.debug("[Checkmate Quest Auth]", message, detail);
         } catch {}
       };
 
@@ -35788,8 +35789,10 @@
         },
         getSession: async () => {
           const supabase = await getSupabaseClient();
+          authDebug("getSession requested");
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
+          authDebug("getSession resolved", { hasSession: Boolean(data.session), hasUser: Boolean(data.session?.user) });
           return data.session ? accountFromSession(data.session) : null;
         },
         onAuthStateChange: async (callback) => {
@@ -35802,9 +35805,17 @@
                 callback(null);
                 return;
               }
-              try { callback(await accountFromSession(session)); } catch {}
+              try {
+                const account = await accountFromSession(session);
+                authDebug("Auth state account resolved", { hasUsername: Boolean(account?.username), hasEmail: Boolean(account?.email) });
+                callback(account);
+              } catch (error) {
+                authDebug("Auth state account resolution failed", { message: error?.message || "unknown" });
+                callback(null);
+              }
             }, 0);
           });
+          authDebug("Auth listener subscribed", { active: Boolean(data.subscription) });
           return () => data.subscription?.unsubscribe();
         }
       };
@@ -36038,6 +36049,14 @@
       if (name) name.textContent = account.username || "Chess Player";
       if (title) title.textContent = profile.title || getDragonProfileSnapshot().rank || "Chess learner";
       if (email) email.textContent = account.email || "Connected account";
+      if (new URLSearchParams(location.search).get("authDebug") === "1") {
+        console.debug("[Checkmate Quest Auth] UI rendered", {
+          authenticated,
+          guestHidden: Array.from(document.querySelectorAll("[data-auth-guest]")).every((element) => element.hidden),
+          accountVisible: Boolean(accountPanel && !accountPanel.hidden),
+          emailVisible: Boolean(email?.textContent)
+        });
+      }
     }
 
     function applyAuthenticatedAccount(account) {
