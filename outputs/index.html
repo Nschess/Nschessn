@@ -24445,6 +24445,7 @@
     const authRegistryStorageKey = "checkmateQuest.authRegistry.demo.v1";
     const authPreferencesStorageKey = "checkmateQuest.authPreferences.v1";
     const authThrottleStorageKey = "checkmateQuest.authThrottle.v1";
+    const authEmailCooldownStorageKey = "checkmateQuest.authEmailCooldown.v1";
     const dragonProfileStorageKey = "checkmateQuest.dragonProfile.v1";
     const friendChallengeStorageKey = "checkmateQuest.friendChallenge.v1";
     const friendDirectoryStorageKey = "checkmateQuest.friends.v1";
@@ -35470,6 +35471,27 @@
       let cachedAccount = null;
       let supabaseClientPromise = null;
 
+      const authDebug = (message, detail = {}) => {
+        try {
+          if (localStorage.getItem("checkmateQuest.authDebug") === "1") console.debug("[Checkmate Quest Auth]", message, detail);
+        } catch {}
+      };
+
+      const emailCooldownKey = (kind, email) => `${kind}:${normalizeAuthEmail(email)}`;
+      const getEmailCooldownSeconds = (kind, email) => {
+        const until = Number(readJsonStorage(authEmailCooldownStorageKey, {})[emailCooldownKey(kind, email)] || 0);
+        return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+      };
+      const setEmailCooldown = (kind, email, seconds = 60) => {
+        const saved = readJsonStorage(authEmailCooldownStorageKey, {});
+        writeJsonStorage(authEmailCooldownStorageKey, { ...saved, [emailCooldownKey(kind, email)]: Date.now() + seconds * 1000 });
+      };
+      const emailError = (kind, email, error) => {
+        if (!/rate limit|too many requests|over_email_send_rate_limit/i.test(String(error?.message || error?.code || ""))) return error;
+        setEmailCooldown(kind, email, 90);
+        return new Error(`Email service is cooling down. Please wait 90 seconds before requesting another ${kind === "reset" ? "reset link" : "confirmation email"}.`);
+      };
+
       const hasLogoutBlock = () => {
         try { return localStorage.getItem(supabaseLogoutBlockStorageKey) === "1"; } catch { return false; }
       };
@@ -35488,7 +35510,21 @@
             }
           } catch {}
         });
+        try {
+          document.cookie.split(";").forEach((entry) => {
+            const name = entry.split("=")[0].trim();
+            if (/^(sb-|supabase|.*auth-token)/i.test(name)) document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+          });
+        } catch {}
       };
+
+      const stopSessionRefresh = () => {
+        Promise.resolve(supabaseClientPromise)
+          .then((client) => client?.auth?.stopAutoRefresh?.())
+          .catch(() => {});
+      };
+
+      const startSessionRefresh = (client) => client?.auth?.startAutoRefresh?.();
 
       const getConfig = async () => {
         if (!configPromise) {
@@ -35534,9 +35570,22 @@
           supabaseClientPromise = getConfig().then(({ url, anonKey }) => {
             const createClient = window.supabase?.createClient;
             if (typeof createClient !== "function") throw new Error("Supabase client did not load. Refresh and try again.");
-            return createClient(url, anonKey, {
+            const clientId = `${url}:${anonKey.slice(0, 12)}`;
+            const shared = window.CheckmateQuestSupabaseClient;
+            if (shared?.id === clientId && shared.client) {
+              authDebug("Supabase client ready", { reused: true });
+              return shared.client;
+            }
+            const client = createClient(url, anonKey, {
               auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
             });
+            window.CheckmateQuestSupabaseClient = { id: clientId, client };
+            authDebug("Supabase client ready", { reused: false });
+            return client;
+          }).catch((error) => {
+            supabaseClientPromise = null;
+            authDebug("Supabase client failed", { message: error?.message || "unknown" });
+            throw error;
           });
         }
         return supabaseClientPromise;
@@ -35569,6 +35618,7 @@
 
       const clearSession = ({ blockRestore = false } = {}) => {
         cachedAccount = null;
+        stopSessionRefresh();
         clearSupabaseBrowserAuthStorage();
         if (blockRestore) {
           try { localStorage.setItem(supabaseLogoutBlockStorageKey, "1"); } catch {}
@@ -35675,37 +35725,56 @@
           }
         },
         emailExists: async () => false,
+        emailCooldownSeconds: getEmailCooldownSeconds,
         register: async ({ username, email, password }) => {
+          const cooldown = getEmailCooldownSeconds("verify", email);
+          if (cooldown) throw new Error(`Please wait ${cooldown}s before requesting another confirmation email.`);
           clearLogoutBlock();
           const supabase = await getSupabaseClient();
+          startSessionRefresh(supabase);
           const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
-          if (error) throw error;
+          if (error) throw emailError("verify", email, error);
           if (!payload.user || payload.user.identities?.length === 0) throw new Error("That email already has a Player Pass.");
           const account = await getProfile(payload.user);
+          if (!payload.session) setEmailCooldown("verify", email);
           if (payload.session) await accountFromSession(payload.session, true);
           return { ...account, requiresEmailConfirmation: !payload.session };
         },
         login: async ({ email, password, remember }) => {
           clearLogoutBlock();
           const supabase = await getSupabaseClient();
+          startSessionRefresh(supabase);
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
           return accountFromSession(data.session, remember);
         },
         resetPassword: async (email) => {
+          const cooldown = getEmailCooldownSeconds("reset", email);
+          if (cooldown) throw new Error(`Please wait ${cooldown}s before requesting another reset link.`);
           const supabase = await getSupabaseClient();
           const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}${location.pathname}` });
-          if (error) throw error;
+          if (error) throw emailError("reset", email, error);
+          setEmailCooldown("reset", email);
         },
         logoutAllDevices: async () => {
           const supabase = await getSupabaseClient();
+          authDebug("Global logout requested");
           const { error } = await supabase.auth.signOut({ scope: "global" });
-          if (error) throw error;
+          if (error) {
+            authDebug("Global logout failed; securing this browser", { message: error.message || "unknown" });
+            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+            stopSessionRefresh();
+            clearSession({ blockRestore: true });
+            throw new Error("This browser was signed out, but other devices could not be revoked. Please try Logout All Devices again.");
+          }
+          stopSessionRefresh();
           clearSession({ blockRestore: true });
+          authDebug("Global logout completed");
         },
         startGoogleLogin: async () => {
           clearLogoutBlock();
           const supabase = await getSupabaseClient();
+          startSessionRefresh(supabase);
           const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}${location.pathname}` } });
           if (error) throw error;
         },
@@ -35744,8 +35813,9 @@
         },
         onAuthStateChange: async (callback) => {
           const supabase = await getSupabaseClient();
-          const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+          const { data } = supabase.auth.onAuthStateChange((event, session) => {
             window.setTimeout(async () => {
+              authDebug("Auth state changed", { event, hasSession: Boolean(session), blocked: hasLogoutBlock() });
               if (!session || hasLogoutBlock()) {
                 if (session) await supabase.auth.signOut({ scope: "local" }).catch(() => {});
                 clearSession();
