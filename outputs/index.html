@@ -17008,14 +17008,13 @@
                   </div>
                 </div>
                 <button class="button" type="submit">Login</button>
-                <button class="button secondary" type="button" id="authLogoutAll">Logout All Devices</button>
               </form>
               <button class="button secondary" type="button" id="authGoogleLogin" data-auth-guest>Continue with Google</button>
               <div class="auth-session-loading" id="authSessionLoading" aria-live="polite">Checking your secure session...</div>
               <div class="auth-account-panel" id="authAccountPanel" hidden>
                 <span class="auth-account-avatar" id="authAccountAvatar" aria-hidden="true">♟</span>
                 <span class="auth-account-copy"><strong id="authAccountName">Player</strong><small id="authAccountTitle">Chess learner</small></span>
-                <button class="button secondary" type="button" id="authPanelLogout">Logout</button>
+                <button class="button secondary" type="button" id="authPanelLogout">Logout All Devices</button>
               </div>
               <p class="auth-status" id="authStatus" data-auth-guest aria-live="polite">Welcome! Let's begin your chess adventure.</p>
               <ul class="auth-security" data-auth-guest aria-label="Password security requirements">
@@ -19143,7 +19142,7 @@
               </div>
             </div>
             <article class="featured-coach-card" aria-label="KingNorbert Coach Bot profile">
-              <span class="featured-coach-avatar"><img src="assets/kingnorbert-coach.png" alt="KingNorbert Coach Bot" /></span>
+              <span class="featured-coach-avatar" data-coach-avatar="assets/kingnorbert-coach.png" data-coach-fallback="KN" role="img" aria-label="KingNorbert Coach Bot"></span>
               <div class="featured-coach-copy">
                 <span>Featured coach bot</span>
                 <h4>KingNorbert <span aria-hidden="true">♛</span></h4>
@@ -31086,6 +31085,48 @@
       }
     }
 
+    function renderCoachAvatar(container, { imageUrl = "", fallback = "KN", label = "Coach avatar" } = {}) {
+      if (!container) return;
+      const showFallback = () => {
+        if (container.dataset.renderedCoachAvatar === `fallback:${fallback}` && !container.querySelector("img")) return;
+        container.classList.remove("has-coach-photo");
+        container.textContent = fallback;
+        container.dataset.renderedCoachAvatar = `fallback:${fallback}`;
+        container.setAttribute("aria-label", label);
+      };
+      if (!imageUrl) {
+        showFallback();
+        return;
+      }
+      if (container.dataset.renderedCoachAvatar === imageUrl && container.querySelector("img")) return;
+      const image = document.createElement("img");
+      image.loading = "eager";
+      image.decoding = "async";
+      image.src = imageUrl;
+      image.alt = "";
+      image.addEventListener("load", () => {
+        container.classList.add("has-coach-photo");
+        container.dataset.renderedCoachAvatar = imageUrl;
+        container.removeAttribute("aria-label");
+      }, { once: true });
+      image.addEventListener("error", () => {
+        reportDeployAssetError(imageUrl, label);
+        showFallback();
+      }, { once: true });
+      container.dataset.renderedCoachAvatar = imageUrl;
+      container.replaceChildren(image);
+    }
+
+    function setupCoachAvatarAssets() {
+      document.querySelectorAll("[data-coach-avatar]").forEach((container) => {
+        renderCoachAvatar(container, {
+          imageUrl: container.dataset.coachAvatar,
+          fallback: container.dataset.coachFallback || "KN",
+          label: container.getAttribute("aria-label") || "Coach avatar"
+        });
+      });
+    }
+
     function updateAiPlayerHeader() {
       const card = document.getElementById("aiPlayerCard");
       if (!card) return;
@@ -31101,24 +31142,7 @@
       card.classList.toggle("is-winner", Boolean(isMate && coachGame.turn() === coachPlayerColor));
       card.classList.toggle("is-loser", Boolean(isMate && coachGame.turn() === botColor));
       const avatar = document.getElementById("aiPlayerAvatar");
-      if (avatar) {
-        avatar.classList.toggle("has-coach-photo", Boolean(ai.avatarImage));
-        if (ai.avatarImage) {
-          const image = document.createElement("img");
-          image.loading = "eager";
-          image.decoding = "async";
-          image.src = ai.avatarImage;
-          image.alt = "";
-          image.addEventListener("error", () => {
-            reportDeployAssetError(ai.avatarImage, `${ai.name} avatar`);
-            avatar.classList.remove("has-coach-photo");
-            avatar.textContent = ai.avatar;
-          }, { once: true });
-          avatar.replaceChildren(image);
-        } else {
-          avatar.textContent = ai.avatar;
-        }
-      }
+      renderCoachAvatar(avatar, { imageUrl: ai.avatarImage, fallback: ai.avatar, label: `${ai.name} avatar` });
       document.getElementById("aiPlayerName").textContent = ai.name;
       document.getElementById("aiPlayerTitle").textContent = ai.title;
       document.getElementById("aiPlayerRating").textContent = `${config.elo} Elo`;
@@ -35437,6 +35461,7 @@
     }
 
     const supabaseSessionStorageKey = "checkmateQuest.supabaseSession.v1";
+    const supabaseLogoutBlockStorageKey = "checkmateQuest.supabaseSignedOut.v1";
 
     function createSupabaseAuthProvider(baseProvider = null) {
       const host = String(location.hostname || "").toLowerCase();
@@ -35444,6 +35469,26 @@
       let configPromise = null;
       let cachedAccount = null;
       let supabaseClientPromise = null;
+
+      const hasLogoutBlock = () => {
+        try { return localStorage.getItem(supabaseLogoutBlockStorageKey) === "1"; } catch { return false; }
+      };
+
+      const clearLogoutBlock = () => {
+        try { localStorage.removeItem(supabaseLogoutBlockStorageKey); } catch {}
+        try { sessionStorage.removeItem(supabaseLogoutBlockStorageKey); } catch {}
+      };
+
+      const clearSupabaseBrowserAuthStorage = () => {
+        [localStorage, sessionStorage].forEach((storage) => {
+          try {
+            for (let index = storage.length - 1; index >= 0; index -= 1) {
+              const key = storage.key(index) || "";
+              if (key === supabaseSessionStorageKey || /^sb-.*auth-token/i.test(key)) storage.removeItem(key);
+            }
+          } catch {}
+        });
+      };
 
       const getConfig = async () => {
         if (!configPromise) {
@@ -35513,6 +35558,7 @@
           account
         };
         cachedAccount = account || null;
+        clearLogoutBlock();
         try { sessionStorage.removeItem(supabaseSessionStorageKey); } catch {}
         if (remember) writeJsonStorage(supabaseSessionStorageKey, record);
         else {
@@ -35521,11 +35567,14 @@
         return account;
       };
 
-      const clearSession = () => {
+      const clearSession = ({ blockRestore = false } = {}) => {
         cachedAccount = null;
-        try { sessionStorage.removeItem(supabaseSessionStorageKey); } catch {}
-        try { localStorage.removeItem(supabaseSessionStorageKey); } catch {}
-        writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), currentEmail: "" });
+        clearSupabaseBrowserAuthStorage();
+        if (blockRestore) {
+          try { localStorage.setItem(supabaseLogoutBlockStorageKey, "1"); } catch {}
+          try { sessionStorage.setItem(supabaseLogoutBlockStorageKey, "1"); } catch {}
+        }
+        writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), currentEmail: "", rememberEmail: "" });
       };
 
       const getProfile = async (user) => {
@@ -35627,6 +35676,7 @@
         },
         emailExists: async () => false,
         register: async ({ username, email, password }) => {
+          clearLogoutBlock();
           const supabase = await getSupabaseClient();
           const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
           if (error) throw error;
@@ -35636,6 +35686,7 @@
           return { ...account, requiresEmailConfirmation: !payload.session };
         },
         login: async ({ email, password, remember }) => {
+          clearLogoutBlock();
           const supabase = await getSupabaseClient();
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
@@ -35650,27 +35701,43 @@
           const supabase = await getSupabaseClient();
           const { error } = await supabase.auth.signOut({ scope: "global" });
           if (error) throw error;
-          clearSession();
+          clearSession({ blockRestore: true });
         },
         startGoogleLogin: async () => {
+          clearLogoutBlock();
           const supabase = await getSupabaseClient();
           const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}${location.pathname}` } });
           if (error) throw error;
         },
         consumeOAuthRedirect: async () => {
           const supabase = await getSupabaseClient();
+          if (hasLogoutBlock()) {
+            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+            clearSession();
+            return null;
+          }
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
           return data.session ? accountFromSession(data.session, true) : null;
         },
         restoreSession: async () => {
           const supabase = await getSupabaseClient();
+          if (hasLogoutBlock()) {
+            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+            clearSession();
+            return null;
+          }
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
           return data.session ? accountFromSession(data.session, true) : null;
         },
         getSession: async () => {
           const supabase = await getSupabaseClient();
+          if (hasLogoutBlock()) {
+            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+            clearSession();
+            return null;
+          }
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
           return data.session ? accountFromSession(data.session, true) : null;
@@ -35679,7 +35746,8 @@
           const supabase = await getSupabaseClient();
           const { data } = supabase.auth.onAuthStateChange((_event, session) => {
             window.setTimeout(async () => {
-              if (!session) {
+              if (!session || hasLogoutBlock()) {
+                if (session) await supabase.auth.signOut({ scope: "local" }).catch(() => {});
                 clearSession();
                 callback(null);
                 return;
@@ -36019,6 +36087,17 @@
       const panelLogoutButton = document.getElementById("authPanelLogout");
       if (!registerForm || !loginForm) return;
 
+      const finishGlobalLogout = async () => {
+        const provider = getAuthProvider();
+        if (!provider?.logoutAllDevices) throw new Error("Online account logout is unavailable.");
+        await provider.logoutAllDevices();
+        registerForm.reset();
+        loginForm.reset();
+        applyAuthenticatedAccount(null);
+        location.hash = "#login";
+        window.requestAnimationFrame(() => document.getElementById("login")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      };
+
       const authPrefs = readJsonStorage(authPreferencesStorageKey, { rememberEmail: "" });
       if (authPrefs.rememberEmail && loginEmail) {
         loginEmail.value = authPrefs.rememberEmail;
@@ -36203,15 +36282,8 @@
       });
 
       logoutAllButton?.addEventListener("click", async () => {
-        const provider = getAuthProvider();
-        if (!provider?.logoutAllDevices) {
-          setAuthMessage("Logout all devices will work after online accounts are connected.", "error");
-          return;
-        }
-
         try {
-          await provider.logoutAllDevices();
-          applyAuthenticatedAccount(null);
+          await finishGlobalLogout();
           setAuthMessage("Logged out from all devices.", "success");
         } catch (error) {
           setAuthMessage(error?.message || "Could not log out every device yet.", "error");
@@ -36219,12 +36291,11 @@
       });
 
       panelLogoutButton?.addEventListener("click", async () => {
-        const provider = getAuthProvider();
-        if (!provider?.logoutAllDevices) return;
         try {
-          await provider.logoutAllDevices();
-          applyAuthenticatedAccount(null);
+          await finishGlobalLogout();
+          setAuthMessage("Logged out from all devices.", "success");
         } catch (error) {
+          const provider = getAuthProvider();
           renderAuthUi(provider.getCachedAccount?.() || null, false);
           setAuthMessage(error?.message || "Logout did not finish. Try again.", "error");
         }
@@ -39579,6 +39650,7 @@
     setupLoginProfile();
     setupSecureAuth();
     void setupSupabaseAuthUi();
+    setupCoachAvatarAssets();
     setupSettingsPage();
     setupAdminPanel();
     buildHeroBoard();
