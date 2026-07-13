@@ -1,0 +1,6 @@
+.env.local
+.env.*.local
+.env
+.tmp-*/
+.agents/
+.codex/
