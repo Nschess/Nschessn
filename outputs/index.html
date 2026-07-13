@@ -2744,6 +2744,20 @@
       flex: 0 0 auto;
     }
 
+    .auth-account-actions {
+      display: flex;
+      flex: 0 0 auto;
+      gap: 7px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 520px) {
+      .auth-account-panel { align-items: flex-start; flex-wrap: wrap; }
+      .auth-account-actions { width: 100%; }
+      .auth-account-actions .button { flex: 1 1 140px; }
+    }
+
     @keyframes auth-spin {
       to { transform: rotate(360deg); }
     }
@@ -16960,7 +16974,7 @@
               <div class="login-pass-panel">
                 <h4>Secure Account</h4>
             <div class="auth-panel" aria-labelledby="authTitle">
-              <div>
+              <div data-auth-guest>
                 <p class="eyebrow">Secure account</p>
                 <h3 id="authTitle">Start your chess adventure</h3>
                 <p>Create your account in under one minute and keep your progress ready for the next challenge.</p>
@@ -17013,8 +17027,11 @@
               <div class="auth-session-loading" id="authSessionLoading" aria-live="polite">Checking your secure session...</div>
               <div class="auth-account-panel" id="authAccountPanel" hidden>
                 <span class="auth-account-avatar" id="authAccountAvatar" aria-hidden="true">♟</span>
-                <span class="auth-account-copy"><strong id="authAccountName">Player</strong><small id="authAccountTitle">Chess learner</small></span>
-                <button class="button secondary" type="button" id="authPanelLogout">Logout All Devices</button>
+                <span class="auth-account-copy"><strong id="authAccountName">Player</strong><small id="authAccountTitle">Chess learner</small><small id="authAccountEmail">player@example.com</small></span>
+                <span class="auth-account-actions">
+                  <button class="button secondary" type="button" id="authPanelLogout">Logout</button>
+                  <button class="button secondary" type="button" id="authPanelLogoutAll">Logout All Devices</button>
+                </span>
               </div>
               <p class="auth-status" id="authStatus" data-auth-guest aria-live="polite">Welcome! Let's begin your chess adventure.</p>
               <ul class="auth-security" data-auth-guest aria-label="Password security requirements">
@@ -35330,8 +35347,7 @@
         if (!step) return finishTour();
         document.body.classList.add("is-first-tour-active");
         if (step.hash && window.location.hash !== step.hash) {
-          window.history.replaceState(null, "", step.hash);
-          syncTabsFromHash(false);
+          window.location.hash = step.hash;
         }
         stepLabel.textContent = `${index + 1}/${steps.length}`;
         title.textContent = step.title;
@@ -35461,8 +35477,7 @@
       };
     }
 
-    const supabaseSessionStorageKey = "checkmateQuest.supabaseSession.v1";
-    const supabaseLogoutBlockStorageKey = "checkmateQuest.supabaseSignedOut.v1";
+    const legacySupabaseAuthStorageKeys = ["checkmateQuest.supabaseSession.v1", "checkmateQuest.supabaseSignedOut.v1"];
 
     function createSupabaseAuthProvider(baseProvider = null) {
       const host = String(location.hostname || "").toLowerCase();
@@ -35492,21 +35507,12 @@
         return new Error(`Email service is cooling down. Please wait 90 seconds before requesting another ${kind === "reset" ? "reset link" : "confirmation email"}.`);
       };
 
-      const hasLogoutBlock = () => {
-        try { return localStorage.getItem(supabaseLogoutBlockStorageKey) === "1"; } catch { return false; }
-      };
-
-      const clearLogoutBlock = () => {
-        try { localStorage.removeItem(supabaseLogoutBlockStorageKey); } catch {}
-        try { sessionStorage.removeItem(supabaseLogoutBlockStorageKey); } catch {}
-      };
-
       const clearSupabaseBrowserAuthStorage = () => {
         [localStorage, sessionStorage].forEach((storage) => {
           try {
             for (let index = storage.length - 1; index >= 0; index -= 1) {
               const key = storage.key(index) || "";
-              if (key === supabaseSessionStorageKey || /^sb-.*auth-token/i.test(key)) storage.removeItem(key);
+              if (legacySupabaseAuthStorageKeys.includes(key) || /^sb-.*auth-token/i.test(key)) storage.removeItem(key);
             }
           } catch {}
         });
@@ -35517,6 +35523,14 @@
           });
         } catch {}
       };
+
+      const clearLegacyAuthStorage = () => {
+        [localStorage, sessionStorage].forEach((storage) => {
+          try { legacySupabaseAuthStorageKeys.forEach((key) => storage.removeItem(key)); } catch {}
+        });
+      };
+
+      clearLegacyAuthStorage();
 
       const stopSessionRefresh = () => {
         Promise.resolve(supabaseClientPromise)
@@ -35591,43 +35605,14 @@
         return supabaseClientPromise;
       };
 
-      const readSession = () => {
-        try {
-          const temporary = JSON.parse(sessionStorage.getItem(supabaseSessionStorageKey) || "null");
-          if (temporary?.accessToken) return temporary;
-        } catch {}
-        return readJsonStorage(supabaseSessionStorageKey, null);
-      };
-
-      const saveSession = (session, account, remember = true) => {
-        const record = {
-          accessToken: session?.access_token || session?.accessToken || "",
-          refreshToken: session?.refresh_token || session?.refreshToken || "",
-          expiresAt: Number(session?.expires_at || session?.expiresAt || 0),
-          account
-        };
-        cachedAccount = account || null;
-        clearLogoutBlock();
-        try { sessionStorage.removeItem(supabaseSessionStorageKey); } catch {}
-        if (remember) writeJsonStorage(supabaseSessionStorageKey, record);
-        else {
-          try { sessionStorage.setItem(supabaseSessionStorageKey, JSON.stringify(record)); } catch {}
-        }
-        return account;
-      };
-
-      const clearSession = ({ blockRestore = false } = {}) => {
+      const clearSession = () => {
         cachedAccount = null;
         stopSessionRefresh();
         clearSupabaseBrowserAuthStorage();
-        if (blockRestore) {
-          try { localStorage.setItem(supabaseLogoutBlockStorageKey, "1"); } catch {}
-          try { sessionStorage.setItem(supabaseLogoutBlockStorageKey, "1"); } catch {}
-        }
         writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), currentEmail: "", rememberEmail: "" });
       };
 
-      const getProfile = async (user) => {
+      const getProfile = async (user, accessToken = "") => {
         const fallback = {
           publicId: String(user?.id || ""),
           username: normalizeAuthUsername(user?.user_metadata?.username) || `player_${String(user?.id || "").replace(/-/g, "").slice(0, 12)}`,
@@ -35637,7 +35622,9 @@
         };
         if (!user?.id) return fallback;
         try {
-          const rows = await request("rest/v1", `profiles?id=eq.${encodeURIComponent(user.id)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at&limit=1`);
+          const rows = await request("rest/v1", `profiles?id=eq.${encodeURIComponent(user.id)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at&limit=1`, {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+          });
           const profile = Array.isArray(rows) ? rows[0] : null;
           return profile ? {
             ...fallback,
@@ -35666,19 +35653,24 @@
         headers: { Authorization: `Bearer ${accessToken}` }
       });
 
-      const accountFromSession = async (session, remember = true) => {
-        const user = session?.user || await fetchUser(session?.access_token || session?.accessToken || "");
-        const account = await getProfile(user);
-        return saveSession({ ...session, user }, account, remember);
+      const accountFromSession = async (session) => {
+        const accessToken = session?.access_token || session?.accessToken || "";
+        const user = session?.user || await fetchUser(accessToken);
+        const account = await getProfile(user, accessToken);
+        cachedAccount = account;
+        return account;
       };
 
       return {
         ...(baseProvider || {}),
-        getCachedAccount: () => cachedAccount || readSession()?.account || null,
+        getCachedAccount: () => cachedAccount,
         saveProfile: async (profileData = {}) => {
-          const session = readSession();
-          const account = cachedAccount || session?.account;
-          if (!session?.accessToken || !account?.publicId) return null;
+          const supabase = await getSupabaseClient();
+          const { data, error } = await supabase.auth.getSession();
+          if (error) throw error;
+          const accessToken = data.session?.access_token;
+          const account = cachedAccount || (data.session ? await accountFromSession(data.session) : null);
+          if (!accessToken || !account?.publicId) return null;
           const row = {
             avatar: String(profileData.avatar || "auto").slice(0, 64),
             rating: Math.max(400, Math.min(3000, Number(profileData.rating) || 450)),
@@ -35694,7 +35686,7 @@
           };
           const rows = await request("rest/v1", `profiles?id=eq.${encodeURIComponent(account.publicId)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at`, {
             method: "PATCH",
-            headers: { Authorization: `Bearer ${session.accessToken}`, "Content-Type": "application/json", Prefer: "return=representation" },
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Prefer: "return=representation" },
             body: JSON.stringify(row)
           });
           const saved = Array.isArray(rows) ? rows[0] : null;
@@ -35713,7 +35705,6 @@
               updatedAt: String(saved.updated_at || row.updated_at)
             } : row
           };
-          saveSession(session, cachedAccount, Boolean(readJsonStorage(supabaseSessionStorageKey, null)?.accessToken));
           return cachedAccount;
         },
         usernameExists: async (username) => {
@@ -35729,7 +35720,6 @@
         register: async ({ username, email, password }) => {
           const cooldown = getEmailCooldownSeconds("verify", email);
           if (cooldown) throw new Error(`Please wait ${cooldown}s before requesting another confirmation email.`);
-          clearLogoutBlock();
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
           const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
@@ -35737,16 +35727,15 @@
           if (!payload.user || payload.user.identities?.length === 0) throw new Error("That email already has a Player Pass.");
           const account = await getProfile(payload.user);
           if (!payload.session) setEmailCooldown("verify", email);
-          if (payload.session) await accountFromSession(payload.session, true);
+          if (payload.session) await accountFromSession(payload.session);
           return { ...account, requiresEmailConfirmation: !payload.session };
         },
-        login: async ({ email, password, remember }) => {
-          clearLogoutBlock();
+        login: async ({ email, password }) => {
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
-          return accountFromSession(data.session, remember);
+          return accountFromSession(data.session);
         },
         resetPassword: async (email) => {
           const cooldown = getEmailCooldownSeconds("reset", email);
@@ -35756,6 +35745,14 @@
           if (error) throw emailError("reset", email, error);
           setEmailCooldown("reset", email);
         },
+        logout: async () => {
+          const supabase = await getSupabaseClient();
+          const { error } = await supabase.auth.signOut({ scope: "local" });
+          if (error) throw error;
+          stopSessionRefresh();
+          clearSession();
+          authDebug("Local logout completed");
+        },
         logoutAllDevices: async () => {
           const supabase = await getSupabaseClient();
           authDebug("Global logout requested");
@@ -35764,15 +35761,14 @@
             authDebug("Global logout failed; securing this browser", { message: error.message || "unknown" });
             await supabase.auth.signOut({ scope: "local" }).catch(() => {});
             stopSessionRefresh();
-            clearSession({ blockRestore: true });
+            clearSession();
             throw new Error("This browser was signed out, but other devices could not be revoked. Please try Logout All Devices again.");
           }
           stopSessionRefresh();
-          clearSession({ blockRestore: true });
+          clearSession();
           authDebug("Global logout completed");
         },
         startGoogleLogin: async () => {
-          clearLogoutBlock();
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
           const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}${location.pathname}` } });
@@ -35780,49 +35776,33 @@
         },
         consumeOAuthRedirect: async () => {
           const supabase = await getSupabaseClient();
-          if (hasLogoutBlock()) {
-            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-            clearSession();
-            return null;
-          }
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
-          return data.session ? accountFromSession(data.session, true) : null;
+          return data.session ? accountFromSession(data.session) : null;
         },
         restoreSession: async () => {
           const supabase = await getSupabaseClient();
-          if (hasLogoutBlock()) {
-            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-            clearSession();
-            return null;
-          }
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
-          return data.session ? accountFromSession(data.session, true) : null;
+          return data.session ? accountFromSession(data.session) : null;
         },
         getSession: async () => {
           const supabase = await getSupabaseClient();
-          if (hasLogoutBlock()) {
-            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-            clearSession();
-            return null;
-          }
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
-          return data.session ? accountFromSession(data.session, true) : null;
+          return data.session ? accountFromSession(data.session) : null;
         },
         onAuthStateChange: async (callback) => {
           const supabase = await getSupabaseClient();
           const { data } = supabase.auth.onAuthStateChange((event, session) => {
             window.setTimeout(async () => {
-              authDebug("Auth state changed", { event, hasSession: Boolean(session), blocked: hasLogoutBlock() });
-              if (!session || hasLogoutBlock()) {
-                if (session) await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+              authDebug("Auth state changed", { event, hasSession: Boolean(session) });
+              if (!session) {
                 clearSession();
                 callback(null);
                 return;
               }
-              try { callback(await accountFromSession(session, true)); } catch {}
+              try { callback(await accountFromSession(session)); } catch {}
             }, 0);
           });
           return () => data.subscription?.unsubscribe();
@@ -36013,23 +35993,51 @@
 
     let authStateUnsubscribe = null;
 
+    function syncAuthProfileHeader(account = null) {
+      const panel = document.querySelector(".login-player-profile");
+      if (!panel) return;
+      const authenticated = Boolean(account?.username);
+      panel.dataset.authenticated = String(authenticated);
+      const name = panel.querySelector('[data-profile-field="name"]');
+      const level = panel.querySelector('[data-profile-field="level"]');
+      const avatar = panel.querySelector(".player-profile-avatar");
+      if (authenticated) {
+        if (name) name.textContent = account.username;
+        if (level) level.textContent = account.profileData?.title || getDragonProfileSnapshot().rank || "Chess learner";
+        return;
+      }
+      if (name) name.textContent = "Guest Explorer";
+      if (level) level.textContent = "Sign in to save progress";
+      if (avatar) avatar.textContent = String.fromCodePoint(0x265F);
+    }
+
     function renderAuthUi(account = null, loading = false) {
-      const guestVisible = !loading && !account;
+      const authenticated = Boolean(account?.username);
+      const guestVisible = !loading && !authenticated;
+      document.documentElement.dataset.authState = loading ? "loading" : authenticated ? "authenticated" : "guest";
+      syncAuthProfileHeader(account);
       document.querySelectorAll("[data-auth-guest]").forEach((element) => {
-        element.hidden = !guestVisible;
+        if (element.id !== "authRegisterForm" && element.id !== "authLoginForm") element.hidden = !guestVisible;
       });
+      const selectedTab = document.querySelector('[data-auth-tab][aria-selected="true"]')?.dataset.authTab || "register";
+      const registerForm = document.getElementById("authRegisterForm");
+      const loginForm = document.getElementById("authLoginForm");
+      if (registerForm) registerForm.hidden = !guestVisible || selectedTab !== "register";
+      if (loginForm) loginForm.hidden = !guestVisible || selectedTab !== "login";
       const loadingPanel = document.getElementById("authSessionLoading");
       const accountPanel = document.getElementById("authAccountPanel");
       if (loadingPanel) loadingPanel.hidden = !loading;
-      if (accountPanel) accountPanel.hidden = loading || !account;
-      if (!account) return;
+      if (accountPanel) accountPanel.hidden = loading || !authenticated;
+      if (!authenticated) return;
       const profile = account.profileData || {};
       const avatar = document.getElementById("authAccountAvatar");
       const name = document.getElementById("authAccountName");
       const title = document.getElementById("authAccountTitle");
+      const email = document.getElementById("authAccountEmail");
       if (avatar) avatar.textContent = profile.avatar || getDragonProfileSnapshot().avatar || "♟";
       if (name) name.textContent = account.username || "Chess Player";
       if (title) title.textContent = profile.title || getDragonProfileSnapshot().rank || "Chess learner";
+      if (email) email.textContent = account.email || "Connected account";
     }
 
     function applyAuthenticatedAccount(account) {
@@ -36063,12 +36071,14 @@
         return;
       }
       try {
-        applyAuthenticatedAccount(await provider.getSession());
         if (!authStateUnsubscribe && provider.onAuthStateChange) {
           authStateUnsubscribe = await provider.onAuthStateChange((account) => applyAuthenticatedAccount(account));
         }
-      } catch {
+        applyAuthenticatedAccount(await provider.getSession());
+      } catch (error) {
+        console.error("[Checkmate Quest Auth] Session initialization failed.", error);
         renderAuthUi(null, false);
+        setAuthMessage("Secure account could not be reached. Refresh and try again.", "error");
       }
     }
 
@@ -36152,10 +36162,19 @@
       const loginEmail = document.getElementById("authLoginEmail");
       const rememberMe = document.getElementById("authRememberMe");
       const forgotButton = document.getElementById("authForgotPassword");
-      const logoutAllButton = document.getElementById("authLogoutAll");
       const googleButton = document.getElementById("authGoogleLogin");
       const panelLogoutButton = document.getElementById("authPanelLogout");
+      const panelLogoutAllButton = document.getElementById("authPanelLogoutAll");
       if (!registerForm || !loginForm) return;
+
+      const finishLocalLogout = async () => {
+        const provider = getAuthProvider();
+        if (!provider?.logout) throw new Error("Online account logout is unavailable.");
+        await provider.logout();
+        registerForm.reset();
+        loginForm.reset();
+        applyAuthenticatedAccount(null);
+      };
 
       const finishGlobalLogout = async () => {
         const provider = getAuthProvider();
@@ -36214,6 +36233,7 @@
         const accountDates = { username: result.username, joinDate: currentProfile.joinDate || now, lastLogin: now };
         let onlineAccount = null;
         try {
+          if (!result.provider?.register) throw new Error("Secure accounts are unavailable. Refresh the secure site and try again.");
           if (result.provider?.register) {
             onlineAccount = await result.provider.register({
               username: result.username,
@@ -36279,6 +36299,10 @@
         }
 
         const provider = getAuthProvider();
+        if (!provider?.login) {
+          setAuthMessage("Secure login is unavailable. Refresh the secure site and try again.", "error");
+          return;
+        }
 
         try {
           const shouldRemember = Boolean(rememberMe?.checked);
@@ -36351,16 +36375,16 @@
         }
       });
 
-      logoutAllButton?.addEventListener("click", async () => {
+      panelLogoutButton?.addEventListener("click", async () => {
         try {
-          await finishGlobalLogout();
-          setAuthMessage("Logged out from all devices.", "success");
+          await finishLocalLogout();
+          setAuthMessage("Logged out. See you next time.", "success");
         } catch (error) {
-          setAuthMessage(error?.message || "Could not log out every device yet.", "error");
+          setAuthMessage(error?.message || "Logout did not finish. Try again.", "error");
         }
       });
 
-      panelLogoutButton?.addEventListener("click", async () => {
+      panelLogoutAllButton?.addEventListener("click", async () => {
         try {
           await finishGlobalLogout();
           setAuthMessage("Logged out from all devices.", "success");
