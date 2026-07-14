@@ -31334,8 +31334,11 @@
     let friendNetworkTimer = 0;
     let friendSearchTimer = 0;
     let friendNetworkRequest = 0;
+    let friendNetworkRefreshPromise = null;
+    let friendNetworkLastRefresh = 0;
     let friendNetworkUnsubscribe = null;
     let friendNetworkSubscribing = false;
+    let networkVisibilityHandler = null;
     let friendIncomingNoticeCode = "";
     let coachPremove = null;
     let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0, renderSignature: "" };
@@ -34776,15 +34779,18 @@
       };
     }
 
-    async function refreshFriendNetwork() {
+    async function refreshFriendNetwork(force = false) {
       const provider = getFriendProvider();
       if (!provider) return false;
+      if (friendNetworkRefreshPromise) return friendNetworkRefreshPromise;
+      if (!force && Date.now() - friendNetworkLastRefresh < 900) return true;
       const requestId = ++friendNetworkRequest;
-      try {
+      friendNetworkRefreshPromise = (async () => {
         const [directory, challenges] = await Promise.all([provider.getFriendDirectory(), provider.listFriendChallenges()]);
         if (requestId !== friendNetworkRequest) return false;
         friendNetworkState.directory = (Array.isArray(directory) ? directory : []).map(normalizeFriendRecord).filter((friend) => friend.id);
         friendNetworkState.challenges = (Array.isArray(challenges) ? challenges : []).map(normalizeRemoteFriendChallenge).filter(Boolean);
+        friendNetworkLastRefresh = Date.now();
         const state = friendChallengeState || readFriendChallengeState();
         const matching = state.remote ? friendNetworkState.challenges.find((challenge) => challenge.code === state.code) : null;
         const incoming = friendNetworkState.challenges.find((challenge) => challenge.status === "pending" && challenge.opponentId === getFriendCurrentUserId());
@@ -34798,16 +34804,21 @@
         }
         else renderFriendChallengeLobby();
         return true;
+      })();
+      try {
+        return await friendNetworkRefreshPromise;
       } catch (error) {
         if (requestId === friendNetworkRequest) setFriendChallengeStatus(error?.message || "Friendly Challenge is unavailable. Please try again.");
         return false;
+      } finally {
+        if (requestId === friendNetworkRequest) friendNetworkRefreshPromise = null;
       }
     }
 
     function ensureFriendRealtime(provider = getFriendProvider()) {
       if (friendNetworkUnsubscribe || friendNetworkSubscribing || !provider?.subscribeFriendChallenges) return;
       friendNetworkSubscribing = true;
-      Promise.resolve(provider.subscribeFriendChallenges(() => void refreshFriendNetwork()))
+      Promise.resolve(provider.subscribeFriendChallenges(() => void refreshFriendNetwork(true)))
         .then((unsubscribe) => { if (typeof unsubscribe === "function") friendNetworkUnsubscribe = unsubscribe; })
         .catch(() => {})
         .finally(() => { friendNetworkSubscribing = false; });
@@ -35162,6 +35173,7 @@
         if (remote) applyRemoteFriendChallenge(remote, false);
       } catch (error) {
         setFriendChallengeStatus(error?.message || "Move saved locally. Reconnect to retry syncing it.");
+        window.setTimeout(() => void reconnectFriendChallenge(), 700);
       }
     }
 
@@ -35181,6 +35193,7 @@
         return true;
       } catch (error) {
         setFriendChallengeStatus(error?.message || "Game action saved locally. Reconnect to retry syncing it.");
+        window.setTimeout(() => void reconnectFriendChallenge(), 700);
         return false;
       }
     }
@@ -35800,24 +35813,54 @@
       } catch {
         state.tournamentResultReported = false;
         saveFriendChallengeState(state);
+        window.setTimeout(() => void reportTournamentResultFromBoard(), 1400);
       }
     }
 
+    function stopFriendNetworkSync() {
+      window.clearInterval(friendNetworkTimer);
+      friendNetworkTimer = 0;
+      friendNetworkRequest += 1;
+      friendNetworkRefreshPromise = null;
+      try { friendNetworkUnsubscribe?.(); } catch {}
+      friendNetworkUnsubscribe = null;
+      friendNetworkSubscribing = false;
+    }
+
+    function stopTournamentNetworkSync() {
+      window.clearInterval(tournamentRuntime.timer);
+      window.clearTimeout(tournamentRuntime.launchTimer);
+      tournamentRuntime.timer = 0;
+      tournamentRuntime.launchTimer = 0;
+      tournamentRuntime.refreshPromise = null;
+      try { tournamentRuntime.unsubscribe?.(); } catch {}
+      tournamentRuntime.unsubscribe = null;
+      tournamentRuntime.subscribing = false;
+      if (networkVisibilityHandler) document.removeEventListener("visibilitychange", networkVisibilityHandler);
+      networkVisibilityHandler = null;
+    }
+
     function startTournamentNetworkSync() {
+      stopTournamentNetworkSync();
       const saved = readTournamentState();
       tournamentRuntime.currentCode = saved.currentCode;
       renderTournamentLobby();
       void refreshTournamentNetwork(true);
       ensureTournamentRealtime();
-      window.clearInterval(tournamentRuntime.timer);
       tournamentRuntime.timer = window.setInterval(() => void refreshTournamentNetwork(), 2500);
-      document.addEventListener("visibilitychange", () => { if (!document.hidden) void refreshTournamentNetwork(true); });
+      networkVisibilityHandler = () => {
+        if (!document.hidden) {
+          void refreshFriendNetwork(true);
+          void refreshTournamentNetwork(true);
+        }
+      };
+      document.addEventListener("visibilitychange", networkVisibilityHandler);
     }
 
     function startFriendNetworkSync() {
-      window.clearInterval(friendNetworkTimer);
+      stopFriendNetworkSync();
       ensureFriendRealtime();
-      void refreshFriendNetwork();
+      void refreshFriendNetwork(true);
       friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 5000);
     }
 
@@ -37985,6 +38028,8 @@
     function applyAuthenticatedAccount(account) {
       if (!account?.username) {
         cloudProfileReady = false;
+        stopFriendNetworkSync();
+        stopTournamentNetworkSync();
         renderAuthUi(null, false);
         return;
       }

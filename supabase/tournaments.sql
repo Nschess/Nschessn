@@ -416,6 +416,73 @@ begin
 end;
 $$;
 
+create or replace function public.settle_tournament_pairing(p_pairing_id uuid, p_result text, p_termination text default null)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  pairing public.tournament_pairings;
+  challenge public.game_challenges;
+  final_result text := p_result;
+  white_rating integer;
+  black_rating integer;
+  white_expected numeric;
+  white_score numeric;
+  delta integer;
+begin
+  select * into pairing from public.tournament_pairings where id = p_pairing_id for update;
+  if pairing.id is null then raise exception 'Tournament pairing not found'; end if;
+  if pairing.status <> 'active' then return pairing.tournament_id; end if;
+  select * into challenge from public.game_challenges where id = pairing.challenge_id for update;
+  if challenge.id is not null and challenge.status = 'completed' and challenge.result in ('white', 'black', 'draw', 'aborted') then
+    final_result := challenge.result;
+  end if;
+  if final_result not in ('white', 'black', 'draw', 'aborted') then raise exception 'Tournament result is invalid'; end if;
+
+  update public.tournament_pairings
+  set status = case when final_result = 'aborted' then 'aborted' else 'completed' end,
+      result = final_result,
+      completed_at = now()
+  where id = pairing.id;
+
+  update public.game_challenges
+  set status = 'completed',
+      result = final_result,
+      termination = coalesce(nullif(termination, ''), nullif(p_termination, ''), case when final_result = 'aborted' then 'aborted' else 'tournament result' end),
+      updated_at = now()
+  where id = pairing.challenge_id;
+
+  if final_result = 'white' then
+    update public.tournament_entries set score = score + 1, wins = wins + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.white_id;
+    update public.tournament_entries set losses = losses + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.black_id;
+    update public.profiles set wins = wins + 1, xp = xp + 25, coins = coins + 20, updated_at = now() where id = pairing.white_id;
+    update public.profiles set losses = losses + 1, xp = xp + 10, updated_at = now() where id = pairing.black_id;
+  elsif final_result = 'black' then
+    update public.tournament_entries set losses = losses + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.white_id;
+    update public.tournament_entries set score = score + 1, wins = wins + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.black_id;
+    update public.profiles set losses = losses + 1, xp = xp + 10, updated_at = now() where id = pairing.white_id;
+    update public.profiles set wins = wins + 1, xp = xp + 25, coins = coins + 20, updated_at = now() where id = pairing.black_id;
+  elsif final_result = 'draw' then
+    update public.tournament_entries set score = score + .5, draws = draws + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id in (pairing.white_id, pairing.black_id);
+    update public.profiles set draws = draws + 1, xp = xp + 15, coins = coins + 8, updated_at = now() where id in (pairing.white_id, pairing.black_id);
+  end if;
+
+  if final_result in ('white', 'black', 'draw') then
+    select rating into white_rating from public.profiles where id = pairing.white_id;
+    select rating into black_rating from public.profiles where id = pairing.black_id;
+    white_expected := 1 / (1 + power(10::numeric, (black_rating - white_rating)::numeric / 400));
+    white_score := case final_result when 'white' then 1 when 'black' then 0 else .5 end;
+    delta := round(16 * (white_score - white_expected));
+    update public.profiles set rating = greatest(400, least(3000, rating + delta)), updated_at = now() where id = pairing.white_id;
+    update public.profiles set rating = greatest(400, least(3000, rating - delta)), updated_at = now() where id = pairing.black_id;
+  end if;
+
+  perform public.advance_tournament(pairing.tournament_id);
+  return pairing.tournament_id;
+end;
+$$;
+
 create or replace function public.expire_tournaments()
 returns void
 language plpgsql
@@ -424,6 +491,16 @@ as $$
 declare
   event record;
 begin
+  for event in
+    select pairing.id as pairing_id, challenge.result, challenge.termination
+    from public.tournament_pairings pairing
+    join public.game_challenges challenge on challenge.id = pairing.challenge_id
+    where pairing.status = 'active'
+      and challenge.status = 'completed'
+      and challenge.result in ('white', 'black', 'draw', 'aborted')
+  loop
+    perform public.settle_tournament_pairing(event.pairing_id, event.result, event.termination);
+  end loop;
   for event in
     update public.tournament_pairings pairing
     set status = 'aborted', result = 'aborted', completed_at = now()
@@ -569,7 +646,7 @@ begin
   update public.tournament_entries set withdrawn = true, updated_at = now() where tournament_id = event.id and user_id = current_user_id;
   if not found then raise exception 'You have not joined this tournament'; end if;
   for pairing in select * from public.tournament_pairings where tournament_id = event.id and status = 'active' and current_user_id in (white_id, black_id) loop
-    perform public.report_tournament_result(pairing.id, case when pairing.white_id = current_user_id then 'black' else 'white' end);
+    perform public.settle_tournament_pairing(pairing.id, case when pairing.white_id = current_user_id then 'black' else 'white' end, 'player left tournament');
   end loop;
   return public.tournament_payload(event, current_user_id);
 end;
@@ -662,45 +739,14 @@ declare
   current_user_id uuid := auth.uid();
   pairing public.tournament_pairings;
   event public.tournaments;
-  white_rating integer;
-  black_rating integer;
-  white_expected numeric;
-  white_score numeric;
-  delta integer;
+  event_id uuid;
 begin
   select * into pairing from public.tournament_pairings where id = p_pairing_id for update;
   if pairing.id is null or current_user_id not in (pairing.white_id, pairing.black_id) then raise exception 'Tournament pairing not found'; end if;
   if pairing.status <> 'active' then return public.get_tournament((select code from public.tournaments where id = pairing.tournament_id)); end if;
   if p_result not in ('white', 'black', 'draw', 'aborted') then raise exception 'Tournament result is invalid'; end if;
-  update public.tournament_pairings set status = case when p_result = 'aborted' then 'aborted' else 'completed' end, result = p_result, completed_at = now() where id = pairing.id;
-  update public.game_challenges
-  set status = 'completed', result = p_result, termination = case when p_result = 'aborted' then 'aborted' else coalesce(nullif(termination, ''), 'tournament result') end, updated_at = now()
-  where id = pairing.challenge_id;
-  if p_result = 'white' then
-    update public.tournament_entries set score = score + 1, wins = wins + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.white_id;
-    update public.tournament_entries set losses = losses + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.black_id;
-    update public.profiles set wins = wins + 1, xp = xp + 25, coins = coins + 20, updated_at = now() where id = pairing.white_id;
-    update public.profiles set losses = losses + 1, xp = xp + 10, updated_at = now() where id = pairing.black_id;
-  elsif p_result = 'black' then
-    update public.tournament_entries set losses = losses + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.white_id;
-    update public.tournament_entries set score = score + 1, wins = wins + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.black_id;
-    update public.profiles set losses = losses + 1, xp = xp + 10, updated_at = now() where id = pairing.white_id;
-    update public.profiles set wins = wins + 1, xp = xp + 25, coins = coins + 20, updated_at = now() where id = pairing.black_id;
-  elsif p_result = 'draw' then
-    update public.tournament_entries set score = score + .5, draws = draws + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id in (pairing.white_id, pairing.black_id);
-    update public.profiles set draws = draws + 1, xp = xp + 15, coins = coins + 8, updated_at = now() where id in (pairing.white_id, pairing.black_id);
-  end if;
-  if p_result in ('white', 'black', 'draw') then
-    select rating into white_rating from public.profiles where id = pairing.white_id;
-    select rating into black_rating from public.profiles where id = pairing.black_id;
-    white_expected := 1 / (1 + power(10::numeric, (black_rating - white_rating)::numeric / 400));
-    white_score := case p_result when 'white' then 1 when 'black' then 0 else .5 end;
-    delta := round(16 * (white_score - white_expected));
-    update public.profiles set rating = greatest(400, least(3000, rating + delta)), updated_at = now() where id = pairing.white_id;
-    update public.profiles set rating = greatest(400, least(3000, rating - delta)), updated_at = now() where id = pairing.black_id;
-  end if;
-  select * into event from public.tournaments where id = pairing.tournament_id;
-  perform public.advance_tournament(event.id);
+  event_id := public.settle_tournament_pairing(pairing.id, p_result, 'tournament result');
+  select * into event from public.tournaments where id = event_id;
   return public.get_tournament(event.code);
 end;
 $$;
@@ -712,6 +758,7 @@ revoke all on function public.tournament_create_pairing(uuid, integer, uuid, uui
 revoke all on function public.pair_tournament_players(uuid) from public;
 revoke all on function public.award_tournament_finish(uuid) from public;
 revoke all on function public.advance_tournament(uuid) from public;
+revoke all on function public.settle_tournament_pairing(uuid, text, text) from public;
 revoke all on function public.expire_tournaments() from public;
 revoke all on function public.create_tournament(text, text, text, text, integer, integer, integer) from public;
 revoke all on function public.list_tournaments() from public;
