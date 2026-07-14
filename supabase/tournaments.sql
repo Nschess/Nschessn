@@ -433,7 +433,7 @@ begin
       and challenge.expires_at <= now()
     returning pairing.tournament_id, pairing.challenge_id
   loop
-    update public.game_challenges set status = 'completed', updated_at = now() where id = event.challenge_id;
+    update public.game_challenges set status = 'completed', result = 'aborted', termination = 'pairing expired', updated_at = now() where id = event.challenge_id;
     perform public.advance_tournament(event.tournament_id);
   end loop;
   for event in select id from public.tournaments where status = 'running' and format = 'arena' and ends_at <= now() loop
@@ -673,15 +673,22 @@ begin
   if pairing.status <> 'active' then return public.get_tournament((select code from public.tournaments where id = pairing.tournament_id)); end if;
   if p_result not in ('white', 'black', 'draw', 'aborted') then raise exception 'Tournament result is invalid'; end if;
   update public.tournament_pairings set status = case when p_result = 'aborted' then 'aborted' else 'completed' end, result = p_result, completed_at = now() where id = pairing.id;
-  update public.game_challenges set status = 'completed', updated_at = now() where id = pairing.challenge_id;
+  update public.game_challenges
+  set status = 'completed', result = p_result, termination = case when p_result = 'aborted' then 'aborted' else coalesce(nullif(termination, ''), 'tournament result') end, updated_at = now()
+  where id = pairing.challenge_id;
   if p_result = 'white' then
     update public.tournament_entries set score = score + 1, wins = wins + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.white_id;
     update public.tournament_entries set losses = losses + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.black_id;
+    update public.profiles set wins = wins + 1, xp = xp + 25, coins = coins + 20, updated_at = now() where id = pairing.white_id;
+    update public.profiles set losses = losses + 1, xp = xp + 10, updated_at = now() where id = pairing.black_id;
   elsif p_result = 'black' then
     update public.tournament_entries set losses = losses + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.white_id;
     update public.tournament_entries set score = score + 1, wins = wins + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id = pairing.black_id;
+    update public.profiles set losses = losses + 1, xp = xp + 10, updated_at = now() where id = pairing.white_id;
+    update public.profiles set wins = wins + 1, xp = xp + 25, coins = coins + 20, updated_at = now() where id = pairing.black_id;
   elsif p_result = 'draw' then
     update public.tournament_entries set score = score + .5, draws = draws + 1, updated_at = now() where tournament_id = pairing.tournament_id and user_id in (pairing.white_id, pairing.black_id);
+    update public.profiles set draws = draws + 1, xp = xp + 15, coins = coins + 8, updated_at = now() where id in (pairing.white_id, pairing.black_id);
   end if;
   if p_result in ('white', 'black', 'draw') then
     select rating into white_rating from public.profiles where id = pairing.white_id;

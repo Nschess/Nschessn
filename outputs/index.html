@@ -12708,6 +12708,30 @@
       flex-wrap: wrap;
     }
 
+    .friend-game-chat {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.13);
+    }
+
+    .friend-game-chat-head,
+    .friend-game-chat-form {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .friend-game-chat-head small,
+    .friend-game-chat-messages { color: var(--muted); font-size: 0.82rem; }
+    .friend-game-chat-messages { display: grid; gap: 4px; max-height: 120px; overflow: auto; }
+    .friend-game-chat-messages p { margin: 0; overflow-wrap: anywhere; }
+    .friend-game-chat-messages p.is-self { color: var(--gold); }
+    .friend-game-chat-form input { min-width: 0; flex: 1; }
+
     .friend-challenge-notice {
       position: fixed;
       z-index: 120;
@@ -19828,6 +19852,14 @@
             </div>
             <div class="move-history" id="moveHistory" aria-label="Move history"></div>
             <p class="trainer-note" id="gamePgn">PGN appears here after export.</p>
+            <section class="friend-game-chat" id="friendGameChat" hidden aria-label="Game chat">
+              <div class="friend-game-chat-head"><strong>Game chat</strong><small>Friendly and game-focused</small></div>
+              <div class="friend-game-chat-messages" id="friendGameChatMessages" aria-live="polite"></div>
+              <form class="friend-game-chat-form" id="friendGameChatForm">
+                <input id="friendGameChatInput" maxlength="240" autocomplete="off" placeholder="Good luck!" aria-label="Game chat message" />
+                <button class="button secondary" type="submit">Send</button>
+              </form>
+            </section>
           </div>
         </div>
       </div>
@@ -31302,9 +31334,11 @@
     let friendNetworkTimer = 0;
     let friendSearchTimer = 0;
     let friendNetworkRequest = 0;
+    let friendNetworkUnsubscribe = null;
+    let friendNetworkSubscribing = false;
     let friendIncomingNoticeCode = "";
     let coachPremove = null;
-    let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0 };
+    let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0, renderSignature: "" };
     let chessRulesPromise = null;
     let stockfishWorker = null;
     let stockfishReady = false;
@@ -31353,7 +31387,10 @@
     }
 
     function isCoachGameOver() {
-      return Boolean(matchClockExpiredColor) || coachDrawAgreed || callCoachRule(coachGame, "isGameOver", "game_over");
+      return Boolean(matchClockExpiredColor)
+        || coachDrawAgreed
+        || Boolean(friendChallengeState?.remote && (friendChallengeState.status === "completed" || getFriendGameOutcome(friendChallengeState)))
+        || callCoachRule(coachGame, "isGameOver", "game_over");
     }
 
     function isCoachCheck() {
@@ -31783,6 +31820,41 @@
         .filter((move) => move.startsWith("__"));
     }
 
+    function getFriendGameOutcome(state = friendChallengeState || readFriendChallengeState()) {
+      const result = String(state?.result || "");
+      const termination = String(state?.termination || "").replace(/_/g, " ");
+      if (["white", "black", "draw", "aborted"].includes(result)) return { result, termination: termination || "game complete" };
+      const signals = getFriendControlSignals(state);
+      const marker = [...signals].reverse().find((signal) => /^__result:(white|black|draw|aborted):[a-z_]+$/.test(signal));
+      if (marker) {
+        const [, markedResult, markedTermination] = marker.split(":");
+        return { result: markedResult, termination: markedTermination.replace(/_/g, " ") };
+      }
+      if (signals.includes("__abort")) return { result: "aborted", termination: "aborted" };
+      if (signals.includes("__draw_accept")) return { result: "draw", termination: "draw agreement" };
+      if (signals.includes("__resign:w")) return { result: "black", termination: "resignation" };
+      if (signals.includes("__resign:b")) return { result: "white", termination: "resignation" };
+      if (!state?.active || !coachGame) return null;
+      if (matchClockExpiredColor) return { result: matchClockExpiredColor === "w" ? "black" : "white", termination: "timeout" };
+      if (callCoachRule(coachGame, "isCheckmate", "in_checkmate")) return { result: coachGame.turn() === "w" ? "black" : "white", termination: "checkmate" };
+      if (callCoachRule(coachGame, "isStalemate", "in_stalemate")) return { result: "draw", termination: "stalemate" };
+      if (callCoachRule(coachGame, "isThreefoldRepetition", "in_threefold_repetition")) return { result: "draw", termination: "threefold repetition" };
+      if (callCoachRule(coachGame, "isDrawByFiftyMoves", "in_draw_by_fifty_moves")) return { result: "draw", termination: "fifty-move rule" };
+      if (callCoachRule(coachGame, "isInsufficientMaterial", "insufficient_material")) return { result: "draw", termination: "insufficient material" };
+      return null;
+    }
+
+    function friendOutcomeSignal(outcome) {
+      return outcome ? `__result:${outcome.result}:${String(outcome.termination || "ended").toLowerCase().replace(/[^a-z]+/g, "_").replace(/^_|_$/g, "") || "ended"}` : "";
+    }
+
+    function formatFriendGameOutcome(outcome) {
+      if (!outcome) return "Friend game completed.";
+      if (outcome.result === "white" || outcome.result === "black") return `${getCoachColorName(outcome.result === "white" ? "w" : "b")} won by ${outcome.termination || "game end"}.`;
+      if (outcome.result === "draw") return `Draw by ${outcome.termination || "agreement"}.`;
+      return "Game aborted before move 2.";
+    }
+
     function getFriendDrawOfferBy(state = friendChallengeState || readFriendChallengeState()) {
       const signal = getFriendControlSignals(state).reverse().find((move) => move.startsWith("__draw_offer:"));
       return signal ? signal.split(":")[1] || "" : "";
@@ -31829,7 +31901,9 @@
       if (matchClockExpiredColor) return;
       matchClockExpiredColor = color === "b" ? "b" : "w";
       if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
-      coachMessage = `${getCoachColorName(matchClockExpiredColor)} ran out of time. The clock is paused.`;
+      const outcome = friendChallengeState?.active ? getFriendGameOutcome(friendChallengeState) : null;
+      coachMessage = outcome ? formatFriendGameOutcome(outcome) : `${getCoachColorName(matchClockExpiredColor)} ran out of time. The clock is paused.`;
+      if (friendChallengeState?.active && outcome) void syncFriendSignal(friendOutcomeSignal(outcome), "completed");
       updateCoachPanel();
       renderCoachBoard();
     }
@@ -33870,15 +33944,23 @@
               : "";
       const isMate = callCoachRule(coachGame, "isCheckmate", "in_checkmate");
       const isDrawn = Boolean(drawReason) || callCoachRule(coachGame, "isDraw", "in_draw");
+      const friendOutcome = friendChallengeState?.remote ? getFriendGameOutcome(friendChallengeState) : null;
+      const friendFinished = Boolean(friendOutcome) || friendChallengeState?.status === "completed";
 
-      if (coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor) recordCoachGameResult(isMate && coachGame.turn() === getCoachBotColor());
+      if (!friendChallengeState?.remote && (coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor)) {
+        recordCoachGameResult(isMate && coachGame.turn() === getCoachBotColor());
+      }
+      if (friendFinished && friendChallengeState?.tournamentPairingId && !friendChallengeState.tournamentResultReported) void reportTournamentResultFromBoard();
 
       if (bossBadge) {
         bossBadge.hidden = !activeBoss;
         bossBadge.textContent = activeBoss ? `${getBossAvatar(activeBoss)} ${activeBoss.name}` : "Boss battle";
       }
       turnBadge.textContent = coachThinking ? "Coach thinking" : `${turn} to move`;
-      if (matchClockExpiredColor) {
+      if (friendFinished) {
+        statusBadge.textContent = friendOutcome?.result === "draw" ? "Draw" : friendOutcome?.result === "aborted" ? "Aborted" : "Game complete";
+        coach.textContent = formatFriendGameOutcome(friendOutcome);
+      } else if (matchClockExpiredColor) {
         statusBadge.textContent = `${getCoachColorName(matchClockExpiredColor)} flagged`;
         coach.textContent = `${getCoachColorName(matchClockExpiredColor)} ran out of time. The board is paused.`;
       } else if (coachDrawAgreed) {
@@ -33895,15 +33977,15 @@
         coach.textContent = coachMessage;
       }
       coach.textContent = coachMemoryLine(coach.textContent);
-      if (coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor) playCoachEndSound(isMate, isDrawn);
-      setAudioScene(isMate ? (coachGame.turn() === getCoachBotColor() ? "victory" : "defeat") : isDrawn || coachDrawAgreed || matchClockExpiredColor ? "menu" : "game");
+      if (friendFinished || coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor) playCoachEndSound(isMate, Boolean(friendOutcome?.result === "draw" || isDrawn));
+      setAudioScene(friendFinished || isDrawn || coachDrawAgreed || matchClockExpiredColor ? "menu" : isMate ? (coachGame.turn() === getCoachBotColor() ? "victory" : "defeat") : "game");
 
       renderCoachCaptured();
       renderCoachHistory();
       updateAiPlayerHeader();
       renderOpeningCompass();
-      renderCoachPracticeLinks(coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor);
-      renderGuidedGameReview(coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor);
+      renderCoachPracticeLinks(friendFinished || coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor);
+      renderGuidedGameReview(friendFinished || coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor);
       ensurePostGameReview();
       document.getElementById("undoGame").disabled = coachThinking || !coachGame.history().length;
       document.getElementById("replayMistake").disabled = coachThinking || !coachReplayFen;
@@ -34197,7 +34279,8 @@
       advanceMatchClock(move.color);
       if (friendChallengeState?.active) {
         saveFriendChallengeState({ ...friendChallengeState, active: true });
-        void syncFriendChallengePosition(true);
+        const outcome = getFriendGameOutcome(friendChallengeState);
+        void (outcome ? syncFriendSignal(friendOutcomeSignal(outcome), "completed") : syncFriendChallengePosition(true));
       }
     playCoachMoveSound(move, "player");
       gameStats.moveQualityTotal += Math.max(0, Math.min(100, 100 - Math.round(betterGap / 8)));
@@ -34382,6 +34465,40 @@
       if (status) status.textContent = message;
     }
 
+    function renderFriendGameChat(state = friendChallengeState || readFriendChallengeState()) {
+      const panel = document.getElementById("friendGameChat");
+      const messages = document.getElementById("friendGameChatMessages");
+      if (!panel || !messages) return;
+      const enabled = Boolean(state?.remote && ["active", "completed"].includes(state.status));
+      panel.hidden = !enabled;
+      if (!enabled) return;
+      const rows = Array.isArray(state.messages) ? state.messages.slice(-24) : [];
+      const signature = rows.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}:${message.body || ""}`).join("|");
+      if (messages.dataset.signature === signature) return;
+      messages.dataset.signature = signature;
+      messages.replaceChildren(...(rows.length ? rows : [createBookText("p", "", "Say good luck before the next move.")]).map((message) => {
+        if (message instanceof Element) return message;
+        const line = document.createElement("p");
+        if (String(message.userId || message.user_id || "") === getFriendCurrentUserId()) line.className = "is-self";
+        line.append(createBookText("strong", "", message.username || "Player"), document.createTextNode(` ${message.body || ""}`));
+        return line;
+      }));
+    }
+
+    async function sendFriendGameMessage(event) {
+      event?.preventDefault();
+      const input = document.getElementById("friendGameChatInput");
+      const text = String(input?.value || "").trim();
+      if (!text || !friendChallengeState?.remote) return;
+      try {
+        const remote = await getFriendProvider()?.sendFriendMessage(friendChallengeState.code, text);
+        if (remote) applyRemoteFriendChallenge(remote, false);
+        if (input) input.value = "";
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "Message could not be sent.");
+      }
+    }
+
     function getFriendProvider() {
       const provider = getAuthProvider();
       return provider?.createFriendChallenge && provider?.getFriendDirectory ? provider : null;
@@ -34471,8 +34588,11 @@
         gameType: raw.gameType === "rated" ? "rated" : "casual",
         clock: String(raw.clock || "10+0"),
         status: String(raw.status || "pending"),
+        result: String(raw.result || "pending"),
+        termination: String(raw.termination || ""),
         fen: String(raw.fen || ""),
         moves: Array.isArray(raw.moves) ? raw.moves.map(String) : [],
+        messages: Array.isArray(raw.messages) ? raw.messages : [],
         clockState: normalizeMatchClockState(raw.clockState || raw.clock_state, raw.clock),
         updatedAt: String(raw.updatedAt || raw.updated_at || ""),
         expiresAt: String(raw.expiresAt || raw.expires_at || "")
@@ -34505,6 +34625,10 @@
         online: true,
         fen: remote.fen,
         moves: remote.moves,
+        result: remote.result,
+        termination: remote.termination,
+        messages: remote.messages,
+        remoteMessageStamp: remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|"),
         clockState: remote.clockState,
         remoteUpdatedAt: remote.updatedAt
       };
@@ -34513,27 +34637,26 @@
     function applyRemoteFriendChallenge(raw, restoreBoard = false) {
       const remote = normalizeRemoteFriendChallenge(raw);
       if (!remote) return false;
+      const previous = friendChallengeState || readFriendChallengeState();
+      const boardNeedsRestore = Boolean(restoreBoard && ["active", "completed"].includes(remote.status) && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen));
+      const messageStamp = remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|");
+      const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteUpdatedAt === remote.updatedAt && previous.remoteMessageStamp === messageStamp && previous.status === remote.status;
+      if (unchanged && !boardNeedsRestore) return true;
       const next = toFriendChallengeState(remote);
       friendChallengeState = next;
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
-      const signals = getFriendControlSignals(next);
-      const resignSignal = signals.find((move) => move.startsWith("__resign:"));
-      const aborted = signals.includes("__abort");
-      const drawAccepted = signals.includes("__draw_accept");
       if (remote.status === "active") {
         coachPlayerColor = next.color;
         coachFlipped = next.color === "b";
         resetMatchPlayerTimer(next.clock, next.clockState);
       }
       if (remote.status === "completed") {
-        coachDrawAgreed = true;
+        const outcome = getFriendGameOutcome(next);
+        coachDrawAgreed = outcome?.result === "draw";
         if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
-        coachMessage = aborted ? "Game aborted before move 2."
-          : drawAccepted ? "Draw accepted. Good calm game."
-            : resignSignal ? `${getCoachColorName((resignSignal.split(":")[1] || "w"))} resigned.`
-              : "Friend game completed.";
+        coachMessage = formatFriendGameOutcome(outcome);
       }
-      if (restoreBoard && remote.status === "active" && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen)) {
+      if (boardNeedsRestore) {
         try {
           coachGame = new CoachChess(remote.fen);
           coachPlayerColor = next.color;
@@ -34543,7 +34666,7 @@
           coachSelected = "";
           coachLegalMoves = [];
           coachLastMove = coachGame.history({ verbose: true }).at(-1) || null;
-          coachMessage = "Friend move received. Your board is up to date.";
+          coachMessage = remote.status === "completed" ? formatFriendGameOutcome(getFriendGameOutcome(next)) : "Friend move received. Your board is up to date.";
           tryRunCoachPremove();
           renderCoachBoard();
           updateCoachPanel();
@@ -34560,6 +34683,7 @@
         updateCoachPanel();
         if (next.tournamentPairingId && !next.tournamentResultReported) void reportTournamentResultFromBoard();
       }
+      renderFriendGameChat(next);
       renderFriendChallengeLobby();
       return true;
     }
@@ -34678,6 +34802,15 @@
         if (requestId === friendNetworkRequest) setFriendChallengeStatus(error?.message || "Friendly Challenge is unavailable. Please try again.");
         return false;
       }
+    }
+
+    function ensureFriendRealtime(provider = getFriendProvider()) {
+      if (friendNetworkUnsubscribe || friendNetworkSubscribing || !provider?.subscribeFriendChallenges) return;
+      friendNetworkSubscribing = true;
+      Promise.resolve(provider.subscribeFriendChallenges(() => void refreshFriendNetwork()))
+        .then((unsubscribe) => { if (typeof unsubscribe === "function") friendNetworkUnsubscribe = unsubscribe; })
+        .catch(() => {})
+        .finally(() => { friendNetworkSubscribing = false; });
     }
 
     async function searchFriendPlayers(query = document.getElementById("friendSearchInput")?.value || "") {
@@ -35054,11 +35187,13 @@
 
     function finishFriendGame(message, signal = "") {
       coachMoveToken += 1;
-      coachDrawAgreed = true;
+      const nextMoves = getSyncedFriendMoves(signal ? [signal] : []);
+      const outcome = getFriendGameOutcome({ ...(friendChallengeState || {}), moves: nextMoves });
+      coachDrawAgreed = outcome?.result === "draw";
       if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
-      coachMessage = message;
+      coachMessage = outcome ? formatFriendGameOutcome(outcome) : message;
       if (friendChallengeState) {
-        friendChallengeState = { ...friendChallengeState, active: true, status: "active", moves: getSyncedFriendMoves(signal ? [signal] : []) };
+        friendChallengeState = { ...friendChallengeState, active: true, status: "active", terminalPending: Boolean(outcome), moves: nextMoves };
         saveFriendChallengeState(friendChallengeState);
       }
       if (signal) void syncFriendSignal(signal, "completed");
@@ -35195,6 +35330,7 @@
       if (index >= 0) tournamentRuntime.events[index] = normalized;
       else tournamentRuntime.events.unshift(normalized);
       tournamentRuntime.currentCode = normalized.code;
+      tournamentRuntime.renderSignature = "";
       saveTournamentState();
       renderTournamentLobby();
       return normalized;
@@ -35287,6 +35423,13 @@
         return;
       }
       const events = tournamentRuntime.events;
+      const renderSignature = JSON.stringify({ currentCode: tournamentRuntime.currentCode, events, inviteResults: tournamentRuntime.inviteResults.map((player) => player.id) });
+      if (tournamentRuntime.renderSignature === renderSignature) {
+        const selected = getSelectedTournament();
+        if (selected) scheduleTournamentLaunch(selected);
+        return;
+      }
+      tournamentRuntime.renderSignature = renderSignature;
       if (!events.length) list.replaceChildren(createBookText("p", "tournament-empty", "No events yet. Create the first one."));
       else {
         list.replaceChildren(...events.map((event) => {
@@ -35627,6 +35770,8 @@
     }
 
     function getTournamentBoardResult() {
+      const stored = getFriendGameOutcome(friendChallengeState);
+      if (stored) return stored.result;
       const signals = getFriendControlSignals();
       if (signals.includes("__abort")) return "aborted";
       const resign = signals.find((signal) => signal.startsWith("__resign:"));
@@ -35671,8 +35816,9 @@
 
     function startFriendNetworkSync() {
       window.clearInterval(friendNetworkTimer);
+      ensureFriendRealtime();
       void refreshFriendNetwork();
-      friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 2000);
+      friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 5000);
     }
 
     function takebackFriendMove() {
@@ -36400,6 +36546,7 @@
       document.getElementById("friendReconnect")?.addEventListener("click", () => void reconnectFriendChallenge());
       document.getElementById("friendRematch")?.addEventListener("click", () => startFriendChallenge(true));
       document.getElementById("friendTakeback")?.addEventListener("click", takebackFriendMove);
+      document.getElementById("friendGameChatForm")?.addEventListener("submit", sendFriendGameMessage);
       document.getElementById("tournamentCreateForm")?.addEventListener("submit", createTournamentFromForm);
       document.getElementById("tournamentRefresh")?.addEventListener("click", () => void refreshTournamentNetwork(true));
       document.addEventListener("click", (event) => {
@@ -37370,6 +37517,16 @@
           }
         },
         listFriendChallenges: () => callFriendRpc("list_game_challenges"),
+        sendFriendMessage: (code, body) => callFriendRpc("send_game_challenge_message", { p_code: String(code || ""), p_body: String(body || "") }),
+        subscribeFriendChallenges: async (callback) => {
+          const supabase = await getSupabaseClient();
+          const refresh = () => { if (typeof callback === "function") callback(); };
+          const channel = supabase.channel("checkmate-friend-games")
+            .on("postgres_changes", { event: "*", schema: "public", table: "game_challenges" }, refresh)
+            .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_messages" }, refresh)
+            .subscribe();
+          return () => { try { supabase.removeChannel(channel); } catch {} };
+        },
         createTournament: (event) => callFriendRpc("create_tournament", {
           p_title: String(event?.title || ""),
           p_format: String(event?.format || "arena"),
