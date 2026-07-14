@@ -35682,6 +35682,15 @@
         });
       };
 
+      const getAuthRedirectUrl = () => {
+        const isLocal = ["localhost", "127.0.0.1", "::1"].includes(host);
+        if (isLocal) {
+          const path = location.pathname.endsWith("/") ? location.pathname : location.pathname.replace(/\/[^/]*$/, "/");
+          return `${window.location.origin}${path || "/"}`;
+        }
+        return `${window.location.origin}/outputs/`;
+      };
+
       clearLegacyAuthStorage();
 
       const stopSessionRefresh = () => {
@@ -35907,7 +35916,7 @@
           if (cooldown) throw new Error(`Please wait ${cooldown}s before requesting another confirmation email.`);
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
-          const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
+          const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: getAuthRedirectUrl() } });
           if (error) throw emailError("verify", email, error);
           if (!payload.user || payload.user.identities?.length === 0) throw new Error("That email already has a Player Pass.");
           const account = await getProfile(payload.user);
@@ -35926,7 +35935,7 @@
           const cooldown = getEmailCooldownSeconds("reset", email);
           if (cooldown) throw new Error(`Please wait ${cooldown}s before requesting another reset link.`);
           const supabase = await getSupabaseClient();
-          const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}${location.pathname}` });
+          const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: getAuthRedirectUrl() });
           if (error) throw emailError("reset", email, error);
           setEmailCooldown("reset", email);
         },
@@ -35956,7 +35965,7 @@
         startGoogleLogin: async () => {
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
-          const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}${location.pathname}` } });
+          const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: getAuthRedirectUrl() } });
           if (error) throw error;
         },
         consumeOAuthRedirect: async () => {
