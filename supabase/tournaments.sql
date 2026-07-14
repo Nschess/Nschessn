@@ -18,6 +18,10 @@ create table if not exists public.tournaments (
   starts_at timestamptz,
   ends_at timestamptz,
   rewards_paid boolean not null default false,
+  inactivity_grace_seconds integer not null default 45 check (inactivity_grace_seconds between 30 and 120),
+  inactivity_end_seconds integer not null default 900 check (inactivity_end_seconds between 300 and 86400),
+  auto_paused boolean not null default false,
+  inactive_since timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -81,13 +85,27 @@ create table if not exists public.tournament_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.tournament_presence (
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  connected boolean not null default true,
+  last_seen timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (tournament_id, user_id)
+);
+
 alter table public.tournament_entries add column if not exists berserk_count integer not null default 0;
+alter table public.tournaments add column if not exists inactivity_grace_seconds integer not null default 45 check (inactivity_grace_seconds between 30 and 120);
+alter table public.tournaments add column if not exists inactivity_end_seconds integer not null default 900 check (inactivity_end_seconds between 300 and 86400);
+alter table public.tournaments add column if not exists auto_paused boolean not null default false;
+alter table public.tournaments add column if not exists inactive_since timestamptz;
 
 create index if not exists tournaments_status_idx on public.tournaments (status, visibility, created_at desc);
 create index if not exists tournament_entries_standings_idx on public.tournament_entries (tournament_id, withdrawn, score desc, wins desc, joined_at);
 create index if not exists tournament_pairings_active_idx on public.tournament_pairings (tournament_id, status, round_no);
 create index if not exists tournament_invites_receiver_idx on public.tournament_invites (receiver_id, created_at desc);
 create index if not exists tournament_messages_timeline_idx on public.tournament_messages (tournament_id, created_at desc);
+create index if not exists tournament_presence_active_idx on public.tournament_presence (tournament_id, connected, last_seen desc);
 
 alter table public.game_challenges add column if not exists tournament_pairing_id uuid references public.tournament_pairings(id) on delete set null;
 create unique index if not exists game_challenges_tournament_pairing_idx on public.game_challenges (tournament_pairing_id) where tournament_pairing_id is not null;
@@ -108,6 +126,10 @@ do $$ begin
   alter publication supabase_realtime add table public.tournament_messages;
 exception when duplicate_object or undefined_object then null;
 end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.tournament_presence;
+exception when duplicate_object or undefined_object then null;
+end $$;
 
 alter table public.tournaments enable row level security;
 alter table public.tournament_entries enable row level security;
@@ -115,6 +137,7 @@ alter table public.tournament_invites enable row level security;
 alter table public.tournament_pairings enable row level security;
 alter table public.tournament_awards enable row level security;
 alter table public.tournament_messages enable row level security;
+alter table public.tournament_presence enable row level security;
 
 create or replace function public.make_tournament_code()
 returns text
@@ -294,10 +317,12 @@ begin
   increment_value := greatest(0, least(120, split_part(event.clock, '+', 2)::integer)) * 1000;
   insert into public.game_challenges (
     code, creator_id, opponent_id, invite_type, game_type, creator_color, clock,
-    white_ms, black_ms, increment_ms, active_color, turn_started_at, status, expires_at
+    white_ms, black_ms, increment_ms, active_color, turn_started_at, status, expires_at,
+    abandon_grace_seconds, both_inactive_result
   ) values (
     code_value, p_white, p_black, 'private', 'rated', 'w', event.clock,
-    base_ms, base_ms, increment_value, 'w', now(), 'active', now() + interval '6 hours'
+    base_ms, base_ms, increment_value, 'w', now(), 'active', now() + interval '6 hours',
+    event.inactivity_grace_seconds, 'draw'
   ) returning * into challenge;
   insert into public.tournament_pairings (tournament_id, round_no, white_id, black_id, challenge_id)
   values (p_tournament_id, p_round, p_white, p_black, challenge.id)
@@ -394,10 +419,24 @@ security definer set search_path = public
 as $$
 declare
   event public.tournaments;
+  online_count integer;
+  inactive_cutoff timestamptz;
 begin
   select * into event from public.tournaments where id = p_tournament_id for update;
   if event.id is null or event.status <> 'running' then return; end if;
   if exists (select 1 from public.tournament_pairings where tournament_id = event.id and status = 'active') then return; end if;
+  inactive_cutoff := now() - make_interval(secs => event.inactivity_grace_seconds);
+  select count(*) into online_count
+  from public.tournament_entries entry
+  join public.tournament_presence presence on presence.tournament_id = entry.tournament_id and presence.user_id = entry.user_id
+  where entry.tournament_id = event.id and not entry.withdrawn
+    and presence.connected and presence.last_seen > inactive_cutoff;
+  if online_count = 0 and coalesce(event.starts_at, event.created_at) <= inactive_cutoff then
+    update public.tournaments
+    set status = 'paused', auto_paused = true, inactive_since = now(), updated_at = now()
+    where id = event.id;
+    return;
+  end if;
   if event.format = 'arena' then
     if event.ends_at <= now() then
       update public.tournaments set status = 'completed', updated_at = now() where id = event.id;
@@ -413,6 +452,43 @@ begin
     update public.tournaments set current_round = current_round + 1, updated_at = now() where id = event.id;
     perform public.pair_tournament_players(event.id);
   end if;
+end;
+$$;
+
+create or replace function public.touch_tournament_presence(
+  p_code text,
+  p_connected boolean default true
+)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  event public.tournaments;
+begin
+  if current_user_id is null then raise exception 'Sign in to update tournament presence'; end if;
+  perform public.expire_tournaments();
+  select * into event from public.tournaments where code = upper(trim(p_code)) for update;
+  if event.id is null then raise exception 'Tournament not found'; end if;
+  if not exists (
+    select 1 from public.tournament_entries entry
+    where entry.tournament_id = event.id and entry.user_id = current_user_id and not entry.withdrawn
+  ) then raise exception 'Join this tournament first'; end if;
+
+  insert into public.tournament_presence (tournament_id, user_id, connected, last_seen, updated_at)
+  values (event.id, current_user_id, coalesce(p_connected, true), now(), now())
+  on conflict (tournament_id, user_id) do update
+    set connected = excluded.connected, last_seen = excluded.last_seen, updated_at = excluded.updated_at;
+
+  if p_connected and event.status = 'paused' and event.auto_paused then
+    update public.tournaments
+    set status = 'running', auto_paused = false, inactive_since = null, updated_at = now()
+    where id = event.id returning * into event;
+    perform public.pair_tournament_players(event.id);
+    select * into event from public.tournaments where id = event.id;
+  end if;
+  return public.tournament_payload(event, current_user_id);
 end;
 $$;
 
@@ -478,6 +554,15 @@ begin
     update public.profiles set rating = greatest(400, least(3000, rating - delta)), updated_at = now() where id = pairing.black_id;
   end if;
 
+  if final_result in ('white', 'black') and coalesce(nullif(challenge.termination, ''), p_termination, '') = 'abandonment' then
+    insert into public.player_achievements (user_id, achievement_key, metadata)
+    values (
+      case when final_result = 'white' then pairing.white_id else pairing.black_id end,
+      'steadfast-player', jsonb_build_object('pairingId', pairing.id, 'reason', 'abandonment')
+    )
+    on conflict (user_id, achievement_key) do update set earned_at = now(), metadata = excluded.metadata;
+  end if;
+
   perform public.advance_tournament(pairing.tournament_id);
   return pairing.tournament_id;
 end;
@@ -490,7 +575,13 @@ security definer set search_path = public
 as $$
 declare
   event record;
+  lifecycle public.tournaments;
+  active_games integer;
+  participant_count integer;
+  online_count integer;
+  inactive_cutoff timestamptz;
 begin
+  perform public.expire_game_challenges();
   for event in
     select pairing.id as pairing_id, challenge.result, challenge.termination
     from public.tournament_pairings pairing
@@ -502,19 +593,45 @@ begin
     perform public.settle_tournament_pairing(event.pairing_id, event.result, event.termination);
   end loop;
   for event in
-    update public.tournament_pairings pairing
-    set status = 'aborted', result = 'aborted', completed_at = now()
-    from public.game_challenges challenge
-    where pairing.challenge_id = challenge.id
-      and pairing.status = 'active'
-      and challenge.expires_at <= now()
-    returning pairing.tournament_id, pairing.challenge_id
+    select pairing.id as pairing_id
+    from public.tournament_pairings pairing
+    join public.game_challenges challenge on challenge.id = pairing.challenge_id
+    where pairing.status = 'active' and challenge.expires_at <= now()
   loop
-    update public.game_challenges set status = 'completed', result = 'aborted', termination = 'pairing expired', updated_at = now() where id = event.challenge_id;
-    perform public.advance_tournament(event.tournament_id);
+    perform public.settle_tournament_pairing(event.pairing_id, 'aborted', 'pairing expired');
   end loop;
+
+  for lifecycle in select * from public.tournaments where status in ('running', 'paused') for update loop
+    select count(*) into active_games from public.tournament_pairings where tournament_id = lifecycle.id and status = 'active';
+    select count(*) into participant_count from public.tournament_entries where tournament_id = lifecycle.id and not withdrawn;
+    inactive_cutoff := now() - make_interval(secs => lifecycle.inactivity_grace_seconds);
+    select count(*) into online_count
+    from public.tournament_entries entry
+    join public.tournament_presence presence on presence.tournament_id = entry.tournament_id and presence.user_id = entry.user_id
+    where entry.tournament_id = lifecycle.id and not entry.withdrawn
+      and presence.connected and presence.last_seen > inactive_cutoff;
+
+    if lifecycle.status = 'running' and active_games = 0 and participant_count > 0 and online_count = 0
+      and coalesce(lifecycle.starts_at, lifecycle.created_at) <= inactive_cutoff then
+      update public.tournaments
+      set status = 'paused', auto_paused = true, inactive_since = now(), updated_at = now()
+      where id = lifecycle.id;
+    elsif lifecycle.status = 'paused' and lifecycle.auto_paused then
+      if online_count > 0 then
+        update public.tournaments
+        set status = 'running', auto_paused = false, inactive_since = null, updated_at = now()
+        where id = lifecycle.id;
+        perform public.pair_tournament_players(lifecycle.id);
+      elsif lifecycle.inactive_since is not null
+        and lifecycle.inactive_since <= now() - make_interval(secs => lifecycle.inactivity_end_seconds) then
+        update public.tournaments set status = 'completed', auto_paused = false, updated_at = now() where id = lifecycle.id;
+        perform public.award_tournament_finish(lifecycle.id);
+      end if;
+    end if;
+  end loop;
+
   for event in select id from public.tournaments where status = 'running' and format = 'arena' and ends_at <= now() loop
-    update public.tournaments set status = 'completed', updated_at = now() where id = event.id;
+    update public.tournaments set status = 'completed', auto_paused = false, updated_at = now() where id = event.id;
     perform public.award_tournament_finish(event.id);
   end loop;
 end;
@@ -751,13 +868,14 @@ begin
 end;
 $$;
 
-revoke all on table public.tournaments, public.tournament_entries, public.tournament_invites, public.tournament_pairings, public.tournament_awards, public.tournament_messages from anon, authenticated;
+revoke all on table public.tournaments, public.tournament_entries, public.tournament_invites, public.tournament_pairings, public.tournament_awards, public.tournament_messages, public.tournament_presence from anon, authenticated;
 revoke all on function public.make_tournament_code() from public;
 revoke all on function public.tournament_payload(public.tournaments, uuid) from public;
 revoke all on function public.tournament_create_pairing(uuid, integer, uuid, uuid) from public;
 revoke all on function public.pair_tournament_players(uuid) from public;
 revoke all on function public.award_tournament_finish(uuid) from public;
 revoke all on function public.advance_tournament(uuid) from public;
+revoke all on function public.touch_tournament_presence(text, boolean) from public;
 revoke all on function public.settle_tournament_pairing(uuid, text, text) from public;
 revoke all on function public.expire_tournaments() from public;
 revoke all on function public.create_tournament(text, text, text, text, integer, integer, integer) from public;
@@ -778,3 +896,18 @@ grant execute on function public.invite_to_tournament(text, uuid) to authenticat
 grant execute on function public.tournament_host_action(text, text) to authenticated;
 grant execute on function public.report_tournament_result(uuid, text) to authenticated;
 grant execute on function public.send_tournament_message(text, text) to authenticated;
+grant execute on function public.touch_tournament_presence(text, boolean) to authenticated;
+
+-- Optional Supabase pg_cron support: lifecycle cleanup still runs from normal app calls when cron is unavailable.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron')
+    and not exists (select 1 from cron.job where jobname = 'checkmate-game-lifecycle') then
+    perform cron.schedule(
+      'checkmate-game-lifecycle',
+      '* * * * *',
+      'select public.expire_game_challenges(); select public.expire_tournaments();'
+    );
+  end if;
+exception when undefined_table or invalid_schema_name or insufficient_privilege then null;
+end $$;

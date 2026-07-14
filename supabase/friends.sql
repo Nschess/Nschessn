@@ -198,6 +198,8 @@ create table if not exists public.game_challenges (
   increment_ms integer not null default 0 check (increment_ms >= 0),
   active_color text not null default 'w' check (active_color in ('w', 'b')),
   turn_started_at timestamptz,
+  abandon_grace_seconds integer not null default 45 check (abandon_grace_seconds between 30 and 120),
+  both_inactive_result text not null default 'draw' check (both_inactive_result in ('draw', 'aborted')),
   status text not null default 'pending' check (status in ('pending', 'accepted', 'active', 'declined', 'cancelled', 'expired', 'completed')),
   result text not null default 'pending' check (result in ('pending', 'white', 'black', 'draw', 'aborted')),
   termination text not null default '' check (length(termination) <= 48),
@@ -215,6 +217,8 @@ alter table public.game_challenges add column if not exists black_ms bigint not 
 alter table public.game_challenges add column if not exists increment_ms integer not null default 0 check (increment_ms >= 0);
 alter table public.game_challenges add column if not exists active_color text not null default 'w' check (active_color in ('w', 'b'));
 alter table public.game_challenges add column if not exists turn_started_at timestamptz;
+alter table public.game_challenges add column if not exists abandon_grace_seconds integer not null default 45 check (abandon_grace_seconds between 30 and 120);
+alter table public.game_challenges add column if not exists both_inactive_result text not null default 'draw' check (both_inactive_result in ('draw', 'aborted'));
 alter table public.game_challenges add column if not exists result text not null default 'pending' check (result in ('pending', 'white', 'black', 'draw', 'aborted'));
 alter table public.game_challenges add column if not exists termination text not null default '' check (length(termination) <= 48);
 
@@ -228,6 +232,25 @@ create table if not exists public.game_challenge_messages (
 
 create index if not exists game_challenge_messages_timeline_idx on public.game_challenge_messages (challenge_id, created_at desc);
 
+create table if not exists public.game_challenge_presence (
+  challenge_id uuid not null references public.game_challenges(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  connected boolean not null default true,
+  last_seen timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (challenge_id, user_id)
+);
+
+create index if not exists game_challenge_presence_active_idx on public.game_challenge_presence (challenge_id, connected, last_seen desc);
+
+create table if not exists public.player_achievements (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  achievement_key text not null check (length(achievement_key) between 3 and 80),
+  earned_at timestamptz not null default now(),
+  metadata jsonb not null default '{}'::jsonb,
+  primary key (user_id, achievement_key)
+);
+
 do $$ begin
   alter publication supabase_realtime add table public.game_challenges;
 exception when duplicate_object or undefined_object then null;
@@ -236,9 +259,15 @@ do $$ begin
   alter publication supabase_realtime add table public.game_challenge_messages;
 exception when duplicate_object or undefined_object then null;
 end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.game_challenge_presence;
+exception when duplicate_object or undefined_object then null;
+end $$;
 
 alter table public.game_challenges enable row level security;
 alter table public.game_challenge_messages enable row level security;
+alter table public.game_challenge_presence enable row level security;
+alter table public.player_achievements enable row level security;
 
 drop policy if exists game_challenges_participant_read on public.game_challenges;
 create policy game_challenges_participant_read on public.game_challenges
@@ -254,28 +283,153 @@ using (exists (
     and auth.uid() in (challenge.creator_id, challenge.opponent_id)
 ));
 
-create or replace function public.expire_game_challenges()
-returns void
-language sql
+drop policy if exists game_challenge_presence_participant_read on public.game_challenge_presence;
+create policy game_challenge_presence_participant_read on public.game_challenge_presence
+for select to authenticated
+using (exists (
+  select 1 from public.game_challenges as challenge
+  where challenge.id = game_challenge_presence.challenge_id
+    and auth.uid() in (challenge.creator_id, challenge.opponent_id)
+));
+
+drop policy if exists player_achievements_owner_read on public.player_achievements;
+create policy player_achievements_owner_read on public.player_achievements
+for select to authenticated using (auth.uid() = user_id);
+
+create or replace function public.finalize_game_challenge(
+  p_challenge_id uuid,
+  p_result text,
+  p_termination text default 'game end'
+)
+returns public.game_challenges
+language plpgsql
 security definer set search_path = public
 as $$
+declare
+  found public.game_challenges;
+  white_user_id uuid;
+  black_user_id uuid;
+  winner_id uuid;
+  loser_id uuid;
+  white_rating integer;
+  black_rating integer;
+  white_expected numeric;
+  white_score numeric;
+  rating_delta integer;
+begin
+  select * into found from public.game_challenges where id = p_challenge_id for update;
+  if found.id is null then raise exception 'Challenge not found'; end if;
+  if found.status <> 'active' then return found; end if;
+  if p_result not in ('white', 'black', 'draw', 'aborted') then raise exception 'Game result is invalid'; end if;
+
+  update public.game_challenges
+  set status = 'completed',
+      result = p_result,
+      termination = left(coalesce(nullif(trim(p_termination), ''), 'game end'), 48),
+      updated_at = now()
+  where id = found.id
+  returning * into found;
+
+  -- Tournament results are settled by tournaments.sql so standings and rewards stay atomic there.
+  if nullif(to_jsonb(found) ->> 'tournament_pairing_id', '') is not null or p_result = 'aborted' then return found; end if;
+
+  white_user_id := case when found.creator_color = 'w' then found.creator_id else found.opponent_id end;
+  black_user_id := case when found.creator_color = 'b' then found.creator_id else found.opponent_id end;
+  if white_user_id is null or black_user_id is null then return found; end if;
+
+  if p_result = 'white' then
+    winner_id := white_user_id; loser_id := black_user_id; white_score := 1;
+  elsif p_result = 'black' then
+    winner_id := black_user_id; loser_id := white_user_id; white_score := 0;
+  else
+    white_score := .5;
+  end if;
+
+  select rating into white_rating from public.profiles where id = white_user_id;
+  select rating into black_rating from public.profiles where id = black_user_id;
+  if white_rating is not null and black_rating is not null then
+    white_expected := 1 / (1 + power(10::numeric, (black_rating - white_rating)::numeric / 400));
+    rating_delta := round(16 * (white_score - white_expected));
+    update public.profiles set rating = greatest(400, least(3000, rating + rating_delta)), updated_at = now() where id = white_user_id;
+    update public.profiles set rating = greatest(400, least(3000, rating - rating_delta)), updated_at = now() where id = black_user_id;
+  end if;
+
+  if p_result = 'draw' then
+    update public.profiles
+    set draws = draws + 1, xp = xp + 15, coins = coins + 8, updated_at = now()
+    where id in (white_user_id, black_user_id);
+  else
+    update public.profiles
+    set wins = wins + 1, xp = xp + 25, coins = coins + 20, updated_at = now()
+    where id = winner_id;
+    update public.profiles
+    set losses = losses + 1, xp = xp + 8, updated_at = now()
+    where id = loser_id;
+    if p_termination = 'abandonment' then
+      insert into public.player_achievements (user_id, achievement_key, metadata)
+      values (winner_id, 'steadfast-player', jsonb_build_object('challengeId', found.id, 'reason', 'abandonment'))
+      on conflict (user_id, achievement_key) do update set earned_at = now(), metadata = excluded.metadata;
+    end if;
+  end if;
+  return found;
+end;
+$$;
+
+create or replace function public.expire_game_challenges()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  found public.game_challenges;
+  white_user_id uuid;
+  black_user_id uuid;
+  white_last_seen timestamptz;
+  black_last_seen timestamptz;
+  cutoff timestamptz;
+begin
   update public.game_challenges
   set status = 'expired', updated_at = now()
   where status in ('pending', 'accepted') and expires_at < now();
 
+  for found in
+    select * from public.game_challenges
+    where status = 'active' and clock <> 'none' and turn_started_at is not null
+      and extract(epoch from now() - turn_started_at) * 1000 >= case when active_color = 'w' then white_ms else black_ms end
+    for update skip locked
+  loop
+    if found.active_color = 'w' then
+      update public.game_challenges set white_ms = 0 where id = found.id;
+      perform public.finalize_game_challenge(found.id, 'black', 'timeout');
+    else
+      update public.game_challenges set black_ms = 0 where id = found.id;
+      perform public.finalize_game_challenge(found.id, 'white', 'timeout');
+    end if;
+  end loop;
+
+  for found in
+    select * from public.game_challenges where status = 'active' for update skip locked
+  loop
+    white_user_id := case when found.creator_color = 'w' then found.creator_id else found.opponent_id end;
+    black_user_id := case when found.creator_color = 'b' then found.creator_id else found.opponent_id end;
+    if white_user_id is null or black_user_id is null then continue; end if;
+    cutoff := now() - make_interval(secs => found.abandon_grace_seconds);
+    select max(last_seen) into white_last_seen from public.game_challenge_presence where challenge_id = found.id and user_id = white_user_id;
+    select max(last_seen) into black_last_seen from public.game_challenge_presence where challenge_id = found.id and user_id = black_user_id;
+    white_last_seen := coalesce(white_last_seen, found.turn_started_at, found.created_at);
+    black_last_seen := coalesce(black_last_seen, found.turn_started_at, found.created_at);
+    if white_last_seen > cutoff or black_last_seen > cutoff then
+      if white_last_seen <= cutoff then perform public.finalize_game_challenge(found.id, 'black', 'abandonment'); end if;
+      if black_last_seen <= cutoff then perform public.finalize_game_challenge(found.id, 'white', 'abandonment'); end if;
+    elsif white_last_seen <= cutoff and black_last_seen <= cutoff then
+      perform public.finalize_game_challenge(found.id, found.both_inactive_result, 'both players inactive');
+    end if;
+  end loop;
+
   delete from public.game_challenges
   where status in ('declined', 'cancelled', 'expired', 'completed')
     and updated_at < now() - interval '7 days';
-
-  update public.game_challenges
-  set status = 'completed', result = 'black', termination = 'timeout', white_ms = 0, updated_at = now()
-  where status = 'active' and clock <> 'none' and active_color = 'w' and turn_started_at is not null
-    and extract(epoch from now() - turn_started_at) * 1000 >= white_ms;
-
-  update public.game_challenges
-  set status = 'completed', result = 'white', termination = 'timeout', black_ms = 0, updated_at = now()
-  where status = 'active' and clock <> 'none' and active_color = 'b' and turn_started_at is not null
-    and extract(epoch from now() - turn_started_at) * 1000 >= black_ms;
+end;
 $$;
 
 create or replace function public.challenge_payload(p_challenge public.game_challenges)
@@ -297,7 +451,11 @@ as $$
       'countryFlag', coalesce(to_jsonb(creator) ->> 'country_flag', ''),
       'title', coalesce(creator.title, ''),
       'rating', coalesce(creator.rating, 450),
-      'online', coalesce(creator.last_login_at > now() - interval '5 minutes', false)
+      'online', coalesce((
+        select presence.connected and presence.last_seen > now() - make_interval(secs => challenge.abandon_grace_seconds)
+        from public.game_challenge_presence presence
+        where presence.challenge_id = challenge.id and presence.user_id = creator.id
+      ), creator.last_login_at > now() - interval '5 minutes', false)
     ),
     'opponentId', challenge.opponent_id,
     'opponentName', coalesce(opponent.username, ''),
@@ -309,7 +467,11 @@ as $$
       'countryFlag', coalesce(to_jsonb(opponent) ->> 'country_flag', ''),
       'title', coalesce(opponent.title, ''),
       'rating', coalesce(opponent.rating, 450),
-      'online', coalesce(opponent.last_login_at > now() - interval '5 minutes', false)
+      'online', coalesce((
+        select presence.connected and presence.last_seen > now() - make_interval(secs => challenge.abandon_grace_seconds)
+        from public.game_challenge_presence presence
+        where presence.challenge_id = challenge.id and presence.user_id = opponent.id
+      ), opponent.last_login_at > now() - interval '5 minutes', false)
     ) end,
     'creatorColor', challenge.creator_color,
     'inviteType', challenge.invite_type,
@@ -353,6 +515,33 @@ as $$
   left join public.profiles as creator on creator.id = challenge.creator_id
   left join public.profiles as opponent on opponent.id = challenge.opponent_id
   where challenge.id = p_challenge.id;
+$$;
+
+create or replace function public.touch_game_challenge_presence(
+  p_code text,
+  p_connected boolean default true
+)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  found public.game_challenges;
+begin
+  if current_user_id is null then raise exception 'Sign in to update game presence'; end if;
+  perform public.expire_game_challenges();
+  select * into found from public.game_challenges where code = upper(trim(p_code)) for update;
+  if found.id is null then raise exception 'Challenge not found'; end if;
+  if current_user_id not in (found.creator_id, found.opponent_id) then raise exception 'You are not in this game'; end if;
+  if found.status = 'active' then
+    insert into public.game_challenge_presence (challenge_id, user_id, connected, last_seen, updated_at)
+    values (found.id, current_user_id, coalesce(p_connected, true), now(), now())
+    on conflict (challenge_id, user_id) do update
+      set connected = excluded.connected, last_seen = excluded.last_seen, updated_at = excluded.updated_at;
+  end if;
+  return public.challenge_payload(found);
+end;
 $$;
 
 create or replace function public.create_game_challenge(
@@ -493,12 +682,12 @@ begin
       end;
       if remaining_ms = 0 then
         update public.game_challenges
-        set status = 'completed', result = case when found.active_color = 'w' then 'black' else 'white' end, termination = 'timeout',
-            white_ms = case when found.active_color = 'w' then 0 else white_ms end,
+        set white_ms = case when found.active_color = 'w' then 0 else white_ms end,
             black_ms = case when found.active_color = 'b' then 0 else black_ms end,
             updated_at = now()
         where id = found.id
         returning * into found;
+        select * into found from public.finalize_game_challenge(found.id, case when found.active_color = 'w' then 'black' else 'white' end, 'timeout');
         return public.challenge_payload(found);
       end if;
       if found.active_color = 'w' then
@@ -544,12 +733,12 @@ begin
   update public.game_challenges
   set fen = p_fen,
       moves = coalesce(p_moves, '[]'::jsonb),
-      status = case when p_status = 'completed' then 'completed' else 'active' end,
-      result = case when p_status = 'completed' then completion_result else result end,
-      termination = case when p_status = 'completed' then completion_termination else termination end,
       updated_at = now()
   where id = found.id
   returning * into found;
+  if p_status = 'completed' then
+    select * into found from public.finalize_game_challenge(found.id, completion_result, completion_termination);
+  end if;
   return public.challenge_payload(found);
 end;
 $$;
@@ -595,9 +784,11 @@ begin
 end;
 $$;
 
-revoke all on table public.game_challenges, public.game_challenge_messages from anon, authenticated;
+revoke all on table public.game_challenges, public.game_challenge_messages, public.game_challenge_presence, public.player_achievements from anon, authenticated;
 revoke all on function public.expire_game_challenges() from public;
+revoke all on function public.finalize_game_challenge(uuid, text, text) from public;
 revoke all on function public.challenge_payload(public.game_challenges) from public;
+revoke all on function public.touch_game_challenge_presence(text, boolean) from public;
 revoke all on function public.search_registered_players(text) from public;
 revoke all on function public.create_game_challenge(uuid, text, text, text, text, text) from public;
 revoke all on function public.get_game_challenge(text) from public;
@@ -608,6 +799,7 @@ revoke all on function public.send_game_challenge_message(text, text) from publi
 grant execute on function public.search_registered_players(text) to authenticated;
 grant execute on function public.create_game_challenge(uuid, text, text, text, text, text) to authenticated;
 grant execute on function public.get_game_challenge(text) to authenticated;
+grant execute on function public.touch_game_challenge_presence(text, boolean) to authenticated;
 grant execute on function public.respond_game_challenge(text, text) to authenticated;
 grant execute on function public.save_game_challenge_position(text, text, jsonb, text, boolean) to authenticated;
 grant execute on function public.list_game_challenges() to authenticated;
