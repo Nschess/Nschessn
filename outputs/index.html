@@ -31240,11 +31240,6 @@
     const chessJsUrl = "https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm";
     const stockfishSources = [
       {
-        name: "Local Stockfish Lite",
-        script: "vendor/stockfish/stockfish-lite.js",
-        wasm: "vendor/stockfish/stockfish-nnue-16-single.wasm"
-      },
-      {
         name: "CDN Stockfish Lite",
         script: "https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16-single.js",
         wasm: "https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16-single.wasm"
@@ -31338,13 +31333,16 @@
     let friendNetworkLastRefresh = 0;
     let friendNetworkUnsubscribe = null;
     let friendNetworkSubscribing = false;
+    let friendNetworkSubscriptionGeneration = 0;
+    let friendChallengeSyncEpoch = 0;
+    let friendChallengeSyncQueue = Promise.resolve();
     let networkVisibilityHandler = null;
     let realtimeMatchHeartbeatTimer = 0;
     let realtimeMatchHeartbeatInFlight = false;
     let realtimeMatchVisibilityHandler = null;
     let friendIncomingNoticeCode = "";
     let coachPremove = null;
-    let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0, renderSignature: "", lastPresencePulse: 0, lastPresenceConnected: null };
+    let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, subscriptionGeneration: 0, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0, renderSignature: "", lastPresencePulse: 0, lastPresenceConnected: null };
     let chessRulesPromise = null;
     let stockfishWorker = null;
     let stockfishReady = false;
@@ -31514,6 +31512,7 @@
       stopFriendNetworkSync();
       stopTournamentNetworkSync();
       if (hasRealtimeContext) {
+        invalidateFriendChallengeSync();
         dismissFriendChallengeNotice();
         friendIncomingNoticeCode = "";
         friendChallengeState = {
@@ -34687,6 +34686,7 @@
       const remote = normalizeRemoteFriendChallenge(raw);
       if (!remote) return false;
       const previous = friendChallengeState || readFriendChallengeState();
+      if (previous?.remoteId && previous.remoteId !== remote.id) invalidateFriendChallengeSync();
       const boardNeedsRestore = Boolean(restoreBoard && ["active", "completed"].includes(remote.status) && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen));
       const messageStamp = remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|");
       const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteUpdatedAt === remote.updatedAt && previous.remoteMessageStamp === messageStamp && previous.status === remote.status;
@@ -34732,6 +34732,7 @@
         stopRealtimeMatchLifecycle();
         renderCoachBoard();
         updateCoachPanel();
+        void refreshServerAuthoritativeProfile();
         if (next.tournamentPairingId && !next.tournamentResultReported) void reportTournamentResultFromBoard();
       }
       renderFriendGameChat(next);
@@ -34865,11 +34866,22 @@
 
     function ensureFriendRealtime(provider = getFriendProvider()) {
       if (friendNetworkUnsubscribe || friendNetworkSubscribing || !provider?.subscribeFriendChallenges) return;
+      const generation = friendNetworkSubscriptionGeneration;
       friendNetworkSubscribing = true;
-      Promise.resolve(provider.subscribeFriendChallenges(() => void refreshFriendNetwork(true)))
-        .then((unsubscribe) => { if (typeof unsubscribe === "function") friendNetworkUnsubscribe = unsubscribe; })
+      Promise.resolve(provider.subscribeFriendChallenges(() => {
+        if (generation === friendNetworkSubscriptionGeneration) void refreshFriendNetwork(true);
+      }))
+        .then((unsubscribe) => {
+          if (generation !== friendNetworkSubscriptionGeneration) {
+            try { unsubscribe?.(); } catch {}
+            return;
+          }
+          if (typeof unsubscribe === "function") friendNetworkUnsubscribe = unsubscribe;
+        })
         .catch(() => {})
-        .finally(() => { friendNetworkSubscribing = false; });
+        .finally(() => {
+          if (generation === friendNetworkSubscriptionGeneration) friendNetworkSubscribing = false;
+        });
     }
 
     async function searchFriendPlayers(query = document.getElementById("friendSearchInput")?.value || "") {
@@ -35214,39 +35226,63 @@
       }
     }
 
+    function invalidateFriendChallengeSync() {
+      friendChallengeSyncEpoch += 1;
+      friendChallengeSyncQueue = Promise.resolve();
+    }
+
+    function queueFriendChallengeSync(task) {
+      const epoch = friendChallengeSyncEpoch;
+      const queued = friendChallengeSyncQueue.catch(() => {}).then(() => task(epoch));
+      friendChallengeSyncQueue = queued.catch(() => {});
+      return queued;
+    }
+
     async function syncFriendChallengePosition(moveApplied = false) {
-      const state = friendChallengeState;
-      const provider = getFriendProvider();
-      if (!state?.remote || !state.active || !coachGame || !provider) return;
-      const moves = getSyncedFriendMoves();
-      try {
-        const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active", moveApplied });
-        if (remote) applyRemoteFriendChallenge(remote, false);
-      } catch (error) {
-        setFriendChallengeStatus(error?.message || "Move saved locally. Reconnect to retry syncing it.");
-        window.setTimeout(() => void reconnectFriendChallenge(), 700);
-      }
+      return queueFriendChallengeSync(async (epoch) => {
+        const state = friendChallengeState;
+        const provider = getFriendProvider();
+        if (epoch !== friendChallengeSyncEpoch || !state?.remote || !state.active || !coachGame || !provider) return false;
+        const code = state.code;
+        const moves = getSyncedFriendMoves();
+        try {
+          const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active", moveApplied });
+          if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) applyRemoteFriendChallenge(remote, false);
+          return true;
+        } catch (error) {
+          if (epoch === friendChallengeSyncEpoch) {
+            setFriendChallengeStatus(error?.message || "Move saved locally. Reconnect to retry syncing it.");
+            window.setTimeout(() => void reconnectFriendChallenge(), 700);
+          }
+          return false;
+        }
+      });
     }
 
     async function syncFriendSignal(signal, status = "active") {
-      const state = friendChallengeState;
-      const provider = getFriendProvider();
-      if (!state?.remote || !state.active || !coachGame || !provider) return false;
-      try {
-        const remote = await provider.saveFriendChallengePosition({
-          ...state,
-          fen: coachGame.fen(),
-          moves: getSyncedFriendMoves([signal]),
-          status,
-          moveApplied: false
-        });
-        if (remote) applyRemoteFriendChallenge(remote, false);
-        return true;
-      } catch (error) {
-        setFriendChallengeStatus(error?.message || "Game action saved locally. Reconnect to retry syncing it.");
-        window.setTimeout(() => void reconnectFriendChallenge(), 700);
-        return false;
-      }
+      return queueFriendChallengeSync(async (epoch) => {
+        const state = friendChallengeState;
+        const provider = getFriendProvider();
+        if (epoch !== friendChallengeSyncEpoch || !state?.remote || !state.active || !coachGame || !provider) return false;
+        const code = state.code;
+        try {
+          const remote = await provider.saveFriendChallengePosition({
+            ...state,
+            fen: coachGame.fen(),
+            moves: getSyncedFriendMoves([signal]),
+            status,
+            moveApplied: false
+          });
+          if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) applyRemoteFriendChallenge(remote, false);
+          return true;
+        } catch (error) {
+          if (epoch === friendChallengeSyncEpoch) {
+            setFriendChallengeStatus(error?.message || "Game action saved locally. Reconnect to retry syncing it.");
+            window.setTimeout(() => void reconnectFriendChallenge(), 700);
+          }
+          return false;
+        }
+      });
     }
 
     function finishFriendGame(message, signal = "") {
@@ -35309,6 +35345,7 @@
     function returnFriendLobby() {
       void syncRealtimeMatchPresence(false);
       stopRealtimeMatchLifecycle();
+      invalidateFriendChallengeSync();
       coachPremove = null;
       coachSelected = "";
       coachLegalMoves = [];
@@ -35731,11 +35768,22 @@
 
     function ensureTournamentRealtime(provider = getTournamentProvider()) {
       if (tournamentRuntime.unsubscribe || tournamentRuntime.subscribing || !provider?.subscribeTournaments) return;
+      const generation = tournamentRuntime.subscriptionGeneration;
       tournamentRuntime.subscribing = true;
-      Promise.resolve(provider.subscribeTournaments(() => void refreshTournamentNetwork(true)))
-        .then((unsubscribe) => { if (typeof unsubscribe === "function") tournamentRuntime.unsubscribe = unsubscribe; })
+      Promise.resolve(provider.subscribeTournaments(() => {
+        if (generation === tournamentRuntime.subscriptionGeneration) void refreshTournamentNetwork(true);
+      }))
+        .then((unsubscribe) => {
+          if (generation !== tournamentRuntime.subscriptionGeneration) {
+            try { unsubscribe?.(); } catch {}
+            return;
+          }
+          if (typeof unsubscribe === "function") tournamentRuntime.unsubscribe = unsubscribe;
+        })
         .catch(() => {})
-        .finally(() => { tournamentRuntime.subscribing = false; });
+        .finally(() => {
+          if (generation === tournamentRuntime.subscriptionGeneration) tournamentRuntime.subscribing = false;
+        });
     }
 
     async function openTournament(code) {
@@ -35874,6 +35922,7 @@
         setSelectedTournament(result);
         friendChallengeState = { ...state, active: false, pending: false, status: "completed", tournamentResultReported: true };
         saveFriendChallengeState(friendChallengeState);
+        void refreshServerAuthoritativeProfile();
         await refreshTournamentNetwork(true);
         returnToTournamentLobby(result);
       } catch {
@@ -35887,6 +35936,7 @@
       window.clearInterval(friendNetworkTimer);
       friendNetworkTimer = 0;
       friendNetworkRequest += 1;
+      friendNetworkSubscriptionGeneration += 1;
       friendNetworkRefreshPromise = null;
       try { friendNetworkUnsubscribe?.(); } catch {}
       friendNetworkUnsubscribe = null;
@@ -35898,10 +35948,12 @@
       const state = friendChallengeState;
       const provider = getFriendProvider();
       if (!state?.remote || !state.active || state.status !== "active" || !provider?.touchFriendChallengePresence) return;
+      const epoch = friendChallengeSyncEpoch;
+      const code = state.code;
       realtimeMatchHeartbeatInFlight = true;
       try {
         const remote = await provider.touchFriendChallengePresence(state.code, connected);
-        if (remote) applyRemoteFriendChallenge(remote, false);
+        if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) applyRemoteFriendChallenge(remote, false);
         if (state.tournamentCode && provider.touchTournamentPresence) await provider.touchTournamentPresence(state.tournamentCode, connected);
       } catch {
         // Presence is retried by the next heartbeat; a failed pulse never changes a local game result.
@@ -35931,6 +35983,7 @@
       window.clearTimeout(tournamentRuntime.launchTimer);
       tournamentRuntime.timer = 0;
       tournamentRuntime.launchTimer = 0;
+      tournamentRuntime.subscriptionGeneration += 1;
       tournamentRuntime.refreshPromise = null;
       try { tournamentRuntime.unsubscribe?.(); } catch {}
       tournamentRuntime.unsubscribe = null;
@@ -38577,7 +38630,7 @@
       };
     }
 
-    function applySupabaseProfileData(account) {
+    function applySupabaseProfileData(account, { preferRemote = false } = {}) {
       if (!account?.profileData) return false;
       const remote = normalizeSupabaseProfileData(account.profileData);
       const remoteScore = (Number(remote.xp) || 0) + (Number(remote.coins) || 0) + (Number(remote.wins) || 0) + (Number(remote.losses) || 0) + (Number(remote.draws) || 0) + remote.friends.friends.length;
@@ -38587,7 +38640,7 @@
       const localSavedAt = Date.parse(readJsonStorage(progressAutosaveStorageKey, {})?.savedAt || "") || 0;
       const remoteSavedAt = Date.parse(remote.updatedAt || "") || 0;
       if (!remoteScore && localScore) return false;
-      if (localScore && localSavedAt > remoteSavedAt) return false;
+      if (!preferRemote && localScore && localSavedAt > remoteSavedAt) return false;
 
       puzzleXp = Math.max(0, Number(remote.xp) || 0);
       puzzleCoins = Math.max(0, Number(remote.coins) || 0);
@@ -38614,11 +38667,34 @@
       queueSupabaseProfileSync();
     }
 
+    let serverProfileRefreshPromise = null;
+
+    async function refreshServerAuthoritativeProfile() {
+      const provider = getAuthProvider();
+      if (!provider?.getSession) return null;
+      if (serverProfileRefreshPromise) return serverProfileRefreshPromise;
+      serverProfileRefreshPromise = Promise.resolve(provider.getSession())
+        .then((account) => {
+          if (!account) return null;
+          applySupabaseProfileData(account, { preferRemote: true });
+          cloudProfileSignature = "";
+          renderLearnerProfile();
+          renderHomeDashboard();
+          renderInGamePlayerCard();
+          updateAiPlayerHeader();
+          return account;
+        })
+        .catch(() => null)
+        .finally(() => { serverProfileRefreshPromise = null; });
+      return serverProfileRefreshPromise;
+    }
+
     function queueSupabaseProfileSync() {
       const provider = getAuthProvider();
-      if (!cloudProfileReady || !provider?.saveProfile || !provider.getCachedAccount?.()?.publicId) return;
+      if (!cloudProfileReady || !provider?.saveProfile || !provider.getCachedAccount?.()?.publicId || friendChallengeState?.remote) return;
       window.clearTimeout(cloudProfileSyncTimer);
       cloudProfileSyncTimer = window.setTimeout(async () => {
+        if (friendChallengeState?.remote) return;
         const payload = getCloudProfilePayload();
         const signature = JSON.stringify(payload);
         if (signature === cloudProfileSignature) return;

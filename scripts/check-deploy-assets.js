@@ -6,10 +6,7 @@ const indexPath = path.join(siteDir, "index.html");
 const html = fs.readFileSync(indexPath, "utf8");
 const required = [
   "index.html",
-  "verified-puzzles.js",
-  "assets/kingnorbert-coach.png",
-  "vendor/stockfish/stockfish-lite.js",
-  "vendor/stockfish/stockfish-nnue-16-single.wasm"
+  "assets/kingnorbert-coach.png"
 ];
 
 const refs = new Set(required);
