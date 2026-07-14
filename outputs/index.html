@@ -17006,6 +17006,7 @@
                   <small data-auth-error="confirmPassword">Passwords must match.</small>
                 </label>
                 <button class="button" type="submit">Create Secure Account</button>
+                <button class="button secondary" type="button" id="authResendConfirmation" hidden>Resend confirmation email</button>
               </form>
               <form class="auth-form" id="authLoginForm" data-auth-guest hidden novalidate>
                 <label class="auth-field" for="authLoginEmail">Email
@@ -24466,7 +24467,6 @@
     const authRegistryStorageKey = "checkmateQuest.authRegistry.demo.v1";
     const authPreferencesStorageKey = "checkmateQuest.authPreferences.v1";
     const authThrottleStorageKey = "checkmateQuest.authThrottle.v1";
-    const authEmailCooldownStorageKey = "checkmateQuest.authEmailCooldown.v1";
     const dragonProfileStorageKey = "checkmateQuest.dragonProfile.v1";
     const friendChallengeStorageKey = "checkmateQuest.friendChallenge.v1";
     const friendDirectoryStorageKey = "checkmateQuest.friends.v1";
@@ -33829,15 +33829,25 @@
     }
 
     function readFriendDirectoryState() {
-      const fallback = { lastSearch: "" };
+      const fallback = { lastSearch: "", friends: [], outgoing: [], incoming: [] };
       const saved = readJsonStorage(friendDirectoryStorageKey, fallback);
       return {
-        lastSearch: String(saved?.lastSearch || "")
+        lastSearch: String(saved?.lastSearch || ""),
+        friends: Array.isArray(saved?.friends) ? saved.friends : [],
+        outgoing: Array.isArray(saved?.outgoing) ? saved.outgoing : [],
+        incoming: Array.isArray(saved?.incoming) ? saved.incoming : []
       };
     }
 
     function saveFriendDirectoryState(next) {
-      writeJsonStorage(friendDirectoryStorageKey, { lastSearch: String(next.lastSearch || "") });
+      const current = readFriendDirectoryState();
+      const source = next && typeof next === "object" ? next : {};
+      writeJsonStorage(friendDirectoryStorageKey, {
+        lastSearch: String(source.lastSearch ?? current.lastSearch ?? ""),
+        friends: Array.isArray(source.friends) ? source.friends : current.friends,
+        outgoing: Array.isArray(source.outgoing) ? source.outgoing : current.outgoing,
+        incoming: Array.isArray(source.incoming) ? source.incoming : current.incoming
+      });
       renderFriendDirectory();
     }
 
@@ -35630,6 +35640,33 @@
 
     const legacySupabaseAuthStorageKeys = ["checkmateQuest.supabaseSession.v1", "checkmateQuest.supabaseSignedOut.v1"];
 
+    // Supabase rows created before newer profile fields existed can be partial.
+    // Normalize them once at the boundary so UI code always receives the same shape.
+    function normalizeSupabaseProfileData(profile = {}) {
+      const source = profile && typeof profile === "object" ? profile : {};
+      const friendSource = source.friends && typeof source.friends === "object" && !Array.isArray(source.friends) ? source.friends : {};
+      return {
+        ...source,
+        avatar: String(source.avatar || "auto"),
+        rating: Math.max(400, Number(source.rating) || 450),
+        coins: Math.max(0, Number(source.coins) || 0),
+        xp: Math.max(0, Number(source.xp) || 0),
+        wins: Math.max(0, Number(source.wins) || 0),
+        losses: Math.max(0, Number(source.losses) || 0),
+        draws: Math.max(0, Number(source.draws) || 0),
+        title: String(source.title || ""),
+        friends: {
+          friends: Array.isArray(friendSource.friends) ? friendSource.friends : (Array.isArray(source.friends) ? source.friends : []),
+          outgoing: Array.isArray(friendSource.outgoing) ? friendSource.outgoing : [],
+          incoming: Array.isArray(friendSource.incoming) ? friendSource.incoming : []
+        },
+        requests: Array.isArray(source.requests) ? source.requests : [],
+        inventory: Array.isArray(source.inventory) ? source.inventory : [],
+        achievements: Array.isArray(source.achievements) ? source.achievements : [],
+        updatedAt: String(source.updatedAt || source.updated_at || "")
+      };
+    }
+
     function createSupabaseAuthProvider(baseProvider = null) {
       const host = String(location.hostname || "").toLowerCase();
       if (location.protocol !== "https:" || host.endsWith(".github.io")) return baseProvider;
@@ -35644,19 +35681,14 @@
         } catch {}
       };
 
-      const emailCooldownKey = (kind, email) => `${kind}:${normalizeAuthEmail(email)}`;
-      const getEmailCooldownSeconds = (kind, email) => {
-        const until = Number(readJsonStorage(authEmailCooldownStorageKey, {})[emailCooldownKey(kind, email)] || 0);
-        return Math.max(0, Math.ceil((until - Date.now()) / 1000));
-      };
-      const setEmailCooldown = (kind, email, seconds = 60) => {
-        const saved = readJsonStorage(authEmailCooldownStorageKey, {});
-        writeJsonStorage(authEmailCooldownStorageKey, { ...saved, [emailCooldownKey(kind, email)]: Date.now() + seconds * 1000 });
-      };
-      const emailError = (kind, email, error) => {
-        if (!/rate limit|too many requests|over_email_send_rate_limit/i.test(String(error?.message || error?.code || ""))) return error;
-        setEmailCooldown(kind, email, 90);
-        return new Error(`Email service is cooling down. Please wait 90 seconds before requesting another ${kind === "reset" ? "reset link" : "confirmation email"}.`);
+      const emailError = (error) => {
+        const status = Number(error?.status || error?.statusCode || error?.response?.status || 0);
+        if (status !== 429 && !/rate limit|too many requests|over_email_send_rate_limit/i.test(String(error?.message || error?.code || ""))) return error;
+        const serverError = new Error(error?.message || "Email service is temporarily rate limited.");
+        serverError.code = "AUTH_EMAIL_RATE_LIMIT";
+        serverError.status = status || 429;
+        serverError.retryAfterMs = getAuthServerRetryMs(error);
+        return serverError;
       };
 
       const clearSupabaseBrowserAuthStorage = () => {
@@ -35779,7 +35811,7 @@
           username: normalizeAuthUsername(user?.user_metadata?.username) || `player_${String(user?.id || "").replace(/-/g, "").slice(0, 12)}`,
           email: normalizeAuthEmail(user?.email),
           joinDate: user?.created_at || "",
-          profileData: null
+          profileData: normalizeSupabaseProfileData()
         };
         if (!user?.id) return fallback;
         try {
@@ -35792,18 +35824,7 @@
             publicId: String(profile.public_id || fallback.publicId),
             username: normalizeAuthUsername(profile.username) || fallback.username,
             joinDate: profile.created_at || fallback.joinDate,
-            profileData: {
-              avatar: String(profile.avatar || "auto"),
-              rating: Number(profile.rating) || 450,
-              coins: Math.max(0, Number(profile.coins) || 0),
-              xp: Math.max(0, Number(profile.xp) || 0),
-              wins: Math.max(0, Number(profile.wins) || 0),
-              losses: Math.max(0, Number(profile.losses) || 0),
-              draws: Math.max(0, Number(profile.draws) || 0),
-              title: String(profile.title || ""),
-              friends: profile.friends && typeof profile.friends === "object" ? profile.friends : { friends: [] },
-              updatedAt: String(profile.updated_at || "")
-            }
+            profileData: normalizeSupabaseProfileData(profile)
           } : fallback;
         } catch {
           return fallback;
@@ -35874,7 +35895,7 @@
             losses: Math.max(0, Number(profileData.losses) || 0),
             draws: Math.max(0, Number(profileData.draws) || 0),
             title: String(profileData.title || "").slice(0, 48),
-            friends: profileData.friends && typeof profileData.friends === "object" ? profileData.friends : { friends: [] },
+            friends: normalizeSupabaseProfileData(profileData).friends,
             last_login_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
@@ -35886,18 +35907,7 @@
           const saved = Array.isArray(rows) ? rows[0] : null;
           cachedAccount = {
             ...account,
-            profileData: saved ? {
-              avatar: String(saved.avatar || row.avatar),
-              rating: Number(saved.rating) || row.rating,
-              coins: Math.max(0, Number(saved.coins) || row.coins),
-              xp: Math.max(0, Number(saved.xp) || row.xp),
-              wins: Math.max(0, Number(saved.wins) || row.wins),
-              losses: Math.max(0, Number(saved.losses) || row.losses),
-              draws: Math.max(0, Number(saved.draws) || row.draws),
-              title: String(saved.title || row.title),
-              friends: saved.friends && typeof saved.friends === "object" ? saved.friends : row.friends,
-              updatedAt: String(saved.updated_at || row.updated_at)
-            } : row
+            profileData: normalizeSupabaseProfileData(saved ? { ...row, ...saved } : row)
           };
           return cachedAccount;
         },
@@ -35910,17 +35920,14 @@
           }
         },
         emailExists: async () => false,
-        emailCooldownSeconds: getEmailCooldownSeconds,
         register: async ({ username, email, password }) => {
-          const cooldown = getEmailCooldownSeconds("verify", email);
-          if (cooldown) throw new Error(`Please wait ${cooldown}s before requesting another confirmation email.`);
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
           const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: getAuthRedirectUrl() } });
-          if (error) throw emailError("verify", email, error);
-          if (!payload.user || payload.user.identities?.length === 0) throw new Error("That email already has a Player Pass.");
-          const account = await getProfile(payload.user);
-          if (!payload.session) setEmailCooldown("verify", email);
+          if (error) throw emailError(error);
+          const user = payload?.user || null;
+          if (!user || (Array.isArray(user.identities) && user.identities.length === 0)) throw new Error("That email already has a Player Pass.");
+          const account = await getProfile(user);
           if (payload.session) await accountFromSession(payload.session);
           return { ...account, requiresEmailConfirmation: !payload.session };
         },
@@ -35932,12 +35939,14 @@
           return accountFromSession(data.session);
         },
         resetPassword: async (email) => {
-          const cooldown = getEmailCooldownSeconds("reset", email);
-          if (cooldown) throw new Error(`Please wait ${cooldown}s before requesting another reset link.`);
           const supabase = await getSupabaseClient();
           const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: getAuthRedirectUrl() });
-          if (error) throw emailError("reset", email, error);
-          setEmailCooldown("reset", email);
+          if (error) throw emailError(error);
+        },
+        resendConfirmation: async (email) => {
+          const supabase = await getSupabaseClient();
+          const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: getAuthRedirectUrl() } });
+          if (error) throw emailError(error);
         },
         logout: async () => {
           const supabase = await getSupabaseClient();
@@ -36094,7 +36103,7 @@
     function getAvailableLocalUsername(email, registry = readAuthRegistry()) {
       const profileName = normalizeAuthUsername(readLearnerProfile().name);
       const emailName = normalizeAuthEmail(email).split("@")[0] || "Player";
-      const cleanBase = (profileName || emailName).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 20);
+      const cleanBase = String(profileName || emailName || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 20);
       const base = cleanBase.length >= 3 ? cleanBase : `Player${cleanBase}`.slice(0, 20);
       const taken = new Set(registry.accounts.map((account) => String(account.username || "").toLowerCase()));
       let candidate = base;
@@ -36193,6 +36202,45 @@
       status.textContent = message;
       status.classList.toggle("is-error", type === "error");
       status.classList.toggle("is-success", type === "success");
+    }
+
+    const authEmailRetryUntil = { verify: 0, reset: 0 };
+    const authEmailRetryTimers = { verify: 0, reset: 0 };
+
+    function getAuthServerRetryMs(error = {}) {
+      const direct = Number(error?.retryAfterMs || 0);
+      if (direct > 0) return direct;
+      const header = error?.response?.headers?.get?.("retry-after") || error?.headers?.get?.("retry-after");
+      const values = [error?.retry_after, error?.retryAfter, error?.details?.retry_after, error?.data?.retry_after, header];
+      for (const value of values) {
+        const seconds = Number(value);
+        if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds * 1000);
+        const date = Date.parse(String(value || ""));
+        if (Number.isFinite(date) && date > Date.now()) return date - Date.now();
+      }
+      const match = String(error?.message || "").match(/(?:wait|after|try again in)\D{0,24}(\d+)\s*(second|sec|minute|min)/i);
+      if (!match) return 0;
+      return Number(match[1]) * (/min/i.test(match[2]) ? 60000 : 1000);
+    }
+
+    function updateAuthEmailRetryUi(kind) {
+      const remaining = Math.max(0, Math.ceil((authEmailRetryUntil[kind] - Date.now()) / 1000));
+      const button = document.getElementById(kind === "verify" ? "authResendConfirmation" : "authForgotPassword");
+      if (button) {
+        if (!button.dataset.defaultLabel) button.dataset.defaultLabel = button.textContent;
+        button.disabled = remaining > 0;
+        button.textContent = remaining ? `${button.dataset.defaultLabel} (${remaining}s)` : button.dataset.defaultLabel;
+      }
+      window.clearTimeout(authEmailRetryTimers[kind]);
+      if (remaining) authEmailRetryTimers[kind] = window.setTimeout(() => updateAuthEmailRetryUi(kind), Math.min(remaining * 1000, 1000));
+    }
+
+    function applyAuthEmailRetry(kind, error) {
+      const retryMs = getAuthServerRetryMs(error);
+      if (!retryMs) return 0;
+      authEmailRetryUntil[kind] = Date.now() + retryMs;
+      updateAuthEmailRetryUi(kind);
+      return Math.ceil(retryMs / 1000);
     }
 
     let authStateUnsubscribe = null;
@@ -36374,10 +36422,18 @@
       const loginEmail = document.getElementById("authLoginEmail");
       const rememberMe = document.getElementById("authRememberMe");
       const forgotButton = document.getElementById("authForgotPassword");
+      const resendConfirmationButton = document.getElementById("authResendConfirmation");
       const googleButton = document.getElementById("authGoogleLogin");
       const panelLogoutButton = document.getElementById("authPanelLogout");
       const panelLogoutAllButton = document.getElementById("authPanelLogoutAll");
       if (!registerForm || !loginForm) return;
+
+      const showResendConfirmation = (email) => {
+        if (!resendConfirmationButton) return;
+        resendConfirmationButton.dataset.email = normalizeAuthEmail(email);
+        resendConfirmationButton.hidden = false;
+        updateAuthEmailRetryUi("verify");
+      };
 
       const finishLocalLogout = async () => {
         const provider = getAuthProvider();
@@ -36456,6 +36512,7 @@
             if (onlineAccount.requiresEmailConfirmation) {
               writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), rememberEmail: result.email });
               registerForm.reset();
+              showResendConfirmation(result.email);
               setAuthMessage("Check your inbox to confirm your account, then log in to begin.", "success");
               return;
             }
@@ -36472,6 +36529,10 @@
             setAuthMessage("Welcome! Your local Player Pass is ready.", "success");
           }
         } catch (error) {
+          if (error?.code === "AUTH_EMAIL_RATE_LIMIT") {
+            showResendConfirmation(result.email);
+            applyAuthEmailRetry("verify", error);
+          }
           setAuthMessage(error?.message || "Account creation failed. Try again.", "error");
           return;
         }
@@ -36583,7 +36644,24 @@
           await provider.resetPassword(email);
           setAuthMessage("Reset link sent. Check your inbox.", "success");
         } catch (error) {
+          if (error?.code === "AUTH_EMAIL_RATE_LIMIT") applyAuthEmailRetry("reset", error);
           setAuthMessage(error?.message || "The reset link did not send yet. Try again soon.", "error");
+        }
+      });
+
+      resendConfirmationButton?.addEventListener("click", async () => {
+        const email = normalizeAuthEmail(resendConfirmationButton.dataset.email || document.getElementById("authEmail")?.value);
+        const provider = getAuthProvider();
+        if (!email || !provider?.resendConfirmation) {
+          setAuthMessage("Enter your account email, then request a new confirmation link.", "error");
+          return;
+        }
+        try {
+          await provider.resendConfirmation(email);
+          setAuthMessage("Confirmation email sent. Check your inbox.", "success");
+        } catch (error) {
+          if (error?.code === "AUTH_EMAIL_RATE_LIMIT") applyAuthEmailRetry("verify", error);
+          setAuthMessage(error?.message || "The confirmation email did not send yet.", "error");
         }
       });
 
@@ -36664,10 +36742,12 @@
     }
 
     function applySupabaseProfileData(account) {
-      const remote = account?.profileData;
-      if (!remote) return false;
-      const remoteScore = (Number(remote.xp) || 0) + (Number(remote.coins) || 0) + (Number(remote.wins) || 0) + (Number(remote.losses) || 0) + (Number(remote.draws) || 0) + (Array.isArray(remote.friends?.friends) ? remote.friends.friends.length : 0);
-      const localScore = puzzleXp + puzzleCoins + (Number(gameStats.wins) || 0) + Math.max(0, Number(gameStats.played) || 0) + readFriendDirectoryState().friends.length;
+      if (!account?.profileData) return false;
+      const remote = normalizeSupabaseProfileData(account.profileData);
+      const remoteScore = (Number(remote.xp) || 0) + (Number(remote.coins) || 0) + (Number(remote.wins) || 0) + (Number(remote.losses) || 0) + (Number(remote.draws) || 0) + remote.friends.friends.length;
+      const localFriends = readFriendDirectoryState().friends;
+      const localFriendCount = Array.isArray(localFriends) ? localFriends.length : 0;
+      const localScore = puzzleXp + puzzleCoins + (Number(gameStats.wins) || 0) + Math.max(0, Number(gameStats.played) || 0) + localFriendCount;
       const localSavedAt = Date.parse(readJsonStorage(progressAutosaveStorageKey, {})?.savedAt || "") || 0;
       const remoteSavedAt = Date.parse(remote.updatedAt || "") || 0;
       if (!remoteScore && localScore) return false;
@@ -36681,12 +36761,11 @@
       gameStats = { ...gameStats, wins, played: wins + losses + draws, draws };
       const prefs = readLearnerPrefs();
       writeJsonStorage(learnerPrefsStorageKey, { ...prefs, avatar: remote.avatar || prefs.avatar, title: remote.title || prefs.title });
-      const remoteFriends = remote.friends && typeof remote.friends === "object" ? remote.friends : {};
       writeJsonStorage(friendDirectoryStorageKey, {
         ...readFriendDirectoryState(),
-        friends: Array.isArray(remoteFriends.friends) ? remoteFriends.friends : [],
-        outgoing: Array.isArray(remoteFriends.outgoing) ? remoteFriends.outgoing : [],
-        incoming: Array.isArray(remoteFriends.incoming) ? remoteFriends.incoming : []
+        friends: remote.friends.friends,
+        outgoing: remote.friends.outgoing,
+        incoming: remote.friends.incoming
       });
       savePuzzleState();
       return true;
