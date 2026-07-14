@@ -199,6 +199,8 @@ create table if not exists public.game_challenges (
   active_color text not null default 'w' check (active_color in ('w', 'b')),
   turn_started_at timestamptz,
   status text not null default 'pending' check (status in ('pending', 'accepted', 'active', 'declined', 'cancelled', 'expired', 'completed')),
+  result text not null default 'pending' check (result in ('pending', 'white', 'black', 'draw', 'aborted')),
+  termination text not null default '' check (length(termination) <= 48),
   fen text not null default 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' check (length(fen) <= 256),
   moves jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
@@ -213,7 +215,44 @@ alter table public.game_challenges add column if not exists black_ms bigint not 
 alter table public.game_challenges add column if not exists increment_ms integer not null default 0 check (increment_ms >= 0);
 alter table public.game_challenges add column if not exists active_color text not null default 'w' check (active_color in ('w', 'b'));
 alter table public.game_challenges add column if not exists turn_started_at timestamptz;
+alter table public.game_challenges add column if not exists result text not null default 'pending' check (result in ('pending', 'white', 'black', 'draw', 'aborted'));
+alter table public.game_challenges add column if not exists termination text not null default '' check (length(termination) <= 48);
+
+create table if not exists public.game_challenge_messages (
+  id uuid primary key default gen_random_uuid(),
+  challenge_id uuid not null references public.game_challenges(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  body text not null check (length(trim(body)) between 1 and 240),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists game_challenge_messages_timeline_idx on public.game_challenge_messages (challenge_id, created_at desc);
+
+do $$ begin
+  alter publication supabase_realtime add table public.game_challenges;
+exception when duplicate_object or undefined_object then null;
+end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.game_challenge_messages;
+exception when duplicate_object or undefined_object then null;
+end $$;
+
 alter table public.game_challenges enable row level security;
+alter table public.game_challenge_messages enable row level security;
+
+drop policy if exists game_challenges_participant_read on public.game_challenges;
+create policy game_challenges_participant_read on public.game_challenges
+for select to authenticated
+using (auth.uid() in (creator_id, opponent_id));
+
+drop policy if exists game_challenge_messages_participant_read on public.game_challenge_messages;
+create policy game_challenge_messages_participant_read on public.game_challenge_messages
+for select to authenticated
+using (exists (
+  select 1 from public.game_challenges as challenge
+  where challenge.id = game_challenge_messages.challenge_id
+    and auth.uid() in (challenge.creator_id, challenge.opponent_id)
+));
 
 create or replace function public.expire_game_challenges()
 returns void
@@ -229,12 +268,12 @@ as $$
     and updated_at < now() - interval '7 days';
 
   update public.game_challenges
-  set status = 'completed', white_ms = 0, updated_at = now()
+  set status = 'completed', result = 'black', termination = 'timeout', white_ms = 0, updated_at = now()
   where status = 'active' and clock <> 'none' and active_color = 'w' and turn_started_at is not null
     and extract(epoch from now() - turn_started_at) * 1000 >= white_ms;
 
   update public.game_challenges
-  set status = 'completed', black_ms = 0, updated_at = now()
+  set status = 'completed', result = 'white', termination = 'timeout', black_ms = 0, updated_at = now()
   where status = 'active' and clock <> 'none' and active_color = 'b' and turn_started_at is not null
     and extract(epoch from now() - turn_started_at) * 1000 >= black_ms;
 $$;
@@ -286,8 +325,27 @@ as $$
       'serverNow', now()
     ),
     'status', challenge.status,
+    'result', challenge.result,
+    'termination', challenge.termination,
     'fen', challenge.fen,
     'moves', challenge.moves,
+    'messages', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', note.id,
+        'userId', note.user_id,
+        'username', coalesce(author.username, 'Player'),
+        'body', note.body,
+        'createdAt', note.created_at
+      ) order by note.created_at asc)
+      from (
+        select message.*
+        from public.game_challenge_messages as message
+        where message.challenge_id = challenge.id
+        order by message.created_at desc
+        limit 50
+      ) as note
+      left join public.profiles as author on author.id = note.user_id
+    ), '[]'::jsonb),
     'updatedAt', challenge.updated_at,
     'expiresAt', challenge.expires_at
   )
@@ -406,6 +464,9 @@ declare
   active_user_id uuid;
   elapsed_ms bigint;
   remaining_ms bigint;
+  result_signal text;
+  completion_result text := 'aborted';
+  completion_termination text := 'ended';
 begin
   if current_user_id is null then raise exception 'Sign in to save a friend game'; end if;
   perform public.expire_game_challenges();
@@ -432,7 +493,7 @@ begin
       end;
       if remaining_ms = 0 then
         update public.game_challenges
-        set status = 'completed',
+        set status = 'completed', result = case when found.active_color = 'w' then 'black' else 'white' end, termination = 'timeout',
             white_ms = case when found.active_color = 'w' then 0 else white_ms end,
             black_ms = case when found.active_color = 'b' then 0 else black_ms end,
             updated_at = now()
@@ -459,10 +520,56 @@ begin
     end if;
   end if;
 
+  select item.value into result_signal
+  from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) with ordinality as item(value, ordinal)
+  where item.value like '__result:%'
+  order by item.ordinal desc
+  limit 1;
+
+  if p_status = 'completed' then
+    if exists (select 1 from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) as item(value) where item.value = '__abort') then
+      completion_result := 'aborted'; completion_termination := 'aborted';
+    elsif exists (select 1 from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) as item(value) where item.value = '__draw_accept') then
+      completion_result := 'draw'; completion_termination := 'draw agreement';
+    elsif exists (select 1 from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) as item(value) where item.value = '__resign:w') then
+      completion_result := 'black'; completion_termination := 'resignation';
+    elsif exists (select 1 from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) as item(value) where item.value = '__resign:b') then
+      completion_result := 'white'; completion_termination := 'resignation';
+    elsif result_signal ~ '^__result:(white|black|draw|aborted):[a-z_]+$' then
+      completion_result := split_part(result_signal, ':', 2);
+      completion_termination := replace(split_part(result_signal, ':', 3), '_', ' ');
+    end if;
+  end if;
+
   update public.game_challenges
-  set fen = p_fen, moves = coalesce(p_moves, '[]'::jsonb), status = case when p_status = 'completed' then 'completed' else 'active' end, updated_at = now()
+  set fen = p_fen,
+      moves = coalesce(p_moves, '[]'::jsonb),
+      status = case when p_status = 'completed' then 'completed' else 'active' end,
+      result = case when p_status = 'completed' then completion_result else result end,
+      termination = case when p_status = 'completed' then completion_termination else termination end,
+      updated_at = now()
   where id = found.id
   returning * into found;
+  return public.challenge_payload(found);
+end;
+$$;
+
+create or replace function public.send_game_challenge_message(p_code text, p_body text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  found public.game_challenges;
+  clean_body text := left(trim(coalesce(p_body, '')), 240);
+begin
+  if current_user_id is null then raise exception 'Sign in to chat'; end if;
+  select * into found from public.game_challenges where code = upper(trim(p_code));
+  if found.id is null or current_user_id not in (found.creator_id, found.opponent_id) then raise exception 'This game is unavailable'; end if;
+  if found.status not in ('active', 'completed') then raise exception 'Chat is available once the game starts'; end if;
+  if length(clean_body) = 0 then raise exception 'Write a short message first'; end if;
+  insert into public.game_challenge_messages (challenge_id, user_id, body) values (found.id, current_user_id, clean_body);
   return public.challenge_payload(found);
 end;
 $$;
@@ -483,12 +590,12 @@ begin
   from public.game_challenges as challenge
   where (challenge.creator_id = current_user_id or challenge.opponent_id = current_user_id)
     and (challenge.status in ('pending', 'accepted', 'active')
-      or (challenge.status = 'declined' and challenge.updated_at > now() - interval '1 day'));
+      or (challenge.status in ('declined', 'completed') and challenge.updated_at > now() - interval '1 day'));
   return result;
 end;
 $$;
 
-revoke all on table public.game_challenges from anon, authenticated;
+revoke all on table public.game_challenges, public.game_challenge_messages from anon, authenticated;
 revoke all on function public.expire_game_challenges() from public;
 revoke all on function public.challenge_payload(public.game_challenges) from public;
 revoke all on function public.search_registered_players(text) from public;
@@ -497,9 +604,11 @@ revoke all on function public.get_game_challenge(text) from public;
 revoke all on function public.respond_game_challenge(text, text) from public;
 revoke all on function public.save_game_challenge_position(text, text, jsonb, text, boolean) from public;
 revoke all on function public.list_game_challenges() from public;
+revoke all on function public.send_game_challenge_message(text, text) from public;
 grant execute on function public.search_registered_players(text) to authenticated;
 grant execute on function public.create_game_challenge(uuid, text, text, text, text, text) to authenticated;
 grant execute on function public.get_game_challenge(text) to authenticated;
 grant execute on function public.respond_game_challenge(text, text) to authenticated;
 grant execute on function public.save_game_challenge_position(text, text, jsonb, text, boolean) to authenticated;
 grant execute on function public.list_game_challenges() to authenticated;
+grant execute on function public.send_game_challenge_message(text, text) to authenticated;
