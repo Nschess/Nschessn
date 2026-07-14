@@ -6052,6 +6052,38 @@
       align-items: start;
     }
 
+    .leaderboard-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 0 0 16px;
+      padding: 10px;
+      border: 1px solid rgba(255, 248, 237, 0.12);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .leaderboard-toolbar button {
+      min-height: 38px;
+      padding: 0 14px;
+      border: 1px solid rgba(255, 248, 237, 0.14);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.18);
+      color: var(--soft);
+      font: inherit;
+      font-weight: 1000;
+      cursor: pointer;
+      transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+    }
+
+    .leaderboard-toolbar button:hover,
+    .leaderboard-toolbar button[aria-pressed="true"] {
+      transform: translateY(-1px);
+      border-color: rgba(231, 182, 93, 0.58);
+      background: linear-gradient(135deg, rgba(231, 182, 93, 0.2), rgba(127, 166, 80, 0.16));
+      color: var(--text);
+    }
+
     .leaderboard-card {
       position: relative;
       overflow: hidden;
@@ -6155,6 +6187,17 @@
     .leaderboard-score small {
       color: var(--muted);
       font-size: 0.68rem;
+      font-weight: 800;
+    }
+
+    .leaderboard-card.is-wide {
+      grid-column: 1 / -1;
+    }
+
+    .leaderboard-status {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
       font-weight: 800;
     }
 
@@ -13747,6 +13790,7 @@
       gap: 12px;
     }
 
+    .real-puzzle-modes,
     .real-puzzle-difficulties,
     .real-puzzle-stats,
     .real-puzzle-actions {
@@ -13754,8 +13798,12 @@
       gap: 8px;
     }
 
-    .real-puzzle-difficulties {
+    .real-puzzle-modes {
       grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .real-puzzle-difficulties {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
     }
 
     .real-puzzle-stats,
@@ -13879,6 +13927,7 @@
         width: min(100%, 480px);
       }
 
+      .real-puzzle-modes,
       .real-puzzle-difficulties,
       .real-puzzle-stats,
       .real-puzzle-actions {
@@ -13891,6 +13940,7 @@
         padding: 12px;
       }
 
+      .real-puzzle-modes,
       .real-puzzle-difficulties,
       .real-puzzle-stats,
       .real-puzzle-actions {
@@ -20093,10 +20143,10 @@
             <div>
               <p class="section-kicker">Real puzzle mode</p>
               <h3 id="realPuzzlesTitle">Real Chess Puzzles</h3>
-              <p>Validated FEN positions with forced solution lines, Easy through Expert.</p>
+              <p>Validated FEN positions with full continuations, hints, retries, replay, and rewards.</p>
             </div>
             <div class="real-puzzle-source">
-              <p id="realPuzzleSource">Open set: verified public puzzle rows plus offline validated FEN pack.</p>
+              <p id="realPuzzleSource">Verified trainer: only legal FENs and legal continuations are playable.</p>
               <span class="badge" id="realPuzzleValidation">Validating</span>
             </div>
           </div>
@@ -20118,12 +20168,20 @@
                 <span class="badge" id="realPuzzleTheme">Tactic</span>
                 <span class="badge" id="realPuzzleTimer">00:00</span>
               </div>
+              <div class="real-puzzle-modes" role="group" aria-label="Puzzle mode">
+                <button class="mission-button" type="button" data-real-mode="Daily" aria-pressed="false">Daily</button>
+                <button class="mission-button" type="button" data-real-mode="Trainer" aria-pressed="true">Trainer</button>
+                <button class="mission-button" type="button" data-real-mode="Rush" aria-pressed="false">Rush</button>
+                <button class="mission-button" type="button" data-real-mode="Streak" aria-pressed="false">Streak</button>
+                <button class="mission-button" type="button" data-real-mode="Battle" aria-pressed="false">Battle</button>
+              </div>
               <div class="real-puzzle-difficulties" role="group" aria-label="Real puzzle difficulty">
                 <button class="mission-button" type="button" data-real-difficulty="All" aria-pressed="true">All</button>
-                <button class="mission-button" type="button" data-real-difficulty="Easy" aria-pressed="false">Easy</button>
-                <button class="mission-button" type="button" data-real-difficulty="Medium" aria-pressed="false">Medium</button>
-                <button class="mission-button" type="button" data-real-difficulty="Hard" aria-pressed="false">Hard</button>
+                <button class="mission-button" type="button" data-real-difficulty="Beginner" aria-pressed="false">Beginner</button>
+                <button class="mission-button" type="button" data-real-difficulty="Intermediate" aria-pressed="false">Intermediate</button>
+                <button class="mission-button" type="button" data-real-difficulty="Advanced" aria-pressed="false">Advanced</button>
                 <button class="mission-button" type="button" data-real-difficulty="Expert" aria-pressed="false">Expert</button>
+                <button class="mission-button" type="button" data-real-difficulty="Master" aria-pressed="false">Master</button>
               </div>
               <label class="real-puzzle-card" for="realPuzzleSelect">
                 <span>Jump to puzzle</span>
@@ -20135,6 +20193,10 @@
                 <div class="real-puzzle-card"><strong id="realPuzzleSolved">0</strong><span>Solved</span></div>
                 <div class="real-puzzle-card"><strong id="realPuzzleCoins">0</strong><span>Coins earned</span></div>
                 <div class="real-puzzle-card"><strong id="realPuzzleBest">--</strong><span>Best time</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleAccuracy">100%</strong><span>Accuracy</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleStreak">0</strong><span>Streak</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleRating">600</strong><span>Puzzle rating</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleRecommend">Mate</strong><span>Recommended</span></div>
               </div>
               <h3 id="realPuzzleTitle">Loading real puzzle</h3>
               <p id="realPuzzlePrompt">Loading validated position.</p>
@@ -23521,7 +23583,11 @@
     const puzzleBankVersion = "stable-verified-primer-v5";
 
     const realPuzzleStorageKey = "checkmateQuest.realPuzzles.v1";
-    const realPuzzleBank = [
+    const realPuzzleCollectionCacheKey = "checkmateQuest.realPuzzleCollection.v1";
+    const realPuzzleDifficultyLevels = ["All", "Beginner", "Intermediate", "Advanced", "Expert", "Master"];
+    const realPuzzleModes = ["Daily", "Trainer", "Rush", "Streak", "Battle"];
+    const realPuzzleDifficultyAliases = { Easy: "Beginner", Medium: "Intermediate", Hard: "Advanced" };
+    let realPuzzleBank = [
       {
         id: "verified-00sHx",
         source: "Verified public puzzle sample, CC0",
@@ -24835,12 +24901,21 @@
     let puzzleAutoNextTimer = 0;
     let puzzleHintDestination = "";
     const savedRealPuzzleState = readRealPuzzleState();
-    let realPuzzleDifficulty = ["All", "Easy", "Medium", "Hard", "Expert"].includes(savedRealPuzzleState.difficulty) ? savedRealPuzzleState.difficulty : "All";
+    let realPuzzleMode = realPuzzleModes.includes(savedRealPuzzleState.mode) ? savedRealPuzzleState.mode : "Trainer";
+    let realPuzzleDifficulty = realPuzzleDifficultyLevels.includes(savedRealPuzzleState.difficulty) ? savedRealPuzzleState.difficulty : "All";
     let realPuzzleIndex = Math.max(0, Math.min(realPuzzleBank.length - 1, Number(savedRealPuzzleState.index) || 0));
     let realPuzzleSolved = new Set(Array.isArray(savedRealPuzzleState.solved) ? savedRealPuzzleState.solved : []);
     let realPuzzleAchievementsUnlocked = new Set(Array.isArray(savedRealPuzzleState.achievements) ? savedRealPuzzleState.achievements : []);
     let realPuzzleBestSeconds = Math.max(0, Number(savedRealPuzzleState.bestSeconds) || 0);
     let realPuzzleCoinsEarned = Math.max(0, Number(savedRealPuzzleState.coinsEarned) || 0);
+    let realPuzzleAttempts = Math.max(0, Number(savedRealPuzzleState.attempts) || 0);
+    let realPuzzleCorrect = Math.max(0, Number(savedRealPuzzleState.correct) || 0);
+    let realPuzzleFailed = Math.max(0, Number(savedRealPuzzleState.failed) || 0);
+    let realPuzzleStreak = Math.max(0, Number(savedRealPuzzleState.streak) || 0);
+    let realPuzzleBestStreak = Math.max(realPuzzleStreak, Number(savedRealPuzzleState.bestStreak) || 0);
+    let realPuzzleRating = Math.max(600, Number(savedRealPuzzleState.rating) || 600);
+    let realPuzzleRatingHistory = Array.isArray(savedRealPuzzleState.ratingHistory) ? savedRealPuzzleState.ratingHistory.slice(-100) : [];
+    let realPuzzleRecentlyPlayed = Array.isArray(savedRealPuzzleState.recentlyPlayed) ? savedRealPuzzleState.recentlyPlayed.slice(-200) : [];
     let realPuzzleGame = null;
     let realPuzzleLine = [];
     let realPuzzleStep = 0;
@@ -24856,6 +24931,8 @@
     let realPuzzleFlipped = false;
     let realPuzzleReplaying = false;
     let realPuzzleValidationErrors = [];
+    let realPuzzleValidIndexes = realPuzzleBank.map((_, index) => index);
+    let realPuzzleAutoNextTimer = 0;
     let streak = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.streak) || 0) : 0;
     let puzzleXp = Math.max(0, Number(savedPuzzleState.xp) || 0);
     let puzzleCoins = Math.max(0, Number(savedPuzzleState.coins) || 0);
@@ -26427,10 +26504,11 @@
 
     function getRealPuzzleDifficultyForPlan(plan = "") {
       const value = String(plan).toLowerCase();
-      if (/expert|boss|mate 3|mate 4|mate 5/.test(value)) return "Expert";
-      if (/advanced|hard|sacrifice/.test(value)) return "Hard";
-      if (/beginner|easy|knight|queen|rookie/.test(value)) return "Easy";
-      return /intermediate|tactic|fork|pin|skewer|opening|endgame|defense/.test(value) ? "Medium" : "All";
+      if (/master|boss|mate 4|mate 5/.test(value)) return "Master";
+      if (/expert|mate 3/.test(value)) return "Expert";
+      if (/advanced|hard|sacrifice/.test(value)) return "Advanced";
+      if (/beginner|easy|knight|queen|rookie/.test(value)) return "Beginner";
+      return /intermediate|tactic|fork|pin|skewer|opening|endgame|defense/.test(value) ? "Intermediate" : "All";
     }
 
     function openRealPuzzleExperience(plan = "All") {
@@ -36157,28 +36235,77 @@
 
 
     function readRealPuzzleState() {
-      const fallback = { index: 0, difficulty: "All", solved: [], achievements: [], bestSeconds: 0, coinsEarned: 0 };
+      const fallback = {
+        index: 0,
+        mode: "Trainer",
+        difficulty: "All",
+        solved: [],
+        achievements: [],
+        bestSeconds: 0,
+        coinsEarned: 0,
+        attempts: 0,
+        correct: 0,
+        failed: 0,
+        streak: 0,
+        bestStreak: 0,
+        rating: 600,
+        ratingHistory: [],
+        recentlyPlayed: []
+      };
       const state = readJsonStorage(realPuzzleStorageKey, fallback);
+      if (state && typeof state === "object" && realPuzzleDifficultyAliases[state.difficulty]) state.difficulty = realPuzzleDifficultyAliases[state.difficulty];
       return state && typeof state === "object" ? { ...fallback, ...state } : fallback;
     }
 
     function saveRealPuzzleState() {
       writeJsonStorage(realPuzzleStorageKey, {
         index: realPuzzleIndex,
+        mode: realPuzzleMode,
         difficulty: realPuzzleDifficulty,
         solved: [...realPuzzleSolved],
         achievements: [...realPuzzleAchievementsUnlocked],
         bestSeconds: realPuzzleBestSeconds,
-        coinsEarned: realPuzzleCoinsEarned
+        coinsEarned: realPuzzleCoinsEarned,
+        attempts: realPuzzleAttempts,
+        correct: realPuzzleCorrect,
+        failed: realPuzzleFailed,
+        streak: realPuzzleStreak,
+        bestStreak: realPuzzleBestStreak,
+        rating: realPuzzleRating,
+        ratingHistory: realPuzzleRatingHistory.slice(-100),
+        recentlyPlayed: realPuzzleRecentlyPlayed.slice(-200)
       });
       saveProgressSnapshot("real puzzles");
     }
 
+    function getRealPuzzleDifficulty(puzzle) {
+      return realPuzzleDifficultyAliases[puzzle?.difficulty] || puzzle?.difficulty || "Beginner";
+    }
+
+    function getRealPuzzleThemes(puzzle) {
+      return Array.isArray(puzzle?.themes) && puzzle.themes.length ? puzzle.themes : [puzzle?.theme || "Tactic"];
+    }
+
+    function getRealPuzzleKey(puzzle) {
+      return `${String(puzzle?.fen || "").split(/\s+/).slice(0, 4).join(" ")}|${(puzzle?.moves || []).join(" ")}`;
+    }
+
+    function getRealDailyIndex(indexes = getRealPuzzleIndexes()) {
+      if (!indexes.length) return 0;
+      const daySeed = Math.floor(Date.now() / 86400000);
+      return indexes[daySeed % indexes.length];
+    }
+
     function getRealPuzzleIndexes() {
-      const indexes = realPuzzleBank
-        .map((puzzle, index) => realPuzzleDifficulty === "All" || puzzle.difficulty === realPuzzleDifficulty ? index : -1)
+      const sourceIndexes = realPuzzleValidIndexes.length ? realPuzzleValidIndexes : (realPuzzleValidationErrors.length ? [] : realPuzzleBank.map((_, index) => index));
+      const indexes = sourceIndexes
+        .map((index) => {
+          const puzzle = realPuzzleBank[index];
+          return realPuzzleDifficulty === "All" || getRealPuzzleDifficulty(puzzle) === realPuzzleDifficulty ? index : -1;
+        })
         .filter((index) => index >= 0);
-      return indexes.length ? indexes : realPuzzleBank.map((_, index) => index);
+      if (realPuzzleMode === "Daily") return [getRealDailyIndex(indexes)];
+      return indexes.length ? indexes : sourceIndexes;
     }
 
     function getRealPuzzlePositionLabel() {
@@ -36199,7 +36326,7 @@
 
     function prepareRealPuzzle(puzzle = realPuzzleBank[realPuzzleIndex]) {
       const game = new CoachChess(puzzle.fen);
-      const line = [...puzzle.moves];
+      const line = Array.isArray(puzzle.moves) ? [...puzzle.moves] : [];
       if (puzzle.primer) {
         const primer = line.shift();
         const primerMove = findRealUciMove(game, primer);
@@ -36211,51 +36338,213 @@
 
     function validateRealPuzzleBank() {
       if (!CoachChess) return [];
-      return realPuzzleBank.flatMap((puzzle) => {
+      const errors = [];
+      const seen = new Set();
+      realPuzzleValidIndexes = [];
+      realPuzzleBank.forEach((puzzle, index) => {
         try {
+          if (!puzzle || typeof puzzle !== "object") throw new Error("bad puzzle object");
+          if (!puzzle.id || !puzzle.fen || !Array.isArray(puzzle.moves)) throw new Error("missing id, FEN, or move line");
+          const key = getRealPuzzleKey(puzzle);
+          if (seen.has(key)) throw new Error("duplicate FEN/line");
+          seen.add(key);
           const prepared = prepareRealPuzzle(puzzle);
           const testGame = prepared.game;
+          if (!prepared.line.length) throw new Error("empty continuation");
           for (const uci of prepared.line) {
             const move = findRealUciMove(testGame, uci);
-            if (!move) return [`${puzzle.title}: illegal ${uci}`];
+            if (!move) throw new Error(`illegal ${uci}`);
             testGame.move(toCoachMoveInput(move));
           }
-          return [];
+          if (prepared.line.length === 1 && !callCoachRule(testGame, "isCheckmate", "in_checkmate")) {
+            throw new Error("one-move non-mate needs a continuation");
+          }
+          realPuzzleValidIndexes.push(index);
         } catch (error) {
-          return [`${puzzle.title}: ${error.message}`];
+          errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: ${error.message}`);
         }
       });
+      return errors;
+    }
+
+    function normalizeRealPuzzleRecord(item, index = 0, source = "External verified JSON") {
+      if (!item || typeof item !== "object") return null;
+      const moves = Array.isArray(item.moves) ? item.moves : Array.isArray(item.line) ? item.line : [];
+      const difficulty = realPuzzleDifficultyAliases[item.difficulty] || item.difficulty || (
+        Number(item.rating) >= 2400 ? "Master" :
+        Number(item.rating) >= 1900 ? "Expert" :
+        Number(item.rating) >= 1400 ? "Advanced" :
+        Number(item.rating) >= 950 ? "Intermediate" : "Beginner"
+      );
+      return {
+        id: String(item.id || `external-${index + 1}`),
+        source: item.source || source,
+        difficulty,
+        rating: Math.max(600, Math.min(3000, Number(item.rating) || 900)),
+        theme: item.theme || (Array.isArray(item.themes) ? item.themes[0] : "Tactic") || "Tactic",
+        themes: getRealPuzzleThemes(item),
+        title: item.title || `Puzzle ${index + 1}`,
+        prompt: item.prompt || `${item.side || "Find the best move"} and follow the full continuation.`,
+        fen: item.fen,
+        moves,
+        primer: Boolean(item.primer),
+        hints: Array.isArray(item.hints) && item.hints.length ? item.hints.slice(0, 3) : ["Find forcing moves.", "Check, capture, threat.", `Line starts: ${moves[0] || "best move"}.`],
+        note: item.note || item.explanation || "Full continuation verified before loading."
+      };
+    }
+
+    async function loadRealPuzzleCollection() {
+      const cached = readJsonStorage(realPuzzleCollectionCacheKey, null);
+      const install = (items, source) => {
+        if (!Array.isArray(items) || !items.length) return false;
+        const normalized = items.map((item, index) => normalizeRealPuzzleRecord(item, index, source)).filter(Boolean);
+        const existing = new Set(realPuzzleBank.map(getRealPuzzleKey));
+        const fresh = normalized.filter((puzzle) => {
+          const key = getRealPuzzleKey(puzzle);
+          if (!puzzle.fen || !puzzle.moves.length || existing.has(key)) return false;
+          existing.add(key);
+          return true;
+        });
+        if (!fresh.length) return false;
+        realPuzzleBank = [...realPuzzleBank, ...fresh];
+        return true;
+      };
+      if (cached?.version === puzzleBankVersion) install(cached.puzzles, "Cached verified JSON");
+      try {
+        const response = await fetch("assets/puzzles.json", { cache: "force-cache" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const items = Array.isArray(payload) ? payload : payload.puzzles;
+        if (install(items, payload.source || "Verified JSON collection")) {
+          writeJsonStorage(realPuzzleCollectionCacheKey, { version: puzzleBankVersion, puzzles: items });
+        }
+      } catch {
+        // Offline-first: the built-in seed bank remains playable.
+      }
+    }
+
+    function normalizeLegacyPuzzleForReal(puzzle, index = 0) {
+      if (!CoachChess || !validatePuzzleLine(puzzle).ok) return null;
+      try {
+        const game = new CoachChess(getPuzzleFen(puzzle));
+        const moves = [];
+        for (const notation of getPuzzleLine(puzzle)) {
+          const move = findPuzzleMoveInGame(game, notation);
+          if (!move) return null;
+          game.move(toCoachMoveInput(move));
+          moves.push(moveToUci(move));
+        }
+        const rating = Math.max(600, Math.min(3000, Number(puzzle.rating) || 900));
+        const theme = getPuzzlePattern(puzzle);
+        const difficulty = rating >= 2400 ? "Master" : realPuzzleDifficultyAliases[puzzle.difficulty] || puzzle.difficulty || normalizePuzzleLevel(rating, "Beginner");
+        return {
+          id: `essentials-${puzzle.id || index + 1}`,
+          source: "Local validated essentials pack",
+          difficulty,
+          rating,
+          theme,
+          themes: Array.isArray(puzzle.themes) && puzzle.themes.length ? puzzle.themes : [theme],
+          title: puzzle.title || `Essentials Puzzle ${index + 1}`,
+          prompt: puzzle.prompt || "Find the forcing move and follow the continuation.",
+          fen: getPuzzleFen(puzzle),
+          moves,
+          hints: [
+            puzzle.hint || `Theme: ${theme}.`,
+            `Candidate move starts from ${moves[0]?.slice(0, 2) || "the active piece"}.`,
+            `Destination: ${moves[0]?.slice(2, 4) || "best square"}.`
+          ],
+          note: puzzle.feedback || "This line passed the chess.js legal-move validator."
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    function installLegacyRealPuzzlePack() {
+      if (!Array.isArray(puzzles) || !puzzles.length) return 0;
+      const existing = new Set(realPuzzleBank.map(getRealPuzzleKey));
+      const additions = [];
+      puzzles.forEach((puzzle, index) => {
+        const converted = normalizeLegacyPuzzleForReal(puzzle, index);
+        if (!converted) return;
+        const key = getRealPuzzleKey(converted);
+        if (existing.has(key)) return;
+        existing.add(key);
+        additions.push(converted);
+      });
+      if (additions.length) realPuzzleBank = [...realPuzzleBank, ...additions];
+      return additions.length;
     }
 
     function getRealPuzzleReward(puzzle, seconds) {
       const base = {
-        Easy: { xp: 10, coins: 4 },
-        Medium: { xp: 16, coins: 7 },
-        Hard: { xp: 22, coins: 10 },
-        Expert: { xp: 30, coins: 14 }
-      }[puzzle.difficulty] || { xp: 12, coins: 5 };
+        Beginner: { xp: 10, coins: 4 },
+        Intermediate: { xp: 16, coins: 7 },
+        Advanced: { xp: 22, coins: 10 },
+        Expert: { xp: 30, coins: 14 },
+        Master: { xp: 42, coins: 20 }
+      }[getRealPuzzleDifficulty(puzzle)] || { xp: 12, coins: 5 };
       const speedBonus = seconds && seconds <= 30 ? 2 : 0;
       const hintPenalty = Math.min(realPuzzleHintStep, 2);
       return {
         xp: Math.max(4, base.xp - hintPenalty * 2 + speedBonus),
         coins: Math.max(1, base.coins - hintPenalty + speedBonus),
-        stars: puzzle.difficulty === "Expert" ? 2 : 1,
-        keys: puzzle.difficulty === "Expert" ? 1 : 0
+        stars: ["Expert", "Master"].includes(getRealPuzzleDifficulty(puzzle)) ? 2 : 1,
+        keys: getRealPuzzleDifficulty(puzzle) === "Master" ? 1 : 0
       };
+    }
+
+    function getRealPuzzleAccuracy() {
+      return realPuzzleAttempts ? Math.round((realPuzzleCorrect / realPuzzleAttempts) * 100) : 100;
+    }
+
+    function getRealPuzzleRecommendation() {
+      const solvedThemes = new Map();
+      realPuzzleBank.forEach((puzzle) => {
+        if (!realPuzzleSolved.has(puzzle.id)) return;
+        getRealPuzzleThemes(puzzle).forEach((theme) => solvedThemes.set(theme, (solvedThemes.get(theme) || 0) + 1));
+      });
+      const unsolved = realPuzzleValidIndexes.map((index) => realPuzzleBank[index]).filter((puzzle) => !realPuzzleSolved.has(puzzle.id));
+      const pick = unsolved.sort((a, b) => (solvedThemes.get(a.theme) || 0) - (solvedThemes.get(b.theme) || 0))[0];
+      return pick?.theme || "Tactics";
+    }
+
+    function updateRealPuzzleRating(delta) {
+      realPuzzleRating = Math.max(600, Math.min(3000, realPuzzleRating + delta));
+      realPuzzleRatingHistory = [...realPuzzleRatingHistory, {
+        at: new Date().toISOString(),
+        rating: realPuzzleRating,
+        puzzle: realPuzzleBank[realPuzzleIndex]?.id || "real-puzzle"
+      }].slice(-100);
+    }
+
+    function recordRealPuzzleVisit(puzzle) {
+      if (!puzzle?.id) return;
+      realPuzzleRecentlyPlayed = [...realPuzzleRecentlyPlayed.filter((id) => id !== puzzle.id), puzzle.id].slice(-200);
+    }
+
+    function autoAdvanceRealPuzzleIfNeeded() {
+      window.clearTimeout(realPuzzleAutoNextTimer);
+      if (!["Rush", "Streak", "Battle"].includes(realPuzzleMode)) return;
+      realPuzzleAutoNextTimer = window.setTimeout(() => {
+        realPuzzleIndex = realPuzzleMode === "Streak" ? chooseNextUnsolvedRealPuzzle() : chooseRandomRealPuzzle();
+        renderRealPuzzle();
+      }, 900);
     }
 
     function getRealAchievementDefs() {
       const solvedPuzzles = realPuzzleBank.filter((puzzle) => realPuzzleSolved.has(puzzle.id));
-      const solvedByDifficulty = (difficulty) => solvedPuzzles.filter((puzzle) => puzzle.difficulty === difficulty).length;
-      const totalByDifficulty = (difficulty) => realPuzzleBank.filter((puzzle) => puzzle.difficulty === difficulty).length;
+      const solvedByDifficulty = (difficulty) => solvedPuzzles.filter((puzzle) => getRealPuzzleDifficulty(puzzle) === difficulty).length;
+      const totalByDifficulty = (difficulty) => realPuzzleValidIndexes.map((index) => realPuzzleBank[index]).filter((puzzle) => getRealPuzzleDifficulty(puzzle) === difficulty).length;
       return [
         ["real-first", "Real Solver", realPuzzleSolved.size >= 1],
         ["real-five", "Five Real Wins", realPuzzleSolved.size >= 5],
         ["real-ten", "Ten Real Wins", realPuzzleSolved.size >= 10],
         ["real-database", "Database Sampler", solvedPuzzles.some((puzzle) => puzzle.source.includes("Verified"))],
-        ["real-easy", "Easy Sweep", totalByDifficulty("Easy") > 0 && solvedByDifficulty("Easy") >= totalByDifficulty("Easy")],
+        ["real-easy", "Beginner Sweep", totalByDifficulty("Beginner") > 0 && solvedByDifficulty("Beginner") >= totalByDifficulty("Beginner")],
         ["real-expert", "Expert Strike", solvedByDifficulty("Expert") >= 1],
-        ["real-speed", "Speed Solver", realPuzzleBestSeconds > 0 && realPuzzleBestSeconds <= 30]
+        ["real-speed", "Speed Solver", realPuzzleBestSeconds > 0 && realPuzzleBestSeconds <= 30],
+        ["real-streak", "Streak Climber", realPuzzleBestStreak >= 5]
       ];
     }
 
@@ -36326,10 +36615,9 @@
     function chooseRandomRealPuzzle() {
       const indexes = getRealPuzzleIndexes();
       if (indexes.length <= 1) return indexes[0] || 0;
-      let next = realPuzzleIndex;
-      while (next === realPuzzleIndex) {
-        next = indexes[Math.floor(Math.random() * indexes.length)];
-      }
+      const fresh = indexes.filter((index) => index !== realPuzzleIndex && !realPuzzleRecentlyPlayed.includes(realPuzzleBank[index]?.id));
+      const pool = fresh.length ? fresh : indexes.filter((index) => index !== realPuzzleIndex);
+      const next = pool[Math.floor(Math.random() * pool.length)];
       return next;
     }
 
@@ -36346,7 +36634,7 @@
         const puzzle = realPuzzleBank[index];
         const option = document.createElement("option");
         option.value = String(index);
-        option.textContent = `${puzzle.difficulty}: ${puzzle.title}`;
+        option.textContent = `${getRealPuzzleDifficulty(puzzle)}: ${puzzle.title}`;
         return option;
       }));
       select.value = String(realPuzzleIndex);
@@ -36356,7 +36644,7 @@
         button.type = "button";
         button.textContent = puzzle.title;
         button.setAttribute("aria-pressed", String(index === realPuzzleIndex));
-        button.title = `${puzzle.difficulty} ${puzzle.rating} - ${puzzle.theme}`;
+        button.title = `${getRealPuzzleDifficulty(puzzle)} ${puzzle.rating} - ${getRealPuzzleThemes(puzzle).join(", ")}`;
         button.addEventListener("click", () => {
           realPuzzleIndex = index;
           renderRealPuzzle();
@@ -36409,29 +36697,55 @@
 
     function renderRealPuzzle() {
       if (!document.getElementById("realPuzzleBoard")) return;
-      if (!getRealPuzzleIndexes().includes(realPuzzleIndex)) realPuzzleIndex = getRealPuzzleIndexes()[0] || 0;
+      const playableIndexes = getRealPuzzleIndexes();
+      if (!playableIndexes.length) {
+        const feedback = document.getElementById("realPuzzleFeedback");
+        const validation = document.getElementById("realPuzzleValidation");
+        if (feedback) feedback.textContent = realPuzzleValidationErrors[0] || "No validated puzzles are available yet.";
+        if (validation) validation.textContent = "No valid puzzles";
+        renderRealPuzzleBoard();
+        return;
+      }
+      if (!playableIndexes.includes(realPuzzleIndex)) realPuzzleIndex = playableIndexes[0] || 0;
       const puzzle = realPuzzleBank[realPuzzleIndex];
       resetRealPuzzleGame();
       renderRealPuzzleSelectors();
+      recordRealPuzzleVisit(puzzle);
+      document.querySelectorAll("[data-real-mode]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.realMode === realPuzzleMode));
+      });
       document.querySelectorAll("[data-real-difficulty]").forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.realDifficulty === realPuzzleDifficulty));
       });
-      document.getElementById("realPuzzleDifficulty").textContent = `${puzzle.difficulty} ${puzzle.rating}`;
+      document.getElementById("realPuzzleDifficulty").textContent = `${getRealPuzzleDifficulty(puzzle)} ${puzzle.rating}`;
       document.getElementById("realPuzzleSide").textContent = `${realPuzzleSide === "w" ? "White" : "Black"} to move`;
-      document.getElementById("realPuzzleTheme").textContent = puzzle.theme;
+      document.getElementById("realPuzzleTheme").textContent = getRealPuzzleThemes(puzzle).join(" / ");
       document.getElementById("realPuzzleCounter").textContent = getRealPuzzlePositionLabel();
-      document.getElementById("realPuzzleSolved").textContent = `${realPuzzleSolved.size}/${realPuzzleBank.length}`;
+      document.getElementById("realPuzzleSolved").textContent = `${realPuzzleSolved.size}/${realPuzzleValidIndexes.length || realPuzzleBank.length}`;
       document.getElementById("realPuzzleCoins").textContent = String(realPuzzleCoinsEarned);
       document.getElementById("realPuzzleBest").textContent = realPuzzleBestSeconds ? formatPuzzleTime(realPuzzleBestSeconds * 1000) : "--";
+      document.getElementById("realPuzzleAccuracy").textContent = `${getRealPuzzleAccuracy()}%`;
+      document.getElementById("realPuzzleStreak").textContent = `${realPuzzleStreak}/${realPuzzleBestStreak}`;
+      document.getElementById("realPuzzleRating").textContent = String(realPuzzleRating);
+      document.getElementById("realPuzzleRecommend").textContent = getRealPuzzleRecommendation();
       document.getElementById("realPuzzleTitle").textContent = puzzle.title;
       document.getElementById("realPuzzlePrompt").textContent = puzzle.prompt;
       document.getElementById("realPuzzleHint").textContent = puzzle.note || "Use the hint button if the first candidate move is not clear.";
-      document.getElementById("realPuzzleFeedback").textContent = realPuzzleValidationErrors.length
-        ? `Validation issue: ${realPuzzleValidationErrors[0]}`
-        : "Choose a piece. The line is checked by chess.js before rewards are paid.";
+      const modeNote = {
+        Daily: "Daily puzzle: one focused win today.",
+        Trainer: "Trainer: learn the full line at your pace.",
+        Rush: "Rush: solve and the next puzzle starts automatically.",
+        Streak: "Streak: keep the chain alive with clean solves.",
+        Battle: "Battle: mistakes cost more rating, rewards hit harder."
+      }[realPuzzleMode] || "Choose a piece.";
+      document.getElementById("realPuzzleFeedback").textContent = `${modeNote} The full line is checked by chess.js before rewards are paid.`;
       document.getElementById("realPuzzleMoves").textContent = "";
+      const source = document.getElementById("realPuzzleSource");
+      if (source) source.textContent = `${realPuzzleValidIndexes.length || realPuzzleBank.length} playable puzzles loaded. Optional JSON collections can scale this trainer without using legacy puzzle UI.`;
       const validation = document.getElementById("realPuzzleValidation");
-      if (validation) validation.textContent = realPuzzleValidationErrors.length ? "Needs review" : `${realPuzzleBank.length} validated`;
+      if (validation) validation.textContent = realPuzzleValidationErrors.length
+        ? `${realPuzzleValidIndexes.length} valid, ${realPuzzleValidationErrors.length} removed`
+        : `${realPuzzleValidIndexes.length || realPuzzleBank.length} validated`;
       updateRealPuzzleClock();
       renderRealPuzzleBoard();
       renderRealPuzzleAchievements();
@@ -36455,6 +36769,11 @@
       const seconds = Math.max(1, Math.floor((Date.now() - realPuzzleStartedAt) / 1000));
       const firstSolve = !realPuzzleSolved.has(puzzle.id);
       stopRealPuzzleTimer();
+      realPuzzleAttempts += 1;
+      realPuzzleCorrect += 1;
+      realPuzzleStreak += 1;
+      realPuzzleBestStreak = Math.max(realPuzzleBestStreak, realPuzzleStreak);
+      updateRealPuzzleRating(Math.max(4, Math.round((puzzle.rating - realPuzzleRating) / 24) + (realPuzzleMistakes ? 3 : 10)));
       if (firstSolve) {
         realPuzzleSolved.add(puzzle.id);
         const reward = getRealPuzzleReward(puzzle, seconds);
@@ -36474,6 +36793,7 @@
       document.getElementById("realPuzzleMoves").textContent = realPuzzleMoveSans.join(" ");
       renderRealPuzzleAchievements();
       saveRealPuzzleState();
+      autoAdvanceRealPuzzleIfNeeded();
     }
 
     function finishRealPuzzleMove(move) {
@@ -36482,11 +36802,16 @@
       if (playedUci !== expected) {
         realPuzzleGame.undo();
         realPuzzleMistakes += 1;
+        realPuzzleAttempts += 1;
+        realPuzzleFailed += 1;
+        realPuzzleStreak = 0;
+        updateRealPuzzleRating(realPuzzleMode === "Battle" ? -10 : -6);
         realPuzzleSelected = "";
         realPuzzleLegalMoves = [];
         document.getElementById("realPuzzleFeedback").textContent = `Legal move, but not the validated solution. Mistakes: ${realPuzzleMistakes}. Try a forcing check, capture, or threat.`;
         playPuzzleTone("wrong");
         renderRealPuzzleBoard();
+        saveRealPuzzleState();
         return;
       }
 
@@ -36505,7 +36830,7 @@
     }
 
     function handleRealPuzzleSquare(square) {
-      if (!realPuzzleGame || realPuzzleReplaying || realPuzzleValidationErrors.length) return;
+      if (!realPuzzleGame || realPuzzleReplaying) return;
       startRealPuzzleTimer();
       const piece = realPuzzleGame.get(square);
       if (realPuzzleSelected && square !== realPuzzleSelected) {
@@ -36568,10 +36893,19 @@
       setupRealPuzzles.ready = true;
       try {
         await loadChessRules();
+        await loadRealPuzzleCollection();
+        installLegacyRealPuzzlePack();
         realPuzzleValidationErrors = validateRealPuzzleBank();
       } catch {
         realPuzzleValidationErrors = ["Could not load chess.js for real puzzles."];
       }
+      document.querySelectorAll("[data-real-mode]").forEach((button) => {
+        button.addEventListener("click", () => {
+          realPuzzleMode = button.dataset.realMode || "Trainer";
+          realPuzzleIndex = realPuzzleMode === "Daily" ? getRealDailyIndex(getRealPuzzleIndexes()) : getRealPuzzleIndexes()[0] || 0;
+          renderRealPuzzle();
+        });
+      });
       document.querySelectorAll("[data-real-difficulty]").forEach((button) => {
         button.addEventListener("click", () => {
           realPuzzleDifficulty = button.dataset.realDifficulty || "All";
