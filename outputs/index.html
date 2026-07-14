@@ -12287,6 +12287,38 @@
       flex-wrap: wrap;
     }
 
+    .friend-challenge-notice {
+      position: fixed;
+      z-index: 120;
+      right: max(16px, env(safe-area-inset-right));
+      bottom: max(16px, env(safe-area-inset-bottom));
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      max-width: min(420px, calc(100vw - 32px));
+      padding: 14px;
+      border: 1px solid rgba(127, 166, 80, 0.58);
+      border-radius: 14px;
+      background: rgba(25, 31, 28, 0.95);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
+      animation: friendNoticeIn 180ms ease-out;
+    }
+
+    .friend-challenge-notice strong,
+    .friend-challenge-notice span {
+      display: block;
+    }
+
+    .friend-challenge-notice span {
+      margin-top: 3px;
+      color: var(--muted);
+    }
+
+    @keyframes friendNoticeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .profile-challenge-button {
       min-height: 42px;
       white-space: nowrap;
@@ -12321,6 +12353,15 @@
       .friend-match-actions {
         width: 100%;
         margin-left: 0;
+      }
+
+      .friend-challenge-notice {
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        max-width: none;
+        align-items: stretch;
+        flex-direction: column;
       }
     }
 
@@ -19017,8 +19058,8 @@
           <div class="friend-lobby-head">
             <div>
               <p class="section-kicker">Friend challenge</p>
-              <h3 id="friendChallengeTitle">Invite a friend, then play on this board</h3>
-              <p>Public/private invite tools, custom clocks, casual takebacks, rematch, and reconnect saved in this browser.</p>
+              <h3 id="friendChallengeTitle">Challenge a friend</h3>
+              <p>Choose time and color, then send one link or challenge a player directly.</p>
             </div>
             <div class="friend-code-card">
               <small>Challenge code</small>
@@ -19091,7 +19132,7 @@
           </div>
           <div class="friend-lobby-foot">
             <div class="friend-qr" id="friendQr" aria-label="Challenge QR-style share code"></div>
-            <p id="friendChallengeStatus">Create a code or start a local friend match. Online server sync can be connected later.</p>
+            <p id="friendChallengeStatus">Search a player or share a code to begin.</p>
             <div class="friend-match-actions">
               <button class="button secondary" type="button" id="friendReconnect">Reconnect</button>
               <button class="button secondary" type="button" id="friendRematch">Rematch</button>
@@ -30784,11 +30825,14 @@
     let matchStartedAt = Date.now();
     let matchEndedElapsedMs = null;
     let matchTimerInterval = 0;
+    let matchClockState = null;
+    let matchClockExpiredColor = "";
     let friendChallengeState = null;
     let friendNetworkState = { directory: [], search: [], challenges: [] };
     let friendNetworkTimer = 0;
     let friendSearchTimer = 0;
     let friendNetworkRequest = 0;
+    let friendIncomingNoticeCode = "";
     let chessRulesPromise = null;
     let stockfishWorker = null;
     let stockfishReady = false;
@@ -30837,7 +30881,7 @@
     }
 
     function isCoachGameOver() {
-      return coachDrawAgreed || callCoachRule(coachGame, "isGameOver", "game_over");
+      return Boolean(matchClockExpiredColor) || coachDrawAgreed || callCoachRule(coachGame, "isGameOver", "game_over");
     }
 
     function isCoachCheck() {
@@ -31196,10 +31240,82 @@
       return hasPremium ? "Premium" : "";
     }
 
-    function resetMatchPlayerTimer() {
+    function parseMatchClock(control = "10+0") {
+      const match = String(control || "").match(/^(\d{1,3})\+(\d{1,3})$/);
+      if (!match) return { baseMs: 0, incrementMs: 0 };
+      return {
+        baseMs: Math.max(0, Math.min(24 * 60, Number(match[1]) || 0)) * 60000,
+        incrementMs: Math.max(0, Math.min(120, Number(match[2]) || 0)) * 1000
+      };
+    }
+
+    function normalizeMatchClockState(raw, control = "10+0") {
+      const preset = parseMatchClock(control);
+      const source = raw && typeof raw === "object" ? raw : {};
+      const serverNow = Date.parse(source.serverNow || source.server_now || "") || Date.now();
+      const startAt = Date.parse(source.turnStartedAt || source.turn_started_at || "") || serverNow;
+      return {
+        whiteMs: Math.max(0, Number(source.whiteMs ?? source.white_ms ?? preset.baseMs) || 0),
+        blackMs: Math.max(0, Number(source.blackMs ?? source.black_ms ?? preset.baseMs) || 0),
+        incrementMs: Math.max(0, Number(source.incrementMs ?? source.increment_ms ?? preset.incrementMs) || 0),
+        activeColor: source.activeColor === "b" || source.active_color === "b" ? "b" : "w",
+        turnStartedAt: new Date(startAt).toISOString(),
+        serverNow: new Date(serverNow).toISOString(),
+        receivedAt: Date.now(),
+        running: Boolean(preset.baseMs && source.running !== false && source.paused !== true)
+      };
+    }
+
+    function matchClockServerNow(clock = matchClockState) {
+      const serverNow = Date.parse(clock?.serverNow || "");
+      const receivedAt = Number(clock?.receivedAt) || Date.now();
+      return Number.isFinite(serverNow) ? serverNow + Math.max(0, Date.now() - receivedAt) : Date.now();
+    }
+
+    function getMatchClockSnapshot(clock = matchClockState) {
+      const source = clock || normalizeMatchClockState(null, friendChallengeState?.clock || "10+0");
+      const snapshot = { ...source };
+      const running = Boolean(source.running && coachGame && !isCoachGameOver() && !coachDrawAgreed);
+      if (!running) return snapshot;
+      const startedAt = Date.parse(source.turnStartedAt || "");
+      if (!Number.isFinite(startedAt)) return snapshot;
+      const elapsed = Math.max(0, matchClockServerNow(source) - startedAt);
+      const key = source.activeColor === "b" ? "blackMs" : "whiteMs";
+      snapshot[key] = Math.max(0, snapshot[key] - elapsed);
+      return snapshot;
+    }
+
+    function resetMatchPlayerTimer(control = friendChallengeState?.clock || "10+0", remoteClock = null) {
       matchStartedAt = Date.now();
       matchEndedElapsedMs = null;
+      matchClockExpiredColor = "";
+      matchClockState = normalizeMatchClockState(remoteClock, control);
       updateMatchPlayerTimer();
+    }
+
+    function advanceMatchClock(movedColor) {
+      if (!matchClockState?.running || matchClockExpiredColor) return;
+      const clock = getMatchClockSnapshot();
+      if (clock.activeColor !== movedColor || clock[`${movedColor === "w" ? "white" : "black"}Ms`] <= 0) return;
+      const key = movedColor === "w" ? "whiteMs" : "blackMs";
+      clock[key] += clock.incrementMs;
+      clock.activeColor = movedColor === "w" ? "b" : "w";
+      const now = matchClockServerNow(clock);
+      clock.turnStartedAt = new Date(now).toISOString();
+      clock.serverNow = clock.turnStartedAt;
+      clock.receivedAt = Date.now();
+      matchClockState = clock;
+      if (friendChallengeState?.active) friendChallengeState = { ...friendChallengeState, clockState: clock };
+      updateMatchPlayerTimer();
+    }
+
+    function finishMatchOnTime(color) {
+      if (matchClockExpiredColor) return;
+      matchClockExpiredColor = color === "b" ? "b" : "w";
+      if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
+      coachMessage = `${getCoachColorName(matchClockExpiredColor)} ran out of time. The clock is paused.`;
+      updateCoachPanel();
+      renderCoachBoard();
     }
 
     function updateMatchPlayerTimer() {
@@ -31207,14 +31323,16 @@
       const aiTimer = document.getElementById("aiPlayerTimer");
       const online = document.querySelector("[data-match-online]");
       const avatar = document.querySelector("[data-match-avatar]");
-      if (coachGame && isCoachGameOver() && matchEndedElapsedMs === null) {
-        matchEndedElapsedMs = Date.now() - matchStartedAt;
-      }
-      const elapsed = matchEndedElapsedMs ?? (Date.now() - matchStartedAt);
-      if (timer) timer.textContent = formatMatchClock(elapsed);
-      if (aiTimer) aiTimer.textContent = formatMatchClock(elapsed);
+      const clock = getMatchClockSnapshot();
+      const playerMs = coachPlayerColor === "b" ? clock.blackMs : clock.whiteMs;
+      const opponentMs = coachPlayerColor === "b" ? clock.whiteMs : clock.blackMs;
+      const activeMs = clock.activeColor === "b" ? clock.blackMs : clock.whiteMs;
+      if (clock.running && activeMs <= 0) finishMatchOnTime(clock.activeColor);
+      if (timer) timer.textContent = clock.running ? formatMatchClock(playerMs) : "--:--";
+      if (aiTimer) aiTimer.textContent = clock.running ? formatMatchClock(opponentMs) : "--:--";
       if (avatar) {
-        const progress = Math.min(1, Math.max(0, elapsed / 300000));
+        const base = Math.max(1, parseMatchClock(friendChallengeState?.clock || "10+0").baseMs || 600000);
+        const progress = Math.min(1, Math.max(0, 1 - playerMs / base));
         avatar.dataset.timerRing = "on";
         avatar.style.setProperty("--match-timer-angle", `${Math.round(progress * 360)}deg`);
         avatar.style.setProperty("--timer-ring-color", progress > 0.8 ? "#d86f62" : progress > 0.6 ? "#ffd36b" : "var(--rank-b)");
@@ -31223,8 +31341,9 @@
         const isOnline = navigator.onLine !== false;
         const isGameOver = coachGame && isCoachGameOver();
         online.textContent = !isOnline ? "Offline"
-          : isGameOver ? "Review"
-            : coachGame?.turn() === coachPlayerColor && !coachThinking ? "Your move" : "Ready";
+          : matchClockExpiredColor ? `${getCoachColorName(matchClockExpiredColor)} flagged`
+            : isGameOver ? "Review"
+              : coachGame?.turn() === coachPlayerColor && !coachThinking ? "Your move" : "Ready";
         online.classList.toggle("is-offline", !isOnline);
       }
     }
@@ -33228,14 +33347,17 @@
       const isMate = callCoachRule(coachGame, "isCheckmate", "in_checkmate");
       const isDrawn = Boolean(drawReason) || callCoachRule(coachGame, "isDraw", "in_draw");
 
-      if (coachDrawAgreed || isMate || isDrawn) recordCoachGameResult(isMate && coachGame.turn() === getCoachBotColor());
+      if (coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor) recordCoachGameResult(isMate && coachGame.turn() === getCoachBotColor());
 
       if (bossBadge) {
         bossBadge.hidden = !activeBoss;
         bossBadge.textContent = activeBoss ? `${getBossAvatar(activeBoss)} ${activeBoss.name}` : "Boss battle";
       }
       turnBadge.textContent = coachThinking ? "Coach thinking" : `${turn} to move`;
-      if (coachDrawAgreed) {
+      if (matchClockExpiredColor) {
+        statusBadge.textContent = `${getCoachColorName(matchClockExpiredColor)} flagged`;
+        coach.textContent = `${getCoachColorName(matchClockExpiredColor)} ran out of time. The board is paused.`;
+      } else if (coachDrawAgreed) {
         statusBadge.textContent = "Draw agreed";
         coach.textContent = `Draw agreed. ${buildCoachSummary()}`;
       } else if (isMate) {
@@ -33249,15 +33371,15 @@
         coach.textContent = coachMessage;
       }
       coach.textContent = coachMemoryLine(coach.textContent);
-      if (coachDrawAgreed || isMate || isDrawn) playCoachEndSound(isMate, isDrawn);
-      setAudioScene(isMate ? (coachGame.turn() === getCoachBotColor() ? "victory" : "defeat") : isDrawn || coachDrawAgreed ? "menu" : "game");
+      if (coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor) playCoachEndSound(isMate, isDrawn);
+      setAudioScene(isMate ? (coachGame.turn() === getCoachBotColor() ? "victory" : "defeat") : isDrawn || coachDrawAgreed || matchClockExpiredColor ? "menu" : "game");
 
       renderCoachCaptured();
       renderCoachHistory();
       updateAiPlayerHeader();
       renderOpeningCompass();
-      renderCoachPracticeLinks(coachDrawAgreed || isMate || isDrawn);
-      renderGuidedGameReview(coachDrawAgreed || isMate || isDrawn);
+      renderCoachPracticeLinks(coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor);
+      renderGuidedGameReview(coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor);
       ensurePostGameReview();
       document.getElementById("undoGame").disabled = coachThinking || !coachGame.history().length;
       document.getElementById("replayMistake").disabled = coachThinking || !coachReplayFen;
@@ -33520,9 +33642,10 @@
       coachSelected = "";
       coachLegalMoves = [];
       coachLastMove = move;
+      advanceMatchClock(move.color);
       if (friendChallengeState?.active) {
         saveFriendChallengeState({ ...friendChallengeState, active: true });
-        void syncFriendChallengePosition();
+        void syncFriendChallengePosition(true);
       }
     playCoachMoveSound(move, "player");
       gameStats.moveQualityTotal += Math.max(0, Math.min(100, 100 - Math.round(betterGap / 8)));
@@ -33602,6 +33725,7 @@
           const move = safeReply && coachGame.move(toCoachMoveInput(safeReply));
           if (move) {
             coachLastMove = move;
+            advanceMatchClock(move.color);
             playCoachMoveSound(move, "bot");
             coachMessage = `${explainCoachMove(move)}${getBeginnerBot() ? ` ${pickBotLine("inGame")}` : ""}`;
           } else {
@@ -33697,6 +33821,37 @@
       return String(getFriendProvider()?.getCachedAccount?.()?.publicId || "");
     }
 
+    function dismissFriendChallengeNotice() {
+      document.getElementById("friendChallengeNotice")?.remove();
+    }
+
+    function showIncomingFriendChallengeNotice(challenge) {
+      if (!challenge?.code || friendIncomingNoticeCode === challenge.code) return;
+      friendIncomingNoticeCode = challenge.code;
+      dismissFriendChallengeNotice();
+      const notice = document.createElement("section");
+      notice.id = "friendChallengeNotice";
+      notice.className = "friend-challenge-notice";
+      notice.setAttribute("role", "dialog");
+      notice.setAttribute("aria-label", "Incoming Friendly Challenge");
+      const copy = document.createElement("div");
+      copy.append(
+        createBookText("strong", "", `${challenge.creatorName || "A friend"} challenged you`),
+        createBookText("span", "", `${challenge.gameType === "rated" ? "Rated" : "Casual"} · ${challenge.clock === "none" ? "No clock" : challenge.clock}`)
+      );
+      const actions = document.createElement("div");
+      actions.className = "friend-request-actions";
+      const accept = createBookText("button", "button", "Accept");
+      const decline = createBookText("button", "button secondary", "Decline");
+      accept.type = "button";
+      decline.type = "button";
+      accept.addEventListener("click", () => { dismissFriendChallengeNotice(); void acceptFriendChallenge(); });
+      decline.addEventListener("click", () => { dismissFriendChallengeNotice(); void declineFriendChallenge(); });
+      actions.append(accept, decline);
+      notice.append(copy, actions);
+      document.body.append(notice);
+    }
+
     function oppositeFriendColor(color) {
       return color === "b" ? "w" : "b";
     }
@@ -33717,6 +33872,7 @@
         status: String(raw.status || "pending"),
         fen: String(raw.fen || ""),
         moves: Array.isArray(raw.moves) ? raw.moves.map(String) : [],
+        clockState: normalizeMatchClockState(raw.clockState || raw.clock_state, raw.clock),
         updatedAt: String(raw.updatedAt || raw.updated_at || ""),
         expiresAt: String(raw.expiresAt || raw.expires_at || "")
       };
@@ -33746,6 +33902,7 @@
         online: true,
         fen: remote.fen,
         moves: remote.moves,
+        clockState: remote.clockState,
         remoteUpdatedAt: remote.updatedAt
       };
     }
@@ -33757,6 +33914,7 @@
       const remoteChanged = remote.updatedAt && remote.updatedAt !== friendChallengeState?.remoteUpdatedAt;
       friendChallengeState = next;
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
+      if (remote.status === "active") resetMatchPlayerTimer(next.clock, next.clockState);
       if (restoreBoard && remoteChanged && remote.status === "active" && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen)) {
         try {
           coachGame = new CoachChess(remote.fen);
@@ -33879,7 +34037,10 @@
         const matching = state.remote ? friendNetworkState.challenges.find((challenge) => challenge.code === state.code) : null;
         const incoming = friendNetworkState.challenges.find((challenge) => challenge.status === "pending" && challenge.opponentId === getFriendCurrentUserId());
         if (matching) applyRemoteFriendChallenge(matching, true);
-        else if (incoming && !state.active) applyRemoteFriendChallenge(incoming, false);
+        else if (incoming && !state.active) {
+          applyRemoteFriendChallenge(incoming, false);
+          showIncomingFriendChallengeNotice(incoming);
+        }
         else if (state.remote && state.creatorId !== getFriendCurrentUserId() && state.opponentId !== getFriendCurrentUserId()) {
           saveFriendChallengeState({ ...readFriendChallengeState(), code: createFriendChallengeCode(), remote: false, pending: false, active: false, status: "draft" });
         }
@@ -33944,9 +34105,12 @@
       actions.className = "friend-card-actions";
       if (mode === "search") {
         const add = createBookText("button", "button secondary", "Add");
+        const challenge = createBookText("button", "button", "Challenge");
         add.type = "button";
+        challenge.type = "button";
         add.addEventListener("click", () => void setFriendRequest(friend, "send"));
-        actions.append(add);
+        challenge.addEventListener("click", () => void sendFriendChallenge(friend));
+        actions.append(challenge, add);
       } else if (mode === "outgoing") {
         actions.append(createBookText("span", "badge", "Pending"));
         const cancel = createBookText("button", "button secondary", "Cancel");
@@ -34041,7 +34205,7 @@
           ? `Live friend board: ${state.gameType === "rated" ? "Rated" : "Casual"} • ${state.clock === "none" ? "No clock" : `${state.clock} clock`} • ${state.gameType === "casual" ? "takebacks allowed" : "rated rules"}.`
           : state.status === "declined"
           ? "This challenge was declined. Pick a fresh setup when you are ready."
-          : "1) Share the link or code. 2) Pick color/time. 3) Start Challenge.";
+          : "Choose time and color, then challenge a player or share this code.";
       }
       setValue("friendInviteType", state.inviteType);
       setValue("friendGameType", state.gameType);
@@ -34109,6 +34273,8 @@
         const remote = await getFriendProvider()?.respondFriendChallenge(state.code, "accept");
         if (!remote) throw new Error("Sign in to accept this challenge.");
         applyRemoteFriendChallenge(remote, false);
+        friendIncomingNoticeCode = "";
+        dismissFriendChallengeNotice();
       } catch (error) {
         setFriendChallengeStatus(error?.message || "Could not accept that challenge.");
         return;
@@ -34121,6 +34287,8 @@
       try {
         await getFriendProvider()?.respondFriendChallenge(state.code, "decline");
         saveFriendChallengeState({ ...state, pending: false, active: false, status: "declined" });
+        friendIncomingNoticeCode = "";
+        dismissFriendChallengeNotice();
         setFriendChallengeStatus("Challenge declined. Change the setup or send a fresh invite.");
       } catch (error) {
         setFriendChallengeStatus(error?.message || "Could not decline that challenge.");
@@ -34157,7 +34325,7 @@
       }
       const color = state.color;
       coachMoveToken += 1;
-      coachGame = new CoachChess();
+      coachGame = state.fen ? new CoachChess(state.fen) : new CoachChess();
       coachPlayerColor = color;
       coachFlipped = color === "b";
       coachBotPaused = true;
@@ -34172,7 +34340,7 @@
       friendChallengeState = { ...state, pending: false, active: true, status: "active", color, fen: coachGame.fen(), moves: [], startedAt: Date.now() };
       saveFriendChallengeState(friendChallengeState);
       void syncFriendChallengePosition();
-      resetMatchPlayerTimer();
+      resetMatchPlayerTimer(state.clock, state.clockState);
       renderCoachSidePicker();
       renderCoachBoard();
       updateCoachPanel();
@@ -34222,13 +34390,13 @@
       }
     }
 
-    async function syncFriendChallengePosition() {
+    async function syncFriendChallengePosition(moveApplied = false) {
       const state = friendChallengeState;
       const provider = getFriendProvider();
       if (!state?.remote || !state.active || !coachGame || !provider) return;
       const moves = coachGame.history({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion || ""}`);
       try {
-        const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active" });
+        const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active", moveApplied });
         if (remote) applyRemoteFriendChallenge(remote, false);
       } catch (error) {
         setFriendChallengeStatus(error?.message || "Move saved locally. Reconnect to retry syncing it.");
@@ -34238,7 +34406,7 @@
     function startFriendNetworkSync() {
       window.clearInterval(friendNetworkTimer);
       void refreshFriendNetwork();
-      friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 3500);
+      friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 2000);
     }
 
     function takebackFriendMove() {
@@ -35872,12 +36040,20 @@
         }),
         getFriendChallenge: (code) => callFriendRpc("get_game_challenge", { p_code: String(code || "") }),
         respondFriendChallenge: (code, response) => callFriendRpc("respond_game_challenge", { p_code: String(code || ""), p_response: String(response || "") }),
-        saveFriendChallengePosition: (challenge) => callFriendRpc("save_game_challenge_position", {
-          p_code: String(challenge?.code || ""),
-          p_fen: String(challenge?.fen || ""),
-          p_moves: Array.isArray(challenge?.moves) ? challenge.moves : [],
-          p_status: String(challenge?.status || "active")
-        }),
+        saveFriendChallengePosition: async (challenge) => {
+          const payload = {
+            p_code: String(challenge?.code || ""),
+            p_fen: String(challenge?.fen || ""),
+            p_moves: Array.isArray(challenge?.moves) ? challenge.moves : [],
+            p_status: String(challenge?.status || "active")
+          };
+          try {
+            return await callFriendRpc("save_game_challenge_position", { ...payload, p_move_applied: Boolean(challenge?.moveApplied) });
+          } catch (error) {
+            if (!/p_move_applied|function .*save_game_challenge_position/i.test(String(error?.message || ""))) throw error;
+            return callFriendRpc("save_game_challenge_position", payload);
+          }
+        },
         listFriendChallenges: () => callFriendRpc("list_game_challenges"),
         saveProfile: async (profileData = {}) => {
           const supabase = await getSupabaseClient();
