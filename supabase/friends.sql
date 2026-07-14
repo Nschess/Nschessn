@@ -154,3 +154,225 @@ grant execute on function public.respond_to_friend_request(uuid, boolean) to aut
 grant execute on function public.cancel_friend_request(uuid) to authenticated;
 grant execute on function public.remove_friend(uuid) to authenticated;
 grant execute on function public.get_friend_directory() to authenticated;
+
+-- Registered-player search and private friend games. Run this extension after the
+-- friend-request section above. All writes go through security-definer RPCs.
+alter table public.profiles add column if not exists is_bot boolean not null default false;
+
+create or replace function public.search_registered_players(p_query text)
+returns table (
+  public_id uuid,
+  username text,
+  avatar text,
+  rating integer,
+  title text,
+  last_login_at timestamptz
+)
+language sql
+security definer set search_path = public
+stable
+as $$
+  select profile.id, profile.username, profile.avatar, profile.rating, profile.title, profile.last_login_at
+  from public.profiles as profile
+  where auth.uid() is not null
+    and profile.id <> auth.uid()
+    and not coalesce(profile.is_bot, false)
+    and profile.username ilike '%' || left(trim(coalesce(p_query, '')), 20) || '%'
+  order by profile.last_login_at desc nulls last, profile.username
+  limit 8;
+$$;
+
+create table if not exists public.game_challenges (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique check (code ~ '^[A-Z2-9]{8,16}$'),
+  creator_id uuid not null references auth.users(id) on delete cascade,
+  opponent_id uuid references auth.users(id) on delete set null,
+  invite_type text not null default 'private' check (invite_type in ('private', 'public')),
+  game_type text not null default 'casual' check (game_type in ('casual', 'rated')),
+  creator_color text not null check (creator_color in ('w', 'b')),
+  clock text not null default '10+0' check (length(clock) <= 24),
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'active', 'declined', 'cancelled', 'expired', 'completed')),
+  fen text not null default 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' check (length(fen) <= 256),
+  moves jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '7 days'
+);
+
+create index if not exists game_challenges_participant_idx on public.game_challenges (creator_id, opponent_id, status, updated_at desc);
+create index if not exists game_challenges_code_idx on public.game_challenges (code);
+alter table public.game_challenges enable row level security;
+
+create or replace function public.expire_game_challenges()
+returns void
+language sql
+security definer set search_path = public
+as $$
+  update public.game_challenges
+  set status = 'expired', updated_at = now()
+  where status in ('pending', 'accepted') and expires_at < now();
+$$;
+
+create or replace function public.challenge_payload(p_challenge public.game_challenges)
+returns jsonb
+language sql
+security definer set search_path = public
+stable
+as $$
+  select jsonb_build_object(
+    'id', challenge.id,
+    'code', challenge.code,
+    'creatorId', challenge.creator_id,
+    'creatorName', coalesce(creator.username, 'Friend'),
+    'opponentId', challenge.opponent_id,
+    'opponentName', coalesce(opponent.username, ''),
+    'creatorColor', challenge.creator_color,
+    'inviteType', challenge.invite_type,
+    'gameType', challenge.game_type,
+    'clock', challenge.clock,
+    'status', challenge.status,
+    'fen', challenge.fen,
+    'moves', challenge.moves,
+    'updatedAt', challenge.updated_at,
+    'expiresAt', challenge.expires_at
+  )
+  from public.game_challenges as challenge
+  left join public.profiles as creator on creator.id = challenge.creator_id
+  left join public.profiles as opponent on opponent.id = challenge.opponent_id
+  where challenge.id = p_challenge.id;
+$$;
+
+create or replace function public.create_game_challenge(
+  p_target_id uuid,
+  p_code text,
+  p_invite_type text,
+  p_game_type text,
+  p_color text,
+  p_clock text
+)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  created public.game_challenges;
+  creator_color text := case when p_color = 'b' then 'b' when p_color = 'w' then 'w' when random() < .5 then 'w' else 'b' end;
+begin
+  if current_user_id is null then raise exception 'Sign in to create a challenge'; end if;
+  if p_code !~ '^[A-Z2-9]{8,16}$' then raise exception 'Challenge code is invalid'; end if;
+  if p_target_id = current_user_id then raise exception 'Choose another registered player'; end if;
+  if p_target_id is not null and not exists (select 1 from public.profiles where id = p_target_id and not coalesce(is_bot, false)) then
+    raise exception 'That player is unavailable';
+  end if;
+  insert into public.game_challenges (code, creator_id, opponent_id, invite_type, game_type, creator_color, clock)
+  values (p_code, current_user_id, p_target_id, case when p_invite_type = 'public' then 'public' else 'private' end, case when p_game_type = 'rated' then 'rated' else 'casual' end, creator_color, left(coalesce(p_clock, '10+0'), 24))
+  returning * into created;
+  return public.challenge_payload(created);
+end;
+$$;
+
+create or replace function public.get_game_challenge(p_code text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  found public.game_challenges;
+begin
+  if current_user_id is null then raise exception 'Sign in to open a challenge'; end if;
+  perform public.expire_game_challenges();
+  select * into found from public.game_challenges where code = upper(trim(p_code));
+  if found.id is null then raise exception 'Challenge not found or expired'; end if;
+  if found.creator_id <> current_user_id and found.opponent_id is distinct from current_user_id and not (found.opponent_id is null and found.status = 'pending') then
+    raise exception 'This challenge belongs to another player';
+  end if;
+  return public.challenge_payload(found);
+end;
+$$;
+
+create or replace function public.respond_game_challenge(p_code text, p_response text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  found public.game_challenges;
+begin
+  if current_user_id is null then raise exception 'Sign in to respond to a challenge'; end if;
+  select * into found from public.game_challenges where code = upper(trim(p_code)) for update;
+  if found.id is null or found.expires_at < now() then raise exception 'Challenge not found or expired'; end if;
+  if p_response = 'cancel' and found.creator_id = current_user_id and found.status in ('pending', 'accepted') then
+    update public.game_challenges set status = 'cancelled', updated_at = now() where id = found.id returning * into found;
+  elsif p_response = 'decline' and found.opponent_id = current_user_id and found.status = 'pending' then
+    update public.game_challenges set status = 'declined', updated_at = now() where id = found.id returning * into found;
+  elsif p_response = 'accept' and found.creator_id <> current_user_id and found.status = 'pending' and (found.opponent_id is null or found.opponent_id = current_user_id) then
+    update public.game_challenges set opponent_id = current_user_id, status = 'accepted', updated_at = now() where id = found.id returning * into found;
+  else
+    raise exception 'That challenge cannot be changed';
+  end if;
+  return public.challenge_payload(found);
+end;
+$$;
+
+create or replace function public.save_game_challenge_position(p_code text, p_fen text, p_moves jsonb, p_status text default 'active')
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  found public.game_challenges;
+begin
+  if current_user_id is null then raise exception 'Sign in to save a friend game'; end if;
+  select * into found from public.game_challenges where code = upper(trim(p_code)) for update;
+  if found.id is null then raise exception 'Challenge not found'; end if;
+  if current_user_id <> found.creator_id and current_user_id <> found.opponent_id then raise exception 'You are not in this game'; end if;
+  if found.status not in ('accepted', 'active') then raise exception 'This challenge is not ready to play'; end if;
+  if length(coalesce(p_fen, '')) < 8 or length(p_fen) > 256 or jsonb_typeof(coalesce(p_moves, '[]'::jsonb)) <> 'array' then raise exception 'Game state is invalid'; end if;
+  update public.game_challenges
+  set fen = p_fen, moves = coalesce(p_moves, '[]'::jsonb), status = case when p_status = 'completed' then 'completed' else 'active' end, updated_at = now()
+  where id = found.id
+  returning * into found;
+  return public.challenge_payload(found);
+end;
+$$;
+
+create or replace function public.list_game_challenges()
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  result jsonb;
+begin
+  if current_user_id is null then raise exception 'Sign in to view challenges'; end if;
+  perform public.expire_game_challenges();
+  select coalesce(jsonb_agg(public.challenge_payload(challenge) order by challenge.updated_at desc), '[]'::jsonb)
+  into result
+  from public.game_challenges as challenge
+  where (challenge.creator_id = current_user_id or challenge.opponent_id = current_user_id)
+    and (challenge.status in ('pending', 'accepted', 'active')
+      or (challenge.status = 'declined' and challenge.updated_at > now() - interval '1 day'));
+  return result;
+end;
+$$;
+
+revoke all on table public.game_challenges from anon, authenticated;
+revoke all on function public.expire_game_challenges() from public;
+revoke all on function public.challenge_payload(public.game_challenges) from public;
+revoke all on function public.search_registered_players(text) from public;
+revoke all on function public.create_game_challenge(uuid, text, text, text, text, text) from public;
+revoke all on function public.get_game_challenge(text) from public;
+revoke all on function public.respond_game_challenge(text, text) from public;
+revoke all on function public.save_game_challenge_position(text, text, jsonb, text) from public;
+revoke all on function public.list_game_challenges() from public;
+grant execute on function public.search_registered_players(text) to authenticated;
+grant execute on function public.create_game_challenge(uuid, text, text, text, text, text) to authenticated;
+grant execute on function public.get_game_challenge(text) to authenticated;
+grant execute on function public.respond_game_challenge(text, text) to authenticated;
+grant execute on function public.save_game_challenge_position(text, text, jsonb, text) to authenticated;
+grant execute on function public.list_game_challenges() to authenticated;
