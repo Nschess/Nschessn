@@ -3,6 +3,7 @@ create table if not exists public.profiles (
   public_id text not null unique check (public_id ~ '^[A-Za-z0-9_-]{8,80}$'),
   username text not null unique check (username ~ '^[A-Za-z0-9_-]{3,20}$'),
   avatar text not null default 'auto',
+  country_flag text not null default '',
   rating integer not null default 450 check (rating between 400 and 3000),
   coins bigint not null default 0 check (coins >= 0),
   xp bigint not null default 0 check (xp >= 0),
@@ -17,6 +18,7 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles add column if not exists avatar text not null default 'auto';
+alter table public.profiles add column if not exists country_flag text not null default '';
 alter table public.profiles add column if not exists rating integer not null default 450;
 alter table public.profiles add column if not exists coins bigint not null default 0;
 alter table public.profiles add column if not exists xp bigint not null default 0;

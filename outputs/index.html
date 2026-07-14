@@ -31001,6 +31001,21 @@
     }
 
     function getAiHeaderProfile(level = coachDifficulty) {
+      const friendOpponent = getFriendMatchProfiles().opponent;
+      if (friendChallengeState?.active) {
+        const opponent = friendOpponent || normalizeFriendMatchProfile(null, { name: friendChallengeState.targetName || "Opponent" });
+        return {
+          name: opponent.displayName,
+          title: opponent.title || "Chess Player",
+          rarity: "Rare",
+          avatar: opponent.avatar,
+          avatarImage: opponent.avatarImage,
+          flag: opponent.countryFlag,
+          rating: opponent.rating,
+          online: opponent.online,
+          isFriend: true
+        };
+      }
       const bot = getBeginnerBot(level);
       if (bot) return { name: bot.name, title: bot.personality, rarity: bot.elo >= 1000 ? "Rare" : "Common", avatar: bot.avatar, flag: "PH" };
       if (level === "strong") return { name: "KingNorbert", title: "Coach Bot", rarity: "Legendary", avatar: "KN", avatarImage: "assets/kingnorbert-coach.png", flag: "PH" };
@@ -31188,28 +31203,33 @@
       updateMatchSeatLayout();
       const config = getCoachConfig();
       const ai = getAiHeaderProfile();
+      const displayRating = Math.max(400, Number(ai.rating) || Number(config.elo) || 450);
       const isGameOver = coachGame && isCoachGameOver();
       const isMate = coachGame && callCoachRule(coachGame, "isCheckmate", "in_checkmate");
       const botColor = getCoachBotColor();
       card.dataset.aiRarity = ai.rarity;
       card.classList.toggle("is-active", Boolean(coachGame && coachGame.turn() === botColor && !isGameOver));
-      card.classList.toggle("is-thinking", Boolean(coachThinking));
+      card.classList.toggle("is-thinking", Boolean(!ai.isFriend && coachThinking));
       card.classList.toggle("is-winner", Boolean(isMate && coachGame.turn() === coachPlayerColor));
       card.classList.toggle("is-loser", Boolean(isMate && coachGame.turn() === botColor));
       const avatar = document.getElementById("aiPlayerAvatar");
       renderCoachAvatar(avatar, { imageUrl: ai.avatarImage, fallback: ai.avatar, label: `${ai.name} avatar` });
       document.getElementById("aiPlayerName").textContent = ai.name;
       document.getElementById("aiPlayerTitle").textContent = ai.title;
-      document.getElementById("aiPlayerRating").textContent = `${config.elo} Elo`;
+      document.getElementById("aiPlayerRating").textContent = `${displayRating} Elo`;
       const flag = document.getElementById("aiPlayerFlag");
       if (flag) {
         flag.textContent = formatCountryFlag(ai.flag);
         flag.dataset.countryCode = ai.flag;
       }
       document.getElementById("aiMoveIndicator").textContent = getCoachColorName(botColor);
-      document.getElementById("aiPlayerStatus").textContent = coachThinking ? "Thinking..." : isGameOver ? "Review" : "Online";
+      document.getElementById("aiPlayerStatus").textContent = ai.isFriend
+        ? (!navigator.onLine || !ai.online ? "Offline" : isGameOver ? "Review" : coachGame?.turn() === botColor ? "Their turn" : "Online")
+        : coachThinking ? "Thinking..." : isGameOver ? "Review" : "Online";
       document.getElementById("aiLastMove").textContent = `Last: ${coachLastMove?.san || "--"}`;
-      card.title = `${ai.name}: ${ai.title}. Plays ${config.label}, depth ${config.depth}. Favorite openings: Italian, Queen's Gambit, Sicilian setups.`;
+      card.title = ai.isFriend
+        ? `${ai.name} - ${ai.title}. ${displayRating} Elo.`
+        : `${ai.name}: ${ai.title}. Plays ${config.label}, depth ${config.depth}. Favorite openings: Italian, Queen's Gambit, Sicilian setups.`;
     }
 
     function getCoachStrengthProfile() {
@@ -31359,19 +31379,26 @@
       const card = document.getElementById("matchPlayerCard");
       if (!card) return;
       const profile = getDragonProfileSnapshot();
+      const friendSelf = friendChallengeState?.active ? getFriendMatchProfiles().self : null;
       const prefs = readLearnerPrefs();
       const rating = document.querySelector("[data-match-rating]");
       const premium = document.querySelector("[data-match-premium]");
       const premiumLabel = getPremiumMatchBadge();
 
-      card.querySelector("[data-match-avatar]").textContent = profile.avatar || "\u2726";
-      const matchName = getPreferredPlayerName(profile);
+      card.querySelector("[data-match-avatar]").textContent = friendSelf?.avatar || profile.avatar || "\u2726";
+      const matchName = friendSelf?.displayName || getPreferredPlayerName(profile);
       card.querySelector("[data-match-name]").textContent = matchName;
-      card.querySelector("[data-match-level]").textContent = profile.level || "Level 1 Explorer";
+      card.querySelector("[data-match-level]").textContent = friendSelf?.title || profile.level || "Level 1 Explorer";
       applyAvatarRankBadges(profile);
       renderStyledUsernames(matchName);
-      renderPlayerIdentityExtras(profile);
-      if (rating) rating.textContent = `${getLearnerGameRating()} Elo`;
+      if (friendSelf) {
+        const line = card.querySelector(".match-player-name-line");
+        syncIdentityLine(line, "[data-match-name]", formatCountryFlag(friendSelf.countryFlag), [], friendSelf.title, friendSelf.countryFlag);
+        updateMatchQuickStats({ ...profile, name: matchName });
+      } else {
+        renderPlayerIdentityExtras(profile);
+      }
+      if (rating) rating.textContent = `${friendSelf?.rating || getLearnerGameRating()} Elo`;
       renderFlexBadgeTargets(prefs);
       if (premium) {
         premium.hidden = !premiumLabel;
@@ -33856,6 +33883,35 @@
       return color === "b" ? "w" : "b";
     }
 
+    function normalizeFriendMatchProfile(raw, fallback = {}) {
+      const source = raw && typeof raw === "object" ? raw : {};
+      const username = String(source.username || source.displayName || source.display_name || fallback.name || "Chess Player").trim() || "Chess Player";
+      const storedAvatar = String(source.avatar || "").trim();
+      const avatarImage = /^(?:https?:\/\/|data:image\/|assets\/)/i.test(storedAvatar) ? storedAvatar : "";
+      return {
+        id: String(source.id || fallback.id || ""),
+        username,
+        displayName: String(source.displayName || source.display_name || username).trim() || username,
+        avatar: avatarImage ? "\u265f" : (storedAvatar && storedAvatar !== "auto" ? storedAvatar : "\u265f"),
+        avatarImage,
+        countryFlag: normalizeCountryFlagValue(source.countryFlag || source.country_flag || fallback.countryFlag || ""),
+        title: String(source.title || fallback.title || "Chess Player").trim() || "Chess Player",
+        rating: Math.max(400, Number(source.rating) || Number(fallback.rating) || 450),
+        online: Boolean(source.online)
+      };
+    }
+
+    function getFriendMatchProfiles(state = friendChallengeState || readFriendChallengeState()) {
+      if (!state?.creatorId && !state?.opponentId) return { self: null, opponent: null };
+      const creator = normalizeFriendMatchProfile(state.creatorProfile, { id: state.creatorId, name: state.creatorName });
+      const opponent = normalizeFriendMatchProfile(state.opponentProfile, { id: state.opponentId, name: state.opponentName });
+      const currentUserId = getFriendCurrentUserId();
+      if (!currentUserId) return { self: null, opponent: null };
+      if (creator.id === currentUserId) return { self: creator, opponent: opponent.id ? opponent : null };
+      if (opponent.id === currentUserId) return { self: opponent, opponent: creator.id ? creator : null };
+      return { self: null, opponent: null };
+    }
+
     function normalizeRemoteFriendChallenge(raw) {
       if (!raw || typeof raw !== "object" || !raw.code) return null;
       return {
@@ -33863,8 +33919,10 @@
         code: String(raw.code || "").toUpperCase(),
         creatorId: String(raw.creatorId || raw.creator_id || ""),
         creatorName: String(raw.creatorName || raw.creator_name || "Friend"),
+        creatorProfile: normalizeFriendMatchProfile(raw.creatorProfile || raw.creator_profile, { id: raw.creatorId || raw.creator_id, name: raw.creatorName || raw.creator_name }),
         opponentId: String(raw.opponentId || raw.opponent_id || ""),
         opponentName: String(raw.opponentName || raw.opponent_name || ""),
+        opponentProfile: normalizeFriendMatchProfile(raw.opponentProfile || raw.opponent_profile, { id: raw.opponentId || raw.opponent_id, name: raw.opponentName || raw.opponent_name }),
         creatorColor: raw.creatorColor === "b" ? "b" : "w",
         inviteType: raw.inviteType === "public" ? "public" : "private",
         gameType: raw.gameType === "rated" ? "rated" : "casual",
@@ -33889,6 +33947,8 @@
         remoteId: remote.id,
         creatorId: remote.creatorId,
         opponentId: remote.opponentId,
+        creatorProfile: remote.creatorProfile,
+        opponentProfile: remote.opponentProfile,
         targetId: isCreator ? remote.opponentId : remote.creatorId,
         targetName: isCreator ? (remote.opponentName || "Friend") : remote.creatorName,
         inviteType: remote.inviteType,
@@ -33911,11 +33971,14 @@
       const remote = normalizeRemoteFriendChallenge(raw);
       if (!remote) return false;
       const next = toFriendChallengeState(remote);
-      const remoteChanged = remote.updatedAt && remote.updatedAt !== friendChallengeState?.remoteUpdatedAt;
       friendChallengeState = next;
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
-      if (remote.status === "active") resetMatchPlayerTimer(next.clock, next.clockState);
-      if (restoreBoard && remoteChanged && remote.status === "active" && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen)) {
+      if (remote.status === "active") {
+        coachPlayerColor = next.color;
+        coachFlipped = next.color === "b";
+        resetMatchPlayerTimer(next.clock, next.clockState);
+      }
+      if (restoreBoard && remote.status === "active" && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen)) {
         try {
           coachGame = new CoachChess(remote.fen);
           coachPlayerColor = next.color;
@@ -33931,6 +33994,10 @@
         } catch {
           setFriendChallengeStatus("Your friend game updated, but the board could not be restored. Reconnect once more.");
         }
+      }
+      if (remote.status === "active") {
+        renderInGamePlayerCard();
+        updateAiPlayerHeader();
       }
       renderFriendChallengeLobby();
       return true;
@@ -35816,6 +35883,7 @@
       return {
         ...source,
         avatar: String(source.avatar || "auto"),
+        countryFlag: normalizeCountryFlagValue(source.countryFlag || source.country_flag || ""),
         rating: Math.max(400, Number(source.rating) || 450),
         coins: Math.max(0, Number(source.coins) || 0),
         xp: Math.max(0, Number(source.xp) || 0),
@@ -35983,9 +36051,14 @@
         };
         if (!user?.id) return fallback;
         try {
-          const rows = await request("rest/v1", `profiles?id=eq.${encodeURIComponent(user.id)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at&limit=1`, {
-            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
-          });
+          const profilePath = `profiles?id=eq.${encodeURIComponent(user.id)}&select=public_id,username,avatar,country_flag,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at&limit=1`;
+          const legacyProfilePath = `profiles?id=eq.${encodeURIComponent(user.id)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at&limit=1`;
+          let rows;
+          try {
+            rows = await request("rest/v1", profilePath, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
+          } catch {
+            rows = await request("rest/v1", legacyProfilePath, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
+          }
           const profile = Array.isArray(rows) ? rows[0] : null;
           return profile ? {
             ...fallback,
@@ -36064,6 +36137,7 @@
           if (!accessToken || !account?.publicId) return null;
           const row = {
             avatar: String(profileData.avatar || "auto").slice(0, 64),
+            country_flag: normalizeCountryFlagValue(profileData.countryFlag || ""),
             rating: Math.max(400, Math.min(3000, Number(profileData.rating) || 450)),
             coins: Math.max(0, Number(profileData.coins) || 0),
             xp: Math.max(0, Number(profileData.xp) || 0),
@@ -36075,11 +36149,16 @@
             last_login_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
-          const rows = await request("rest/v1", `profiles?id=eq.${encodeURIComponent(account.publicId)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at`, {
-            method: "PATCH",
-            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Prefer: "return=representation" },
-            body: JSON.stringify(row)
-          });
+          const profilePath = `profiles?id=eq.${encodeURIComponent(account.publicId)}&select=public_id,username,avatar,country_flag,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at`;
+          const legacyProfilePath = `profiles?id=eq.${encodeURIComponent(account.publicId)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at`;
+          const requestOptions = { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Prefer: "return=representation" } };
+          let rows;
+          try {
+            rows = await request("rest/v1", profilePath, { ...requestOptions, body: JSON.stringify(row) });
+          } catch {
+            const { country_flag, ...legacyRow } = row;
+            rows = await request("rest/v1", legacyProfilePath, { ...requestOptions, body: JSON.stringify(legacyRow) });
+          }
           const saved = Array.isArray(rows) ? rows[0] : null;
           cachedAccount = {
             ...account,
@@ -36902,6 +36981,7 @@
       const losses = Math.max(0, Number(gameStats.played) || 0) - Math.max(0, Number(gameStats.wins) || 0) - draws;
       return {
         avatar: readLearnerPrefs().avatar || account.avatar.icon || "auto",
+        countryFlag: normalizeCountryFlagValue(readLearnerProfile().countryFlag),
         rating: account.gameRating,
         coins: puzzleCoins,
         xp: puzzleXp,
@@ -36937,6 +37017,7 @@
       gameStats = { ...gameStats, wins, played: wins + losses + draws, draws };
       const prefs = readLearnerPrefs();
       writeJsonStorage(learnerPrefsStorageKey, { ...prefs, avatar: remote.avatar || prefs.avatar, title: remote.title || prefs.title });
+      writeJsonStorage(learnerProfileStorageKey, { ...readLearnerProfile(), countryFlag: remote.countryFlag || readLearnerProfile().countryFlag });
       writeJsonStorage(friendDirectoryStorageKey, {
         ...readFriendDirectoryState(),
         friends: remote.friends.friends,

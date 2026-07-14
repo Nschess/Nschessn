@@ -159,11 +159,13 @@ grant execute on function public.get_friend_directory() to authenticated;
 -- friend-request section above. All writes go through security-definer RPCs.
 alter table public.profiles add column if not exists is_bot boolean not null default false;
 
-create or replace function public.search_registered_players(p_query text)
+drop function if exists public.search_registered_players(text);
+create function public.search_registered_players(p_query text)
 returns table (
   public_id uuid,
   username text,
   avatar text,
+  country_flag text,
   rating integer,
   title text,
   last_login_at timestamptz
@@ -172,7 +174,7 @@ language sql
 security definer set search_path = public
 stable
 as $$
-  select profile.id, profile.username, profile.avatar, profile.rating, profile.title, profile.last_login_at
+  select profile.id, profile.username, profile.avatar, coalesce(to_jsonb(profile) ->> 'country_flag', ''), profile.rating, profile.title, profile.last_login_at
   from public.profiles as profile
   where auth.uid() is not null
     and profile.id <> auth.uid()
@@ -248,8 +250,28 @@ as $$
     'code', challenge.code,
     'creatorId', challenge.creator_id,
     'creatorName', coalesce(creator.username, 'Friend'),
+    'creatorProfile', jsonb_build_object(
+      'id', creator.id,
+      'username', coalesce(creator.username, 'Chess Player'),
+      'displayName', coalesce(creator.username, 'Chess Player'),
+      'avatar', coalesce(creator.avatar, 'auto'),
+      'countryFlag', coalesce(to_jsonb(creator) ->> 'country_flag', ''),
+      'title', coalesce(creator.title, ''),
+      'rating', coalesce(creator.rating, 450),
+      'online', coalesce(creator.last_login_at > now() - interval '5 minutes', false)
+    ),
     'opponentId', challenge.opponent_id,
     'opponentName', coalesce(opponent.username, ''),
+    'opponentProfile', case when opponent.id is null then null else jsonb_build_object(
+      'id', opponent.id,
+      'username', coalesce(opponent.username, 'Chess Player'),
+      'displayName', coalesce(opponent.username, 'Chess Player'),
+      'avatar', coalesce(opponent.avatar, 'auto'),
+      'countryFlag', coalesce(to_jsonb(opponent) ->> 'country_flag', ''),
+      'title', coalesce(opponent.title, ''),
+      'rating', coalesce(opponent.rating, 450),
+      'online', coalesce(opponent.last_login_at > now() - interval '5 minutes', false)
+    ) end,
     'creatorColor', challenge.creator_color,
     'inviteType', challenge.invite_type,
     'gameType', challenge.game_type,
@@ -367,7 +389,7 @@ end;
 $$;
 
 drop function if exists public.save_game_challenge_position(text, text, jsonb, text);
-create function public.save_game_challenge_position(
+create or replace function public.save_game_challenge_position(
   p_code text,
   p_fen text,
   p_moves jsonb,
