@@ -19237,8 +19237,14 @@
               <button class="button secondary" type="button" id="whyGame">Why?</button>
               <button class="button secondary" type="button" id="replayMistake">Replay Mistake</button>
               <button class="button secondary" type="button" id="showThreats">Threats</button>
-              <button class="button secondary" type="button" id="offerDraw">Agree Draw</button>
+              <button class="button secondary" type="button" id="offerDraw">Offer Draw</button>
+              <button class="button secondary" type="button" id="acceptDraw" hidden>Accept Draw</button>
+              <button class="button secondary" type="button" id="declineDraw" hidden>Decline</button>
+              <button class="button secondary" type="button" id="abortGame">Abort</button>
+              <button class="button secondary" type="button" id="resignGame">Resign</button>
+              <button class="button secondary" type="button" id="returnLobby">Lobby</button>
               <button class="button" type="button" id="exportPgn">Copy PGN</button>
+              <button class="button secondary" type="button" id="importPgn">Import PGN</button>
             </div>
             <details class="coach-library">
               <summary><span>More opponents</span><small>Friendly bots and story battles</small></summary>
@@ -30833,6 +30839,7 @@
     let friendSearchTimer = 0;
     let friendNetworkRequest = 0;
     let friendIncomingNoticeCode = "";
+    let coachPremove = null;
     let chessRulesPromise = null;
     let stockfishWorker = null;
     let stockfishReady = false;
@@ -31303,6 +31310,30 @@
       const key = source.activeColor === "b" ? "blackMs" : "whiteMs";
       snapshot[key] = Math.max(0, snapshot[key] - elapsed);
       return snapshot;
+    }
+
+    function getFriendControlSignals(state = friendChallengeState || readFriendChallengeState()) {
+      return (Array.isArray(state?.moves) ? state.moves : [])
+        .map(String)
+        .filter((move) => move.startsWith("__"));
+    }
+
+    function getFriendDrawOfferBy(state = friendChallengeState || readFriendChallengeState()) {
+      const signal = getFriendControlSignals(state).reverse().find((move) => move.startsWith("__draw_offer:"));
+      return signal ? signal.split(":")[1] || "" : "";
+    }
+
+    function getFriendBoardMoves() {
+      return coachGame?.history({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion || ""}`) || [];
+    }
+
+    function getSyncedFriendMoves(extraSignals = []) {
+      const signals = [...new Set([...getFriendControlSignals(), ...extraSignals].map(String))];
+      return [...getFriendBoardMoves(), ...signals];
+    }
+
+    function isBeforeMoveTwo() {
+      return (coachGame?.history()?.length || 0) < 2;
     }
 
     function resetMatchPlayerTimer(control = friendChallengeState?.clock || "10+0", remoteClock = null) {
@@ -33411,6 +33442,30 @@
       document.getElementById("undoGame").disabled = coachThinking || !coachGame.history().length;
       document.getElementById("replayMistake").disabled = coachThinking || !coachReplayFen;
       document.getElementById("showThreats").setAttribute("aria-pressed", String(coachThreatMode));
+      const drawOfferBy = friendChallengeState?.active ? getFriendDrawOfferBy() : "";
+      const drawIncoming = Boolean(drawOfferBy && drawOfferBy !== coachPlayerColor);
+      const drawOutgoing = Boolean(drawOfferBy && drawOfferBy === coachPlayerColor);
+      const offerDraw = document.getElementById("offerDraw");
+      const acceptDraw = document.getElementById("acceptDraw");
+      const declineDraw = document.getElementById("declineDraw");
+      const abortGame = document.getElementById("abortGame");
+      const resignGame = document.getElementById("resignGame");
+      const returnLobby = document.getElementById("returnLobby");
+      if (offerDraw) {
+        offerDraw.textContent = drawOutgoing ? "Draw Offered" : friendChallengeState?.active ? "Offer Draw" : "Agree Draw";
+        offerDraw.disabled = drawOutgoing || drawIncoming || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
+      }
+      if (acceptDraw) acceptDraw.hidden = !drawIncoming;
+      if (declineDraw) declineDraw.hidden = !drawIncoming;
+      if (abortGame) {
+        abortGame.hidden = !friendChallengeState?.active;
+        abortGame.disabled = !isBeforeMoveTwo() || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
+      }
+      if (resignGame) {
+        resignGame.hidden = !friendChallengeState?.active;
+        resignGame.disabled = coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
+      }
+      if (returnLobby) returnLobby.hidden = !friendChallengeState?.remote && !friendChallengeState?.active;
       updateEnginePanel();
       updateBotToggle();
       renderInGamePlayerCard();
@@ -33610,6 +33665,8 @@
         square.className = `puzzle-square play-square ${isLightCoachSquare(squareNameValue) ? "light" : "dark"}`;
         if (piece) square.classList.add(piece.color === "w" ? "white-piece" : "black-piece");
         if (squareNameValue === coachSelected) square.classList.add("selected");
+        if (coachPremove?.from === squareNameValue) square.classList.add("selected");
+        if (coachPremove?.to === squareNameValue) square.classList.add("legal");
         if (legalMove) square.classList.add(legalMove.captured || legalMove.flags.includes("e") ? "capture" : "legal");
         if (lastSquares.includes(squareNameValue)) square.classList.add("last-move");
         if (animateEffect && squareNameValue === coachLastMove?.to && captureEffect) square.classList.add("capture-impact");
@@ -33634,6 +33691,7 @@
     }
 
     function makeCoachMove(from, to) {
+      if (!coachGame || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return false;
       const legalMoves = coachGame.moves({ square: from, verbose: true }).filter((move) => move.to === to);
       if (!legalMoves.length) {
         playAudioCue("illegal");
@@ -33668,6 +33726,7 @@
 
       coachSelected = "";
       coachLegalMoves = [];
+      coachPremove = null;
       coachLastMove = move;
       advanceMatchClock(move.color);
       if (friendChallengeState?.active) {
@@ -33695,8 +33754,25 @@
     }
 
     function handleCoachSquare(square) {
-      if (!coachGame || coachThinking || isCoachGameOver()) return;
+      if (!coachGame || coachThinking || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return;
       const piece = coachGame.get(square);
+
+      if (friendChallengeState?.active && coachGame.turn() !== coachPlayerColor) {
+        if (coachPremove?.from && square !== coachPremove.from) {
+          coachPremove = { ...coachPremove, to: square };
+          coachMessage = `Premove queued: ${coachPremove.from}-${coachPremove.to}. It will play if legal after your friend's move.`;
+          scheduleCoachBoardRender();
+          updateCoachPanel();
+          return;
+        }
+        if (piece?.color === coachPlayerColor) {
+          coachPremove = { from: square, to: "" };
+          coachMessage = "Premove ready. Pick the destination square while your friend thinks.";
+          scheduleCoachBoardRender();
+          updateCoachPanel();
+          return;
+        }
+      }
 
       if (coachSelected && square !== coachSelected && coachLegalMoves.some((move) => move.to === square)) {
         makeCoachMove(coachSelected, square);
@@ -33792,6 +33868,7 @@
       coachGame = new CoachChess();
       coachSelected = "";
       coachLegalMoves = [];
+      coachPremove = null;
       coachLastMove = null;
       coachThinking = false;
       coachBotPaused = false;
@@ -33973,10 +34050,22 @@
       const next = toFriendChallengeState(remote);
       friendChallengeState = next;
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
+      const signals = getFriendControlSignals(next);
+      const resignSignal = signals.find((move) => move.startsWith("__resign:"));
+      const aborted = signals.includes("__abort");
+      const drawAccepted = signals.includes("__draw_accept");
       if (remote.status === "active") {
         coachPlayerColor = next.color;
         coachFlipped = next.color === "b";
         resetMatchPlayerTimer(next.clock, next.clockState);
+      }
+      if (remote.status === "completed") {
+        coachDrawAgreed = true;
+        if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
+        coachMessage = aborted ? "Game aborted before move 2."
+          : drawAccepted ? "Draw accepted. Good calm game."
+            : resignSignal ? `${getCoachColorName((resignSignal.split(":")[1] || "w"))} resigned.`
+              : "Friend game completed.";
       }
       if (restoreBoard && remote.status === "active" && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen)) {
         try {
@@ -33989,6 +34078,7 @@
           coachLegalMoves = [];
           coachLastMove = coachGame.history({ verbose: true }).at(-1) || null;
           coachMessage = "Friend move received. Your board is up to date.";
+          tryRunCoachPremove();
           renderCoachBoard();
           updateCoachPanel();
         } catch {
@@ -33998,6 +34088,10 @@
       if (remote.status === "active") {
         renderInGamePlayerCard();
         updateAiPlayerHeader();
+      }
+      if (remote.status === "completed") {
+        renderCoachBoard();
+        updateCoachPanel();
       }
       renderFriendChallengeLobby();
       return true;
@@ -34399,6 +34493,7 @@
       coachThinking = false;
       coachSelected = "";
       coachLegalMoves = [];
+      coachPremove = null;
       coachLastMove = null;
       coachDrawAgreed = false;
       coachGameRecorded = false;
@@ -34461,13 +34556,112 @@
       const state = friendChallengeState;
       const provider = getFriendProvider();
       if (!state?.remote || !state.active || !coachGame || !provider) return;
-      const moves = coachGame.history({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion || ""}`);
+      const moves = getSyncedFriendMoves();
       try {
         const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active", moveApplied });
         if (remote) applyRemoteFriendChallenge(remote, false);
       } catch (error) {
         setFriendChallengeStatus(error?.message || "Move saved locally. Reconnect to retry syncing it.");
       }
+    }
+
+    async function syncFriendSignal(signal, status = "active") {
+      const state = friendChallengeState;
+      const provider = getFriendProvider();
+      if (!state?.remote || !state.active || !coachGame || !provider) return false;
+      try {
+        const remote = await provider.saveFriendChallengePosition({
+          ...state,
+          fen: coachGame.fen(),
+          moves: getSyncedFriendMoves([signal]),
+          status,
+          moveApplied: false
+        });
+        if (remote) applyRemoteFriendChallenge(remote, false);
+        return true;
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "Game action saved locally. Reconnect to retry syncing it.");
+        return false;
+      }
+    }
+
+    function finishFriendGame(message, signal = "") {
+      coachMoveToken += 1;
+      coachDrawAgreed = true;
+      if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
+      coachMessage = message;
+      if (friendChallengeState) {
+        friendChallengeState = { ...friendChallengeState, active: true, status: "active", moves: getSyncedFriendMoves(signal ? [signal] : []) };
+        saveFriendChallengeState(friendChallengeState);
+      }
+      if (signal) void syncFriendSignal(signal, "completed");
+      renderCoachBoard();
+      updateCoachPanel();
+    }
+
+    function offerFriendDraw() {
+      if (!friendChallengeState?.active) {
+        coachDrawAgreed = true;
+        coachMessage = buildCoachSummary();
+        renderCoachBoard();
+        return;
+      }
+      const color = coachPlayerColor;
+      coachMessage = "Draw offer sent. Your friend can accept or decline.";
+      void syncFriendSignal(`__draw_offer:${color}`);
+      updateCoachPanel();
+    }
+
+    function acceptFriendDraw() {
+      finishFriendGame("Draw accepted. Good calm game.", "__draw_accept");
+    }
+
+    function declineFriendDraw() {
+      const cleared = getFriendBoardMoves();
+      if (friendChallengeState) friendChallengeState = { ...friendChallengeState, moves: cleared };
+      coachMessage = "Draw declined. Keep playing.";
+      void syncFriendChallengePosition(false);
+      renderCoachBoard();
+      updateCoachPanel();
+    }
+
+    function resignCoachGame() {
+      if (!coachGame || isCoachGameOver() || coachDrawAgreed) return;
+      if (!window.confirm("Resign this game?")) return;
+      finishFriendGame(`${getCoachColorName(coachPlayerColor)} resigned.`, `__resign:${coachPlayerColor}`);
+    }
+
+    function abortFriendGame() {
+      if (!friendChallengeState?.active || !isBeforeMoveTwo()) {
+        coachMessage = "Abort is only available before move 2 in friend games.";
+        updateCoachPanel();
+        return;
+      }
+      finishFriendGame("Game aborted before move 2.", "__abort");
+    }
+
+    function returnFriendLobby() {
+      coachPremove = null;
+      coachSelected = "";
+      coachLegalMoves = [];
+      if (friendChallengeState) {
+        friendChallengeState = { ...friendChallengeState, active: false, pending: false, status: "draft", remote: false, fen: "", moves: [], code: createFriendChallengeCode() };
+        saveFriendChallengeState(friendChallengeState);
+      }
+      location.hash = "play?mode=friend";
+      document.getElementById("friendChallenge")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function tryRunCoachPremove() {
+      if (!coachPremove || !friendChallengeState?.active || !coachGame || coachGame.turn() !== coachPlayerColor) return false;
+      const queued = coachPremove;
+      coachPremove = null;
+      const legal = coachGame.moves({ square: queued.from, verbose: true }).some((move) => move.to === queued.to);
+      if (!legal) {
+        coachMessage = "Your premove was no longer legal after your friend's move.";
+        return false;
+      }
+      return makeCoachMove(queued.from, queued.to);
     }
 
     function startFriendNetworkSync() {
@@ -34487,6 +34681,7 @@
       coachGame.undo();
       coachSelected = "";
       coachLegalMoves = [];
+      coachPremove = null;
       coachLastMove = coachGame.history({ verbose: true }).at(-1) || null;
       coachMessage = "Casual takeback accepted. Keep it friendly and try the idea again.";
       saveFriendChallengeState({ ...(friendChallengeState || readFriendChallengeState()), active: true });
@@ -34517,6 +34712,7 @@
       if (coachGame.turn() === getCoachBotColor()) coachGame.undo();
       coachSelected = "";
       coachLegalMoves = [];
+      coachPremove = null;
       coachLastMove = null;
       coachDrawAgreed = false;
       coachEndSoundPlayed = false;
@@ -34580,6 +34776,36 @@
         coachMessage = "PGN is shown below. Your browser blocked auto-copy, but you can still select it.";
       }
       renderCoachBoard();
+    }
+
+    function importCoachPgn() {
+      if (!CoachChess) return;
+      const pgn = window.prompt("Paste PGN to load for review or replay:");
+      if (!pgn) return;
+      try {
+        const next = new CoachChess();
+        const loaded = typeof next.loadPgn === "function" ? next.loadPgn(pgn) : next.load_pgn?.(pgn);
+        if (loaded === false) throw new Error("PGN rejected");
+        coachMoveToken += 1;
+        coachGame = next;
+        coachSelected = "";
+        coachLegalMoves = [];
+        coachPremove = null;
+        coachLastMove = coachGame.history({ verbose: true }).at(-1) || null;
+        coachBotPaused = true;
+        coachThinking = false;
+        coachDrawAgreed = false;
+        matchClockExpiredColor = "";
+        if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
+        document.getElementById("gamePgn").textContent = coachGame.pgn() || pgn;
+        coachMessage = "PGN imported. Use Review Game after the game ends, or explore the position in Free Play.";
+        renderGuidedGameReview(false);
+        renderCoachBoard();
+        updateCoachPanel();
+      } catch {
+        coachMessage = "That PGN could not be loaded. Check the move text and try again.";
+        updateCoachPanel();
+      }
     }
 
 
@@ -35118,12 +35344,14 @@
       document.getElementById("whyGame").addEventListener("click", askCoachWhy);
       document.getElementById("replayMistake").addEventListener("click", replayCoachMistake);
       document.getElementById("showThreats").addEventListener("click", toggleCoachThreats);
-      document.getElementById("offerDraw").addEventListener("click", () => {
-        coachDrawAgreed = true;
-        coachMessage = buildCoachSummary();
-        renderCoachBoard();
-      });
+      document.getElementById("offerDraw").addEventListener("click", offerFriendDraw);
+      document.getElementById("acceptDraw")?.addEventListener("click", acceptFriendDraw);
+      document.getElementById("declineDraw")?.addEventListener("click", declineFriendDraw);
+      document.getElementById("abortGame")?.addEventListener("click", abortFriendGame);
+      document.getElementById("resignGame")?.addEventListener("click", resignCoachGame);
+      document.getElementById("returnLobby")?.addEventListener("click", returnFriendLobby);
       document.getElementById("exportPgn").addEventListener("click", exportCoachPgn);
+      document.getElementById("importPgn")?.addEventListener("click", importCoachPgn);
       document.getElementById("reviewPrev")?.addEventListener("click", () => stepReview(-1));
       document.getElementById("reviewNext")?.addEventListener("click", () => stepReview(1));
       document.getElementById("reviewPlay")?.addEventListener("click", toggleReviewPlayback);
