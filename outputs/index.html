@@ -16594,6 +16594,11 @@
         animation: none !important;
       }
     }
+    /* The retired puzzle panel remains in the document for backwards-compatible
+       anchors only. The validated trainer below is the single active experience. */
+    #puzzles .puzzle-shell[hidden] {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -19360,12 +19365,12 @@
         <div class="section-head">
           <div>
             <p class="section-kicker">Puzzle board</p>
-            <h2 id="puzzles-title">Find the move</h2>
+            <h2 id="puzzles-title">Puzzle Trainer</h2>
           </div>
           <p class="section-intro">Become a Chess Ninja: pick one 60-second trick, move the pieces, solve the mini puzzle, then jump to the next idea.</p>
         </div>
 
-        <div class="puzzle-shell">
+        <div class="puzzle-shell" hidden aria-hidden="true">
           <nav class="puzzle-side-nav" aria-label="Puzzle menu">
             <button type="button" data-puzzle-plan="main" aria-pressed="true">Puzzles</button>
             <button type="button" data-puzzle-focus="themes">Puzzle Themes</button>
@@ -19826,7 +19831,6 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="verified-puzzles.js?v=20260711"></script>
   <aside class="audio-player" id="audioPlayer" aria-label="Premium music player">
     <span class="audio-wave" aria-hidden="true"></span>
     <div class="audio-now">
@@ -25878,17 +25882,25 @@
       panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
-    function openPuzzleByTitle(title) {
-      const index = puzzles.findIndex((puzzle) => puzzle.title === title);
-      if (index < 0) return;
-      activePuzzlePlan = "Puzzle Adventure";
-      currentPuzzle = index;
-      renderPuzzle();
+    function getRealPuzzleDifficultyForPlan(plan = "") {
+      const value = String(plan).toLowerCase();
+      if (/expert|boss|mate 3|mate 4|mate 5/.test(value)) return "Expert";
+      if (/advanced|hard|sacrifice/.test(value)) return "Hard";
+      if (/beginner|easy|knight|queen|rookie/.test(value)) return "Easy";
+      return /intermediate|tactic|fork|pin|skewer|opening|endgame|defense/.test(value) ? "Medium" : "All";
+    }
+
+    function openRealPuzzleExperience(plan = "All") {
+      realPuzzleDifficulty = getRealPuzzleDifficultyForPlan(plan);
+      const indexes = getRealPuzzleIndexes();
+      realPuzzleIndex = indexes.find((index) => !realPuzzleSolved.has(realPuzzleBank[index].id)) ?? indexes[0] ?? 0;
+      renderRealPuzzle();
       document.querySelector('[data-site-tab="puzzles"]')?.click();
-      window.setTimeout(() => {
-        document.getElementById("feedback").textContent = `${title} loaded. Make the hero move to finish the mission.`;
-        if (CoachChess) startPuzzle();
-      }, 140);
+      window.setTimeout(() => document.getElementById("realPuzzles")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    }
+
+    function openPuzzleByTitle(title) {
+      openRealPuzzleExperience(title);
     }
 
     function startMiniGame(plan) {
@@ -25901,27 +25913,18 @@
         "Puzzle Rush": "Puzzle race",
         "Boss Puzzle": "Boss battle"
       };
-      setPuzzlePlan(plan);
-      document.getElementById("feedback").textContent = `${names[plan] || "Mini-game"} started. No pressure: solve one position and collect rewards.`;
-      startPuzzle();
-      document.getElementById("puzzles")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      openRealPuzzleExperience(plan);
+      document.getElementById("realPuzzleFeedback").textContent = `${names[plan] || "Mini-game"} started. No pressure: solve one position and collect rewards.`;
     }
 
     function runHomeAction(action, plan = "main") {
       if (action === "daily-puzzle") {
-        document.querySelector('[data-site-tab="puzzles"]')?.click();
-        window.setTimeout(() => {
-          activePuzzlePlan = "main";
-          currentPuzzle = getDailyPuzzleIndex();
-          renderPuzzle();
-          startPuzzle();
-        }, 120);
+        openRealPuzzleExperience("Easy");
         return;
       }
 
       if (action === "puzzle-plan") {
-        document.querySelector('[data-site-tab="puzzles"]')?.click();
-        window.setTimeout(() => startMiniGame(plan || "main"), 120);
+        openRealPuzzleExperience(plan || "All");
       }
     }
 
@@ -29829,20 +29832,6 @@
       return true;
     }
 
-    async function loadPuzzleCollectionFromJson() {
-      if (loadEmbeddedVerifiedPuzzles()) return true;
-      if (location.protocol === "file:") return false;
-      try {
-        const response = await fetch("puzzles.json", { cache: "force-cache" });
-        if (!response.ok) return loadEmbeddedVerifiedPuzzles();
-        const data = await response.json();
-        const list = Array.isArray(data) ? data : Array.isArray(data.puzzles) ? data.puzzles : [];
-        return tryInstallPuzzleList(list, "puzzles.json") || loadEmbeddedVerifiedPuzzles();
-      } catch {
-        return false;
-      }
-    }
-
     function refreshPuzzleCollectionStatus() {
       const status = document.getElementById("puzzleCollectionStatus");
       if (!status) return;
@@ -30796,6 +30785,10 @@
     let matchEndedElapsedMs = null;
     let matchTimerInterval = 0;
     let friendChallengeState = null;
+    let friendNetworkState = { directory: [], search: [], challenges: [] };
+    let friendNetworkTimer = 0;
+    let friendSearchTimer = 0;
+    let friendNetworkRequest = 0;
     let chessRulesPromise = null;
     let stockfishWorker = null;
     let stockfishReady = false;
@@ -31281,6 +31274,7 @@
 
     function isCoachPlayablePiece(piece) {
       if (!piece || !coachGame) return false;
+      if (friendChallengeState?.active) return piece.color === coachPlayerColor && coachGame.turn() === coachPlayerColor;
       return coachBotPaused ? piece.color === coachGame.turn() : piece.color === coachPlayerColor && coachGame.turn() === coachPlayerColor;
     }
 
@@ -33525,8 +33519,11 @@
 
       coachSelected = "";
       coachLegalMoves = [];
-    coachLastMove = move;
-    if (friendChallengeState?.active) saveFriendChallengeState({ ...friendChallengeState, active: true });
+      coachLastMove = move;
+      if (friendChallengeState?.active) {
+        saveFriendChallengeState({ ...friendChallengeState, active: true });
+        void syncFriendChallengePosition();
+      }
     playCoachMoveSound(move, "player");
       gameStats.moveQualityTotal += Math.max(0, Math.min(100, 100 - Math.round(betterGap / 8)));
       gameStats.moveQualityMoves += 1;
@@ -33670,11 +33667,11 @@
     }
 
     function createFriendChallengeCode() {
-      return Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
+      return Array.from({ length: 10 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
     }
 
     function readFriendChallengeState() {
-      const fallback = { code: createFriendChallengeCode(), inviteType: "private", gameType: "casual", color: "random", clock: "10+0", fen: "", active: false, createdAt: Date.now() };
+      const fallback = { code: createFriendChallengeCode(), inviteType: "private", gameType: "casual", color: "random", fen: "", moves: [], status: "draft", active: false, createdAt: Date.now() };
       const saved = readJsonStorage(friendChallengeStorageKey, fallback);
       return { ...fallback, ...(saved && typeof saved === "object" ? saved : {}) };
     }
@@ -33684,6 +33681,101 @@
       if (coachGame && friendChallengeState.active) friendChallengeState.fen = coachGame.fen();
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
       renderFriendChallengeLobby();
+    }
+
+    function setFriendChallengeStatus(message) {
+      const status = document.getElementById("friendChallengeStatus");
+      if (status) status.textContent = message;
+    }
+
+    function getFriendProvider() {
+      const provider = getAuthProvider();
+      return provider?.createFriendChallenge && provider?.getFriendDirectory ? provider : null;
+    }
+
+    function getFriendCurrentUserId() {
+      return String(getFriendProvider()?.getCachedAccount?.()?.publicId || "");
+    }
+
+    function oppositeFriendColor(color) {
+      return color === "b" ? "w" : "b";
+    }
+
+    function normalizeRemoteFriendChallenge(raw) {
+      if (!raw || typeof raw !== "object" || !raw.code) return null;
+      return {
+        id: String(raw.id || ""),
+        code: String(raw.code || "").toUpperCase(),
+        creatorId: String(raw.creatorId || raw.creator_id || ""),
+        creatorName: String(raw.creatorName || raw.creator_name || "Friend"),
+        opponentId: String(raw.opponentId || raw.opponent_id || ""),
+        opponentName: String(raw.opponentName || raw.opponent_name || ""),
+        creatorColor: raw.creatorColor === "b" ? "b" : "w",
+        inviteType: raw.inviteType === "public" ? "public" : "private",
+        gameType: raw.gameType === "rated" ? "rated" : "casual",
+        clock: String(raw.clock || "10+0"),
+        status: String(raw.status || "pending"),
+        fen: String(raw.fen || ""),
+        moves: Array.isArray(raw.moves) ? raw.moves.map(String) : [],
+        updatedAt: String(raw.updatedAt || raw.updated_at || ""),
+        expiresAt: String(raw.expiresAt || raw.expires_at || "")
+      };
+    }
+
+    function toFriendChallengeState(remote, previous = friendChallengeState || readFriendChallengeState()) {
+      const me = getFriendCurrentUserId();
+      const isCreator = Boolean(me && remote.creatorId === me);
+      const incoming = Boolean(me && !isCreator && remote.status === "pending" && (remote.opponentId === me || !remote.opponentId));
+      return {
+        ...previous,
+        code: remote.code,
+        remote: true,
+        remoteId: remote.id,
+        creatorId: remote.creatorId,
+        opponentId: remote.opponentId,
+        targetId: isCreator ? remote.opponentId : remote.creatorId,
+        targetName: isCreator ? (remote.opponentName || "Friend") : remote.creatorName,
+        inviteType: remote.inviteType,
+        gameType: remote.gameType,
+        color: isCreator ? remote.creatorColor : oppositeFriendColor(remote.creatorColor),
+        clock: remote.clock,
+        status: remote.status,
+        pending: remote.status === "pending" || remote.status === "accepted",
+        active: remote.status === "active",
+        incoming,
+        online: true,
+        fen: remote.fen,
+        moves: remote.moves,
+        remoteUpdatedAt: remote.updatedAt
+      };
+    }
+
+    function applyRemoteFriendChallenge(raw, restoreBoard = false) {
+      const remote = normalizeRemoteFriendChallenge(raw);
+      if (!remote) return false;
+      const next = toFriendChallengeState(remote);
+      const remoteChanged = remote.updatedAt && remote.updatedAt !== friendChallengeState?.remoteUpdatedAt;
+      friendChallengeState = next;
+      writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
+      if (restoreBoard && remoteChanged && remote.status === "active" && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen)) {
+        try {
+          coachGame = new CoachChess(remote.fen);
+          coachPlayerColor = next.color;
+          coachFlipped = next.color === "b";
+          coachBotPaused = true;
+          coachThinking = false;
+          coachSelected = "";
+          coachLegalMoves = [];
+          coachLastMove = coachGame.history({ verbose: true }).at(-1) || null;
+          coachMessage = "Friend move received. Your board is up to date.";
+          renderCoachBoard();
+          updateCoachPanel();
+        } catch {
+          setFriendChallengeStatus("Your friend game updated, but the board could not be restored. Reconnect once more.");
+        }
+      }
+      renderFriendChallengeLobby();
+      return true;
     }
 
     function getFriendInviteLink(state = friendChallengeState || readFriendChallengeState()) {
@@ -33705,32 +33797,23 @@
       return "random";
     }
 
-    function applyFriendInviteFromHash() {
+    async function applyFriendInviteFromHash() {
       try {
         const hashQuery = location.hash.includes("?") ? location.hash.split("?")[1] : "";
         const invite = new URLSearchParams(hashQuery);
         const code = invite.get("challenge");
         if (!code) return false;
-        const challenger = invite.get("from") || "Friend";
-        friendChallengeState = {
-          ...(friendChallengeState || readFriendChallengeState()),
-          code: code.toUpperCase(),
-          inviteType: invite.get("type") || "private",
-          clock: invite.get("clock") || "10+0",
-          gameType: invite.get("game") || "casual",
-          color: getReceiverColorFromInvite(invite.get("color") || "random"),
-          targetName: challenger,
-          online: true,
-          incoming: true,
-          pending: true,
-          active: false,
-          fen: "",
-          receivedAt: Date.now()
-        };
-        saveFriendChallengeState(friendChallengeState);
+        const provider = getFriendProvider();
+        if (!provider) {
+          setFriendChallengeStatus("Sign in to open a friend invite.");
+          return false;
+        }
+        const remote = await provider.getFriendChallenge(code);
+        applyRemoteFriendChallenge(remote, true);
         window.setTimeout(() => document.getElementById("friendChallenge")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
         return true;
-      } catch {
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "This invite is unavailable or has expired.");
         return false;
       }
     }
@@ -33746,76 +33829,92 @@
     }
 
     function readFriendDirectoryState() {
-      const fallback = { friends: [], outgoing: [], incoming: [], lastSearch: "" };
+      const fallback = { lastSearch: "" };
       const saved = readJsonStorage(friendDirectoryStorageKey, fallback);
-      const cleanIds = (items) => [...new Set((Array.isArray(items) ? items : []).map((id) => String(id || "").trim()).filter(Boolean))];
       return {
-        friends: cleanIds(saved?.friends),
-        outgoing: cleanIds(saved?.outgoing),
-        incoming: cleanIds(saved?.incoming),
         lastSearch: String(saved?.lastSearch || "")
       };
     }
 
     function saveFriendDirectoryState(next) {
-      writeJsonStorage(friendDirectoryStorageKey, {
-        friends: [...new Set(next.friends || [])],
-        outgoing: [...new Set(next.outgoing || [])],
-        incoming: [...new Set(next.incoming || [])],
-        lastSearch: String(next.lastSearch || "")
-      });
+      writeJsonStorage(friendDirectoryStorageKey, { lastSearch: String(next.lastSearch || "") });
       renderFriendDirectory();
-      saveProgressSnapshot("friends");
     }
 
-    function getRegisteredFriendUsers() {
-      const seen = new Set();
-      return readAuthRegistry().accounts
-        .map((account) => {
-          const id = normalizeAuthEmail(account.email);
-          const username = normalizeAuthUsername(account.username);
-          if (!id || !username || seen.has(id)) return null;
-          seen.add(id);
-          return {
-            id,
-            name: username,
-            rating: Number(account.gameRating || account.rating || 450),
-            title: account.title || "Registered Player",
-            avatar: username.slice(0, 1).toUpperCase(),
-            online: Boolean(account.lastLogin)
-          };
-        })
-        .filter(Boolean);
+    function normalizeFriendRecord(row = {}) {
+      const lastLogin = String(row.last_login_at || row.lastLoginAt || "");
+      return {
+        id: String(row.public_id || row.id || row.user_id || ""),
+        name: String(row.username || row.name || "Player"),
+        title: String(row.title || "Chess Player"),
+        rating: Number(row.rating) || 450,
+        avatar: String(row.avatar || "auto"),
+        online: Boolean(lastLogin && Date.now() - Date.parse(lastLogin) < 5 * 60 * 1000),
+        requestId: String(row.request_id || row.requestId || ""),
+        requestStatus: String(row.request_status || row.requestStatus || ""),
+        requestDirection: String(row.request_direction || row.requestDirection || "")
+      };
     }
 
-    function getCurrentFriendUserId() {
-      const name = normalizeAuthUsername(readLearnerProfile().name).toLowerCase();
-      return getRegisteredFriendUsers().find((user) => user.name.toLowerCase() === name)?.id || "";
-    }
-
-    function getFriendById(id) {
-      return getRegisteredFriendUsers().find((friend) => friend.id === id);
-    }
-
-    function setFriendRequest(id, action) {
-      const state = readFriendDirectoryState();
-      const friends = new Set(state.friends);
-      const outgoing = new Set(state.outgoing);
-      const incoming = new Set(state.incoming);
-      if (action === "send") outgoing.add(id);
-      if (action === "cancel") outgoing.delete(id);
-      if (action === "accept") {
-        incoming.delete(id);
-        outgoing.delete(id);
-        friends.add(id);
+    async function refreshFriendNetwork() {
+      const provider = getFriendProvider();
+      if (!provider) return false;
+      const requestId = ++friendNetworkRequest;
+      try {
+        const [directory, challenges] = await Promise.all([provider.getFriendDirectory(), provider.listFriendChallenges()]);
+        if (requestId !== friendNetworkRequest) return false;
+        friendNetworkState.directory = (Array.isArray(directory) ? directory : []).map(normalizeFriendRecord).filter((friend) => friend.id);
+        friendNetworkState.challenges = (Array.isArray(challenges) ? challenges : []).map(normalizeRemoteFriendChallenge).filter(Boolean);
+        const state = friendChallengeState || readFriendChallengeState();
+        const matching = state.remote ? friendNetworkState.challenges.find((challenge) => challenge.code === state.code) : null;
+        const incoming = friendNetworkState.challenges.find((challenge) => challenge.status === "pending" && challenge.opponentId === getFriendCurrentUserId());
+        if (matching) applyRemoteFriendChallenge(matching, true);
+        else if (incoming && !state.active) applyRemoteFriendChallenge(incoming, false);
+        else if (state.remote && state.creatorId !== getFriendCurrentUserId() && state.opponentId !== getFriendCurrentUserId()) {
+          saveFriendChallengeState({ ...readFriendChallengeState(), code: createFriendChallengeCode(), remote: false, pending: false, active: false, status: "draft" });
+        }
+        else renderFriendChallengeLobby();
+        return true;
+      } catch (error) {
+        if (requestId === friendNetworkRequest) setFriendChallengeStatus(error?.message || "Friendly Challenge is unavailable. Please try again.");
+        return false;
       }
-      if (action === "decline") incoming.delete(id);
-      if (action === "remove") {
-        friends.delete(id);
-        outgoing.delete(id);
-        incoming.delete(id);
+    }
+
+    async function searchFriendPlayers(query = document.getElementById("friendSearchInput")?.value || "") {
+      const provider = getFriendProvider();
+      const text = String(query || "").trim();
+      if (!provider || text.length < 2) {
+        friendNetworkState.search = [];
+        renderFriendDirectory();
+        return;
       }
-      saveFriendDirectoryState({ ...state, friends: [...friends], outgoing: [...outgoing], incoming: [...incoming] });
+      try {
+        friendNetworkState.search = (await provider.searchRegisteredPlayers(text)).map(normalizeFriendRecord).filter((friend) => friend.id);
+      } catch (error) {
+        friendNetworkState.search = [];
+        setFriendChallengeStatus(error?.message || "Player search is unavailable.");
+      }
+      renderFriendDirectory();
+    }
+
+    async function setFriendRequest(friend, action) {
+      const provider = getFriendProvider();
+      if (!provider || !friend?.id) {
+        setFriendChallengeStatus("Sign in to manage friends.");
+        return;
+      }
+      try {
+        if (action === "send") await provider.sendFriendRequest(friend.id);
+        if (action === "accept") await provider.respondFriendRequest(friend.requestId, true);
+        if (action === "decline") await provider.respondFriendRequest(friend.requestId, false);
+        if (action === "cancel") await provider.cancelFriendRequest(friend.requestId);
+        if (action === "remove") await provider.removeFriend(friend.id);
+        await refreshFriendNetwork();
+        if (action === "send") setFriendChallengeStatus(`Friend request sent to ${friend.name}.`);
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "That friend action did not finish.");
+      }
     }
 
     function createFriendCard(friend, mode = "search") {
@@ -33836,29 +33935,29 @@
       if (mode === "search") {
         const add = createBookText("button", "button secondary", "Add");
         add.type = "button";
-        add.addEventListener("click", () => setFriendRequest(friend.id, "send"));
+        add.addEventListener("click", () => void setFriendRequest(friend, "send"));
         actions.append(add);
       } else if (mode === "outgoing") {
         actions.append(createBookText("span", "badge", "Pending"));
         const cancel = createBookText("button", "button secondary", "Cancel");
         cancel.type = "button";
-        cancel.addEventListener("click", () => setFriendRequest(friend.id, "cancel"));
+        cancel.addEventListener("click", () => void setFriendRequest(friend, "cancel"));
         actions.append(cancel);
       } else if (mode === "incoming") {
         const accept = createBookText("button", "button", "Accept");
         const decline = createBookText("button", "button secondary", "Decline");
         accept.type = "button";
         decline.type = "button";
-        accept.addEventListener("click", () => setFriendRequest(friend.id, "accept"));
-        decline.addEventListener("click", () => setFriendRequest(friend.id, "decline"));
+        accept.addEventListener("click", () => void setFriendRequest(friend, "accept"));
+        decline.addEventListener("click", () => void setFriendRequest(friend, "decline"));
         actions.append(accept, decline);
       } else {
         const challenge = createBookText("button", "button", "Challenge");
         const remove = createBookText("button", "button secondary", "Remove");
         challenge.type = "button";
         remove.type = "button";
-        challenge.addEventListener("click", () => sendFriendChallenge(friend.name, friend.online));
-        remove.addEventListener("click", () => setFriendRequest(friend.id, "remove"));
+        challenge.addEventListener("click", () => void sendFriendChallenge(friend));
+        remove.addEventListener("click", () => void setFriendRequest(friend, "remove"));
         actions.append(challenge, remove);
       }
       card.append(avatar, main, dot, actions);
@@ -33872,25 +33971,22 @@
       const list = document.getElementById("friendList");
       if (input && document.activeElement !== input) input.value = state.lastSearch;
       const query = String(input?.value || state.lastSearch || "").trim().toLowerCase();
-      const directory = getRegisteredFriendUsers();
-      const currentUserId = getCurrentFriendUserId();
-      const friends = new Set(state.friends);
-      const outgoing = new Set(state.outgoing);
-      const incoming = new Set(state.incoming);
-      const blocked = new Set([currentUserId, ...friends, ...outgoing, ...incoming].filter(Boolean));
+      const provider = getFriendProvider();
+      const directory = friendNetworkState.directory;
+      const existing = new Set(directory.map((friend) => friend.id));
       if (results) {
-        const matches = !query ? [] : directory
-          .filter((friend) => !blocked.has(friend.id))
-          .filter((friend) => friend.name.toLowerCase().includes(query))
+        const matches = !query ? [] : friendNetworkState.search
+          .filter((friend) => !existing.has(friend.id))
+          .filter((friend) => friend.id !== getFriendCurrentUserId())
           .slice(0, 6);
         results.replaceChildren(...(matches.length
           ? matches.map((friend) => createFriendCard(friend, "search"))
-          : [createBookText("p", "", query ? "No registered player matched that search." : "Type a registered username to find players.")]));
+          : [createBookText("p", "", !provider ? "Sign in to search registered players." : query ? "No registered player matched that search." : "Type a registered username to find players.")]));
       }
       if (list) {
-        const incomingCards = [...incoming].map(getFriendById).filter(Boolean).map((friend) => createFriendCard(friend, "incoming"));
-        const outgoingCards = [...outgoing].map(getFriendById).filter(Boolean).map((friend) => createFriendCard(friend, "outgoing"));
-        const savedFriends = [...friends].map(getFriendById).filter(Boolean).map((friend) => createFriendCard(friend, "friend"));
+        const incomingCards = directory.filter((friend) => friend.requestDirection === "incoming" && friend.requestStatus === "pending").map((friend) => createFriendCard(friend, "incoming"));
+        const outgoingCards = directory.filter((friend) => friend.requestDirection === "outgoing" && friend.requestStatus === "pending").map((friend) => createFriendCard(friend, "outgoing"));
+        const savedFriends = directory.filter((friend) => friend.requestStatus === "accepted").map((friend) => createFriendCard(friend, "friend"));
         list.replaceChildren(...(incomingCards.length || outgoingCards.length || savedFriends.length
           ? [...incomingCards, ...outgoingCards, ...savedFriends]
           : [createBookText("p", "", "No friends yet. Search a registered username above.")]));
@@ -33933,12 +34029,19 @@
           ? (state.incoming ? "Incoming challenge received. Accept to start the match." : state.online ? "Challenge sent. Share the link if your friend is on another device." : "Offline invite created. Copy the link or code to send it.")
           : state.active
           ? `Live friend board: ${state.gameType === "rated" ? "Rated" : "Casual"} • ${state.clock === "none" ? "No clock" : `${state.clock} clock`} • ${state.gameType === "casual" ? "takebacks allowed" : "rated rules"}.`
+          : state.status === "declined"
+          ? "This challenge was declined. Pick a fresh setup when you are ready."
           : "1) Share the link or code. 2) Pick color/time. 3) Start Challenge.";
       }
       setValue("friendInviteType", state.inviteType);
       setValue("friendGameType", state.gameType);
       setValue("friendColor", state.color);
       setValue("friendClock", state.clock);
+      const challengeLocked = Boolean(state.remote);
+      ["friendInviteType", "friendGameType", "friendColor", "friendClock"].forEach((id) => {
+        const control = document.getElementById(id);
+        if (control) control.disabled = challengeLocked;
+      });
       const takeback = document.getElementById("friendTakeback");
       if (takeback) takeback.disabled = state.gameType === "rated";
       renderFriendQr(state.code);
@@ -33947,6 +34050,10 @@
     }
 
     function updateFriendChallengeFromControls() {
+      if (friendChallengeState?.remote) {
+        renderFriendChallengeLobby();
+        return;
+      }
       friendChallengeState = {
         ...(friendChallengeState || readFriendChallengeState()),
         inviteType: document.getElementById("friendInviteType")?.value || "private",
@@ -33957,42 +34064,57 @@
       saveFriendChallengeState(friendChallengeState);
     }
 
-    function sendFriendChallenge(targetName = "Friend", forceOnline = null) {
+    async function sendFriendChallenge(target = null) {
       updateFriendChallengeFromControls();
-      const online = forceOnline === null ? navigator.onLine !== false : Boolean(forceOnline);
-      const code = friendChallengeState?.code || createFriendChallengeCode();
-      saveFriendChallengeState({
-        ...(friendChallengeState || readFriendChallengeState()),
-        code,
-        targetName,
-        online,
-        pending: true,
-        active: false,
-        fen: ""
-      });
-      const status = document.getElementById("friendChallengeStatus");
-      if (status) {
-        status.textContent = online
-          ? `Challenge ready for ${targetName}. Send the copied invite link so they receive Accept/Decline.`
-          : `${targetName} is offline. Invite link is ready to share.`;
+      const provider = getFriendProvider();
+      if (!provider) {
+        setFriendChallengeStatus("Sign in before creating a Friendly Challenge.");
+        return;
+      }
+      const state = friendChallengeState || readFriendChallengeState();
+      const friend = target && typeof target === "object" ? target : null;
+      try {
+        const remote = await provider.createFriendChallenge({
+          targetId: friend?.id || null,
+          code: createFriendChallengeCode(),
+          inviteType: state.inviteType,
+          gameType: state.gameType,
+          color: state.color,
+          clock: state.clock
+        });
+        applyRemoteFriendChallenge(remote, false);
+        setFriendChallengeStatus(friend ? `Challenge sent to ${friend.name}. They can accept from their Friendly Challenge panel.` : "Private invite created. Copy the link or code to share it.");
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "Could not create that challenge.");
+        return;
       }
       const link = getFriendInviteLink(friendChallengeState);
       const linkInput = document.getElementById("friendInviteLink");
       if (linkInput) linkInput.value = link;
-      if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(link).catch(() => {});
-      }
     }
 
-    function acceptFriendChallenge() {
-      saveFriendChallengeState({ ...(friendChallengeState || readFriendChallengeState()), pending: false, acceptedAt: Date.now() });
+    async function acceptFriendChallenge() {
+      const state = friendChallengeState || readFriendChallengeState();
+      try {
+        const remote = await getFriendProvider()?.respondFriendChallenge(state.code, "accept");
+        if (!remote) throw new Error("Sign in to accept this challenge.");
+        applyRemoteFriendChallenge(remote, false);
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "Could not accept that challenge.");
+        return;
+      }
       startFriendChallenge(false);
     }
 
-    function declineFriendChallenge() {
-      saveFriendChallengeState({ ...(friendChallengeState || readFriendChallengeState()), pending: false, active: false });
-      const status = document.getElementById("friendChallengeStatus");
-      if (status) status.textContent = "Challenge declined. Change the setup or send a fresh invite.";
+    async function declineFriendChallenge() {
+      const state = friendChallengeState || readFriendChallengeState();
+      try {
+        await getFriendProvider()?.respondFriendChallenge(state.code, "decline");
+        saveFriendChallengeState({ ...state, pending: false, active: false, status: "declined" });
+        setFriendChallengeStatus("Challenge declined. Change the setup or send a fresh invite.");
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "Could not decline that challenge.");
+      }
     }
 
     function openFriendChallengeFromProfile() {
@@ -34000,15 +34122,30 @@
       if (location.hash !== "#play?mode=friend") location.hash = "play?mode=friend";
       window.setTimeout(() => {
         document.getElementById("friendChallenge")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        sendFriendChallenge(targetName);
+        void sendFriendChallenge();
       }, 80);
     }
 
     function startFriendChallenge(rematch = false) {
       if (!CoachChess) return;
-      updateFriendChallengeFromControls();
       const state = friendChallengeState;
-      const color = state.color === "random" ? (Math.random() > 0.5 ? "w" : "b") : state.color;
+      if (!state?.remote) {
+        setFriendChallengeStatus("Create or accept a real friend challenge first.");
+        return;
+      }
+      if (rematch) {
+        void sendFriendChallenge({ id: state.targetId, name: state.targetName });
+        return;
+      }
+      if (state.status === "pending") {
+        setFriendChallengeStatus(state.incoming ? "Accept this challenge before starting." : "Waiting for your friend to accept.");
+        return;
+      }
+      if (state.status !== "accepted" && state.status !== "active") {
+        setFriendChallengeStatus(state.status === "declined" ? "That challenge was declined. Send a fresh invite to play." : "This challenge is no longer available.");
+        return;
+      }
+      const color = state.color;
       coachMoveToken += 1;
       coachGame = new CoachChess();
       coachPlayerColor = color;
@@ -34022,8 +34159,9 @@
       coachGameRecorded = false;
       coachEndSoundPlayed = false;
       coachMessage = `${rematch ? "Rematch ready" : "Friend challenge ready"}. Pass the board or share the invite. White moves first.`;
-      friendChallengeState = { ...state, pending: false, active: true, color, fen: coachGame.fen(), startedAt: Date.now() };
+      friendChallengeState = { ...state, pending: false, active: true, status: "active", color, fen: coachGame.fen(), moves: [], startedAt: Date.now() };
       saveFriendChallengeState(friendChallengeState);
+      void syncFriendChallengePosition();
       resetMatchPlayerTimer();
       renderCoachSidePicker();
       renderCoachBoard();
@@ -34031,42 +34169,69 @@
       powerOnCoachBoard();
     }
 
-    function reconnectFriendChallenge() {
-      const state = readFriendChallengeState();
-      friendChallengeState = state;
-      if (CoachChess && state.fen) {
-        try {
-          coachGame = new CoachChess(state.fen);
-          coachBotPaused = true;
-          coachThinking = false;
-          coachSelected = "";
-          coachLegalMoves = [];
-          coachLastMove = coachGame.history({ verbose: true }).at(-1) || null;
-          coachMessage = `Reconnected to friend challenge ${state.code}.`;
-          renderCoachBoard();
-          updateCoachPanel();
-        } catch {
-          coachMessage = "Reconnect found the invite, but the saved board could not be restored. Start a rematch.";
-        }
+    async function reconnectFriendChallenge() {
+      const state = friendChallengeState || readFriendChallengeState();
+      try {
+        const remote = await getFriendProvider()?.getFriendChallenge(state.code);
+        if (!remote) throw new Error("Sign in to reconnect this game.");
+        applyRemoteFriendChallenge(remote, true);
+        setFriendChallengeStatus(`Reconnected to friend challenge ${state.code}.`);
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "Could not reconnect this friend game.");
       }
-      renderFriendChallengeLobby();
     }
 
-    function joinFriendChallengeCode() {
+    async function replaceFriendChallengeCode() {
+      const state = friendChallengeState || readFriendChallengeState();
+      try {
+        if (state.remote && state.status === "pending" && state.creatorId === getFriendCurrentUserId()) {
+          await getFriendProvider()?.respondFriendChallenge(state.code, "cancel");
+        }
+      } catch {
+        // A stale pending invite must not prevent creating a fresh one.
+      }
+      saveFriendChallengeState({ ...state, code: createFriendChallengeCode(), remote: false, active: false, pending: false, status: "draft", fen: "", moves: [] });
+      setFriendChallengeStatus("New code ready. Send Challenge to create the invite.");
+    }
+
+    async function joinFriendChallengeCode() {
       const input = document.getElementById("friendJoinCode");
-      const code = String(input?.value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+      const code = String(input?.value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
       if (!code) {
         const status = document.getElementById("friendChallengeStatus");
         if (status) status.textContent = "Enter a challenge code first.";
         return;
       }
-      saveFriendChallengeState({ ...(friendChallengeState || readFriendChallengeState()), code, active: false, fen: "" });
-      const status = document.getElementById("friendChallengeStatus");
-      if (status) status.textContent = `Joined code ${code}. Pick color/time, then start when both players are ready.`;
+      try {
+        const remote = await getFriendProvider()?.getFriendChallenge(code);
+        if (!remote) throw new Error("Sign in to join a friend challenge.");
+        applyRemoteFriendChallenge(remote, true);
+        setFriendChallengeStatus(`Joined code ${code}. Accept when you are ready to play.`);
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "That challenge code is unavailable or expired.");
+      }
+    }
+
+    async function syncFriendChallengePosition() {
+      const state = friendChallengeState;
+      const provider = getFriendProvider();
+      if (!state?.remote || !state.active || !coachGame || !provider) return;
+      const moves = coachGame.history({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion || ""}`);
+      try {
+        const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active" });
+        if (remote) applyRemoteFriendChallenge(remote, false);
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "Move saved locally. Reconnect to retry syncing it.");
+      }
+    }
+
+    function startFriendNetworkSync() {
+      window.clearInterval(friendNetworkTimer);
+      void refreshFriendNetwork();
+      friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 3500);
     }
 
     function takebackFriendMove() {
-      updateFriendChallengeFromControls();
       if (friendChallengeState?.gameType === "rated") {
         coachMessage = "Takeback is only available in casual friend games.";
         updateCoachPanel();
@@ -34080,6 +34245,7 @@
       coachLastMove = coachGame.history({ verbose: true }).at(-1) || null;
       coachMessage = "Casual takeback accepted. Keep it friendly and try the idea again.";
       saveFriendChallengeState({ ...(friendChallengeState || readFriendChallengeState()), active: true });
+      void syncFriendChallengePosition();
       renderCoachBoard();
       updateCoachPanel();
     }
@@ -34621,23 +34787,6 @@
       renderRealPuzzle();
     }
 
-    async function setupPuzzleChess() {
-      const board = document.getElementById("puzzleBoard");
-      if (!board || setupPuzzleChess.ready) return;
-      setupPuzzleChess.ready = true;
-
-      try {
-        await loadChessRules();
-      } catch {
-        document.getElementById("feedback").textContent = "Could not load chess.js for playable puzzles. Check your connection, then refresh.";
-        return;
-      }
-
-      await loadPuzzleCollectionFromJson();
-      sanitizeActivePuzzleBank();
-      renderPuzzle();
-    }
-
     async function setupPlayableChess() {
       const board = document.getElementById("coachBoard");
       if (!board || setupPlayableChess.ready) return;
@@ -34745,39 +34894,41 @@
       document.getElementById("reviewShowBest")?.addEventListener("click", () => setReviewCompareMode("best"));
       document.getElementById("reviewReplayBest")?.addEventListener("click", replayReviewBestLine);
       friendChallengeState = readFriendChallengeState();
-      applyFriendInviteFromHash();
+      void applyFriendInviteFromHash();
       renderFriendChallengeLobby();
       ["friendInviteType", "friendGameType", "friendColor", "friendClock"].forEach((id) => {
         document.getElementById(id)?.addEventListener("change", updateFriendChallengeFromControls);
       });
-      document.getElementById("friendNewCode")?.addEventListener("click", () => {
-        saveFriendChallengeState({ ...(friendChallengeState || readFriendChallengeState()), code: createFriendChallengeCode(), active: false, fen: "" });
-      });
+      document.getElementById("friendNewCode")?.addEventListener("click", () => void replaceFriendChallengeCode());
       document.getElementById("friendCopyLink")?.addEventListener("click", () => copyFriendChallengeText(getFriendInviteLink(friendChallengeState || readFriendChallengeState()), "Invite link"));
       document.getElementById("friendCopyCode")?.addEventListener("click", () => copyFriendChallengeText((friendChallengeState || readFriendChallengeState()).code, "Challenge code"));
-      document.getElementById("friendSend")?.addEventListener("click", () => sendFriendChallenge("Friend"));
-      document.getElementById("friendAccept")?.addEventListener("click", acceptFriendChallenge);
-      document.getElementById("friendDecline")?.addEventListener("click", declineFriendChallenge);
+      document.getElementById("friendSend")?.addEventListener("click", () => void sendFriendChallenge());
+      document.getElementById("friendAccept")?.addEventListener("click", () => void acceptFriendChallenge());
+      document.getElementById("friendDecline")?.addEventListener("click", () => void declineFriendChallenge());
       document.getElementById("friendSearchButton")?.addEventListener("click", () => {
         const state = readFriendDirectoryState();
-        saveFriendDirectoryState({ ...state, lastSearch: document.getElementById("friendSearchInput")?.value || "" });
+        const query = document.getElementById("friendSearchInput")?.value || "";
+        saveFriendDirectoryState({ ...state, lastSearch: query });
+        void searchFriendPlayers(query);
       });
       document.getElementById("friendSearchInput")?.addEventListener("input", (event) => {
         const state = readFriendDirectoryState();
         writeJsonStorage(friendDirectoryStorageKey, { ...state, lastSearch: event.target.value || "" });
-        renderFriendDirectory();
+        window.clearTimeout(friendSearchTimer);
+        friendSearchTimer = window.setTimeout(() => void searchFriendPlayers(event.target.value || ""), 220);
       });
       document.getElementById("friendStart")?.addEventListener("click", () => startFriendChallenge(false));
-      document.getElementById("friendJoin")?.addEventListener("click", joinFriendChallengeCode);
-      document.getElementById("friendReconnect")?.addEventListener("click", reconnectFriendChallenge);
+      document.getElementById("friendJoin")?.addEventListener("click", () => void joinFriendChallengeCode());
+      document.getElementById("friendReconnect")?.addEventListener("click", () => void reconnectFriendChallenge());
       document.getElementById("friendRematch")?.addEventListener("click", () => startFriendChallenge(true));
       document.getElementById("friendTakeback")?.addEventListener("click", takebackFriendMove);
       document.addEventListener("click", (event) => {
         if (event.target.closest("[data-profile-challenge]")) openFriendChallengeFromProfile();
       });
       window.addEventListener("hashchange", () => {
-        if (location.hash.includes("challenge=")) applyFriendInviteFromHash();
+        if (location.hash.includes("challenge=")) void applyFriendInviteFromHash();
       });
+      startFriendNetworkSync();
       startMatchPlayerTimer();
       updateAiPlayerHeader();
       renderCoachBoard();
@@ -35662,9 +35813,42 @@
         return account;
       };
 
+      const callFriendRpc = async (name, args = {}) => {
+        const supabase = await getSupabaseClient();
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!sessionData.session?.user) throw new Error("Sign in to use Friendly Challenge.");
+        const { data, error } = await supabase.rpc(name, args);
+        if (error) throw new Error(error.message || "Friendly Challenge could not reach the server.");
+        return data;
+      };
+
       return {
         ...(baseProvider || {}),
         getCachedAccount: () => cachedAccount,
+        searchRegisteredPlayers: (query) => callFriendRpc("search_registered_players", { p_query: String(query || "") }),
+        getFriendDirectory: () => callFriendRpc("get_friend_directory"),
+        sendFriendRequest: (targetId) => callFriendRpc("send_friend_request", { target_user: targetId }),
+        respondFriendRequest: (requestId, accept) => callFriendRpc("respond_to_friend_request", { request_id: requestId, accept_request: Boolean(accept) }),
+        cancelFriendRequest: (requestId) => callFriendRpc("cancel_friend_request", { request_id: requestId }),
+        removeFriend: (targetId) => callFriendRpc("remove_friend", { target_user: targetId }),
+        createFriendChallenge: (challenge) => callFriendRpc("create_game_challenge", {
+          p_target_id: challenge?.targetId || null,
+          p_code: String(challenge?.code || ""),
+          p_invite_type: String(challenge?.inviteType || "private"),
+          p_game_type: String(challenge?.gameType || "casual"),
+          p_color: String(challenge?.color || "random"),
+          p_clock: String(challenge?.clock || "10+0")
+        }),
+        getFriendChallenge: (code) => callFriendRpc("get_game_challenge", { p_code: String(code || "") }),
+        respondFriendChallenge: (code, response) => callFriendRpc("respond_game_challenge", { p_code: String(code || ""), p_response: String(response || "") }),
+        saveFriendChallengePosition: (challenge) => callFriendRpc("save_game_challenge_position", {
+          p_code: String(challenge?.code || ""),
+          p_fen: String(challenge?.fen || ""),
+          p_moves: Array.isArray(challenge?.moves) ? challenge.moves : [],
+          p_status: String(challenge?.status || "active")
+        }),
+        listFriendChallenges: () => callFriendRpc("list_game_challenges"),
         saveProfile: async (profileData = {}) => {
           const supabase = await getSupabaseClient();
           const { data, error } = await supabase.auth.getSession();
@@ -39773,8 +39957,6 @@
     renderMiniBoards();
     setupOpeningFavorites();
     renderCoordinates();
-    renderPuzzle();
-    setupPuzzleChess();
     setupRealPuzzles();
     wireTabs();
     setupBeginnerTutorial();
