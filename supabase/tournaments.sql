@@ -29,6 +29,7 @@ create table if not exists public.tournament_entries (
   wins integer not null default 0,
   draws integer not null default 0,
   losses integer not null default 0,
+  berserk_count integer not null default 0,
   bye_count integer not null default 0,
   withdrawn boolean not null default false,
   joined_at timestamptz not null default now(),
@@ -72,10 +73,21 @@ create table if not exists public.tournament_awards (
   primary key (tournament_id, user_id)
 );
 
+create table if not exists public.tournament_messages (
+  id uuid primary key default gen_random_uuid(),
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  body text not null check (length(trim(body)) between 1 and 240),
+  created_at timestamptz not null default now()
+);
+
+alter table public.tournament_entries add column if not exists berserk_count integer not null default 0;
+
 create index if not exists tournaments_status_idx on public.tournaments (status, visibility, created_at desc);
 create index if not exists tournament_entries_standings_idx on public.tournament_entries (tournament_id, withdrawn, score desc, wins desc, joined_at);
 create index if not exists tournament_pairings_active_idx on public.tournament_pairings (tournament_id, status, round_no);
 create index if not exists tournament_invites_receiver_idx on public.tournament_invites (receiver_id, created_at desc);
+create index if not exists tournament_messages_timeline_idx on public.tournament_messages (tournament_id, created_at desc);
 
 alter table public.game_challenges add column if not exists tournament_pairing_id uuid references public.tournament_pairings(id) on delete set null;
 create unique index if not exists game_challenges_tournament_pairing_idx on public.game_challenges (tournament_pairing_id) where tournament_pairing_id is not null;
@@ -92,12 +104,17 @@ do $$ begin
   alter publication supabase_realtime add table public.tournament_pairings;
 exception when duplicate_object or undefined_object then null;
 end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.tournament_messages;
+exception when duplicate_object or undefined_object then null;
+end $$;
 
 alter table public.tournaments enable row level security;
 alter table public.tournament_entries enable row level security;
 alter table public.tournament_invites enable row level security;
 alter table public.tournament_pairings enable row level security;
 alter table public.tournament_awards enable row level security;
+alter table public.tournament_messages enable row level security;
 
 create or replace function public.make_tournament_code()
 returns text
@@ -159,12 +176,27 @@ as $$
         'wins', standing.wins,
         'draws', standing.draws,
         'losses', standing.losses,
+        'gamesPlayed', standing.games_played,
+        'berserk', standing.berserk_count,
+        'tiebreak', standing.tiebreak,
         'withdrawn', standing.withdrawn
       ) order by standing.player_rank)
       from (
         select row_number() over (order by entry.score desc, entry.wins desc, entry.draws desc, entry.joined_at) as player_rank,
           entry.user_id, profile.username, profile.avatar, coalesce(to_jsonb(profile) ->> 'country_flag', '') as country_flag,
-          profile.title, profile.rating, entry.score, entry.wins, entry.draws, entry.losses, entry.withdrawn, entry.joined_at
+          profile.title, profile.rating, entry.score, entry.wins, entry.draws, entry.losses,
+          entry.wins + entry.draws + entry.losses as games_played,
+          entry.berserk_count,
+          coalesce((
+            select sum(opponent.score)
+            from public.tournament_pairings previous_pairing
+            join public.tournament_entries opponent on opponent.tournament_id = entry.tournament_id
+              and opponent.user_id = case when previous_pairing.white_id = entry.user_id then previous_pairing.black_id else previous_pairing.white_id end
+            where previous_pairing.tournament_id = entry.tournament_id
+              and previous_pairing.status = 'completed'
+              and entry.user_id in (previous_pairing.white_id, previous_pairing.black_id)
+          ), 0) as tiebreak,
+          entry.withdrawn, entry.joined_at
         from public.tournament_entries entry
         join public.profiles profile on profile.id = entry.user_id
         where entry.tournament_id = tournament.id
@@ -178,6 +210,14 @@ as $$
         'blackId', pairing.black_id,
         'whiteName', coalesce(white_profile.username, 'White'),
         'blackName', coalesce(black_profile.username, 'Black'),
+        'whiteAvatar', coalesce(white_profile.avatar, 'auto'),
+        'blackAvatar', coalesce(black_profile.avatar, 'auto'),
+        'whiteFlag', coalesce(to_jsonb(white_profile) ->> 'country_flag', ''),
+        'blackFlag', coalesce(to_jsonb(black_profile) ->> 'country_flag', ''),
+        'whiteTitle', coalesce(white_profile.title, 'Chess Player'),
+        'blackTitle', coalesce(black_profile.title, 'Chess Player'),
+        'whiteRating', coalesce(white_profile.rating, 450),
+        'blackRating', coalesce(black_profile.rating, 450),
         'status', pairing.status,
         'result', pairing.result,
         'challengeCode', challenge.code,
@@ -188,6 +228,25 @@ as $$
       join public.profiles black_profile on black_profile.id = pairing.black_id
       left join public.game_challenges challenge on challenge.id = pairing.challenge_id
       where pairing.tournament_id = tournament.id
+    ), '[]'::jsonb),
+    'messages', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', message.id,
+        'userId', message.user_id,
+        'username', message.username,
+        'avatar', message.avatar,
+        'body', message.body,
+        'createdAt', message.created_at
+      ) order by message.created_at asc)
+      from (
+        select note.id, note.user_id, coalesce(profile.username, 'Player') as username,
+          coalesce(profile.avatar, 'auto') as avatar, note.body, note.created_at
+        from public.tournament_messages note
+        join public.profiles profile on profile.id = note.user_id
+        where note.tournament_id = tournament.id
+        order by note.created_at desc
+        limit 50
+      ) message
     ), '[]'::jsonb),
     'myPairing', (
       select jsonb_build_object(
@@ -365,6 +424,18 @@ as $$
 declare
   event record;
 begin
+  for event in
+    update public.tournament_pairings pairing
+    set status = 'aborted', result = 'aborted', completed_at = now()
+    from public.game_challenges challenge
+    where pairing.challenge_id = challenge.id
+      and pairing.status = 'active'
+      and challenge.expires_at <= now()
+    returning pairing.tournament_id, pairing.challenge_id
+  loop
+    update public.game_challenges set status = 'completed', updated_at = now() where id = event.challenge_id;
+    perform public.advance_tournament(event.tournament_id);
+  end loop;
   for event in select id from public.tournaments where status = 'running' and format = 'arena' and ends_at <= now() loop
     update public.tournaments set status = 'completed', updated_at = now() where id = event.id;
     perform public.award_tournament_finish(event.id);
@@ -521,6 +592,30 @@ begin
 end;
 $$;
 
+create or replace function public.send_tournament_message(p_code text, p_body text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  event public.tournaments;
+  current_user_id uuid := auth.uid();
+  clean_body text := left(trim(coalesce(p_body, '')), 240);
+begin
+  if current_user_id is null then raise exception 'Sign in to chat'; end if;
+  select * into event from public.tournaments where code = upper(trim(p_code));
+  if event.id is null then raise exception 'Tournament not found'; end if;
+  if not exists (
+    select 1 from public.tournament_entries entry
+    where entry.tournament_id = event.id and entry.user_id = current_user_id and not entry.withdrawn
+  ) then raise exception 'Join this tournament to chat'; end if;
+  if length(clean_body) = 0 then raise exception 'Write a short message first'; end if;
+  insert into public.tournament_messages (tournament_id, user_id, body)
+  values (event.id, current_user_id, clean_body);
+  return public.tournament_payload(event, current_user_id);
+end;
+$$;
+
 create or replace function public.tournament_host_action(p_code text, p_action text)
 returns jsonb
 language plpgsql
@@ -603,7 +698,7 @@ begin
 end;
 $$;
 
-revoke all on table public.tournaments, public.tournament_entries, public.tournament_invites, public.tournament_pairings, public.tournament_awards from anon, authenticated;
+revoke all on table public.tournaments, public.tournament_entries, public.tournament_invites, public.tournament_pairings, public.tournament_awards, public.tournament_messages from anon, authenticated;
 revoke all on function public.make_tournament_code() from public;
 revoke all on function public.tournament_payload(public.tournaments, uuid) from public;
 revoke all on function public.tournament_create_pairing(uuid, integer, uuid, uuid) from public;
@@ -619,6 +714,7 @@ revoke all on function public.leave_tournament(text) from public;
 revoke all on function public.invite_to_tournament(text, uuid) from public;
 revoke all on function public.tournament_host_action(text, text) from public;
 revoke all on function public.report_tournament_result(uuid, text) from public;
+revoke all on function public.send_tournament_message(text, text) from public;
 grant execute on function public.create_tournament(text, text, text, text, integer, integer, integer) to authenticated;
 grant execute on function public.list_tournaments() to authenticated;
 grant execute on function public.get_tournament(text) to authenticated;
@@ -627,3 +723,4 @@ grant execute on function public.leave_tournament(text) to authenticated;
 grant execute on function public.invite_to_tournament(text, uuid) to authenticated;
 grant execute on function public.tournament_host_action(text, text) to authenticated;
 grant execute on function public.report_tournament_result(uuid, text) to authenticated;
+grant execute on function public.send_tournament_message(text, text) to authenticated;

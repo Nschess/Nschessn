@@ -12044,6 +12044,10 @@
       display: grid;
     }
 
+    body.tournament-mode #play .play-shell {
+      display: none;
+    }
+
     .tournament-head,
     .tournament-actions,
     .tournament-meta,
@@ -12233,6 +12237,214 @@
       .tournament-share-row .button { width: 100%; }
       .tournament-detail-head,
       .tournament-card-top { align-items: flex-start; flex-direction: column; }
+    }
+
+    .tournament-detail {
+      gap: 12px;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012)),
+        rgba(4, 14, 22, 0.28);
+    }
+
+    .tournament-stage {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      padding: 12px 14px;
+      border: 1px solid rgba(111, 168, 220, 0.28);
+      border-radius: 15px;
+      background: linear-gradient(120deg, rgba(111, 168, 220, 0.14), rgba(127, 166, 80, 0.1));
+    }
+
+    .tournament-stage-icon,
+    .tournament-avatar {
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(255, 248, 237, 0.24);
+      background: rgba(0, 0, 0, 0.24);
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    .tournament-stage-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      color: var(--gold);
+      font-size: 1.25rem;
+      animation: tournament-live-pulse 2.4s ease-in-out infinite;
+    }
+
+    .tournament-stage strong,
+    .tournament-stage span { display: block; }
+    .tournament-stage > div:nth-child(2) span { margin-top: 3px; color: var(--muted); font-size: 0.86rem; line-height: 1.35; }
+
+    .tournament-progress {
+      width: min(100%, 260px);
+      height: 4px;
+      margin-top: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 248, 237, 0.13);
+    }
+
+    .tournament-progress i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--green), var(--gold));
+      transition: width 360ms ease;
+    }
+
+    .tournament-stage-meta {
+      display: grid;
+      gap: 3px;
+      text-align: right;
+      color: var(--soft);
+      font-size: 0.78rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .tournament-auto-start {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 11px;
+      border: 1px solid rgba(127, 166, 80, 0.5);
+      border-radius: 999px;
+      color: #e1ffc9;
+      background: rgba(127, 166, 80, 0.14);
+      font-size: 0.8rem;
+      font-weight: 900;
+    }
+
+    .tournament-dashboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.9fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .tournament-section {
+      display: grid;
+      gap: 7px;
+      padding: 12px;
+      border-color: rgba(255, 248, 237, 0.12);
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.048), rgba(0, 0, 0, 0.13));
+    }
+
+    .tournament-standings { grid-row: span 2; }
+    .tournament-section-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .tournament-section-title strong { margin: 0; }
+    .tournament-section-title span { color: var(--muted); font-size: 0.76rem; font-weight: 800; }
+
+    .tournament-standing-row {
+      display: grid;
+      grid-template-columns: 36px minmax(150px, 1fr) minmax(200px, 1.15fr);
+      align-items: center;
+      gap: 9px;
+      min-height: 51px;
+      padding: 7px 0;
+    }
+
+    .tournament-standing-row.is-self {
+      margin: 0 -6px;
+      padding: 7px 6px;
+      border-radius: 10px;
+      background: rgba(231, 182, 93, 0.1);
+    }
+
+    .tournament-place {
+      color: var(--gold);
+      font-size: 0.83rem;
+      font-weight: 1000;
+    }
+
+    .tournament-player {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      gap: 8px;
+    }
+
+    .tournament-avatar {
+      width: 31px;
+      height: 31px;
+      border-radius: 9px;
+      color: var(--text);
+      font-weight: 1000;
+      font-size: 0.82rem;
+    }
+
+    .tournament-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .tournament-player > span:last-child { display: grid; min-width: 0; gap: 2px; }
+    .tournament-player strong,
+    .tournament-player small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tournament-player small { color: var(--muted); font-size: 0.72rem; }
+
+    .tournament-standing-stats {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 4px 7px;
+    }
+
+    .tournament-standing-stats span {
+      color: var(--soft);
+      font-size: 0.71rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .tournament-standing-stats span:first-child { color: var(--gold); }
+    .tournament-games .tournament-pairing-row.is-self { color: #e6ffc7; }
+
+    .tournament-chat { min-height: 194px; }
+    .tournament-chat-messages {
+      display: grid;
+      align-content: start;
+      gap: 5px;
+      min-height: 96px;
+      max-height: 190px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .tournament-chat-messages p { margin: 0; color: var(--soft); font-size: 0.82rem; line-height: 1.35; overflow-wrap: anywhere; }
+    .tournament-chat-messages p strong { color: var(--text); }
+    .tournament-chat-messages p.is-self { color: #dfffc7; }
+    .tournament-chat-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+    .tournament-chat-form input { min-width: 0; min-height: 36px; }
+
+    @keyframes tournament-live-pulse {
+      50% { transform: translateY(-1px); border-color: rgba(231, 182, 93, 0.62); box-shadow: 0 0 16px rgba(231, 182, 93, 0.22); }
+    }
+
+    @media (max-width: 1050px) {
+      .tournament-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .tournament-standings { grid-column: 1 / -1; grid-row: auto; }
+    }
+
+    @media (max-width: 700px) {
+      .tournament-stage { grid-template-columns: auto minmax(0, 1fr); }
+      .tournament-stage-meta { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); text-align: left; }
+      .tournament-dashboard { grid-template-columns: 1fr; }
+      .tournament-standing-row { grid-template-columns: 32px minmax(0, 1fr); }
+      .tournament-standing-stats { grid-column: 2; justify-content: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tournament-stage-icon { animation: none; }
     }
 
     .friend-lobby-head,
@@ -31092,7 +31304,7 @@
     let friendNetworkRequest = 0;
     let friendIncomingNoticeCode = "";
     let coachPremove = null;
-    let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false };
+    let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0 };
     let chessRulesPromise = null;
     let stockfishWorker = null;
     let stockfishReady = false;
@@ -34346,6 +34558,7 @@
       if (remote.status === "completed") {
         renderCoachBoard();
         updateCoachPanel();
+        if (next.tournamentPairingId && !next.tournamentResultReported) void reportTournamentResultFromBoard();
       }
       renderFriendChallengeLobby();
       return true;
@@ -34955,6 +35168,7 @@
         isHost: Boolean(raw.isHost || raw.is_host),
         standings: Array.isArray(raw.standings) ? raw.standings : [],
         pairings: Array.isArray(raw.pairings) ? raw.pairings : [],
+        messages: Array.isArray(raw.messages) ? raw.messages : [],
         myPairing: raw.myPairing && typeof raw.myPairing === "object" ? raw.myPairing : null
       };
     }
@@ -34998,6 +35212,68 @@
       return button;
     }
 
+    function getTournamentActivePairings(event) {
+      return (event?.pairings || []).filter((pairing) => pairing?.status === "active");
+    }
+
+    function getTournamentWaitingCopy(event) {
+      if (!event || event.status !== "running") return event?.status === "draft" ? "Registration is open." : "This event is not currently pairing.";
+      if (event.myPairing?.status === "active") {
+        const seconds = Math.max(0, Math.ceil((tournamentRuntime.nextLaunchAt - Date.now()) / 1000));
+        return seconds ? `Next game starts in ${seconds}s. Get ready.` : "Your board is ready. Launching it now.";
+      }
+      const activeCount = getTournamentActivePairings(event).length;
+      if (activeCount) return `Round ${Math.max(1, event.currentRound)} is in progress. Your next pairing appears automatically.`;
+      return event.participantCount < 2 ? "Waiting for opponent... Invite a player to begin." : "Finding your next opponent...";
+    }
+
+    function createTournamentAvatar(entry = {}) {
+      const name = String(entry.username || entry.whiteName || entry.blackName || "Player");
+      const stored = String(entry.avatar || entry.whiteAvatar || entry.blackAvatar || "").trim();
+      const avatar = document.createElement("span");
+      avatar.className = "tournament-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      if (/^(?:https?:\/\/|data:image\/|assets\/)/i.test(stored)) {
+        const image = document.createElement("img");
+        image.src = stored;
+        image.alt = "";
+        image.loading = "lazy";
+        image.addEventListener("error", () => { avatar.textContent = name.slice(0, 1).toUpperCase(); }, { once: true });
+        avatar.append(image);
+      } else {
+        avatar.textContent = stored && stored !== "auto" ? stored : name.slice(0, 1).toUpperCase();
+      }
+      return avatar;
+    }
+
+    function scheduleTournamentLaunch(event) {
+      const pairing = event?.myPairing;
+      if (!pairing?.id || pairing.status !== "active" || !pairing.challengeCode) {
+        tournamentRuntime.launchingPairingId = "";
+        tournamentRuntime.nextLaunchAt = 0;
+        window.clearTimeout(tournamentRuntime.launchTimer);
+        return;
+      }
+      const activeState = friendChallengeState || readFriendChallengeState();
+      if (activeState?.active && activeState.tournamentPairingId === String(pairing.id)) return;
+      if (tournamentRuntime.launchingPairingId === String(pairing.id)) return;
+      tournamentRuntime.launchingPairingId = String(pairing.id);
+      window.clearTimeout(tournamentRuntime.launchTimer);
+      const delay = Math.max(650, tournamentRuntime.nextLaunchAt - Date.now());
+      tournamentRuntime.launchTimer = window.setTimeout(() => {
+        void launchTournamentPairing(event).finally(() => { tournamentRuntime.launchingPairingId = ""; });
+      }, delay);
+    }
+
+    function returnToTournamentLobby(event) {
+      const code = String(event?.code || tournamentRuntime.currentCode || "").toUpperCase();
+      if (!code) return;
+      window.clearTimeout(tournamentRuntime.launchTimer);
+      tournamentRuntime.launchingPairingId = "";
+      location.hash = `play?mode=tournament&tournament=${encodeURIComponent(code)}`;
+      window.setTimeout(() => document.getElementById("tournamentLobby")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    }
+
     function renderTournamentLobby() {
       const list = document.getElementById("tournamentList");
       const detail = document.getElementById("tournamentDetail");
@@ -35036,17 +35312,46 @@
         detail.replaceChildren(createBookText("p", "tournament-empty", "Choose an event to see its live pairings and standings."));
         return;
       }
+      const currentUserId = getFriendCurrentUserId();
+      const activePairings = getTournamentActivePairings(event);
       const head = document.createElement("div");
       head.className = "tournament-detail-head";
       const copy = document.createElement("div");
-      copy.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? `Swiss round ${Math.max(1, event.currentRound)}/${event.rounds}` : "Arena"} | ${event.clock} | ${event.participantCount}/${event.maxPlayers} players${event.status === "running" && event.format === "arena" ? ` | ${formatTournamentCountdown(event.endsAt)}` : ""}`));
+      copy.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? `Swiss • Round ${Math.max(1, event.currentRound)}/${event.rounds}` : "Arena"} • ${event.clock} • ${event.participantCount}/${event.maxPlayers} players`));
       head.append(copy, createBookText("span", `tournament-status is-${event.status}`, formatTournamentStatus(event.status)));
+
+      const stage = document.createElement("section");
+      stage.className = "tournament-stage";
+      const stageIcon = createBookText("span", "tournament-stage-icon", event.myPairing?.status === "active" ? "♞" : event.status === "running" ? "⌛" : "◈");
+      const stageCopy = document.createElement("div");
+      stageCopy.append(
+        createBookText("strong", "", event.myPairing?.status === "active" ? "Your game is ready" : event.status === "running" ? "Tournament live" : "Tournament lobby"),
+        createBookText("span", "", getTournamentWaitingCopy(event))
+      );
+      const progress = document.createElement("span");
+      progress.className = "tournament-progress";
+      const progressFill = document.createElement("i");
+      const completion = event.format === "swiss"
+        ? (Math.max(0, event.currentRound - (event.status === "completed" ? 0 : 1)) / Math.max(1, event.rounds)) * 100
+        : event.endsAt && event.startsAt
+          ? Math.max(0, Math.min(100, ((Date.now() - Date.parse(event.startsAt)) / Math.max(1, Date.parse(event.endsAt) - Date.parse(event.startsAt))) * 100))
+          : 0;
+      progressFill.style.width = `${completion.toFixed(1)}%`;
+      progress.append(progressFill);
+      stageCopy.append(progress);
+      const stageMeta = document.createElement("div");
+      stageMeta.className = "tournament-stage-meta";
+      stageMeta.append(
+        createBookText("span", "", event.format === "arena" && event.status === "running" ? formatTournamentCountdown(event.endsAt) : `Round ${event.currentRound || 0}/${event.rounds}`),
+        createBookText("span", "", `${activePairings.length} live game${activePairings.length === 1 ? "" : "s"}`)
+      );
+      stage.append(stageIcon, stageCopy, stageMeta);
 
       const actionRow = document.createElement("div");
       actionRow.className = "tournament-actions";
       if (!event.joined && ["draft", "running"].includes(event.status)) actionRow.append(createTournamentButton("Join tournament", "button", () => void joinTournament(event.code)));
       if (event.joined && event.status === "draft") actionRow.append(createTournamentButton("Leave", "button secondary", () => void leaveTournament(event.code)));
-      if (event.myPairing?.challengeCode && event.myPairing.status === "active") actionRow.append(createTournamentButton("Play round", "button", () => void launchTournamentPairing(event)));
+      if (event.myPairing?.challengeCode && event.myPairing.status === "active") actionRow.append(createBookText("span", "tournament-auto-start", "Board launches automatically"));
       if (event.isHost) {
         const hostActions = document.createElement("div");
         hostActions.className = "tournament-host-actions";
@@ -35082,31 +35387,104 @@
       }
 
       const sections = document.createElement("div");
-      sections.className = "tournament-sections";
+      sections.className = "tournament-dashboard";
       const standings = document.createElement("section");
-      standings.className = "tournament-section";
-      standings.append(createBookText("strong", "", "Live standings"));
+      standings.className = "tournament-section tournament-standings";
+      const standingsTitle = document.createElement("div");
+      standingsTitle.className = "tournament-section-title";
+      standingsTitle.append(createBookText("strong", "", "Live standings"), createBookText("span", "", "Scores update after each game"));
+      standings.append(standingsTitle);
       if (!event.standings.length) standings.append(createBookText("p", "tournament-empty", "Standings appear after players join."));
       else event.standings.slice(0, 12).forEach((entry) => {
         const row = document.createElement("div");
         row.className = `tournament-standing-row${entry.id === getFriendCurrentUserId() ? " is-self" : ""}`;
-        row.append(createBookText("span", "", `#${entry.playerRank || entry.player_rank || "-"} ${entry.username || "Player"}`), createBookText("span", "", `${Number(entry.score || 0).toFixed(Number(entry.score || 0) % 1 ? 1 : 0)} pts`));
+        const place = createBookText("span", "tournament-place", `#${entry.playerRank || entry.player_rank || "-"}`);
+        const player = document.createElement("span");
+        player.className = "tournament-player";
+        const playerCopy = document.createElement("span");
+        playerCopy.append(
+          createBookText("strong", "", `${formatCountryFlag(entry.countryFlag || "")} ${entry.username || "Player"}`.trim()),
+          createBookText("small", "", `${entry.title || "Chess Player"} • ${Math.max(400, Number(entry.rating) || 450)} Elo`)
+        );
+        player.append(createTournamentAvatar(entry), playerCopy);
+        const stats = document.createElement("span");
+        stats.className = "tournament-standing-stats";
+        const stat = (label, value) => stats.append(createBookText("span", "", `${label} ${value}`));
+        stat("Score", Number(entry.score || 0).toFixed(Number(entry.score || 0) % 1 ? 1 : 0));
+        stat("W", Number(entry.wins) || 0);
+        stat("D", Number(entry.draws) || 0);
+        stat("L", Number(entry.losses) || 0);
+        stat("Games", Number(entry.gamesPlayed ?? ((Number(entry.wins) || 0) + (Number(entry.draws) || 0) + (Number(entry.losses) || 0))));
+        stat(event.format === "arena" ? "Berserk" : "TB", event.format === "arena" ? Number(entry.berserk) || 0 : Number(entry.tiebreak || 0).toFixed(1));
+        row.append(place, player, stats);
         standings.append(row);
       });
+
+      const games = document.createElement("section");
+      games.className = "tournament-section tournament-games";
+      const gamesTitle = document.createElement("div");
+      gamesTitle.className = "tournament-section-title";
+      gamesTitle.append(createBookText("strong", "", "Active games"), createBookText("span", "", `${activePairings.length} live`));
+      games.append(gamesTitle);
+      if (!activePairings.length) games.append(createBookText("p", "tournament-empty", event.status === "running" ? "Waiting for opponent... Pairing begins as soon as one is available." : "Games begin when the host starts the event."));
+      else activePairings.slice(0, 8).forEach((pairing) => {
+        const row = document.createElement("div");
+        row.className = `tournament-pairing-row${pairing.id === event.myPairing?.id ? " is-self" : ""}`;
+        const players = createBookText("span", "", `R${pairing.round} • ${pairing.whiteName || "White"} vs ${pairing.blackName || "Black"}`);
+        const state = createBookText("span", "tournament-status is-running", pairing.id === event.myPairing?.id ? "Your game" : "Live");
+        row.append(players, state);
+        games.append(row);
+      });
+
       const pairings = document.createElement("section");
-      pairings.className = "tournament-section";
-      pairings.append(createBookText("strong", "", "Pairings"));
-      if (!event.pairings.length) pairings.append(createBookText("p", "tournament-empty", event.status === "draft" ? "The host starts pairings when registration is ready." : "Looking for the next opponent."));
-      else event.pairings.slice(0, 12).forEach((pairing) => {
+      pairings.className = "tournament-section tournament-pairings";
+      const pairingTitle = document.createElement("div");
+      pairingTitle.className = "tournament-section-title";
+      pairingTitle.append(createBookText("strong", "", "Pairing history"), createBookText("span", "", `Round ${event.currentRound || 0}`));
+      pairings.append(pairingTitle);
+      const completedPairings = event.pairings.filter((pairing) => pairing.status !== "active");
+      if (!completedPairings.length) pairings.append(createBookText("p", "tournament-empty", event.status === "draft" ? "The host starts pairings when registration is ready." : "No completed games yet."));
+      else completedPairings.slice(0, 8).forEach((pairing) => {
         const row = document.createElement("div");
         row.className = "tournament-pairing-row";
-        const side = createBookText("span", "", `R${pairing.round}: ${pairing.whiteName || "White"} vs ${pairing.blackName || "Black"}`);
-        const state = createBookText("span", "", pairing.result === "pending" ? pairing.status : pairing.result);
-        row.append(side, state);
+        row.append(createBookText("span", "", `R${pairing.round} • ${pairing.whiteName || "White"} vs ${pairing.blackName || "Black"}`), createBookText("span", "", pairing.result === "pending" ? pairing.status : pairing.result));
         pairings.append(row);
       });
-      sections.append(standings, pairings);
-      detail.replaceChildren(head, actionRow, share, inviteResults, sections);
+
+      const chat = document.createElement("section");
+      chat.className = "tournament-section tournament-chat";
+      const chatTitle = document.createElement("div");
+      chatTitle.className = "tournament-section-title";
+      chatTitle.append(createBookText("strong", "", "Tournament chat"), createBookText("span", "", event.joined ? "Players only" : "Join to chat"));
+      chat.append(chatTitle);
+      const messages = document.createElement("div");
+      messages.className = "tournament-chat-messages";
+      const chatMessages = event.messages.slice(-12);
+      if (!chatMessages.length) messages.append(createBookText("p", "tournament-empty", "Good luck and have fun."));
+      else chatMessages.forEach((message) => {
+        const line = document.createElement("p");
+        line.className = message.userId === currentUserId ? "is-self" : "";
+        line.append(createBookText("strong", "", message.username || "Player"), document.createTextNode(` ${message.body || ""}`));
+        messages.append(line);
+      });
+      chat.append(messages);
+      if (event.joined) {
+        const chatForm = document.createElement("form");
+        chatForm.className = "tournament-chat-form";
+        const chatInput = document.createElement("input");
+        chatInput.maxLength = 240;
+        chatInput.placeholder = "Say good luck...";
+        chatInput.setAttribute("aria-label", "Tournament chat message");
+        chatForm.append(chatInput, createTournamentButton("Send", "button secondary"));
+        chatForm.addEventListener("submit", (submitEvent) => {
+          submitEvent.preventDefault();
+          void sendTournamentMessage(event, chatInput.value);
+        });
+        chat.append(chatForm);
+      }
+      sections.append(standings, games, pairings, chat);
+      detail.replaceChildren(head, stage, actionRow, share, inviteResults, sections);
+      scheduleTournamentLaunch(event);
     }
 
     async function refreshTournamentNetwork(force = false) {
@@ -35213,9 +35591,22 @@
       }
     }
 
+    async function sendTournamentMessage(event, body) {
+      const text = String(body || "").trim();
+      if (!text) return;
+      try {
+        const updated = await getTournamentProvider()?.sendTournamentMessage(event.code, text);
+        if (updated) setSelectedTournament(updated);
+      } catch (error) {
+        document.querySelector(".tournament-chat-messages")?.append(createBookText("p", "tournament-empty", error?.message || "Message could not be sent."));
+      }
+    }
+
     async function launchTournamentPairing(event) {
       const pairing = event?.myPairing;
       if (!pairing?.challengeCode) return;
+      const activeState = friendChallengeState || readFriendChallengeState();
+      if (activeState?.active && activeState.tournamentPairingId === String(pairing.id)) return;
       const provider = getFriendProvider();
       try {
         const remote = await provider?.getFriendChallenge(pairing.challengeCode);
@@ -35236,11 +35627,15 @@
     }
 
     function getTournamentBoardResult() {
-      if (coachDrawAgreed || callCoachRule(coachGame, "isDraw", "in_draw")) return "draw";
+      const signals = getFriendControlSignals();
+      if (signals.includes("__abort")) return "aborted";
+      const resign = signals.find((signal) => signal.startsWith("__resign:"));
+      if (resign?.endsWith(":w")) return "black";
+      if (resign?.endsWith(":b")) return "white";
+      if (signals.includes("__draw_accept")) return "draw";
       if (matchClockExpiredColor) return matchClockExpiredColor === "w" ? "black" : "white";
       if (callCoachRule(coachGame, "isCheckmate", "in_checkmate")) return coachGame.turn() === "w" ? "black" : "white";
-      const resign = getFriendControlSignals().find((signal) => signal.startsWith("__resign:"));
-      return resign?.endsWith(":w") ? "black" : resign?.endsWith(":b") ? "white" : "aborted";
+      return coachDrawAgreed || callCoachRule(coachGame, "isDraw", "in_draw") ? "draw" : "aborted";
     }
 
     async function reportTournamentResultFromBoard() {
@@ -35251,8 +35646,12 @@
       saveFriendChallengeState(state);
       try {
         const result = await provider.reportTournamentResult(state.tournamentPairingId, getTournamentBoardResult());
+        tournamentRuntime.nextLaunchAt = Date.now() + 1800;
         setSelectedTournament(result);
+        friendChallengeState = { ...state, active: false, pending: false, status: "completed", tournamentResultReported: true };
+        saveFriendChallengeState(friendChallengeState);
         await refreshTournamentNetwork(true);
+        returnToTournamentLobby(result);
       } catch {
         state.tournamentResultReported = false;
         saveFriendChallengeState(state);
@@ -36987,6 +37386,7 @@
         inviteToTournament: (code, targetId) => callFriendRpc("invite_to_tournament", { p_code: String(code || ""), p_target_id: targetId }),
         tournamentHostAction: (code, action) => callFriendRpc("tournament_host_action", { p_code: String(code || ""), p_action: String(action || "") }),
         reportTournamentResult: (pairingId, result) => callFriendRpc("report_tournament_result", { p_pairing_id: pairingId, p_result: result }),
+        sendTournamentMessage: (code, body) => callFriendRpc("send_tournament_message", { p_code: String(code || ""), p_body: String(body || "") }),
         subscribeTournaments: async (callback) => {
           const supabase = await getSupabaseClient();
           const refresh = () => { if (typeof callback === "function") callback(); };
@@ -36994,6 +37394,7 @@
             .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, refresh)
             .on("postgres_changes", { event: "*", schema: "public", table: "tournament_entries" }, refresh)
             .on("postgres_changes", { event: "*", schema: "public", table: "tournament_pairings" }, refresh)
+            .on("postgres_changes", { event: "*", schema: "public", table: "tournament_messages" }, refresh)
             .subscribe();
           return () => { try { supabase.removeChannel(channel); } catch {} };
         },
