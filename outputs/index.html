@@ -12026,6 +12026,215 @@
       display: grid;
     }
 
+    .tournament-lobby {
+      display: none;
+      gap: 12px;
+      margin: 18px 0;
+      border: 1px solid rgba(111, 168, 220, 0.34);
+      border-radius: 20px;
+      padding: clamp(14px, 2vw, 20px);
+      background:
+        radial-gradient(circle at 100% 0%, rgba(111, 168, 220, 0.18), transparent 32%),
+        radial-gradient(circle at 0% 100%, rgba(127, 166, 80, 0.14), transparent 36%),
+        rgba(5, 15, 25, 0.34);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    body.tournament-mode #play .tournament-lobby {
+      display: grid;
+    }
+
+    .tournament-head,
+    .tournament-actions,
+    .tournament-meta,
+    .tournament-share-row,
+    .tournament-host-actions {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+
+    .tournament-head {
+      justify-content: space-between;
+      padding: 12px;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 16px;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .tournament-head h3,
+    .tournament-card h4,
+    .tournament-detail h4 {
+      margin: 0;
+    }
+
+    .tournament-head p,
+    .tournament-card p,
+    .tournament-detail p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .tournament-create-grid {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.5fr) repeat(5, minmax(108px, 1fr)) auto;
+      gap: 9px;
+      padding: 12px;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 16px;
+      background: rgba(0, 0, 0, 0.14);
+    }
+
+    .tournament-create-grid label {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+      color: var(--soft);
+      font-size: 0.82rem;
+      font-weight: 900;
+    }
+
+    .tournament-create-grid input,
+    .tournament-create-grid select,
+    .tournament-share-row input {
+      min-width: 0;
+      min-height: 40px;
+      border: 1px solid rgba(255, 248, 237, 0.14);
+      border-radius: 10px;
+      padding: 8px 10px;
+      color: var(--text);
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    .tournament-create-grid .button {
+      align-self: end;
+      min-height: 40px;
+      white-space: nowrap;
+    }
+
+    .tournament-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.45fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .tournament-list,
+    .tournament-detail {
+      display: grid;
+      gap: 9px;
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 16px;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .tournament-card {
+      display: grid;
+      gap: 7px;
+      padding: 11px;
+      border: 1px solid rgba(255, 248, 237, 0.11);
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(255, 248, 237, 0.07), rgba(255, 248, 237, 0.02));
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+    }
+
+    .tournament-card:hover,
+    .tournament-card.is-selected {
+      transform: translateY(-1px);
+      border-color: rgba(111, 168, 220, 0.5);
+      background: rgba(111, 168, 220, 0.1);
+    }
+
+    .tournament-card-top,
+    .tournament-detail-head,
+    .tournament-standing-row,
+    .tournament-pairing-row {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .tournament-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 25px;
+      padding: 3px 9px;
+      border: 1px solid rgba(111, 168, 220, 0.32);
+      border-radius: 999px;
+      color: #c4e8ff;
+      background: rgba(111, 168, 220, 0.12);
+      font-size: 0.76rem;
+      font-weight: 1000;
+      text-transform: uppercase;
+    }
+
+    .tournament-status.is-running { color: #d9ffc3; border-color: rgba(127, 166, 80, 0.52); background: rgba(127, 166, 80, 0.15); }
+    .tournament-status.is-completed { color: #ffe09a; border-color: rgba(231, 182, 93, 0.48); background: rgba(231, 182, 93, 0.12); }
+    .tournament-status.is-paused { color: #ffd5a8; border-color: rgba(216, 111, 98, 0.45); background: rgba(216, 111, 98, 0.12); }
+
+    .tournament-meta {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .tournament-sections {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .tournament-section {
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid rgba(255, 248, 237, 0.09);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.11);
+    }
+
+    .tournament-section strong {
+      display: block;
+      margin-bottom: 7px;
+    }
+
+    .tournament-standing-row,
+    .tournament-pairing-row {
+      min-height: 34px;
+      padding: 6px 0;
+      border-top: 1px solid rgba(255, 248, 237, 0.08);
+      font-size: 0.86rem;
+    }
+
+    .tournament-standing-row:first-of-type,
+    .tournament-pairing-row:first-of-type { border-top: 0; }
+    .tournament-standing-row.is-self { color: var(--gold); }
+    .tournament-pairing-row button { min-height: 32px; padding: 5px 9px; }
+    .tournament-empty { color: var(--muted); font-size: 0.9rem; }
+
+    @media (max-width: 1050px) {
+      .tournament-create-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .tournament-create-grid label:first-child { grid-column: span 2; }
+      .tournament-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 620px) {
+      .tournament-create-grid,
+      .tournament-sections { grid-template-columns: 1fr; }
+      .tournament-create-grid label:first-child { grid-column: auto; }
+      .tournament-create-grid .button,
+      .tournament-actions .button,
+      .tournament-host-actions .button,
+      .tournament-share-row .button { width: 100%; }
+      .tournament-detail-head,
+      .tournament-card-top { align-items: flex-start; flex-direction: column; }
+    }
+
     .friend-lobby-head,
     .friend-share-row,
     .friend-lobby-foot,
@@ -16667,6 +16876,7 @@
           <div class="nav-menu">
           <a class="is-quick-tab" href="#play" data-site-tab="play" data-site-panel="play">Play AI</a>
           <a class="is-quick-tab" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Friend Challenge</a>
+          <a class="is-quick-tab" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Tournaments</a>
           </div>
         </details>
         <details class="nav-group" aria-label="Practice">
@@ -19140,6 +19350,47 @@
             </div>
           </div>
         </div>
+
+        <section class="tournament-lobby" id="tournamentLobby" aria-labelledby="tournamentTitle">
+          <div class="tournament-head">
+            <div>
+              <p class="section-kicker">Live events</p>
+              <h3 id="tournamentTitle">Chess Tournaments</h3>
+              <p>Join an Arena for continuous pairings or a Swiss event for round-by-round standings.</p>
+            </div>
+            <div class="tournament-actions">
+              <span class="tournament-status" id="tournamentSyncStatus">Syncing</span>
+              <button class="button secondary" type="button" id="tournamentRefresh">Refresh</button>
+            </div>
+          </div>
+          <form class="tournament-create-grid" id="tournamentCreateForm">
+            <label>Name
+              <input id="tournamentName" maxlength="60" required placeholder="Friday Rapid Arena" />
+            </label>
+            <label>Format
+              <select id="tournamentFormat"><option value="arena">Arena</option><option value="swiss">Swiss</option></select>
+            </label>
+            <label>Access
+              <select id="tournamentVisibility"><option value="public">Public</option><option value="private">Private</option></select>
+            </label>
+            <label>Clock
+              <select id="tournamentClock"><option value="3+2">3+2 Blitz</option><option value="5+0">5+0 Blitz</option><option value="10+0" selected>10+0 Rapid</option><option value="15+10">15+10 Rapid</option></select>
+            </label>
+            <label>Players
+              <select id="tournamentMaxPlayers"><option>8</option><option selected>16</option><option>32</option><option>64</option></select>
+            </label>
+            <label>Rounds / mins
+              <select id="tournamentLength"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option></select>
+            </label>
+            <button class="button" type="submit">Create Event</button>
+          </form>
+          <div class="tournament-grid">
+            <div class="tournament-list" id="tournamentList" aria-live="polite"></div>
+            <article class="tournament-detail" id="tournamentDetail" aria-live="polite">
+              <p class="tournament-empty">Choose an event to see its live pairings and standings.</p>
+            </article>
+          </div>
+        </section>
 
         <div class="puzzle-shell play-shell">
           <div class="match-board-column" data-board-orientation="white">
@@ -24517,6 +24768,7 @@
     const dragonProfileStorageKey = "checkmateQuest.dragonProfile.v1";
     const friendChallengeStorageKey = "checkmateQuest.friendChallenge.v1";
     const friendDirectoryStorageKey = "checkmateQuest.friends.v1";
+    const tournamentStorageKey = "checkmateQuest.tournaments.v1";
     const reviewAnalysisCacheStorageKey = "checkmateQuest.reviewAnalysis.v1";
     flexBadgeState = normalizeFlexBadgeState(savedPuzzleState.flexBadges, savedPuzzleState.store, readJsonStorage(learnerPrefsStorageKey, {}));
     let storyState = readJsonStorage(storyStorageKey, { completed: [], stars: 0 });
@@ -30840,6 +31092,7 @@
     let friendNetworkRequest = 0;
     let friendIncomingNoticeCode = "";
     let coachPremove = null;
+    let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false };
     let chessRulesPromise = null;
     let stockfishWorker = null;
     let stockfishReady = false;
@@ -33272,6 +33525,7 @@
     function recordCoachGameResult(playerWon) {
       if (coachGameRecorded || !coachGame?.history().length) return;
       coachGameRecorded = true;
+      if (friendChallengeState?.tournamentPairingId) void reportTournamentResultFromBoard();
       const history = coachGame.history({ verbose: true });
       const whiteMoves = history.filter((move) => move.color === "w");
       const minorMoves = new Set(whiteMoves.filter((move) => ["n", "b"].includes(move.piece)).map((move) => move.from)).size;
@@ -34664,6 +34918,358 @@
       return makeCoachMove(queued.from, queued.to);
     }
 
+    function getTournamentProvider() {
+      const provider = getFriendProvider();
+      return provider?.listTournaments && provider?.getTournament ? provider : null;
+    }
+
+    function readTournamentState() {
+      const saved = readJsonStorage(tournamentStorageKey, {});
+      return { currentCode: String(saved?.currentCode || "").toUpperCase() };
+    }
+
+    function saveTournamentState() {
+      writeJsonStorage(tournamentStorageKey, { currentCode: tournamentRuntime.currentCode });
+    }
+
+    function normalizeTournament(raw = {}) {
+      if (!raw || typeof raw !== "object" || !raw.code) return null;
+      return {
+        id: String(raw.id || ""),
+        code: String(raw.code || "").toUpperCase(),
+        title: String(raw.title || "Chess Tournament"),
+        format: raw.format === "swiss" ? "swiss" : "arena",
+        visibility: raw.visibility === "private" ? "private" : "public",
+        clock: String(raw.clock || "10+0"),
+        maxPlayers: Math.max(2, Number(raw.maxPlayers || raw.max_players) || 16),
+        rounds: Math.max(1, Number(raw.rounds) || 3),
+        durationMinutes: Math.max(5, Number(raw.durationMinutes || raw.duration_minutes) || 30),
+        status: String(raw.status || "draft"),
+        currentRound: Math.max(0, Number(raw.currentRound || raw.current_round) || 0),
+        creatorId: String(raw.creatorId || raw.creator_id || ""),
+        creatorName: String(raw.creatorName || raw.creator_name || "Host"),
+        startsAt: String(raw.startsAt || raw.starts_at || ""),
+        endsAt: String(raw.endsAt || raw.ends_at || ""),
+        participantCount: Math.max(0, Number(raw.participantCount || raw.participant_count) || 0),
+        joined: Boolean(raw.joined),
+        isHost: Boolean(raw.isHost || raw.is_host),
+        standings: Array.isArray(raw.standings) ? raw.standings : [],
+        pairings: Array.isArray(raw.pairings) ? raw.pairings : [],
+        myPairing: raw.myPairing && typeof raw.myPairing === "object" ? raw.myPairing : null
+      };
+    }
+
+    function formatTournamentStatus(status = "draft") {
+      return ({ draft: "Registration", running: "Live", paused: "Paused", completed: "Finished", cancelled: "Cancelled" })[status] || "Registration";
+    }
+
+    function formatTournamentCountdown(endsAt) {
+      const remaining = Date.parse(endsAt || "") - Date.now();
+      if (!Number.isFinite(remaining) || remaining <= 0) return "Finalizing";
+      const total = Math.ceil(remaining / 1000);
+      return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")} remaining`;
+    }
+
+    function getSelectedTournament() {
+      return tournamentRuntime.events.find((event) => event.code === tournamentRuntime.currentCode) || null;
+    }
+
+    function setSelectedTournament(event) {
+      const normalized = normalizeTournament(event);
+      if (!normalized) return null;
+      const index = tournamentRuntime.events.findIndex((item) => item.code === normalized.code);
+      if (index >= 0) tournamentRuntime.events[index] = normalized;
+      else tournamentRuntime.events.unshift(normalized);
+      tournamentRuntime.currentCode = normalized.code;
+      saveTournamentState();
+      renderTournamentLobby();
+      return normalized;
+    }
+
+    function tournamentInviteLink(event) {
+      const base = location.href.split("#")[0];
+      return `${base}#play?mode=tournament&tournament=${encodeURIComponent(event.code)}`;
+    }
+
+    function createTournamentButton(label, className = "button secondary", onClick = null) {
+      const button = createBookText("button", className, label);
+      button.type = "button";
+      if (onClick) button.addEventListener("click", onClick);
+      return button;
+    }
+
+    function renderTournamentLobby() {
+      const list = document.getElementById("tournamentList");
+      const detail = document.getElementById("tournamentDetail");
+      const sync = document.getElementById("tournamentSyncStatus");
+      if (!list || !detail) return;
+      const provider = getTournamentProvider();
+      if (sync) sync.textContent = provider ? "Live sync" : "Sign in";
+      if (!provider) {
+        list.replaceChildren(createBookText("p", "tournament-empty", "Sign in to browse, host, and join live tournaments."));
+        detail.replaceChildren(createBookText("p", "tournament-empty", "Tournament pairings use your secure Friend Challenge account."));
+        return;
+      }
+      const events = tournamentRuntime.events;
+      if (!events.length) list.replaceChildren(createBookText("p", "tournament-empty", "No events yet. Create the first one."));
+      else {
+        list.replaceChildren(...events.map((event) => {
+          const card = document.createElement("article");
+          card.className = `tournament-card${event.code === tournamentRuntime.currentCode ? " is-selected" : ""}`;
+          const top = document.createElement("div");
+          top.className = "tournament-card-top";
+          const title = document.createElement("div");
+          title.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? "Swiss" : "Arena"} | ${event.clock} | ${event.visibility}`));
+          const status = createBookText("span", `tournament-status is-${event.status}`, formatTournamentStatus(event.status));
+          top.append(title, status);
+          const meta = createBookText("div", "tournament-meta", `${event.participantCount}/${event.maxPlayers} players | Host: ${event.creatorName}`);
+          const actions = document.createElement("div");
+          actions.className = "tournament-actions";
+          actions.append(createTournamentButton(event.code === tournamentRuntime.currentCode ? "Selected" : "View", "button secondary", () => void openTournament(event.code)));
+          if (!event.joined && ["draft", "running"].includes(event.status)) actions.append(createTournamentButton("Join", "button", () => void joinTournament(event.code)));
+          card.append(top, meta, actions);
+          return card;
+        }));
+      }
+      const event = getSelectedTournament();
+      if (!event) {
+        detail.replaceChildren(createBookText("p", "tournament-empty", "Choose an event to see its live pairings and standings."));
+        return;
+      }
+      const head = document.createElement("div");
+      head.className = "tournament-detail-head";
+      const copy = document.createElement("div");
+      copy.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? `Swiss round ${Math.max(1, event.currentRound)}/${event.rounds}` : "Arena"} | ${event.clock} | ${event.participantCount}/${event.maxPlayers} players${event.status === "running" && event.format === "arena" ? ` | ${formatTournamentCountdown(event.endsAt)}` : ""}`));
+      head.append(copy, createBookText("span", `tournament-status is-${event.status}`, formatTournamentStatus(event.status)));
+
+      const actionRow = document.createElement("div");
+      actionRow.className = "tournament-actions";
+      if (!event.joined && ["draft", "running"].includes(event.status)) actionRow.append(createTournamentButton("Join tournament", "button", () => void joinTournament(event.code)));
+      if (event.joined && event.status === "draft") actionRow.append(createTournamentButton("Leave", "button secondary", () => void leaveTournament(event.code)));
+      if (event.myPairing?.challengeCode && event.myPairing.status === "active") actionRow.append(createTournamentButton("Play round", "button", () => void launchTournamentPairing(event)));
+      if (event.isHost) {
+        const hostActions = document.createElement("div");
+        hostActions.className = "tournament-host-actions";
+        if (event.status === "draft") hostActions.append(createTournamentButton("Start", "button", () => void runTournamentHostAction(event.code, "start")));
+        if (event.status === "running") hostActions.append(createTournamentButton("Pause", "button secondary", () => void runTournamentHostAction(event.code, "pause")), createTournamentButton("End", "button secondary", () => void runTournamentHostAction(event.code, "end")));
+        if (event.status === "paused") hostActions.append(createTournamentButton("Resume", "button", () => void runTournamentHostAction(event.code, "resume")), createTournamentButton("End", "button secondary", () => void runTournamentHostAction(event.code, "end")));
+        if (event.status === "draft") hostActions.append(createTournamentButton("Cancel", "button secondary", () => void runTournamentHostAction(event.code, "cancel")));
+        actionRow.append(hostActions);
+      }
+
+      const share = document.createElement("div");
+      share.className = "tournament-share-row";
+      const link = document.createElement("input");
+      link.readOnly = true;
+      link.value = tournamentInviteLink(event);
+      link.setAttribute("aria-label", "Tournament invite link");
+      share.append(link, createTournamentButton("Copy link", "button secondary", () => void copyTournamentLink(event)));
+      if (event.isHost) {
+        const invite = document.createElement("input");
+        invite.id = "tournamentInviteSearch";
+        invite.placeholder = "Invite a player by name";
+        invite.autocomplete = "off";
+        share.append(invite, createTournamentButton("Find", "button secondary", () => void searchTournamentInvite(event)));
+      }
+
+      const inviteResults = document.createElement("div");
+      inviteResults.className = "tournament-actions";
+      inviteResults.id = "tournamentInviteResults";
+      if (event.isHost && tournamentRuntime.inviteResults.length) {
+        tournamentRuntime.inviteResults.forEach((player) => {
+          inviteResults.append(createTournamentButton(`Invite ${player.name}`, "button secondary", () => void inviteTournamentPlayer(event, player)));
+        });
+      }
+
+      const sections = document.createElement("div");
+      sections.className = "tournament-sections";
+      const standings = document.createElement("section");
+      standings.className = "tournament-section";
+      standings.append(createBookText("strong", "", "Live standings"));
+      if (!event.standings.length) standings.append(createBookText("p", "tournament-empty", "Standings appear after players join."));
+      else event.standings.slice(0, 12).forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = `tournament-standing-row${entry.id === getFriendCurrentUserId() ? " is-self" : ""}`;
+        row.append(createBookText("span", "", `#${entry.playerRank || entry.player_rank || "-"} ${entry.username || "Player"}`), createBookText("span", "", `${Number(entry.score || 0).toFixed(Number(entry.score || 0) % 1 ? 1 : 0)} pts`));
+        standings.append(row);
+      });
+      const pairings = document.createElement("section");
+      pairings.className = "tournament-section";
+      pairings.append(createBookText("strong", "", "Pairings"));
+      if (!event.pairings.length) pairings.append(createBookText("p", "tournament-empty", event.status === "draft" ? "The host starts pairings when registration is ready." : "Looking for the next opponent."));
+      else event.pairings.slice(0, 12).forEach((pairing) => {
+        const row = document.createElement("div");
+        row.className = "tournament-pairing-row";
+        const side = createBookText("span", "", `R${pairing.round}: ${pairing.whiteName || "White"} vs ${pairing.blackName || "Black"}`);
+        const state = createBookText("span", "", pairing.result === "pending" ? pairing.status : pairing.result);
+        row.append(side, state);
+        pairings.append(row);
+      });
+      sections.append(standings, pairings);
+      detail.replaceChildren(head, actionRow, share, inviteResults, sections);
+    }
+
+    async function refreshTournamentNetwork(force = false) {
+      const provider = getTournamentProvider();
+      if (!provider || tournamentRuntime.refreshPromise || (!force && Date.now() - tournamentRuntime.lastRefresh < 2200)) return;
+      ensureTournamentRealtime(provider);
+      tournamentRuntime.refreshPromise = provider.listTournaments()
+        .then(async (rows) => {
+          tournamentRuntime.events = (Array.isArray(rows) ? rows : []).map(normalizeTournament).filter(Boolean);
+          tournamentRuntime.lastRefresh = Date.now();
+          const requested = new URLSearchParams(location.hash.split("?")[1] || "").get("tournament");
+          const code = String(requested || tournamentRuntime.currentCode || readTournamentState().currentCode || "").toUpperCase();
+          if (code && !tournamentRuntime.events.some((event) => event.code === code)) {
+            try { setSelectedTournament(await provider.getTournament(code)); } catch { tournamentRuntime.currentCode = ""; }
+          } else if (code) tournamentRuntime.currentCode = code;
+          renderTournamentLobby();
+        })
+        .catch(() => { renderTournamentLobby(); })
+        .finally(() => { tournamentRuntime.refreshPromise = null; });
+      return tournamentRuntime.refreshPromise;
+    }
+
+    function ensureTournamentRealtime(provider = getTournamentProvider()) {
+      if (tournamentRuntime.unsubscribe || tournamentRuntime.subscribing || !provider?.subscribeTournaments) return;
+      tournamentRuntime.subscribing = true;
+      Promise.resolve(provider.subscribeTournaments(() => void refreshTournamentNetwork(true)))
+        .then((unsubscribe) => { if (typeof unsubscribe === "function") tournamentRuntime.unsubscribe = unsubscribe; })
+        .catch(() => {})
+        .finally(() => { tournamentRuntime.subscribing = false; });
+    }
+
+    async function openTournament(code) {
+      const provider = getTournamentProvider();
+      if (!provider) return;
+      try { setSelectedTournament(await provider.getTournament(code)); }
+      catch (error) { document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Tournament could not be opened.")); }
+    }
+
+    async function createTournamentFromForm(event) {
+      event.preventDefault();
+      const provider = getTournamentProvider();
+      if (!provider) return;
+      const format = document.getElementById("tournamentFormat")?.value === "swiss" ? "swiss" : "arena";
+      const size = Number(document.getElementById("tournamentLength")?.value) || 5;
+      try {
+        const created = await provider.createTournament({
+          title: document.getElementById("tournamentName")?.value?.trim() || "Chess Event",
+          format,
+          visibility: document.getElementById("tournamentVisibility")?.value || "public",
+          clock: document.getElementById("tournamentClock")?.value || "10+0",
+          maxPlayers: Number(document.getElementById("tournamentMaxPlayers")?.value) || 16,
+          rounds: format === "swiss" ? size : 3,
+          durationMinutes: format === "arena" ? size * 10 : 30
+        });
+        setSelectedTournament(created);
+        document.getElementById("tournamentName").value = "";
+      } catch (error) {
+        document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Tournament could not be created."));
+      }
+    }
+
+    async function joinTournament(code) {
+      try { setSelectedTournament(await getTournamentProvider()?.joinTournament(code)); await refreshTournamentNetwork(true); }
+      catch (error) { document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Could not join this tournament.")); }
+    }
+
+    async function leaveTournament(code) {
+      try { setSelectedTournament(await getTournamentProvider()?.leaveTournament(code)); await refreshTournamentNetwork(true); }
+      catch (error) { document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Could not leave this tournament.")); }
+    }
+
+    async function runTournamentHostAction(code, action) {
+      try { setSelectedTournament(await getTournamentProvider()?.tournamentHostAction(code, action)); await refreshTournamentNetwork(true); }
+      catch (error) { document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Tournament action was not available.")); }
+    }
+
+    async function copyTournamentLink(event) {
+      const link = tournamentInviteLink(event);
+      try { await navigator.clipboard?.writeText(link); }
+      catch { window.prompt("Copy this tournament link", link); }
+    }
+
+    async function searchTournamentInvite(event) {
+      const query = document.getElementById("tournamentInviteSearch")?.value?.trim() || "";
+      if (!query) return;
+      try {
+        const rows = await getTournamentProvider()?.searchRegisteredPlayers(query);
+        tournamentRuntime.inviteResults = (Array.isArray(rows) ? rows : []).map(normalizeFriendRecord)
+          .filter((player) => player.id && player.id !== getFriendCurrentUserId());
+        renderTournamentLobby();
+      } catch {
+        tournamentRuntime.inviteResults = [];
+        renderTournamentLobby();
+      }
+    }
+
+    async function inviteTournamentPlayer(event, player) {
+      try {
+        await getTournamentProvider()?.inviteToTournament(event.code, player.id);
+        tournamentRuntime.inviteResults = [];
+        renderTournamentLobby();
+      } catch (error) {
+        document.getElementById("tournamentInviteResults")?.replaceChildren(createBookText("span", "tournament-empty", error?.message || "Invite could not be sent."));
+      }
+    }
+
+    async function launchTournamentPairing(event) {
+      const pairing = event?.myPairing;
+      if (!pairing?.challengeCode) return;
+      const provider = getFriendProvider();
+      try {
+        const remote = await provider?.getFriendChallenge(pairing.challengeCode);
+        if (!remote) throw new Error("Your paired game is not ready yet.");
+        applyRemoteFriendChallenge(remote, true);
+        friendChallengeState = {
+          ...friendChallengeState,
+          tournamentCode: event.code,
+          tournamentPairingId: String(pairing.id || ""),
+          tournamentResultReported: false
+        };
+        saveFriendChallengeState(friendChallengeState);
+        startFriendChallenge(false);
+        location.hash = "play";
+      } catch (error) {
+        document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Could not open the paired game."));
+      }
+    }
+
+    function getTournamentBoardResult() {
+      if (coachDrawAgreed || callCoachRule(coachGame, "isDraw", "in_draw")) return "draw";
+      if (matchClockExpiredColor) return matchClockExpiredColor === "w" ? "black" : "white";
+      if (callCoachRule(coachGame, "isCheckmate", "in_checkmate")) return coachGame.turn() === "w" ? "black" : "white";
+      const resign = getFriendControlSignals().find((signal) => signal.startsWith("__resign:"));
+      return resign?.endsWith(":w") ? "black" : resign?.endsWith(":b") ? "white" : "aborted";
+    }
+
+    async function reportTournamentResultFromBoard() {
+      const state = friendChallengeState;
+      const provider = getTournamentProvider();
+      if (!state?.tournamentPairingId || state.tournamentResultReported || !provider) return;
+      state.tournamentResultReported = true;
+      saveFriendChallengeState(state);
+      try {
+        const result = await provider.reportTournamentResult(state.tournamentPairingId, getTournamentBoardResult());
+        setSelectedTournament(result);
+        await refreshTournamentNetwork(true);
+      } catch {
+        state.tournamentResultReported = false;
+        saveFriendChallengeState(state);
+      }
+    }
+
+    function startTournamentNetworkSync() {
+      const saved = readTournamentState();
+      tournamentRuntime.currentCode = saved.currentCode;
+      renderTournamentLobby();
+      void refreshTournamentNetwork(true);
+      ensureTournamentRealtime();
+      window.clearInterval(tournamentRuntime.timer);
+      tournamentRuntime.timer = window.setInterval(() => void refreshTournamentNetwork(), 2500);
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) void refreshTournamentNetwork(true); });
+    }
+
     function startFriendNetworkSync() {
       window.clearInterval(friendNetworkTimer);
       void refreshFriendNetwork();
@@ -35395,13 +36001,17 @@
       document.getElementById("friendReconnect")?.addEventListener("click", () => void reconnectFriendChallenge());
       document.getElementById("friendRematch")?.addEventListener("click", () => startFriendChallenge(true));
       document.getElementById("friendTakeback")?.addEventListener("click", takebackFriendMove);
+      document.getElementById("tournamentCreateForm")?.addEventListener("submit", createTournamentFromForm);
+      document.getElementById("tournamentRefresh")?.addEventListener("click", () => void refreshTournamentNetwork(true));
       document.addEventListener("click", (event) => {
         if (event.target.closest("[data-profile-challenge]")) openFriendChallengeFromProfile();
       });
       window.addEventListener("hashchange", () => {
         if (location.hash.includes("challenge=")) void applyFriendInviteFromHash();
+        if (location.hash.includes("tournament=")) void refreshTournamentNetwork(true);
       });
       startFriendNetworkSync();
+      startTournamentNetworkSync();
       startMatchPlayerTimer();
       updateAiPlayerHeader();
       renderCoachBoard();
@@ -35637,6 +36247,9 @@
         const cleanHash = rawHash.split("?")[0];
         if (!cleanHash || cleanHash === "top") return null;
         if (cleanHash === "admin") return { tab: "admin", panel: "admin", focus: "admin" };
+        if (cleanHash === "tournaments" || /(^|[?&])(mode=tournament|tournament=)/.test(rawHash)) {
+          return { tab: "tournaments", panel: "play", focus: "tournamentLobby" };
+        }
         if (cleanHash === "friendChallenge" || /(^|[?&])(mode=friend|challenge=)/.test(rawHash)) {
           return { tab: "friendChallenge", panel: "play", focus: "friendChallenge" };
         }
@@ -35693,6 +36306,7 @@
           notation: "page-learn",
           books: "page-learn",
           play: "page-play",
+          tournaments: "page-play",
           leaderboards: "page-profile",
           puzzles: "page-puzzles",
           videos: "page-media",
@@ -35718,7 +36332,7 @@
 
       function showHome(shouldScroll = false) {
         document.body.classList.remove("site-tab-mode");
-        document.body.classList.remove("friend-challenge-mode");
+        document.body.classList.remove("friend-challenge-mode", "tournament-mode");
         clearActiveTabs();
         const homeLink = document.querySelector("[data-home-link]");
         homeLink?.classList.add("is-active-tab");
@@ -35750,6 +36364,7 @@
 
         document.body.classList.add("site-tab-mode");
         document.body.classList.toggle("friend-challenge-mode", config.tab === "friendChallenge");
+        document.body.classList.toggle("tournament-mode", config.tab === "tournaments");
         if (config.panel === "play") preloadStockfishWhenIdle();
         panels.forEach((item) => {
           const isActive = item === panel;
@@ -36356,6 +36971,32 @@
           }
         },
         listFriendChallenges: () => callFriendRpc("list_game_challenges"),
+        createTournament: (event) => callFriendRpc("create_tournament", {
+          p_title: String(event?.title || ""),
+          p_format: String(event?.format || "arena"),
+          p_visibility: String(event?.visibility || "public"),
+          p_clock: String(event?.clock || "10+0"),
+          p_max_players: Number(event?.maxPlayers) || 16,
+          p_rounds: Number(event?.rounds) || 3,
+          p_duration_minutes: Number(event?.durationMinutes) || 30
+        }),
+        listTournaments: () => callFriendRpc("list_tournaments"),
+        getTournament: (code) => callFriendRpc("get_tournament", { p_code: String(code || "") }),
+        joinTournament: (code) => callFriendRpc("join_tournament", { p_code: String(code || "") }),
+        leaveTournament: (code) => callFriendRpc("leave_tournament", { p_code: String(code || "") }),
+        inviteToTournament: (code, targetId) => callFriendRpc("invite_to_tournament", { p_code: String(code || ""), p_target_id: targetId }),
+        tournamentHostAction: (code, action) => callFriendRpc("tournament_host_action", { p_code: String(code || ""), p_action: String(action || "") }),
+        reportTournamentResult: (pairingId, result) => callFriendRpc("report_tournament_result", { p_pairing_id: pairingId, p_result: result }),
+        subscribeTournaments: async (callback) => {
+          const supabase = await getSupabaseClient();
+          const refresh = () => { if (typeof callback === "function") callback(); };
+          const channel = supabase.channel("checkmate-tournaments")
+            .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, refresh)
+            .on("postgres_changes", { event: "*", schema: "public", table: "tournament_entries" }, refresh)
+            .on("postgres_changes", { event: "*", schema: "public", table: "tournament_pairings" }, refresh)
+            .subscribe();
+          return () => { try { supabase.removeChannel(channel); } catch {} };
+        },
         saveProfile: async (profileData = {}) => {
           const supabase = await getSupabaseClient();
           const { data, error } = await supabase.auth.getSession();
