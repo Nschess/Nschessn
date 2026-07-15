@@ -4,3 +4,4 @@
 .tmp-*/
 .agents/
 .codex/
+data/lichess_db_puzzle.csv

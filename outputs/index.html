@@ -23597,10 +23597,10 @@
 
     const puzzleStorageKey = "checkmateQuest.puzzles.v1";
     const progressBackupStorageKey = "checkmateQuest.progressBackup.v1";
-    const puzzleBankVersion = "strict-stockfish-verified-v6";
+    const puzzleBankVersion = "strict-stockfish-verified-v7";
 
     const realPuzzleStorageKey = "checkmateQuest.realPuzzles.v1";
-    const realPuzzleCollectionCacheKey = "checkmateQuest.realPuzzleCollection.v2";
+    const realPuzzleCollectionCacheKey = "checkmateQuest.realPuzzleCollection.v4";
     const puzzleRuntimeDebug = (() => {
       try {
         return new URLSearchParams(window.location.search).has("puzzleDebug");
@@ -23612,195 +23612,8 @@
     const realPuzzleModes = ["Daily", "Trainer", "Rush", "Streak", "Battle"];
     const realPuzzleDifficultyAliases = { Easy: "Beginner", Medium: "Intermediate", Hard: "Advanced" };
     let puzzleCollectionReady = false;
-    let realPuzzleCollectionSource = "legacy embedded samples";
-    let realPuzzleBank = [
-      {
-        id: "verified-00sHx",
-        source: "Verified public puzzle sample, CC0",
-        difficulty: "Hard",
-        rating: 1760,
-        theme: "Endgame tactic",
-        title: "Verified 00sHx: Back Rank Conversion",
-        prompt: "The source line begins with the opponent move. After it appears, find the forcing bishop move.",
-        fen: "q3k1nr/1p3ppp/4p3/3pP3/2pP4/2P2N2/P1P2PPP/R1BQKB1R b KQk - 0 10",
-        moves: ["e8d7", "a2e6", "d7d8", "f7f8"],
-        primer: true,
-        hints: ["Use the opened diagonal.", "The bishop move comes with a threat.", "Solution starts: Be6."],
-        note: "Imported from an open public puzzle database sample format."
-      },
-      {
-        id: "verified-00sJ9",
-        source: "Verified public puzzle sample, CC0",
-        difficulty: "Expert",
-        rating: 2671,
-        theme: "Deflection",
-        title: "Verified 00sJ9: Bishop Deflection",
-        prompt: "After the source move, capture with the bishop and keep the rook tactic in mind.",
-        fen: "r3r1k1/pb3p1p/1p2p1p1/2p5/P1P2B2/4P1P1/1B3P1P/R2R2K1 b - - 0 23",
-        moves: ["e6e5", "f4e5", "e8e5", "b2e5"],
-        primer: true,
-        hints: ["Start by removing the advanced pawn.", "Your bishop can force a rook recapture.", "Solution starts: Bxe5."],
-        note: "Imported from an open public puzzle database sample format."
-      },
-      {
-        id: "verified-00sJb",
-        source: "Verified public puzzle sample, CC0",
-        difficulty: "Hard",
-        rating: 2235,
-        theme: "Knight attack",
-        title: "Verified 00sJb: Knight Jump",
-        prompt: "The opponent weakens dark squares. Find the forcing knight jump.",
-        fen: "r3qrk1/pb1n1ppp/1p2p3/3pP3/2pP1P2/P1P2N2/1P4PP/R1BQKB1R b KQ - 2 15",
-        moves: ["f7f6", "f3g5", "f6g5", "f4g5"],
-        primer: true,
-        hints: ["The knight can jump forward with tempo.", "After the pawn captures, another pawn recaptures.", "Solution starts: Ng5."],
-        note: "Imported from an open public puzzle database sample format."
-      },
-      {
-        id: "verified-00sO1",
-        source: "Verified public puzzle sample, CC0",
-        difficulty: "Easy",
-        rating: 998,
-        theme: "Pawn tactic",
-        title: "Verified 00sO1: Pawn Pull",
-        prompt: "The source move pushes a pawn. Find the knight move that punishes it.",
-        fen: "2r3k1/4bppp/p3pn2/1p6/3P4/2N1BN2/PP3PPP/R4RK1 b - - 0 17",
-        moves: ["b5b4", "c3a4", "b4a3", "b2a3"],
-        primer: true,
-        hints: ["The knight can attack the b-pawn from a4.", "Follow the recapture sequence.", "Solution starts: Na4."],
-        note: "Imported from an open public puzzle database sample format."
-      },
-      {
-        id: "real-back-rank-1",
-        source: "Offline validated FEN pack",
-        difficulty: "Easy",
-        rating: 700,
-        theme: "Mate in 1",
-        title: "Back Rank Bell",
-        prompt: "White to move. Use the open file and finish immediately.",
-        fen: "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
-        moves: ["d1d8"],
-        hints: ["Look for a rook check.", "The king has no escape squares.", "Solution: Rd8#."],
-        note: "Validated locally with chess.js."
-      },
-      {
-        id: "real-fools-mate",
-        source: "Offline validated FEN pack",
-        difficulty: "Easy",
-        rating: 650,
-        theme: "Opening mate",
-        title: "Fool's Mate Finish",
-        prompt: "Black to move. White opened the king; end it now.",
-        fen: "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2",
-        moves: ["d8h4"],
-        hints: ["The queen has a direct diagonal.", "The king on e1 cannot escape.", "Solution: Qh4#."],
-        note: "Classic opening mate, validated locally with chess.js."
-      },
-      {
-        id: "real-queen-rescue",
-        source: "Offline validated FEN pack",
-        difficulty: "Easy",
-        rating: 760,
-        theme: "Win queen",
-        title: "Queen Rescue Check",
-        prompt: "White to move. Capture the attacker with check.",
-        fen: "4k3/8/8/4q2Q/8/8/8/4K3 w - - 0 1",
-        moves: ["h5e5"],
-        hints: ["The queen moves straight left.", "Capture on e5.", "Solution: Qxe5+."],
-        note: "Validated locally with chess.js."
-      },
-      {
-        id: "real-promotion-check",
-        source: "Offline validated FEN pack",
-        difficulty: "Easy",
-        rating: 820,
-        theme: "Promotion",
-        title: "Promotion With Check",
-        prompt: "White to move. Turn the passed pawn into a queen.",
-        fen: "k7/7P/5K2/8/8/8/8/8 w - - 0 1",
-        moves: ["h7h8q"],
-        hints: ["The pawn is one step away.", "Promote to a queen.", "Solution: h8=Q+."],
-        note: "Validated locally with chess.js."
-      },
-      {
-        id: "real-knight-fork",
-        source: "Offline validated FEN pack",
-        difficulty: "Medium",
-        rating: 1120,
-        theme: "Fork",
-        title: "Knight Fork Spark",
-        prompt: "White to move. Check first, win the queen next.",
-        fen: "8/8/4k3/7q/8/3N4/8/4K3 w - - 0 1",
-        moves: ["d3f4"],
-        hints: ["Knights attack in an L shape.", "The check also attacks h5.", "Solution: Nf4+."],
-        note: "Validated locally with chess.js."
-      },
-      {
-        id: "real-bishop-queen",
-        source: "Offline validated FEN pack",
-        difficulty: "Medium",
-        rating: 1200,
-        theme: "Diagonal tactic",
-        title: "Bishop Sniper Line",
-        prompt: "White to move. Follow the diagonal and win the queen.",
-        fen: "4k3/8/7q/8/8/8/8/2B1K3 w - - 0 1",
-        moves: ["c1h6"],
-        hints: ["Trace the bishop diagonal.", "The queen sits on h6.", "Solution: Bxh6."],
-        note: "Validated locally with chess.js."
-      },
-      {
-        id: "real-battery-strike",
-        source: "Offline validated FEN pack",
-        difficulty: "Hard",
-        rating: 1500,
-        theme: "Battery",
-        title: "Queen Battery Strike",
-        prompt: "Black to move. The bishop protects the target square.",
-        fen: "6k1/5ppp/8/2b5/8/6q1/5PPP/6K1 b - - 0 1",
-        moves: ["g3f2"],
-        hints: ["The queen can capture near the king.", "The bishop on c5 protects f2.", "Solution: Qxf2+."],
-        note: "Validated locally with chess.js."
-      },
-      {
-        id: "real-bishop-deflection",
-        source: "Offline validated FEN pack",
-        difficulty: "Hard",
-        rating: 1650,
-        theme: "Win queen",
-        title: "Bishop Takes the Queen",
-        prompt: "White to move. Capture the queen with check.",
-        fen: "r3k2r/pppq1ppp/5N2/1B6/8/8/PPPP1PPP/R3K2R w KQkq - 0 1",
-        moves: ["b5d7"],
-        hints: ["The bishop can travel through c6.", "The target is the queen on d7.", "Solution: Bxd7+."],
-        note: "Validated locally with chess.js."
-      },
-      {
-        id: "real-castle-safety",
-        source: "Offline validated FEN pack",
-        difficulty: "Medium",
-        rating: 1050,
-        theme: "King safety",
-        title: "Castle Before Trouble",
-        prompt: "White to move. Use the legal castling move.",
-        fen: "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
-        moves: ["e1g1"],
-        hints: ["Move the king two squares toward the rook.", "Use kingside castling.", "Solution: O-O."],
-        note: "Validated locally with chess.js."
-      },
-      {
-        id: "real-pinned-queen",
-        source: "Offline validated FEN pack",
-        difficulty: "Expert",
-        rating: 1900,
-        theme: "Pinned queen",
-        title: "Pinned Queen Harvest",
-        prompt: "White to move. The queen is pinned to the king.",
-        fen: "4k3/4q3/8/8/8/8/8/4R1K1 w - - 0 1",
-        moves: ["e1e7"],
-        hints: ["Use the rook on the open file.", "Capture the pinned queen.", "Solution: Rxe7+."],
-        note: "Validated locally with chess.js."
-      }
-    ];
+    let realPuzzleCollectionSource = "data/puzzles.json";
+    let realPuzzleBank = [];
     function buildPuzzleEssentialsBank() {
       const tacticalSeeds = [
         {
@@ -25039,6 +24852,7 @@
     let realPuzzleTransitionId = 0;
     let realPuzzleValidationErrors = [];
     let realPuzzleValidIndexes = realPuzzleBank.map((_, index) => index);
+    let realPuzzleCollectionLoaded = false;
     let realPuzzleAutoNextTimer = 0;
     let streak = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.streak) || 0) : 0;
     let puzzleXp = Math.max(0, Number(savedPuzzleState.xp) || 0);
@@ -31583,6 +31397,15 @@
     }
 
     function renderPuzzle() {
+      if (document.getElementById("realPuzzles") && !realPuzzleCollectionLoaded) {
+        const feedback = document.getElementById("feedback");
+        if (feedback) feedback.textContent = "Preparing puzzles...";
+        ["startPuzzle", "hintPuzzle", "revealPuzzle", "retryPuzzle", "replayPuzzle"].forEach((id) => {
+          const control = document.getElementById(id);
+          if (control) control.disabled = true;
+        });
+        return;
+      }
       const indexes = getActivePuzzleIndexes();
       if (!indexes.length) {
         const feedback = document.getElementById("feedback");
@@ -37012,13 +36835,58 @@
       };
     }
 
+    function syncLegacyPuzzleTrainer() {
+      if (!CoachChess || !realPuzzleBank.length) return false;
+      const records = realPuzzleBank.map((puzzle) => {
+        try {
+          const prepared = prepareRealPuzzle(puzzle);
+          const line = [...prepared.line];
+          if (!line.length) return null;
+          return {
+            id: puzzle.id,
+            level: puzzle.difficulty === "Master" ? "Expert" : puzzle.difficulty,
+            difficulty: puzzle.difficulty,
+            rating: puzzle.rating,
+            mode: "Puzzle Trainer",
+            theme: puzzle.theme,
+            themes: puzzle.themes,
+            title: puzzle.title,
+            prompt: puzzle.prompt,
+            hint: puzzle.hints[0] || puzzle.note,
+            feedback: puzzle.note,
+            side: prepared.game.turn() === "w" ? "White to move" : "Black to move",
+            fen: prepared.game.fen(),
+            line,
+            answers: [{ move: line[0], correct: true }],
+            targets: [line[0].slice(2, 4)]
+          };
+        } catch {
+          return null;
+        }
+      }).filter(Boolean);
+      if (!records.length) return false;
+      puzzles = records;
+      playablePuzzleIndexes = null;
+      currentPuzzle = Math.max(0, Math.min(currentPuzzle, puzzles.length - 1));
+      puzzleValidationReport = {
+        totalPuzzles: records.length,
+        validPuzzles: records.length,
+        duplicatePuzzlesRemoved: 0,
+        invalidPositionsFixed: 0,
+        averageContinuationLength: Number((records.reduce((sum, puzzle) => sum + puzzle.line.length, 0) / records.length).toFixed(2)),
+        failedPuzzles: []
+      };
+      return true;
+    }
+
     async function loadRealPuzzleCollection() {
-      const install = (items, source) => {
+      if (realPuzzleCollectionLoaded) return true;
+      const install = (items, source, replaceExisting = true) => {
         if (!Array.isArray(items) || !items.length) return false;
         const normalized = items.map((item, index) => normalizeRealPuzzleRecord(item, index, source)).filter(Boolean);
-        const existing = new Set(realPuzzleBank.map(getRealPuzzleKey));
-        const existingIds = new Set(realPuzzleBank.map((puzzle) => String(puzzle?.id || "")).filter(Boolean));
-        const existingPositions = new Set(realPuzzleBank.map(getRealPuzzlePositionKey));
+        const existing = new Set((replaceExisting ? [] : realPuzzleBank).map(getRealPuzzleKey));
+        const existingIds = new Set((replaceExisting ? [] : realPuzzleBank).map((puzzle) => String(puzzle?.id || "")).filter(Boolean));
+        const existingPositions = new Set((replaceExisting ? [] : realPuzzleBank).map(getRealPuzzlePositionKey));
         const fresh = normalized.filter((puzzle) => {
           const key = getRealPuzzleKey(puzzle);
           const positionKey = getRealPuzzlePositionKey(puzzle);
@@ -37029,91 +36897,29 @@
           return true;
         });
         if (!fresh.length) return false;
-        realPuzzleBank = [...realPuzzleBank, ...fresh];
-        realPuzzleCollectionSource = `${realPuzzleCollectionSource} + ${source}`;
+        realPuzzleBank = replaceExisting ? fresh : [...realPuzzleBank, ...fresh];
+        realPuzzleCollectionSource = source;
         return true;
       };
-      const collectionUrl = String(document.documentElement.dataset.puzzleCollectionUrl || window.CHECKMATE_PUZZLE_PACK_URL || "").trim();
-      // A hosted collection is optional. The verified local bank is the default,
-      // so deployments never request a file that has not been included.
-      if (!collectionUrl) return false;
+      const configuredUrl = String(document.documentElement.dataset.puzzleCollectionUrl || window.CHECKMATE_PUZZLE_PACK_URL || "").trim();
+      const collectionUrl = configuredUrl || new URL("../data/puzzles.json?v=lichess-500-v1", window.location.href).href;
       const cached = readJsonStorage(realPuzzleCollectionCacheKey, null);
-      if (cached?.version === puzzleBankVersion) install(cached.puzzles, "Cached verified JSON");
+      let installed = cached?.version === puzzleBankVersion && install(cached.puzzles, "Cached Lichess puzzles");
       try {
-        const response = await fetch(collectionUrl, { cache: "force-cache" });
-        if (!response.ok) return false;
+        const response = await fetch(collectionUrl, { cache: "no-cache" });
+        if (!response.ok) return installed;
         const payload = await response.json();
         const items = Array.isArray(payload) ? payload : payload.puzzles;
-        if (install(items, payload.source || "Verified JSON collection")) {
+        if (install(items, payload.source || "Lichess puzzle database")) {
+          installed = true;
           writeJsonStorage(realPuzzleCollectionCacheKey, { version: puzzleBankVersion, puzzles: items });
         }
       } catch {
-        // The local verified bank remains available when an optional pack fails.
+        // The cached JSON collection remains available when the deployed file cannot load.
       }
-      return true;
-    }
-
-    function normalizeLegacyPuzzleForReal(puzzle, index = 0) {
-      if (!CoachChess || !validatePuzzleLine(puzzle).ok) return null;
-      try {
-        const game = new CoachChess(getPuzzleFen(puzzle));
-        const moves = [];
-        for (const notation of getPuzzleLine(puzzle)) {
-          const move = findPuzzleMoveInGame(game, notation);
-          if (!move) return null;
-          game.move(toCoachMoveInput(move));
-          moves.push(moveToUci(move));
-        }
-        const rating = Math.max(600, Math.min(3000, Number(puzzle.rating) || 900));
-        const theme = getPuzzlePattern(puzzle);
-        const declaredDifficulty = realPuzzleDifficultyAliases[puzzle.difficulty] || puzzle.difficulty;
-        const difficulty = realPuzzleDifficultyLevels.includes(declaredDifficulty)
-          ? declaredDifficulty
-          : rating >= 2400 ? "Master" : normalizePuzzleLevel(rating, "Beginner");
-        return {
-          id: `essentials-${puzzle.id || index + 1}`,
-          source: "Local validated essentials pack",
-          difficulty,
-          rating,
-          theme,
-          themes: Array.isArray(puzzle.themes) && puzzle.themes.length ? puzzle.themes : [theme],
-          title: puzzle.title || `Essentials Puzzle ${index + 1}`,
-          prompt: puzzle.prompt || "Find the forcing move and follow the continuation.",
-          fen: getPuzzleFen(puzzle),
-          moves,
-          hints: [
-            puzzle.hint || `Theme: ${theme}.`,
-            `Candidate move starts from ${moves[0]?.slice(0, 2) || "the active piece"}.`,
-            `Destination: ${moves[0]?.slice(2, 4) || "best square"}.`
-          ],
-          note: puzzle.feedback || "The tactic works because each move creates a forcing reply."
-        };
-      } catch {
-        return null;
-      }
-    }
-
-    function installLegacyRealPuzzlePack(sourcePuzzles = originalTieredPuzzleBank, replaceExisting = false) {
-      if (!Array.isArray(sourcePuzzles) || !sourcePuzzles.length) return 0;
-      if (replaceExisting) realPuzzleBank = [];
-      const existing = new Set(realPuzzleBank.map(getRealPuzzleKey));
-      const existingIds = new Set(realPuzzleBank.map((puzzle) => String(puzzle?.id || "")).filter(Boolean));
-      const existingPositions = new Set(realPuzzleBank.map(getRealPuzzlePositionKey));
-      const additions = [];
-      sourcePuzzles.forEach((puzzle, index) => {
-        const converted = normalizeLegacyPuzzleForReal(puzzle, index);
-        if (!converted) return;
-        const key = getRealPuzzleKey(converted);
-        const positionKey = getRealPuzzlePositionKey(converted);
-        if (existing.has(key) || existingIds.has(converted.id) || existingPositions.has(positionKey)) return;
-        existing.add(key);
-        existingIds.add(converted.id);
-        existingPositions.add(positionKey);
-        additions.push(converted);
-      });
-      if (additions.length) realPuzzleBank = [...realPuzzleBank, ...additions];
-      if (replaceExisting) realPuzzleCollectionSource = "originalTieredPuzzleBank";
-      return additions.length;
+      realPuzzleCollectionLoaded = installed;
+      if (installed) syncLegacyPuzzleTrainer();
+      return installed;
     }
 
     function reportRealPuzzleDiagnostics() {
@@ -37221,9 +37027,23 @@
       }].slice(-100);
     }
 
+    function getRealPuzzleSeenKey() {
+      return realPuzzleDifficulty === "All" ? "all" : realPuzzleDifficulty.toLowerCase();
+    }
+
+    function getRealPuzzleSeenIds(indexes = getRealPuzzleIndexes()) {
+      const allowed = new Set(indexes.map((index) => realPuzzleBank[index]?.id).filter(Boolean));
+      return new Set((Array.isArray(realPuzzleSeenByDifficulty[getRealPuzzleSeenKey()])
+        ? realPuzzleSeenByDifficulty[getRealPuzzleSeenKey()]
+        : []).filter((id) => allowed.has(id)));
+    }
+
     function recordRealPuzzleVisit(puzzle) {
       if (!puzzle?.id) return;
       realPuzzleRecentlyPlayed = [...realPuzzleRecentlyPlayed.filter((id) => id !== puzzle.id), puzzle.id].slice(-200);
+      const seen = getRealPuzzleSeenIds();
+      seen.add(puzzle.id);
+      realPuzzleSeenByDifficulty[getRealPuzzleSeenKey()] = [...seen];
     }
 
     function autoAdvanceRealPuzzleIfNeeded() {
@@ -37346,7 +37166,11 @@
       const position = Math.max(0, indexes.indexOf(realPuzzleIndex));
       const currentTactic = getRealPuzzleTacticalKey(realPuzzleBank[realPuzzleIndex]);
       const unsolved = indexes.filter((index) => index !== realPuzzleIndex && !realPuzzleSolved.has(realPuzzleBank[index]?.id));
-      const candidates = delta > 0 && unsolved.length ? new Set(unsolved) : new Set(indexes);
+      const seen = getRealPuzzleSeenIds(indexes);
+      const unseen = indexes.filter((index) => index !== realPuzzleIndex && !seen.has(realPuzzleBank[index]?.id));
+      const candidates = delta > 0
+        ? new Set(unseen.length ? unseen : (unsolved.length ? unsolved : indexes))
+        : new Set(indexes);
       for (let offset = 1; offset < indexes.length; offset += 1) {
         const candidate = indexes[(position + delta * offset + indexes.length) % indexes.length];
         if (candidates.has(candidate) && getRealPuzzleTacticalKey(realPuzzleBank[candidate]) !== currentTactic) {
@@ -37734,9 +37558,9 @@
         const engineErrors = await verifyRealPuzzleBankWithStockfish();
         if (engineErrors.length) realPuzzleValidationErrors.push(...engineErrors);
       } catch {
-        // Rule validation already left the local collection playable.
+        // Runtime validation is best-effort; the JSON collection remains playable when it loaded.
       } finally {
-        puzzleCollectionReady = realPuzzleValidIndexes.length > 0 || getPlayablePuzzleIndexes().length > 0;
+        puzzleCollectionReady = realPuzzleValidIndexes.length > 0;
         reportRealPuzzleDiagnostics();
         refreshPuzzleCollectionStatus();
         renderPuzzle();
@@ -37750,14 +37574,10 @@
       document.getElementById("realPuzzles")?.setAttribute("data-loading", "true");
       try {
         await loadChessRules();
-        sanitizeActivePuzzleBank();
-        // Restore the original tiered essentials bank in the visible trainer.
-        // This conversion keeps its existing FENs and continuations intact and
-        // filters them through the same validation used by the new UI.
-        installLegacyRealPuzzlePack(originalTieredPuzzleBank, true);
+        await loadRealPuzzleCollection();
         renderPuzzle();
         realPuzzleValidationErrors = validateRealPuzzleBank();
-        puzzleCollectionReady = realPuzzleValidIndexes.length > 0 || getPlayablePuzzleIndexes().length > 0;
+        puzzleCollectionReady = realPuzzleValidIndexes.length > 0;
         reportRealPuzzleRuntime("collection-ready");
       } catch {
         realPuzzleValidationErrors = ["Puzzle rules are temporarily unavailable."];
