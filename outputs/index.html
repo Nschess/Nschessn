@@ -994,21 +994,13 @@
       display: block;
       margin: auto;
       pointer-events: none;
+      object-fit: contain;
+      object-position: center;
+      user-select: none;
       overflow: visible;
       filter: var(--piece-svg-filter, none);
       transform: translateZ(0);
       contain: paint;
-    }
-
-    .piece-svg .piece-body,
-    .piece-svg .piece-inset,
-    .piece-svg .piece-shine {
-      vector-effect: non-scaling-stroke;
-      shape-rendering: geometricPrecision;
-    }
-
-    .piece-svg .piece-shine {
-      pointer-events: none;
     }
 
     .mini-square .piece-svg {
@@ -20758,255 +20750,21 @@
     let activePieceSvgSet = "classic";
     let pieceSvgRenderVersion = 0;
     const pieceSvgMarkupCache = new Map();
-    const pieceSvgProfiles = {
-      classic: { base: "M22 88h56l-5-10H27z", body: "M35 78c2-18 7-28 15-32 8 4 13 14 15 32z", trim: "M34 66h32M29 78h42", motif: "M42 58h16" },
-      staunton: { base: "M20 88h60l-7-11H27z", body: "M33 77c4-19 8-30 17-35 9 5 13 16 17 35z", trim: "M32 63c10 4 26 4 36 0M30 77h40", motif: "M41 55c6 3 12 3 18 0" },
-      wooden: { base: "M20 88h60l-9-12H29z", body: "M32 76c3-13 6-25 18-33 12 8 15 20 18 33z", trim: "M30 64c12-4 28-4 40 0M36 48c8 4 20 4 28 0", motif: "M43 72c8-8 8-18 1-25M56 72c-5-9-5-17 2-25" },
-      marble: { base: "M23 88h54l-6-12H29z", body: "M34 76c1-20 7-31 16-36 9 5 15 16 16 36z", trim: "M31 75h38M36 61h28", motif: "M39 69c8-9 17 2 23-8M39 54c7-8 13 0 20-7" },
-      glass: { base: "M25 88h50l-8-11H33z", body: "M31 77l19-38 19 38z", trim: "M40 72h20M43 58h14", motif: "M41 70l9-25 9 25M37 77l13-35 13 35" },
-      stone: { base: "M18 88h64l-8-13H26z", body: "M31 75l8-28 24-4 7 32z", trim: "M28 75h44M38 55h26", motif: "M39 69l7-8 8 5 8-10" },
-      minimal: { base: "M26 88h48l-4-10H30z", body: "M39 78V48h22v30z", trim: "M34 78h32", motif: "M43 63h14" },
-      modern: { base: "M22 88h56l-10-12H32z", body: "M34 76l16-34 16 34z", trim: "M36 66h28M30 77h40", motif: "M43 57l7-10 7 10" },
-      tournament: { base: "M18 88h64l-6-8H24z", body: "M34 80c1-15 5-27 16-37 11 10 15 22 16 37z", trim: "M28 80h44M33 70h34M37 57h26", motif: "M40 63c7 3 13 3 20 0" },
-      pixel: { base: "M22 88h56V78H66V68H34v10H22z", body: "M36 68V48h8V40h12v8h8v20z", trim: "M34 78h32M36 60h28", motif: "M44 52h12v8H44z" },
-      crystal: { base: "M24 88h52l-10-12H34z", body: "M31 76l19-40 19 40-19 8z", trim: "M50 36v48M37 67h26", motif: "M38 75l12-39 12 39M32 76l18 8 18-8" },
-      emerald: { base: "M21 88h58l-8-12H29z", body: "M32 76c2-16 8-27 18-36 10 9 16 20 18 36z", trim: "M35 64c7 6 23 6 30 0M31 76h38", motif: "M50 46c8 7 8 14 0 21-8-7-8-14 0-21z" },
-      ruby: { base: "M22 88h56l-7-12H29z", body: "M31 76l19-37 19 37-19 8z", trim: "M35 64l15-25 15 25M31 76h38", motif: "M50 49l9 10-9 10-9-10z" },
-      sapphire: { base: "M22 88h56l-8-13H30z", body: "M30 75l20-38 20 38-20 10z", trim: "M38 64h24M50 37v48", motif: "M39 58l11-12 11 12-11 12z" },
-      metal: { base: "M19 88h62l-9-12H28z", body: "M34 76l7-31h18l7 31z", trim: "M32 58h36M28 76h44", motif: "M39 69h22M43 49h14" },
-      neo: { base: "M23 88h54l-6-11H29z", body: "M33 77c3-21 10-31 17-36 7 5 14 15 17 36z", trim: "M37 64c8 5 18 5 26 0M32 77h36", motif: "M41 59c6-10 12-10 18 0" },
-      neon: { base: "M21 88h58l-8-12H29z", body: "M31 76l19-34 19 34z", trim: "M34 66h32M29 76h42", motif: "M39 70l22-24M39 46l22 24" },
-      gold: { base: "M18 88h64l-9-12H27z", body: "M32 76c4-19 9-30 18-38 9 8 14 19 18 38z", trim: "M28 76h44M35 60h30", motif: "M42 53l8-8 8 8-8 8z" },
-      shadow: { base: "M20 88h60l-10-13H30z", body: "M30 75c3-20 10-30 20-36 10 6 17 16 20 36z", trim: "M34 64c7 5 25 5 32 0M28 75h44", motif: "M40 57c8 10 13 10 20 0" },
-      ice: { base: "M23 88h54l-9-12H32z", body: "M30 76l20-42 20 42-20 9z", trim: "M40 67h20M50 34v51", motif: "M50 47v20M40 57h20M43 50l14 14M57 50L43 64" },
-      samurai: { base: "M20 88h60l-8-11H28z", body: "M32 77c1-18 8-29 18-34 10 5 17 16 18 34z", trim: "M31 62c11 8 27 8 38 0M28 77h44", motif: "M34 52c10-10 22-10 32 0M40 70l20-20" },
-      medieval: { base: "M18 88h64l-8-12H26z", body: "M31 76l5-30 14-8 14 8 5 30z", trim: "M33 60h34M28 76h44", motif: "M50 45v24M41 55h18" },
-      fantasy: { base: "M22 88h56l-7-11H29z", body: "M31 77c7-23 12-30 19-36 7 6 12 13 19 36z", trim: "M34 65c9 7 23 7 32 0M31 77h38", motif: "M50 47l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z" },
-      viking: { base: "M19 88h62l-9-12H28z", body: "M32 76c2-17 8-28 18-36 10 8 16 19 18 36z", trim: "M32 61c12 7 24 7 36 0M29 76h42", motif: "M35 49c-8 3-13 0-15-7M65 49c8 3 13 0 15-7" },
-      egyptian: { base: "M21 88h58l-9-12H30z", body: "M30 76l20-39 20 39z", trim: "M34 66h32M29 76h42", motif: "M40 57c7-8 13-8 20 0-7 8-13 8-20 0zM50 53v8" },
-      dragon: { base: "M18 88h64l-9-12H27z", body: "M31 76c4-20 8-29 19-38 11 9 15 18 19 38z", trim: "M29 76h42M34 62c10 7 22 7 32 0", motif: "M34 58c-8-12-2-19 8-14M66 58c8-12 2-19-8-14M42 70c8-5 8-11 0-16" },
-      galaxy: { base: "M22 88h56l-8-12H30z", body: "M32 76c2-19 8-29 18-37 10 8 16 18 18 37z", trim: "M34 64c9 5 23 5 32 0M30 76h40", motif: "M50 48a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM37 57c9-9 17-9 26 0" },
-      cyber: { base: "M20 88h60l-8-12H28z", body: "M33 76V43h34v33z", trim: "M33 58h34M29 76h42", motif: "M39 50h9v10h13M50 70v-8h11" },
-      cyberpunk: { base: "M19 88h62l-10-12H29z", body: "M31 76l8-33h22l8 33z", trim: "M33 55h34M29 76h42", motif: "M38 67h10v-9h14M62 48h-9v9H42" },
-      space: { base: "M23 88h54l-8-12H31z", body: "M31 76c2-18 9-31 19-40 10 9 17 22 19 40z", trim: "M35 64c8 4 22 4 30 0M31 76h38", motif: "M36 57c10-12 18-12 28 0M42 47l8-6 8 6" },
-      divine: { base: "M20 88h60l-9-12H29z", body: "M32 76c4-20 9-31 18-39 9 8 14 19 18 39z", trim: "M29 76h42M36 61h28", motif: "M50 43v26M38 56h24M42 48l16 16M58 48L42 64" },
-      cosmic: { base: "M21 88h58l-9-12H30z", body: "M31 76c4-22 10-31 19-39 9 8 15 17 19 39z", trim: "M34 64c11 8 21 8 32 0M30 76h40", motif: "M50 47c11 0 17 7 17 14s-6 14-17 14-17-7-17-14 6-14 17-14zM41 61h18" }
-    };
-
-    const pieceCodeLookup = {
-      K: { color: "w", type: "k" }, Q: { color: "w", type: "q" }, R: { color: "w", type: "r" }, B: { color: "w", type: "b" }, N: { color: "w", type: "n" }, P: { color: "w", type: "p" },
-      k: { color: "b", type: "k" }, q: { color: "b", type: "q" }, r: { color: "b", type: "r" }, b: { color: "b", type: "b" }, n: { color: "b", type: "n" }, p: { color: "b", type: "p" }
-    };
-
-    function getPieceCodeInfo(piece) {
-      if (!piece) return null;
-      if (typeof piece === "object" && piece.color && piece.type) return { color: piece.color, type: piece.type };
-      return pieceCodeLookup[String(piece)] || null;
-    }
-
-    const pieceArtFamilies = {
-      classic: "staunton", staunton: "staunton", wooden: "wood", marble: "stone", glass: "crystal", stone: "stone",
-      minimal: "minimal", modern: "modern", tournament: "tournament", pixel: "pixel", crystal: "crystal", emerald: "gem", ruby: "gem", sapphire: "gem",
-      metal: "metal", neo: "tech", neon: "tech", gold: "royal", shadow: "obsidian", ice: "ice", samurai: "samurai",
-      medieval: "medieval", fantasy: "fantasy", viking: "viking", egyptian: "egyptian", dragon: "dragon",
-      galaxy: "space", cyber: "tech", cyberpunk: "cyberpunk", space: "space", divine: "divine", cosmic: "cosmic"
-    };
-
-    const pieceMaterialBySet = {
-      classic: "matte", glass: "glossy", metal: "metallic", marble: "marble",
-      crystal: "crystal", shadow: "obsidian", wooden: "wooden"
-    };
-
-    function pieceAttrs(fill, stroke, width = 3) {
-      return `fill="${fill}" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"`;
-    }
-
-    function resolvePieceSvgSet(style) {
-      return supportedPieceSvgSets.has(style) ? style : "classic";
-    }
-
-    function createPremiumClassicPiece(type, fill, stroke, accent, shine) {
-      const solid = pieceAttrs(fill, stroke, 3.2);
-      const inset = `fill="${accent}" opacity=".17"`;
-      const shineFill = `fill="${shine}" opacity=".34"`;
-      const art = {
-        k: `<path class="piece-body" d="M20 109H108L99 96H29z" ${solid}/><path class="piece-body" d="M33 96C36 79 43 67 52 62H76C85 67 92 79 95 96z" ${solid}/><path class="piece-body" d="M43 66C43 56 51 49 64 49s21 7 21 17l-5 10H48z" ${solid}/><path class="piece-body" d="M59 15h10v13h13v10H69v21H59V38H46V28h13z" ${solid}/><path class="piece-inset" d="M45 78c7-7 31-7 38 0l-4 10H49z" ${inset}/><path class="piece-shine" d="M51 68c4-4 10-5 16-4l-5 13H50z" ${shineFill}/>`,
-        q: `<path class="piece-body" d="M18 109H110L100 96H28z" ${solid}/><path class="piece-body" d="M30 96c4-18 10-29 19-36h30c9 7 15 18 19 36z" ${solid}/><path class="piece-body" d="M24 61l5-34 18 19 17-32 17 32 18-19 5 34-18-7-12 13-10-12-10 12-12-13z" ${solid}/><circle class="piece-body" cx="29" cy="23" r="5" ${solid}/><circle class="piece-body" cx="64" cy="12" r="5" ${solid}/><circle class="piece-body" cx="99" cy="23" r="5" ${solid}/><path class="piece-inset" d="M43 76l21-13 21 13-6 12H49z" ${inset}/><path class="piece-shine" d="M41 61l17-20 5 17-10 18z" ${shineFill}/>`,
-        r: `<path class="piece-body" d="M17 109H111l-10-13H27z" ${solid}/><path class="piece-body" d="M28 96V55h72v41z" ${solid}/><path class="piece-body" d="M24 56V26h15v11h12V26h13v11h13V26h12v11h15v19z" ${solid}/><path class="piece-inset" d="M38 61h14v27H38zM76 61h14v27H76z" ${inset}/><path class="piece-shine" d="M32 61h8v28h-8z" ${shineFill}/><path class="piece-shine" d="M55 61h7v28h-7z" ${shineFill}/>`,
-        b: `<path class="piece-body" d="M19 109h90l-10-13H29z" ${solid}/><path class="piece-body" d="M31 96c3-18 10-30 33-40 23 10 30 22 33 40z" ${solid}/><path class="piece-body" d="M64 14c18 14 27 29 25 43-2 13-11 24-25 31-14-7-23-18-25-31-2-14 7-29 25-43z" ${solid}/><path class="piece-inset" d="M76 27L47 62l8 7 29-34z" ${inset}/><path class="piece-shine" d="M50 30c-6 10-7 20-3 29l13-18z" ${shineFill}/><path class="piece-body" d="M43 78c6 5 30 5 42 0l-6 12H49z" ${solid}/>`,
-        n: `<path class="piece-body" d="M16 109h96l-11-14H28z" ${solid}/><path class="piece-body" d="M26 95c5-25 15-49 37-70 18 3 29 16 30 34l-18-5 9 13c-12 17-31 26-58 28z" ${solid}/><path class="piece-body" d="M49 31l-9-17 20 11 10-15 3 21z" ${solid}/><path class="piece-inset" d="M56 61l19-5 9 11c-8 10-17 16-29 19z" ${inset}/><circle cx="70" cy="43" r="3.5" fill="${accent}"/><path class="piece-shine" d="M38 76c7-3 15-9 21-18l7 6c-6 11-15 18-27 22z" ${shineFill}/>`,
-        p: `<path class="piece-body" d="M20 109h88l-10-13H30z" ${solid}/><path class="piece-body" d="M33 96c3-19 12-30 31-36 19 6 28 17 31 36z" ${solid}/><path class="piece-body" d="M41 54c-6-6-9-14-9-23 0-14 14-24 32-24s32 10 32 24c0 9-3 17-9 23-12 8-34 8-46 0z" ${solid}/><path class="piece-inset" d="M43 67c10-6 26-6 42 0l-6 13H49z" ${inset}/><path class="piece-shine" d="M47 18c-6 6-8 15-5 23l14-6 2-18z" ${shineFill}/>`
-      };
-      return art[type] || art.p;
-    }
-
-    function getPieceProfileParts(style, fill, stroke, accent, shine, family) {
-      const profile = pieceSvgProfiles[style];
-      if (!profile) console.warn(`Missing SVG piece profile for theme: ${style}`);
-      const safeProfile = profile || pieceSvgProfiles.classic;
-      const attrs = pieceAttrs(fill, stroke, family === "minimal" ? 3.8 : 3.35);
-      return {
-        attrs,
-        soft: `fill="none" stroke="${shine}" stroke-width="2.15" stroke-linecap="round"`,
-        base: `<path d="${safeProfile.base}" ${attrs}/>`,
-        body: `<path d="${safeProfile.body}" ${attrs}/>`,
-        trim: `<path class="piece-accent" d="${safeProfile.trim}" fill="none" stroke="${accent}" stroke-width="2.2" opacity=".74"/>`,
-        motif: `<path class="piece-mark" d="${safeProfile.motif}" fill="none" stroke="${accent}" stroke-width="2.15" opacity=".56"/>`
-      };
-    }
-
-    function getPieceSilhouette(type, fill, stroke, accent, shine, family, style = "classic") {
-      const { attrs, soft, base, body, trim, motif } = getPieceProfileParts(style, fill, stroke, accent, shine, family);
-      const crown = family === "pixel"
-        ? `<path d="M28 45V28h8v8h8v-8h12v8h8v-8h8v17z" ${attrs}/>`
-        : family === "dragon"
-          ? `<path d="M21 45l11-22 11 14 7-25 7 25 11-14 11 22-15-5-14 6-14-6z" ${attrs}/><path d="M33 27c-7-5-11-11-12-18M67 27c7-5 11-11 12-18" fill="none" stroke="${accent}" stroke-width="3" opacity=".7"/>`
-        : family === "viking"
-          ? `<path d="M24 44l9-20 10 12 7-21 7 21 10-12 9 20z" ${attrs}/><path d="M34 26c-10 0-17-6-20-15M66 26c10 0 17-6 20-15" fill="none" stroke="${accent}" stroke-width="3" opacity=".7"/>`
-        : family === "samurai"
-          ? `<path d="M22 44c12-16 44-16 56 0l-10 8c-11-9-25-9-36 0z" ${attrs}/><path d="M31 35h38M38 27h24" fill="none" stroke="${accent}" stroke-width="3" opacity=".72"/>`
-        : family === "egyptian"
-          ? `<path d="M23 45l27-31 27 31H61l-11-15-11 15z" ${attrs}/><path d="M38 38h24M50 23v22" fill="none" stroke="${accent}" stroke-width="2.5" opacity=".75"/>`
-        : family === "tech" || family === "cyberpunk"
-          ? `<path d="M24 45V29h14v-9h24v9h14v16z" ${attrs}/><path d="M35 35h30M50 20v25" fill="none" stroke="${accent}" stroke-width="2.4" opacity=".78"/>`
-        : family === "space" || family === "cosmic"
-          ? `<path d="M22 44c10-18 46-18 56 0l-13 3c-11-8-19-8-30 0z" ${attrs}/><circle cx="50" cy="25" r="8" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/><path d="M34 36c11-9 21-9 32 0" fill="none" stroke="${accent}" stroke-width="2.2" opacity=".75"/>`
-        : family === "divine"
-          ? `<path d="M23 44l11-20 10 12 6-24 6 24 10-12 11 20z" ${attrs}/><path d="M50 14v31M37 27h26" fill="none" stroke="${shine}" stroke-width="2.6" opacity=".8"/>`
-        : `<path d="M24 44l8-23 12 15 6-24 6 24 12-15 8 23z" ${attrs}/>`;
-      const tower = family === "pixel"
-        ? `<path d="M29 72V40h8v-9h8v9h10v-9h8v9h8v32z" ${attrs}/>`
-        : family === "egyptian"
-          ? `<path d="M29 72l8-36h26l8 36z" ${attrs}/><path d="M26 38h48l-6-13H32z" ${attrs}/>`
-          : family === "samurai"
-            ? `<path d="M28 72V44l22-16 22 16v28z" ${attrs}/><path d="M25 45h50M34 55h32" fill="none" stroke="${accent}" stroke-width="3" opacity=".72"/>`
-          : family === "viking"
-            ? `<path d="M29 72V37h42v35z" ${attrs}/><path d="M25 38l9-15 8 15M58 38l8-15 9 15" ${attrs}/>`
-          : family === "tech" || family === "cyberpunk"
-            ? `<path d="M28 72V36h44v36z" ${attrs}/><path d="M31 46h38M39 36v36M61 36v36" fill="none" stroke="${accent}" stroke-width="2.5" opacity=".75"/>`
-          : family === "dragon"
-            ? `<path d="M27 72V39h46v33z" ${attrs}/><path d="M25 40l10-14 10 14M55 40l10-14 10 14" ${attrs}/><path d="M36 55c10 7 18 7 28 0" ${soft}/>`
-          : `<path d="M30 72V38h40v34z" ${attrs}/><path d="M27 39V21h10v8h9v-8h8v8h9v-8h10v18z" ${attrs}/>`;
-      const bishopHead = family === "crystal" || family === "ice"
-        ? `<path d="M50 14l19 32-19 25-19-25z" ${attrs}/>`
-        : family === "minimal"
-          ? `<path d="M35 18h30v50H35z" ${attrs}/>`
-        : family === "egyptian"
-          ? `<path d="M50 14l22 44H28z" ${attrs}/><path d="M39 49h22M50 27v31" ${soft}/>`
-        : family === "samurai"
-          ? `<path d="M31 45c7-18 31-18 38 0l-8 25H39z" ${attrs}/><path d="M35 43h30" fill="none" stroke="${accent}" stroke-width="3" opacity=".72"/>`
-        : family === "space" || family === "cosmic"
-          ? `<path d="M50 15c15 9 22 19 20 31-2 12-9 19-20 24-11-5-18-12-20-24-2-12 5-22 20-31z" ${attrs}/><circle cx="50" cy="43" r="8" fill="none" stroke="${accent}" stroke-width="2.2" opacity=".75"/>`
-          : `<path d="M50 15c13 8 20 18 20 29 0 12-8 21-20 26-12-5-20-14-20-26 0-11 7-21 20-29z" ${attrs}/>`;
-      const horse = family === "pixel"
-        ? `<path d="M28 73V61h8V49h8V37h8V25h16v9h8v16h-9v9h-9v8H44v6z" ${attrs}/>`
-        : family === "dragon"
-          ? `<path d="M27 73c6-25 16-42 34-54 15 4 22 17 19 31l-16-7 8 13c-9 10-23 17-45 17z" ${attrs}/><path d="M42 27l-10-12M53 22l-2-13" fill="none" stroke="${accent}" stroke-width="3" opacity=".78"/>`
-        : family === "samurai"
-          ? `<path d="M27 73c6-21 15-35 30-49 13 2 22 12 23 25l-17-3 7 10c-9 9-22 15-43 17z" ${attrs}/><path d="M43 31h25M39 40h31" fill="none" stroke="${accent}" stroke-width="2.6" opacity=".74"/>`
-        : family === "viking"
-          ? `<path d="M27 73c6-24 15-39 31-52 13 3 21 13 20 26l-14-4 7 12c-8 9-23 16-44 18z" ${attrs}/><path d="M43 28c-8-6-13-12-14-20M58 24c5-5 7-10 7-16" fill="none" stroke="${accent}" stroke-width="3" opacity=".72"/>`
-        : family === "tech" || family === "cyberpunk"
-          ? `<path d="M27 73l10-36 21-17 19 14v18l-14-3 7 11-16 13z" ${attrs}/><path d="M38 47h23M45 34h24M53 58h14" fill="none" stroke="${accent}" stroke-width="2.4" opacity=".78"/>`
-        : family === "egyptian"
-          ? `<path d="M28 73l9-34 17-19 20 16-4 18-13-4 5 11c-8 7-18 11-34 12z" ${attrs}/><path d="M39 44h23M45 32h16" fill="none" stroke="${accent}" stroke-width="2.5" opacity=".74"/>`
-          : `<path d="M28 73c5-24 13-38 29-52 12 3 21 13 21 27l-15-5 7 12c-8 9-22 16-42 18z" ${attrs}/>`;
-      const pawnHead = family === "pixel"
-        ? `<path d="M38 18h24v24H38z" ${attrs}/>`
-        : family === "crystal" || family === "ice"
-          ? `<path d="M50 15l16 18-16 18-16-18z" ${attrs}/>`
-        : family === "egyptian"
-          ? `<path d="M50 16l17 28H33z" ${attrs}/>`
-        : family === "tech" || family === "cyberpunk"
-          ? `<path d="M36 18h28v26H36z" ${attrs}/><path d="M42 31h16" ${soft}/>`
-        : family === "dragon"
-          ? `<path d="M34 38c5-17 27-25 32 0-8 10-24 10-32 0z" ${attrs}/><path d="M43 24l-4-9M57 24l4-9" fill="none" stroke="${accent}" stroke-width="2.5" opacity=".75"/>`
-        : `<circle cx="50" cy="30" r="15.5" ${attrs}/>`;
-
-      if (type === "k") {
-        return `${base}${body}<path d="M39 45h22v24H39z" ${attrs}/><path d="M47 13h6v10h10v7H53v13h-6V30H37v-7h10z" ${attrs}/><path d="M40 53c7-4 13-4 20 0" ${soft}/>${trim}${motif}`;
-      }
-      if (type === "q") {
-        return `${base}${body}${crown}<circle cx="32" cy="21" r="4.2" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/><circle cx="50" cy="13" r="4.2" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/><circle cx="68" cy="21" r="4.2" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/><path d="M35 51h30" ${soft}/>${trim}${motif}`;
-      }
-      if (type === "r") {
-        return `${base}${tower}<path class="piece-accent" d="M35 48h30M38 59h24" fill="none" stroke="${accent}" stroke-width="2.5" opacity=".75"/><path d="M40 40v30M60 40v30" ${soft}/>${trim}${motif}`;
-      }
-      if (type === "b") {
-        return `${base}${body}${bishopHead}<path class="piece-accent" d="M58 29L42 56" fill="none" stroke="${accent}" stroke-width="3.2" opacity=".86"/><path d="M39 47c7 6 15 6 22 0" ${soft}/>${trim}${motif}`;
-      }
-      if (type === "n") {
-        return `${base}${horse}<path d="M39 64c12-9 21-20 25-34" ${soft}/><circle cx="58" cy="36" r="2.7" fill="${accent}"/><path class="piece-accent" d="M45 27l-7-8M51 24l-2-10" fill="none" stroke="${accent}" stroke-width="2.7" opacity=".78"/>${trim}${motif}`;
-      }
-      return `${base}${body}${pawnHead}<path d="M41 37c6 4 12 4 18 0" ${soft}/>${trim}${motif}`;
-    }
-
-    function getPieceStyleOverlay(style, type, stroke, accent, shine) {
-      const family = pieceArtFamilies[style] || "staunton";
-      const overlays = {
-        classic: `<path class="piece-mark" d="M37 70h26" fill="none" stroke="${shine}" stroke-width="2" opacity=".42"/>`,
-        staunton: `<path class="piece-mark" d="M36 53c8 4 20 4 28 0M38 69h24" fill="none" stroke="${shine}" stroke-width="2" opacity=".52"/>`,
-        wooden: `<path class="piece-mark" d="M39 74c7-11 7-22 0-33M52 75c-5-12-3-23 6-34M63 72c-5-8-4-16 2-22" fill="none" stroke="${accent}" stroke-width="2" opacity=".64"/>`,
-        marble: `<path class="piece-mark" d="M33 69c9-10 15 2 22-8M38 48c8-8 14 1 22-7M45 78c6-5 10-2 16-7" fill="none" stroke="${accent}" stroke-width="2.1" opacity=".58"/>`,
-        glass: `<path class="piece-mark" d="M38 72l12-42 12 42M41 57h18M45 42h10" fill="none" stroke="${shine}" stroke-width="2" opacity=".78"/>`,
-        stone: `<path class="piece-mark" d="M33 71l10-9 9 6 12-12M40 49l8-6 9 4 8-8" fill="none" stroke="${accent}" stroke-width="2.2" opacity=".56"/>`,
-        minimal: `<path class="piece-mark" d="M38 66h24M42 51h16" fill="none" stroke="${accent}" stroke-width="2.6" opacity=".72"/>`,
-        modern: `<path class="piece-mark" d="M38 69l23-27M36 52h28" fill="none" stroke="${accent}" stroke-width="2.45" opacity=".76"/>`,
-        tournament: `<path class="piece-mark" d="M34 72h32M38 61h24M42 49h16" fill="none" stroke="${shine}" stroke-width="2.15" opacity=".72"/>`,
-        pixel: `<path class="piece-mark" d="M36 43h8v8h-8zM56 43h8v8h-8zM40 64h20v8H40z" fill="${accent}" opacity=".72"/>`,
-        crystal: `<path class="piece-mark" d="M50 24v54M35 70l15-46 15 46M38 56h24" fill="none" stroke="${shine}" stroke-width="2" opacity=".74"/>`,
-        emerald: `<path class="piece-mark" d="M50 39c9 7 9 15 0 23-9-8-9-16 0-23zM40 68c7-4 13-4 20 0" fill="none" stroke="${accent}" stroke-width="2.35" opacity=".8"/>`,
-        ruby: `<path class="piece-mark" d="M50 39l11 12-11 12-11-12zM38 70l12-12 12 12" fill="none" stroke="${accent}" stroke-width="2.35" opacity=".82"/>`,
-        sapphire: `<path class="piece-mark" d="M50 37c8 9 12 16 12 22 0 7-5 11-12 11s-12-4-12-11c0-6 4-13 12-22z" fill="none" stroke="${accent}" stroke-width="2.25" opacity=".82"/>`,
-        metal: `<path class="piece-mark" d="M32 72h36M36 58h28M42 44h16" fill="none" stroke="${shine}" stroke-width="2.4" opacity=".68"/><circle cx="38" cy="66" r="2" fill="${accent}" opacity=".68"/><circle cx="62" cy="66" r="2" fill="${accent}" opacity=".68"/>`,
-        neo: `<path class="piece-mark" d="M37 61c8-10 18-10 26 0M40 71h20M45 48h10" fill="none" stroke="${accent}" stroke-width="2.35" opacity=".78"/>`,
-        neon: `<path class="piece-mark" d="M37 67l26-26M37 42l26 26M42 55h16" fill="none" stroke="${accent}" stroke-width="2.45" opacity=".78"/>`,
-        gold: `<path class="piece-mark" d="M40 58l10-10 10 10-10 10zM35 43h30M42 72h16" fill="none" stroke="${accent}" stroke-width="2.35" opacity=".84"/>`,
-        shadow: `<path class="piece-mark" d="M39 73l20-36M45 78l15-24" fill="none" stroke="${accent}" stroke-width="2.7" opacity=".6"/>`,
-        ice: `<path class="piece-mark" d="M50 39v28M39 53h22M42 45l16 16M58 45L42 61" fill="none" stroke="${shine}" stroke-width="2" opacity=".78"/>`,
-        samurai: `<path class="piece-mark" d="M36 69l25-26M38 58h24M37 43c9-6 17-6 26 0" fill="none" stroke="${accent}" stroke-width="2.5" opacity=".78"/>`,
-        medieval: `<path class="piece-mark" d="M50 41v27M39 52h22M36 68h28" fill="none" stroke="${accent}" stroke-width="2.55" opacity=".78"/><circle cx="42" cy="38" r="2" fill="${accent}" opacity=".8"/><circle cx="58" cy="38" r="2" fill="${accent}" opacity=".8"/>`,
-        fantasy: `<path class="piece-mark" d="M50 38l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z" fill="none" stroke="${accent}" stroke-width="2.2" opacity=".78"/>`,
-        viking: `<path class="piece-mark" d="M39 45c-6-1-10-5-11-11M61 45c6-1 10-5 11-11M39 68c8 5 14 5 22 0" fill="none" stroke="${accent}" stroke-width="2.65" opacity=".76"/>`,
-        egyptian: `<path class="piece-mark" d="M37 51c8-9 18-9 26 0-8 9-18 9-26 0zM50 47v8M38 69h24" fill="none" stroke="${accent}" stroke-width="2.35" opacity=".82"/>`,
-        dragon: `<path class="piece-mark" d="M39 48c-8-9-4-16 7-14M61 48c8-9 4-16-7-14M41 70c9-5 9-12 0-19M59 70c-9-5-9-12 0-19" fill="none" stroke="${accent}" stroke-width="2.55" opacity=".78"/>`,
-        galaxy: `<path class="piece-mark" d="M35 55c10-12 20-12 30 0M39 66c9 7 13 7 22 0" fill="none" stroke="${accent}" stroke-width="2.1" opacity=".76"/><circle cx="63" cy="43" r="2.5" fill="${accent}" opacity=".82"/>`,
-        cyber: `<path class="piece-mark" d="M37 45h12v9h15M41 70v-8h13v-8h10" fill="none" stroke="${accent}" stroke-width="2.45" opacity=".8"/>`,
-        cyberpunk: `<path class="piece-mark" d="M33 68h17v-8h18M40 41h10v10h17M58 75v-11" fill="none" stroke="${accent}" stroke-width="2.55" opacity=".82"/>`,
-        space: `<path class="piece-mark" d="M36 55c9-11 19-11 28 0M41 65c7 5 11 5 18 0" fill="none" stroke="${accent}" stroke-width="2.1" opacity=".74"/><circle cx="60" cy="42" r="3.2" fill="none" stroke="${accent}" stroke-width="2" opacity=".82"/>`,
-        divine: `<path class="piece-mark" d="M50 34v34M38 51h24M42 42l16 18M58 42L42 60" fill="none" stroke="${accent}" stroke-width="2.35" opacity=".82"/>`,
-        cosmic: `<path class="piece-mark" d="M36 53c12-14 16-14 28 0M36 64c12 10 16 10 28 0M50 43a7 7 0 1 0 0 14 7 7 0 0 0 0-14z" fill="none" stroke="${accent}" stroke-width="2.1" opacity=".78"/>`
-      };
-      return overlays[style] || overlays[family] || overlays.modern;
-    }
-
-    const cleanPieceSymbols = {
-      wk: String.fromCharCode(0x2654),
-      wq: String.fromCharCode(0x2655),
-      wr: String.fromCharCode(0x2656),
-      wb: String.fromCharCode(0x2657),
-      wn: String.fromCharCode(0x2658),
-      wp: String.fromCharCode(0x2659),
-      bk: String.fromCharCode(0x265A),
-      bq: String.fromCharCode(0x265B),
-      br: String.fromCharCode(0x265C),
-      bb: String.fromCharCode(0x265D),
-      bn: String.fromCharCode(0x265E),
-      bp: String.fromCharCode(0x265F)
-    };
-
-    const letterPieceSymbols = {
-      wk: "K", wq: "Q", wr: "R", wb: "B", wn: "N", wp: "P",
-      bk: "k", bq: "q", br: "r", bb: "b", bn: "n", bp: "p"
-    };
-
-    function getCleanPieceSymbol(info, forceClassic = false) {
-      const key = `${info.color}${info.type}`;
-      return !forceClassic && document.body.classList.contains("piece-letter")
-        ? letterPieceSymbols[key] || ""
-        : cleanPieceSymbols[key] || "";
-    }
-
+    const licensedPieceAssetSet = Object.freeze({
+      wb: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/wB.svg",
+      wk: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/wK.svg",
+      wn: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/wN.svg",
+      wp: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/wP.svg",
+      wq: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/wQ.svg",
+      wr: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/wR.svg",
+      bb: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/bB.svg",
+      bk: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/bK.svg",
+      bn: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/bN.svg",
+      bp: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/bP.svg",
+      bq: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/bQ.svg",
+      br: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/bR.svg"
+    });
+    const prewarmedPieceAssets = new Set();
     function getPieceSvgTheme(style) {
       const theme = pieceSetThemes?.[style] || pieceSetThemes?.classic || {};
       return {
@@ -21019,41 +20777,31 @@
       };
     }
 
-    function getPiecePremiumLayer(style, rarity, accent, shine, glow) {
-      if (!["Legendary", "Legendary+", "Mythic", "Immortal", "Celestial", "Eternal", "Divine"].includes(rarity)) return "";
-      const family = pieceArtFamilies[style] || "staunton";
-      const spark = family === "dragon"
-        ? `<path class="piece-spark" d="M25 32c9 4 13 10 11 18M75 32c-9 4-13 10-11 18" fill="none" stroke="${accent}" stroke-width="2" opacity=".55"/>`
-        : family === "space" || family === "cosmic"
-          ? `<path class="piece-spark" d="M23 53c13-18 41-18 54 0M30 68c16 10 24 10 40 0" fill="none" stroke="${accent}" stroke-width="1.8" opacity=".52"/><circle class="piece-spark" cx="71" cy="29" r="2.4" fill="${shine}" opacity=".78"/>`
-          : family === "tech" || family === "cyberpunk"
-            ? `<path class="piece-spark" d="M24 30h12v-8M76 70H64v8M27 73h10v-8h12" fill="none" stroke="${accent}" stroke-width="2" opacity=".58"/>`
-            : `<path class="piece-spark" d="M28 35l5-5M72 35l-5-5M30 72l5 5M70 72l-5 5" fill="none" stroke="${shine}" stroke-width="2" opacity=".58"/>`;
-      return `<ellipse class="piece-aura" cx="50" cy="54" rx="33" ry="38" fill="${glow}" opacity=".18"/>${spark}`;
-    }
-
     function createPieceSvgMarkup(piece, style = activePieceSvgSet, forceClassic = false) {
       const info = getPieceCodeInfo(piece);
       if (!info) return "";
       const colorClass = info.color === "w" ? "white-piece" : "black-piece";
       const resolvedStyle = forceClassic ? "classic" : resolvePieceSvgSet(style);
-      const symbol = getCleanPieceSymbol(info, forceClassic);
       const theme = getPieceSvgTheme(resolvedStyle);
       const cacheKey = `${resolvedStyle}:${info.color}:${info.type}`;
       const cached = pieceSvgMarkupCache.get(cacheKey);
       if (cached) return cached;
-      const fill = info.color === "w" ? theme.whiteFill : theme.blackFill;
-      const stroke = info.color === "w" ? theme.whiteStroke : theme.blackStroke;
-      const accent = info.color === "w" ? theme.blackFill : theme.whiteFill;
-      const shine = info.color === "w" ? "rgba(255,255,255,.82)" : "rgba(255,248,237,.72)";
-      const silhouette = createPremiumClassicPiece(info.type, fill, stroke, accent, shine);
-      const markup = `<svg class="piece-svg ${colorClass}" viewBox="0 0 128 128" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" role="presentation" data-piece="${info.color}${info.type}" data-symbol="${symbol}" data-style="${resolvedStyle}" data-rarity="${theme.rarity}" shape-rendering="geometricPrecision">${silhouette}</svg>`;
+      const asset = licensedPieceAssetSet[`${info.color}${info.type}`];
+      if (!asset) return "";
+      const markup = `<img class="piece-svg ${colorClass}" src="${asset}" alt="" aria-hidden="true" draggable="false" decoding="async" fetchpriority="high" referrerpolicy="no-referrer" data-piece="${info.color}${info.type}" data-style="${resolvedStyle}" data-rarity="${theme.rarity}">`;
       pieceSvgMarkupCache.set(cacheKey, markup);
       return markup;
     }
 
     function prewarmPieceSvgSet(style = activePieceSvgSet) {
       const resolvedStyle = resolvePieceSvgSet(style);
+      Object.values(licensedPieceAssetSet).forEach((asset) => {
+        if (prewarmedPieceAssets.has(asset)) return;
+        prewarmedPieceAssets.add(asset);
+        const image = new Image();
+        image.decoding = "async";
+        image.src = asset;
+      });
       ["K", "Q", "R", "B", "N", "P", "k", "q", "r", "b", "n", "p"].forEach((piece) => createPieceSvgMarkup(piece, resolvedStyle));
     }
 
@@ -24507,7 +24255,7 @@
       };
     }
     const pieceSetThemes = {
-      classic: makePieceSet("Quest Staunton", "Free", 0, "#f8f6f0", "rgba(82, 60, 40, 0.88)", "#161310", "rgba(246, 238, 222, 0.44)", "rgba(231, 182, 93, 0.12)", "A hand-drawn tournament set with six distinct silhouettes, tuned for fast, clear play."),
+      classic: makePieceSet("Chessnut", "Free", 0, "#f8f6f0", "rgba(82, 60, 40, 0.88)", "#161310", "rgba(246, 238, 222, 0.44)", "rgba(231, 182, 93, 0.12)", "A professional Apache-2.0 SVG set with crisp, proven tournament silhouettes."),
       staunton: makePieceSet("Royal Staunton", "Common", 120, "#fffaf0", "rgba(88, 61, 39, 0.74)", "#181412", "rgba(255, 248, 237, 0.44)", "rgba(231, 182, 93, 0.2)", "A polished tournament upgrade with a premium showcase feel."),
       wooden: makePieceSet("Wooden Grain", "Common", 180, "#f7ddb2", "rgba(96, 58, 29, 0.78)", "#5a351d", "rgba(248, 221, 178, 0.5)", "rgba(181, 136, 99, 0.34)", "A warm woodgrain finish on the same clear piece set."),
       marble: makePieceSet("Marble Polish", "Common", 220, "#f6f2e8", "rgba(97, 91, 83, 0.72)", "#46423e", "rgba(246, 242, 232, 0.48)", "rgba(255, 248, 237, 0.28)", "A light marble finish with calm high-contrast edges."),
@@ -24541,14 +24289,7 @@
       cosmic: makePieceSet("Celestial Realm", "Legendary", 2200, "#fff2ff", "rgba(109, 68, 180, 0.86)", "#201231", "rgba(255, 218, 255, 0.62)", "rgba(255, 139, 245, 0.52)", "A rare cosmic collection for your final form.")
     };
     function getPieceGeometrySignature(style) {
-      if (resolvePieceSvgSet(style) === "classic") {
-        return ["k", "q", "r", "b", "n", "p"].map((type) => createPremiumClassicPiece(type, "F", "S", "A", "H")).join("|").replace(/\s+/g, "");
-      }
-      const family = pieceArtFamilies[style] || "staunton";
-      return ["k", "q", "r", "b", "n", "p"]
-        .map((type) => `${getPieceSilhouette(type, "F", "S", "A", "H", family, style)}${getPieceStyleOverlay(style, type, "S", "A", "H")}`)
-        .join("|")
-        .replace(/\s+/g, "");
+      return `licensed-chessnut:${resolvePieceSvgSet(style)}`;
     }
 
     function validateUniquePieceThemes() {
@@ -24564,22 +24305,13 @@
     }
 
     function validatePremiumPieceSvgSet() {
-      const types = ["k", "q", "r", "b", "n", "p"];
-      const errors = [];
-      const artwork = types.map((type) => ({ type, markup: createPremiumClassicPiece(type, "#f8f6f0", "#2a211a", "#161310", "#ffffff") }));
-      if (new Set(artwork.map(({ markup }) => markup)).size !== artwork.length) errors.push("duplicate piece geometry");
-      artwork.forEach(({ type, markup }) => {
-        const svg = new DOMParser().parseFromString(`<svg viewBox="0 0 128 128" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" role="presentation">${markup}</svg>`, "image/svg+xml");
-        if (svg.querySelector("parsererror")) errors.push(`${type}: invalid SVG`);
-        if (svg.documentElement.getAttribute("viewBox") !== "0 0 128 128") errors.push(`${type}: invalid viewBox`);
-        svg.querySelectorAll("path").forEach((path) => {
-          const data = String(path.getAttribute("d") || "").trim();
-          if (!data || !/z$/i.test(data)) errors.push(`${type}: open path`);
-        });
-      });
-      const report = { set: "Quest Staunton", pieces: artwork.length, valid: errors.length === 0, errors };
+      const expected = ["wk", "wq", "wr", "wb", "wn", "wp", "bk", "bq", "br", "bb", "bn", "bp"];
+      const missing = expected.filter((piece) => !licensedPieceAssetSet[piece]);
+      const duplicates = new Set(Object.values(licensedPieceAssetSet)).size !== expected.length;
+      const errors = [...missing, ...(duplicates ? ["duplicate asset reference"] : [])];
+      const report = { set: "Chessnut", pieces: expected.length, valid: errors.length === 0, errors };
       window.checkmatePieceSetReport = report;
-      if (errors.length) console.error("[Checkmate Quest pieces] SVG validation failed", report);
+      if (errors.length) console.error("[Checkmate Quest pieces] asset validation failed", report);
       return report.valid;
     }
 
