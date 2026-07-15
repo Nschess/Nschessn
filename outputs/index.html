@@ -1004,6 +1004,10 @@
       contain: paint;
     }
 
+    body.piece-finish-crystal {
+      --piece-svg-filter: saturate(1.08) contrast(1.04) drop-shadow(0 1px 1px rgba(4, 43, 70, 0.34)) drop-shadow(0 0 5px rgba(126, 228, 255, 0.24));
+    }
+
     .mini-square .piece-svg {
       width: 86%;
       height: 86%;
@@ -12138,6 +12142,20 @@
       background: rgba(0, 0, 0, 0.14);
     }
 
+    .store-preview-inline-svg {
+      width: min(76%, 126px);
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      filter: drop-shadow(0 9px 14px rgba(0, 0, 0, 0.24));
+    }
+
+    .store-preview-inline-svg svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
     .tournament-create-grid label {
       display: grid;
       gap: 5px;
@@ -19689,6 +19707,7 @@
                 <option value="candy">Candy Quest</option>
                 <option value="slate">Slate Arena</option>
                 <option value="sunrise">Sunrise Puzzle</option>
+                <option value="royalCourt">Royal Board Theme</option>
               </select>
             </label>
             <label>Pieces
@@ -24254,18 +24273,20 @@
       boss: { label: "Boss Tamer", rarity: "Epic", cost: 280, icon: "Crown", description: "Show your boss-battle progress without clutter." },
       dragon: { label: "Dragon Slayer", rarity: "Legendary", cost: 520, icon: "Dragon", description: "Premium animated badge for brave campaign wins." },
       mate: { label: "Checkmate Artist", rarity: "Legendary", cost: 650, icon: "Mate", description: "Premium badge for clean finishes and calm attacks." },
-      master: { label: "Chess Master Crown", rarity: "Mythic", cost: 1200, icon: "Mythic", description: "A mythic flex badge for the final champion path." }
+      master: { label: "Chess Master Crown", rarity: "Mythic", cost: 1200, icon: "Mythic", description: "A mythic flex badge for the final champion path." },
+      tacticalMaster: { label: "Tactical Master", storeName: "Tactical Master Badge", rarity: "Epic", cost: 340, icon: "Tactics", description: "A clean tactical crest for players who spot the forcing move.", inlineSvg: '<svg viewBox="0 0 64 64" role="img" aria-label="Tactical Master Badge"><path fill="#23364a" d="M32 5 55 14v16c0 14-9 24-23 29C18 54 9 44 9 30V14z"/><path fill="#8fc4ef" d="m32 10 18 7v13c0 10-6 18-18 23-12-5-18-13-18-23V17z"/><path fill="#f8f6f0" d="m30 17 4 0 2 12 10 3-3 4-9-2-2 10-4 0-2-10-9 2-3-4 10-3z"/><circle cx="32" cy="30" r="4" fill="#e7b65d"/></svg>' }
     };
     const flexBadgeStoreItems = Object.entries(flexBadgeThemes).map(([value, badge]) => ({
       id: `flex-${value}`,
       type: "flexBadge",
       value,
-      name: `${badge.label} Flex Badge`,
+      name: badge.storeName || `${badge.label} Flex Badge`,
       cost: badge.cost,
       rarity: badge.rarity,
       tag: "Flex Badge",
       description: badge.description,
-      previewText: `${badge.icon} ${badge.label}`
+      previewText: `${badge.icon} ${badge.label}`,
+      inlineSvg: badge.inlineSvg || ""
     }));
     const nameStyleThemes = {
       classic: { label: "Classic", rarity: "Common", cost: 0, animation: "Static", popular: 80, description: "Clean readable username for every board and profile." },
@@ -24459,6 +24480,7 @@
       sunrise: { label: "Sunrise Puzzle", rarity: "Epic", cost: 110, light: "#ffe2b8", dark: "#c6654b", glow: "rgba(255, 174, 90, 0.3)", description: "A bright reward board for daily habits." },
       sakura: { label: "Sakura Breeze", rarity: "Epic", cost: 135, light: "#ffe8ef", dark: "#b86f8c", glow: "rgba(255, 168, 194, 0.32)", description: "Gentle pink board for relaxed study and replay." },
       royal: { label: "Royal Violet", rarity: "Legendary", cost: 220, light: "#f6e6b9", dark: "#7b4f9e", glow: "rgba(174, 135, 255, 0.42)", animated: true, description: "Legendary royal board with a subtle glowing preview." },
+      royalCourt: { label: "Royal Court", storeName: "Royal Board Theme", rarity: "Epic", cost: 185, light: "#f7e9bf", dark: "#6b4a83", glow: "rgba(233, 190, 93, 0.42)", lightTexture: "linear-gradient(135deg, rgba(255,255,255,.22), transparent 48%)", darkTexture: "linear-gradient(135deg, rgba(255,230,142,.16), transparent 52%)", description: "Ivory and plum squares with restrained royal-gold contrast.", inlineSvg: '<svg viewBox="0 0 64 64" role="img" aria-label="Royal Board Theme"><rect x="7" y="7" width="50" height="50" rx="7" fill="#31253d"/><path fill="#f7e9bf" d="M11 11h12v12H11zm24 0h18v12H35zM23 23h12v12H23zM11 35h12v18H11zm24 0h18v18H35z"/><path fill="#e7b65d" d="m21 28 5-7 6 5 6-5 5 7-4 1v8H25v-8z"/><circle cx="32" cy="18" r="2" fill="#e7b65d"/></svg>' },
       emerald: { label: "Emerald Crown", rarity: "Legendary", cost: 240, light: "#e2f4d3", dark: "#2f8a67", glow: "rgba(74, 255, 156, 0.38)", animated: true, description: "Clean green legendary board for protected-piece players." },
       crystal: { label: "Crystal Lake", rarity: "Legendary", cost: 260, light: "#eefbff", dark: "#6fa8dc", glow: "rgba(143, 214, 255, 0.44)", animated: true, description: "Glassy blue board with crisp square separation." },
       carbon: { label: "Carbon Fiber", rarity: "Legendary", cost: 290, light: "#dbe0e2", dark: "#293037", glow: "rgba(164, 194, 207, 0.36)", lightTexture: "repeating-linear-gradient(45deg, rgba(15,22,27,.08) 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, rgba(255,255,255,.18) 0 1px, transparent 1px 6px)", darkTexture: "repeating-linear-gradient(45deg, rgba(255,255,255,.08) 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, rgba(0,0,0,.24) 0 1px, transparent 1px 6px)", animated: true, description: "Modern woven-carbon texture with high-contrast competition squares." },
@@ -24472,7 +24494,7 @@
       id: `board-${value}`,
       type: "board",
       value,
-      name: `${theme.label} Board`,
+      name: theme.storeName || `${theme.label} Board`,
       cost: theme.cost,
       tag: "Board Theme",
       rarity: theme.rarity,
@@ -24480,8 +24502,12 @@
       animated: Boolean(theme.animated),
       description: theme.description,
       preview: [theme.light, theme.dark],
-      previewText: theme.label
+      previewText: theme.label,
+      inlineSvg: theme.inlineSvg || ""
     }));
+    const pieceFinishStoreItems = [
+      { id: "piecefinish-crystal", type: "pieceFinish", value: "crystal", name: "Crystal Chess Set", cost: 440, rarity: "Rare", tag: "Piece Finish", description: "A cool crystal sheen that keeps every tournament silhouette crisp.", inlineSvg: '<svg viewBox="0 0 64 64" role="img" aria-label="Crystal Chess Set"><path fill="#244d6d" d="m32 5 17 15-7 36H22l-7-36z"/><path fill="#9eeaff" d="m32 9 10 12-10 8-10-8z"/><path fill="#dffbff" d="m22 21 10 8v23l-8-8zm20 0-10 8v23l8-8z"/><path fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" d="m32 5 17 15-7 36H22l-7-36zM22 21l10 8 10-8M32 29v23"/></svg>' }
+    ];
     const avatarEffectThemes = {
       none: { label: "No Effect", rarity: "Common", cost: 0, accent: "#e7b65d", description: "Clean avatar with no extra glow." },
       glow: { label: "Warm Glow", rarity: "Common", cost: 45, accent: "#e7b65d", description: "A soft gold aura for daily practice." },
@@ -24520,6 +24546,7 @@
     const storeItems = [
       ...backgroundThemeStoreItems,
       ...pieceSetStoreItems,
+      ...pieceFinishStoreItems,
       ...archetypeStoreItems,
       ...flexBadgeStoreItems,
       ...nameStyleStoreItems,
@@ -27141,6 +27168,7 @@
       const prefs = readLearnerPrefs();
       if (type === "board") return `board-${prefs.board}`;
       if (type === "skin") return `skin-${prefs.pieceSkin || "classic"}`;
+      if (type === "pieceFinish") return `piecefinish-${prefs.pieceFinish || "classic"}`;
       if (type === "trail") return `trail-${prefs.trail || "none"}`;
       if (type === "avatar") return prefs.avatar && prefs.avatar !== "auto" ? storeItems.find((item) => item.type === "avatar" && item.value === prefs.avatar)?.id || "" : "";
       if (type === "avatarEffect") return `avatarfx-${prefs.avatarEffect || "none"}`;
@@ -27172,6 +27200,13 @@
     function buildStorePreview(item) {
       const preview = document.createElement("div");
       preview.className = "store-preview";
+      if (item.inlineSvg) {
+        const art = document.createElement("span");
+        art.className = "store-preview-inline-svg";
+        art.innerHTML = item.inlineSvg;
+        preview.appendChild(art);
+        return preview;
+      }
       if (item.type === "board") {
         const board = document.createElement("span");
         board.className = "store-preview-board";
@@ -27275,6 +27310,7 @@
       const nextPrefs = { ...prefs };
       if (item.type === "board") nextPrefs.board = item.value;
       if (item.type === "skin") nextPrefs.pieceSkin = item.value;
+      if (item.type === "pieceFinish") nextPrefs.pieceFinish = item.value;
       if (item.type === "trail") nextPrefs.trail = item.value;
       if (item.type === "avatar") nextPrefs.avatar = item.value;
       if (item.type === "avatarEffect") nextPrefs.avatarEffect = item.value;
@@ -27875,7 +27911,7 @@
 
     function getStoreCategory(item) {
       return item.type === "backgroundTheme" ? "Backgrounds"
-        : item.type === "skin" ? "Chess Pieces"
+        : ["skin", "pieceFinish"].includes(item.type) ? "Chess Pieces"
         : ["avatar", "frame", "avatarEffect"].includes(item.type) ? "Avatars"
         : item.type === "archetype" ? "Style"
         : item.type === "flexBadge" ? "Flex Badges"
@@ -28015,7 +28051,7 @@
               : item.type === "lastMove"
                 ? prefs.lastMoveFavorites.includes(item.value)
                 : ["musicPack", "sfxPack"].includes(item.type) && ((prefs.musicFavorites || []).includes(`${item.type}:${item.value}`) || (prefs.musicFavorites || []).includes(item.value));
-          card.className = `store-card${isOwned ? " is-owned" : ""}${isEquipped ? " is-equipped" : ""}${item.type === "board" ? " is-board-theme" : ""}${item.type === "skin" ? " is-piece-set" : ""}${item.type === "backgroundTheme" ? " is-background-theme" : ""}${item.type === "nameStyle" ? " is-name-style" : ""}${["avatar", "frame", "avatarEffect"].includes(item.type) ? " is-avatar-cosmetic" : ""}${item.petAvatar ? " is-pet-avatar" : ""}${item.type === "lastMove" ? " is-highlight" : ""}${["musicPack", "sfxPack"].includes(item.type) ? " is-music-pack" : ""}${isFavorite ? " is-favorite" : ""}`;
+          card.className = `store-card${isOwned ? " is-owned" : ""}${isEquipped ? " is-equipped" : ""}${item.type === "board" ? " is-board-theme" : ""}${["skin", "pieceFinish"].includes(item.type) ? " is-piece-set" : ""}${item.type === "backgroundTheme" ? " is-background-theme" : ""}${item.type === "nameStyle" ? " is-name-style" : ""}${["avatar", "frame", "avatarEffect"].includes(item.type) ? " is-avatar-cosmetic" : ""}${item.petAvatar ? " is-pet-avatar" : ""}${item.type === "lastMove" ? " is-highlight" : ""}${["musicPack", "sfxPack"].includes(item.type) ? " is-music-pack" : ""}${isFavorite ? " is-favorite" : ""}`;
           card.dataset.rarity = item.rarity || "";
           if (item.petAvatar) card.dataset.petId = item.id;
           if (item.type === "board") card.style.setProperty("--board-preview-glow", getBoardTheme(item.value).glow);
@@ -39737,7 +39773,7 @@
         shuffle: false, loop: true, crossfade: true, backgroundMusic: true, pieceSounds: true, captureSounds: true,
         checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true
       };
-      const fallback = { theme: "dark", backgroundTheme: "classic", backgroundFavorites: [], board: "wood", boardFavorites: [], boardSize: "large", boardScale: 100, pieces: "classic", pieceSkin: "classic", pieceFavorites: [], archetype: "balanced", nameStyle: "classic", nameFx: "on", nameStyleFavorites: [], musicFavorites: [], coords: "on", speed: "normal", motion: "system", pressure: "on", contrast: "normal", trail: "none", avatar: "auto", avatarFrame: "", avatarEffect: "none", avatarFavorites: [], boardBorder: "classic", lastMoveColor: "classic", lastMoveFavorites: [], title: "", audio: fallbackAudio };
+      const fallback = { theme: "dark", backgroundTheme: "classic", backgroundFavorites: [], board: "wood", boardFavorites: [], boardSize: "large", boardScale: 100, pieces: "classic", pieceSkin: "classic", pieceFinish: "classic", pieceFavorites: [], archetype: "balanced", nameStyle: "classic", nameFx: "on", nameStyleFavorites: [], musicFavorites: [], coords: "on", speed: "normal", motion: "system", pressure: "on", contrast: "normal", trail: "none", avatar: "auto", avatarFrame: "", avatarEffect: "none", avatarFavorites: [], boardBorder: "classic", lastMoveColor: "classic", lastMoveFavorites: [], title: "", audio: fallbackAudio };
       const saved = readJsonStorage(learnerPrefsStorageKey, fallback);
       const prefs = { ...fallback, ...(saved && typeof saved === "object" ? saved : {}) };
       prefs.audio = { ...fallbackAudio, ...(prefs.audio && typeof prefs.audio === "object" ? prefs.audio : {}) };
@@ -39761,6 +39797,7 @@
       if (!boardBorderThemes[prefs.boardBorder]) prefs.boardBorder = "classic";
       if (!backgroundThemes[prefs.backgroundTheme]) prefs.backgroundTheme = "classic";
       if (!supportedPieceSvgSets.has(prefs.pieceSkin)) prefs.pieceSkin = "classic";
+      if (prefs.pieceFinish !== "crystal") prefs.pieceFinish = "classic";
       if (!archetypeThemes[prefs.archetype]) prefs.archetype = "balanced";
       if (!nameStyleThemes[prefs.nameStyle]) prefs.nameStyle = "classic";
       if (!avatarEffectThemes[prefs.avatarEffect]) prefs.avatarEffect = "none";
@@ -39863,6 +39900,7 @@
       [...supportedPieceSvgSets].forEach((skin) => {
         document.body.classList.toggle(`skin-${skin}`, prefs.pieceSkin === skin);
       });
+      document.body.classList.toggle("piece-finish-crystal", prefs.pieceFinish === "crystal");
       document.body.dataset.pieceSet = getPieceSetTheme(prefs.pieceSkin).name;
       document.body.classList.toggle("coords-off", prefs.coords === "off");
       document.body.classList.toggle("speed-slow", prefs.speed === "slow");
