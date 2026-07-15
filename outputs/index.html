@@ -20544,6 +20544,8 @@
       return "";
     }
 
+    // Keep one production-quality set active until the next complete set is ready.
+    const supportedPieceSvgSets = new Set(["classic"]);
     let activePieceSvgSet = "classic";
     let pieceSvgRenderVersion = 0;
     const pieceSvgMarkupCache = new Map();
@@ -20608,6 +20610,25 @@
 
     function pieceAttrs(fill, stroke, width = 3) {
       return `fill="${fill}" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"`;
+    }
+
+    function resolvePieceSvgSet(style) {
+      return supportedPieceSvgSets.has(style) ? style : "classic";
+    }
+
+    function createPremiumClassicPiece(type, fill, stroke, accent, shine) {
+      const solid = pieceAttrs(fill, stroke, 3.15);
+      const detail = `fill="none" stroke="${accent}" stroke-width="2.05" stroke-linecap="round" stroke-linejoin="round" opacity=".62"`;
+      const highlight = `fill="none" stroke="${shine}" stroke-width="2.05" stroke-linecap="round" opacity=".52"`;
+      const art = {
+        k: `<path d="M20 88h60l-6-9H26z" ${solid}/><path d="M30 79c2-13 7-22 14-28h12c7 6 12 15 14 28z" ${solid}/><path d="M37 55c3-8 7-12 13-12s10 4 13 12l-3 11H40z" ${solid}/><path d="M47 12h6v10h10v7H53v14h-6V29H37v-7h10z" ${solid}/><path d="M39 69c7 3 15 3 22 0M42 59h16" ${highlight}/><path d="M31 79h38" ${detail}/>`,
+        q: `<path d="M19 88h62l-7-9H26z" ${solid}/><path d="M29 79c3-14 7-23 13-29h16c6 6 10 15 13 29z" ${solid}/><path d="M28 49l6-27 15 15 11-22 7 22 14-15 3 27-13-6-11 10-11-10z" ${solid}/><circle cx="34" cy="20" r="4" ${solid}/><circle cx="60" cy="13" r="4" ${solid}/><circle cx="80" cy="20" r="4" ${solid}/><path d="M36 61c7 4 17 4 25 0M34 72h32" ${highlight}/><path d="M29 79h42" ${detail}/>`,
+        r: `<path d="M18 88h64l-7-10H25z" ${solid}/><path d="M27 78V40h46v38z" ${solid}/><path d="M24 41V20h11v9h9v-9h12v9h9v-9h11v21z" ${solid}/><path d="M35 48v23M50 48v23M65 48v23" ${detail}/><path d="M32 59h36M29 76h42" ${highlight}/>`,
+        b: `<path d="M21 88h58l-7-9H28z" ${solid}/><path d="M31 79c2-14 6-23 19-31 13 8 17 17 19 31z" ${solid}/><path d="M50 13c13 10 20 21 19 33-1 11-8 19-19 25-11-6-18-14-19-25-1-12 6-23 19-33z" ${solid}/><path d="M59 25L41 55" ${detail}/><path d="M41 67c6 4 12 4 18 0M35 77h30" ${highlight}/>`,
+        n: `<path d="M18 88h64l-7-10H25z" ${solid}/><path d="M28 78c4-18 11-37 27-54 14 2 23 13 24 27l-14-4 8 10c-10 12-24 19-45 21z" ${solid}/><path d="M52 28l-8-13M61 30l4-15" ${detail}/><circle cx="61" cy="40" r="2.5" fill="${accent}"/><path d="M38 66c9-2 18-8 24-17M32 76h37" ${highlight}/>`,
+        p: `<path d="M22 88h56l-7-9H29z" ${solid}/><path d="M32 79c2-14 6-23 18-28 12 5 16 14 18 28z" ${solid}/><path d="M38 50c-4-5-6-11-6-17 0-11 8-20 18-20s18 9 18 20c0 6-2 12-6 17-7 5-17 5-24 0z" ${solid}/><path d="M40 61c6 3 14 3 20 0M35 77h30" ${highlight}/>`
+      };
+      return art[type] || art.p;
     }
 
     function getPieceProfileParts(style, fill, stroke, accent, shine, family) {
@@ -20806,13 +20827,9 @@
       const info = getPieceCodeInfo(piece);
       if (!info) return "";
       const colorClass = info.color === "w" ? "white-piece" : "black-piece";
-      const resolvedStyle = forceClassic ? "classic" : (pieceSetThemes?.[style] ? style : "classic");
+      const resolvedStyle = forceClassic ? "classic" : resolvePieceSvgSet(style);
       const symbol = getCleanPieceSymbol(info, forceClassic);
       const theme = getPieceSvgTheme(resolvedStyle);
-      const material = pieceMaterialBySet[resolvedStyle] || "matte";
-      if (document.body.dataset.pieceRenderer !== "svg") {
-        return `<span class="piece-symbol ${colorClass}" aria-hidden="true" data-piece="${info.color}${info.type}" data-symbol="${symbol}" data-style="classic-glyph" data-material="${material}" data-rarity="${theme.rarity}">${symbol}</span>`;
-      }
       const cacheKey = `${resolvedStyle}:${info.color}:${info.type}`;
       const cached = pieceSvgMarkupCache.get(cacheKey);
       if (cached) return cached;
@@ -20820,17 +20837,14 @@
       const stroke = info.color === "w" ? theme.whiteStroke : theme.blackStroke;
       const accent = info.color === "w" ? theme.blackFill : theme.whiteFill;
       const shine = info.color === "w" ? "rgba(255,255,255,.82)" : "rgba(255,248,237,.72)";
-      const family = pieceArtFamilies[resolvedStyle] || "staunton";
-      const silhouette = getPieceSilhouette(info.type, fill, stroke, accent, shine, family, resolvedStyle);
-      const overlay = getPieceStyleOverlay(resolvedStyle, info.type, stroke, accent, shine);
-      const premium = getPiecePremiumLayer(resolvedStyle, theme.rarity, accent, shine, theme.glow);
-      const markup = `<svg class="piece-svg ${colorClass}" viewBox="0 0 100 100" aria-hidden="true" focusable="false" data-piece="${info.color}${info.type}" data-symbol="${symbol}" data-style="${resolvedStyle}" data-rarity="${theme.rarity}" shape-rendering="geometricPrecision">${premium}${silhouette}${overlay}</svg>`;
+      const silhouette = createPremiumClassicPiece(info.type, fill, stroke, accent, shine);
+      const markup = `<svg class="piece-svg ${colorClass}" viewBox="0 0 100 100" aria-hidden="true" focusable="false" data-piece="${info.color}${info.type}" data-symbol="${symbol}" data-style="${resolvedStyle}" data-rarity="${theme.rarity}" shape-rendering="geometricPrecision">${silhouette}</svg>`;
       pieceSvgMarkupCache.set(cacheKey, markup);
       return markup;
     }
 
     function prewarmPieceSvgSet(style = activePieceSvgSet) {
-      const resolvedStyle = pieceSetThemes?.[style] ? style : "classic";
+      const resolvedStyle = resolvePieceSvgSet(style);
       ["K", "Q", "R", "B", "N", "P", "k", "q", "r", "b", "n", "p"].forEach((piece) => createPieceSvgMarkup(piece, resolvedStyle));
     }
 
@@ -24284,7 +24298,7 @@
       };
     }
     const pieceSetThemes = {
-      classic: makePieceSet("Matte Classic", "Free", 0, "#fff8ed", "rgba(93, 64, 42, 0.72)", "#1d1814", "rgba(255, 248, 237, 0.42)", "rgba(231, 182, 93, 0.18)", "The clean starter finish: elegant, readable, and always unlocked."),
+      classic: makePieceSet("Quest Staunton", "Free", 0, "#f8f6f0", "rgba(82, 60, 40, 0.88)", "#161310", "rgba(246, 238, 222, 0.44)", "rgba(231, 182, 93, 0.12)", "A hand-drawn tournament set with six distinct silhouettes, tuned for fast, clear play."),
       staunton: makePieceSet("Royal Staunton", "Common", 120, "#fffaf0", "rgba(88, 61, 39, 0.74)", "#181412", "rgba(255, 248, 237, 0.44)", "rgba(231, 182, 93, 0.2)", "A polished tournament upgrade with a premium showcase feel."),
       wooden: makePieceSet("Wooden Grain", "Common", 180, "#f7ddb2", "rgba(96, 58, 29, 0.78)", "#5a351d", "rgba(248, 221, 178, 0.5)", "rgba(181, 136, 99, 0.34)", "A warm woodgrain finish on the same clear piece set."),
       marble: makePieceSet("Marble Polish", "Common", 220, "#f6f2e8", "rgba(97, 91, 83, 0.72)", "#46423e", "rgba(246, 242, 232, 0.48)", "rgba(255, 248, 237, 0.28)", "A light marble finish with calm high-contrast edges."),
@@ -24318,6 +24332,9 @@
       cosmic: makePieceSet("Celestial Realm", "Legendary", 2200, "#fff2ff", "rgba(109, 68, 180, 0.86)", "#201231", "rgba(255, 218, 255, 0.62)", "rgba(255, 139, 245, 0.52)", "A rare cosmic collection for your final form.")
     };
     function getPieceGeometrySignature(style) {
+      if (resolvePieceSvgSet(style) === "classic") {
+        return ["k", "q", "r", "b", "n", "p"].map((type) => createPremiumClassicPiece(type, "F", "S", "A", "H")).join("|").replace(/\s+/g, "");
+      }
       const family = pieceArtFamilies[style] || "staunton";
       return ["k", "q", "r", "b", "n", "p"]
         .map((type) => `${getPieceSilhouette(type, "F", "S", "A", "H", family, style)}${getPieceStyleOverlay(style, type, "S", "A", "H")}`)
@@ -24328,7 +24345,7 @@
     function validateUniquePieceThemes() {
       const seen = new Map();
       const duplicates = [];
-      Object.keys(pieceSetThemes).forEach((style) => {
+      [...supportedPieceSvgSets].forEach((style) => {
         const signature = getPieceGeometrySignature(style);
         if (seen.has(signature)) duplicates.push(`${style} duplicates ${seen.get(signature)}`);
         else seen.set(signature, style);
@@ -24337,7 +24354,7 @@
       return duplicates.length === 0;
     }
     validateUniquePieceThemes();
-    const pieceSetStoreItems = Object.entries(pieceSetThemes).map(([value, set]) => ({
+    const pieceSetStoreItems = Object.entries(pieceSetThemes).filter(([value]) => supportedPieceSvgSets.has(value)).map(([value, set]) => ({
       id: `skin-${value}`,
       type: "skin",
       value,
@@ -26800,13 +26817,14 @@
     }
 
     function getPieceSetTheme(value) {
-      return pieceSetThemes[value] || pieceSetThemes.classic;
+      return pieceSetThemes[resolvePieceSvgSet(value)] || pieceSetThemes.classic;
     }
 
     function applyPieceSetTheme(value) {
-      activePieceSvgSet = pieceSetThemes[value] ? value : "classic";
+      activePieceSvgSet = resolvePieceSvgSet(value);
       pieceSvgRenderVersion += 1;
-      applyStyleVars(document.body, getPieceSetTheme(value).vars);
+      document.body.dataset.pieceRenderer = "svg";
+      applyStyleVars(document.body, getPieceSetTheme(activePieceSvgSet).vars);
       prewarmPieceSvgSet(activePieceSvgSet);
     }
 
@@ -39255,7 +39273,7 @@
       if (!boardThemeDefinitions[prefs.board]) prefs.board = "wood";
       if (!boardBorderThemes[prefs.boardBorder]) prefs.boardBorder = "classic";
       if (!backgroundThemes[prefs.backgroundTheme]) prefs.backgroundTheme = "classic";
-      if (!pieceSetThemes[prefs.pieceSkin]) prefs.pieceSkin = "classic";
+      if (!supportedPieceSvgSets.has(prefs.pieceSkin)) prefs.pieceSkin = "classic";
       if (!archetypeThemes[prefs.archetype]) prefs.archetype = "balanced";
       if (!nameStyleThemes[prefs.nameStyle]) prefs.nameStyle = "classic";
       if (!avatarEffectThemes[prefs.avatarEffect]) prefs.avatarEffect = "none";
@@ -39279,7 +39297,7 @@
       if (prefs.flexBadge === `go${"d"}`) prefs.flexBadge = "master";
       if (prefs.flexBadge && !flexBadgeThemes[prefs.flexBadge]) delete prefs.flexBadge;
       prefs.pieceFavorites = Array.isArray(prefs.pieceFavorites)
-        ? [...new Set(prefs.pieceFavorites.filter((value) => pieceSetThemes[value]))]
+        ? [...new Set(prefs.pieceFavorites.filter((value) => supportedPieceSvgSets.has(value)))]
         : [];
       prefs.boardFavorites = Array.isArray(prefs.boardFavorites)
         ? [...new Set(prefs.boardFavorites.filter((value) => boardThemeDefinitions[value]))]
@@ -39355,7 +39373,7 @@
       playSection?.style.setProperty("--match-card-width", `${clampNumber(Math.round(scaledBoardSize * 0.58), 320, 540)}px`);
       applyBoardTheme(prefs.board);
       document.body.classList.toggle("piece-letter", prefs.pieces === "letter");
-      Object.keys(pieceSetThemes).forEach((skin) => {
+      [...supportedPieceSvgSets].forEach((skin) => {
         document.body.classList.toggle(`skin-${skin}`, prefs.pieceSkin === skin);
       });
       document.body.dataset.pieceSet = getPieceSetTheme(prefs.pieceSkin).name;
