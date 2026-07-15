@@ -31809,31 +31809,38 @@
       return Boolean(friendChallengeState?.remote && friendChallengeState?.active && friendChallengeState.status === "active");
     }
 
-    function startSoloCoachGame() {
-      const hasRealtimeContext = Boolean(friendChallengeState?.remote || friendChallengeState?.tournamentPairingId);
+    function resetRealtimeContextForAi() {
       if (isRealtimeMatchActive()) void syncRealtimeMatchPresence(false);
       stopRealtimeMatchLifecycle();
       stopFriendNetworkSync();
       stopTournamentNetworkSync();
-      if (hasRealtimeContext) {
-        invalidateFriendChallengeSync();
-        dismissFriendChallengeNotice();
-        friendIncomingNoticeCode = "";
-        friendChallengeState = {
-          code: createFriendChallengeCode(), inviteType: "private", gameType: "casual", color: "random",
-          fen: "", moves: [], status: "draft", active: false, pending: false, remote: false, createdAt: Date.now()
-        };
-        writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
-        tournamentRuntime.events = [];
-        tournamentRuntime.currentCode = "";
-        tournamentRuntime.inviteResults = [];
-        tournamentRuntime.renderSignature = "";
-        tournamentRuntime.lastPresencePulse = 0;
-        tournamentRuntime.lastPresenceConnected = null;
-        saveTournamentState();
-        renderFriendGameChat(friendChallengeState);
-        renderFriendChallengeLobby();
-      }
+      invalidateFriendChallengeSync();
+      dismissFriendChallengeNotice();
+      friendIncomingNoticeCode = "";
+      try {
+        localStorage.removeItem(friendChallengeStorageKey);
+        localStorage.removeItem(tournamentStorageKey);
+        sessionStorage.removeItem(friendChallengeStorageKey);
+        sessionStorage.removeItem(tournamentStorageKey);
+      } catch {}
+      friendChallengeState = {
+        code: createFriendChallengeCode(), inviteType: "private", gameType: "casual", color: "random",
+        fen: "", moves: [], status: "draft", active: false, pending: false, remote: false, createdAt: Date.now()
+      };
+      tournamentRuntime.events = [];
+      tournamentRuntime.currentCode = "";
+      tournamentRuntime.inviteResults = [];
+      tournamentRuntime.renderSignature = "";
+      tournamentRuntime.lastPresencePulse = 0;
+      tournamentRuntime.lastPresenceConnected = null;
+      writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
+      saveTournamentState();
+      renderFriendGameChat(friendChallengeState);
+      renderFriendChallengeLobby();
+    }
+
+    function startSoloCoachGame() {
+      resetRealtimeContextForAi();
       matchClockState = null;
       matchClockExpiredColor = "";
       coachPremove = null;
@@ -34843,9 +34850,12 @@
       coachThinking = false;
       coachBotPaused = false;
       coachDrawAgreed = false;
+      coachThreatMode = false;
+      coachReplayFen = "";
       coachGameRecorded = false;
       coachEndSoundPlayed = false;
       coachMistakeNote = "";
+      coachWhyText = "Select or make a move, then ask why.";
       coachReviewMoments = [];
       coachCurrentHanging = 0;
       coachFlipped = coachPlayerColor === "b";
