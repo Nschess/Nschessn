@@ -13909,6 +13909,178 @@
       background: rgba(127, 166, 80, 0.18);
     }
 
+    /* Active puzzle trainer: player-facing controls only. */
+    .real-puzzles-panel {
+      position: relative;
+      max-width: 1240px;
+      margin: 28px auto 0;
+      padding: clamp(16px, 2.2vw, 28px);
+      border-color: color-mix(in srgb, var(--gold) 30%, var(--line));
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--green) 18%, transparent), transparent 35%),
+        radial-gradient(circle at 96% 12%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 30%),
+        linear-gradient(135deg, color-mix(in srgb, var(--panel) 84%, transparent), color-mix(in srgb, var(--panel-2) 66%, transparent));
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+    }
+
+    .real-puzzles-head {
+      margin-bottom: clamp(16px, 2vw, 24px);
+    }
+
+    .real-puzzles-head p {
+      max-width: 62ch;
+      font-size: 0.98rem;
+    }
+
+    .real-puzzle-shell {
+      grid-template-columns: minmax(360px, 1.1fr) minmax(320px, 0.9fr);
+      gap: clamp(18px, 2.5vw, 32px);
+    }
+
+    .real-puzzle-board-wrap,
+    .real-board-quick-actions {
+      width: min(100%, 560px);
+    }
+
+    .real-puzzle-board-wrap {
+      border-radius: 13px;
+    }
+
+    .real-board-quick-actions {
+      gap: 10px;
+    }
+
+    .real-puzzle-info {
+      gap: 14px;
+    }
+
+    .real-puzzle-control {
+      display: grid;
+      gap: 8px;
+    }
+
+    .real-puzzle-control-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .real-puzzle-control-head small {
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .real-puzzle-modes,
+    .real-puzzle-difficulties,
+    .real-puzzle-stats,
+    .real-puzzle-actions {
+      gap: 9px;
+    }
+
+    .real-puzzle-difficulties {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .real-puzzle-stats {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    #realPuzzles .mission-button {
+      min-height: 48px;
+      padding: 8px 6px;
+      border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--panel) 72%, transparent);
+      color: var(--text);
+      font-size: 0.8rem;
+      font-weight: 900;
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+
+    #realPuzzles .mission-button:hover,
+    #realPuzzles .mission-button:focus-visible,
+    #realPuzzles .mission-button[aria-pressed="true"] {
+      transform: translateY(-1px);
+      border-color: color-mix(in srgb, var(--green) 72%, var(--gold));
+      background: color-mix(in srgb, var(--green) 21%, var(--panel));
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.13);
+    }
+
+    .real-puzzle-card {
+      min-width: 0;
+      padding: 12px;
+      border-color: color-mix(in srgb, var(--line) 86%, transparent);
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--panel) 74%, transparent);
+    }
+
+    .real-puzzle-card strong {
+      overflow: hidden;
+      color: var(--soft);
+      font-size: clamp(0.94rem, 1.4vw, 1.12rem);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .real-puzzle-card span {
+      margin-top: 3px;
+      font-size: 0.72rem;
+    }
+
+    .real-puzzle-hint {
+      min-height: 48px;
+      padding: 13px 14px;
+      border-color: color-mix(in srgb, var(--gold) 36%, var(--line));
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--gold) 12%, var(--panel));
+    }
+
+    .real-puzzle-feedback {
+      min-height: 54px;
+      border-radius: 0 9px 9px 0;
+      background: color-mix(in srgb, var(--green) 12%, var(--panel));
+    }
+
+    .real-puzzle-moves {
+      min-height: 44px;
+      border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--panel) 66%, transparent);
+    }
+
+    .real-puzzle-name-list[hidden],
+    .real-puzzle-source[hidden] {
+      display: none;
+    }
+
+    .real-puzzles-panel[data-loading="true"] .real-puzzle-board-wrap::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      border-radius: inherit;
+      pointer-events: none;
+      background: linear-gradient(115deg, transparent 24%, rgba(255, 255, 255, 0.25) 48%, transparent 72%);
+      background-size: 220% 100%;
+      animation: realPuzzleLoadingShimmer 1.05s ease-in-out infinite;
+    }
+
+    @keyframes realPuzzleLoadingShimmer {
+      from { background-position: 180% 0; opacity: 0.16; }
+      50% { opacity: 0.72; }
+      to { background-position: -80% 0; opacity: 0.16; }
+    }
+
     @media (max-width: 760px) {
       .real-puzzle-shell {
         grid-template-columns: 1fr;
@@ -13933,6 +14105,14 @@
       .real-puzzle-actions {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
+      .real-puzzle-difficulties {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .real-puzzle-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 580px) {
@@ -13945,6 +14125,20 @@
       .real-puzzle-stats,
       .real-puzzle-actions {
         grid-template-columns: 1fr;
+      }
+
+      .real-puzzle-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .real-puzzle-modes,
+      .real-puzzle-difficulties,
+      .real-puzzle-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .real-puzzle-control-head small {
+        display: none;
       }
     }
 
@@ -20164,12 +20358,12 @@
         <article class="real-puzzles-panel" id="realPuzzles" aria-labelledby="realPuzzlesTitle">
           <div class="real-puzzles-head">
             <div>
-              <p class="section-kicker">Real puzzle mode</p>
-              <h3 id="realPuzzlesTitle">Real Chess Puzzles</h3>
-              <p>Validated FEN positions with full continuations, hints, retries, replay, and rewards.</p>
+              <p class="section-kicker">Puzzle studio</p>
+              <h3 id="realPuzzlesTitle">Find the winning idea</h3>
+              <p>Play the line, learn one tactical pattern, and collect progress without the pressure.</p>
             </div>
-            <div class="real-puzzle-source">
-              <p id="realPuzzleSource">Verified trainer: only legal FENs and legal continuations are playable.</p>
+            <div class="real-puzzle-source" hidden aria-hidden="true">
+              <p id="realPuzzleSource"></p>
               <span class="badge" id="realPuzzleValidation">Validating</span>
             </div>
           </div>
@@ -20191,38 +20385,42 @@
                 <span class="badge" id="realPuzzleTheme">Tactic</span>
                 <span class="badge" id="realPuzzleTimer">00:00</span>
               </div>
-              <div class="real-puzzle-modes" role="group" aria-label="Puzzle mode">
-                <button class="mission-button" type="button" data-real-mode="Daily" aria-pressed="false">Daily</button>
-                <button class="mission-button" type="button" data-real-mode="Trainer" aria-pressed="true">Trainer</button>
-                <button class="mission-button" type="button" data-real-mode="Rush" aria-pressed="false">Rush</button>
-                <button class="mission-button" type="button" data-real-mode="Streak" aria-pressed="false">Streak</button>
-                <button class="mission-button" type="button" data-real-mode="Battle" aria-pressed="false">Battle</button>
+              <div class="real-puzzle-control">
+                <div class="real-puzzle-control-head"><span>Practice mode</span><small>Pick the pace that feels good today</small></div>
+                <div class="real-puzzle-modes" role="group" aria-label="Puzzle mode">
+                  <button class="mission-button" type="button" data-real-mode="Daily" aria-pressed="false">Daily</button>
+                  <button class="mission-button" type="button" data-real-mode="Trainer" aria-pressed="true">Trainer</button>
+                  <button class="mission-button" type="button" data-real-mode="Rush" aria-pressed="false">Rush</button>
+                  <button class="mission-button" type="button" data-real-mode="Streak" aria-pressed="false">Streak</button>
+                  <button class="mission-button" type="button" data-real-mode="Battle" aria-pressed="false">Battle</button>
+                </div>
               </div>
-              <div class="real-puzzle-difficulties" role="group" aria-label="Real puzzle difficulty">
-                <button class="mission-button" type="button" data-real-difficulty="All" aria-pressed="true">All</button>
-                <button class="mission-button" type="button" data-real-difficulty="Beginner" aria-pressed="false">Beginner</button>
-                <button class="mission-button" type="button" data-real-difficulty="Intermediate" aria-pressed="false">Intermediate</button>
-                <button class="mission-button" type="button" data-real-difficulty="Advanced" aria-pressed="false">Advanced</button>
-                <button class="mission-button" type="button" data-real-difficulty="Expert" aria-pressed="false">Expert</button>
-                <button class="mission-button" type="button" data-real-difficulty="Master" aria-pressed="false">Master</button>
+              <div class="real-puzzle-control">
+                <div class="real-puzzle-control-head"><span>Difficulty</span><small>Challenge yourself at your own speed</small></div>
+                <div class="real-puzzle-difficulties" role="group" aria-label="Real puzzle difficulty">
+                  <button class="mission-button" type="button" data-real-difficulty="All" aria-pressed="true">All</button>
+                  <button class="mission-button" type="button" data-real-difficulty="Beginner" aria-pressed="false">Beginner</button>
+                  <button class="mission-button" type="button" data-real-difficulty="Intermediate" aria-pressed="false">Intermediate</button>
+                  <button class="mission-button" type="button" data-real-difficulty="Advanced" aria-pressed="false">Advanced</button>
+                  <button class="mission-button" type="button" data-real-difficulty="Expert" aria-pressed="false">Expert</button>
+                  <button class="mission-button" type="button" data-real-difficulty="Master" aria-pressed="false">Master</button>
+                </div>
               </div>
               <label class="real-puzzle-card" for="realPuzzleSelect">
-                <span>Jump to puzzle</span>
+                <span>Choose a challenge</span>
                 <select class="real-puzzle-select" id="realPuzzleSelect"></select>
               </label>
-              <div class="real-puzzle-name-list" id="realPuzzleNameList" aria-label="All real puzzle names"></div>
+              <div class="real-puzzle-name-list" id="realPuzzleNameList" aria-label="All real puzzle names" hidden></div>
               <div class="real-puzzle-stats" aria-label="Real puzzle progress">
-                <div class="real-puzzle-card"><strong id="realPuzzleCounter">1 / 12</strong><span>Position</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleSolved">0</strong><span>Solved</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleCoins">0</strong><span>Coins earned</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleBest">--</strong><span>Best time</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleCounter">1 / 12</strong><span>Progress</span></div>
                 <div class="real-puzzle-card"><strong id="realPuzzleAccuracy">100%</strong><span>Accuracy</span></div>
                 <div class="real-puzzle-card"><strong id="realPuzzleStreak">0</strong><span>Streak</span></div>
                 <div class="real-puzzle-card"><strong id="realPuzzleRating">600</strong><span>Puzzle rating</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleRecommend">Mate</strong><span>Recommended</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleCoins">0</strong><span>Rewards</span></div>
+                <div hidden><strong id="realPuzzleSolved">0</strong><strong id="realPuzzleBest">--</strong><strong id="realPuzzleRecommend">Mate</strong></div>
               </div>
-              <h3 id="realPuzzleTitle">Loading real puzzle</h3>
-              <p id="realPuzzlePrompt">Loading validated position.</p>
+              <h3 id="realPuzzleTitle">Puzzle ready</h3>
+              <p id="realPuzzlePrompt">Find the strongest move and follow the idea.</p>
               <p class="real-puzzle-hint" id="realPuzzleHint">Hints appear here.</p>
               <p class="real-puzzle-feedback" id="realPuzzleFeedback">Choose a piece to start.</p>
               <div class="real-puzzle-moves" id="realPuzzleMoves" aria-label="Played solution line"></div>
@@ -36594,7 +36792,7 @@
         moves,
         primer: Boolean(item.primer),
         hints: Array.isArray(item.hints) && item.hints.length ? item.hints.slice(0, 3) : ["Find forcing moves.", "Check, capture, threat.", `Line starts: ${moves[0] || "best move"}.`],
-        note: item.note || item.explanation || "Full continuation verified before loading."
+        note: item.note || item.explanation || "Each move keeps the pressure on until the idea is complete."
       };
     }
 
@@ -36658,7 +36856,7 @@
             `Candidate move starts from ${moves[0]?.slice(0, 2) || "the active piece"}.`,
             `Destination: ${moves[0]?.slice(2, 4) || "best square"}.`
           ],
-          note: puzzle.feedback || "This line passed the chess.js legal-move validator."
+          note: puzzle.feedback || "The tactic works because each move creates a forcing reply."
         };
       } catch {
         return null;
@@ -36679,6 +36877,21 @@
       });
       if (additions.length) realPuzzleBank = [...realPuzzleBank, ...additions];
       return additions.length;
+    }
+
+    function reportRealPuzzleDiagnostics() {
+      const report = {
+        loaded: realPuzzleBank.length,
+        playable: realPuzzleValidIndexes.length,
+        removed: realPuzzleValidationErrors.length,
+        errors: [...realPuzzleValidationErrors]
+      };
+      window.checkmateRealPuzzleReport = report;
+      try {
+        const debug = new URLSearchParams(window.location.search).has("debug")
+          || window.localStorage.getItem("checkmateQuest.debug") === "true";
+        if (debug) console.info("[Checkmate Quest Puzzle diagnostics]", report);
+      } catch {}
     }
 
     function getRealPuzzleReward(puzzle, seconds) {
@@ -36905,9 +37118,7 @@
       const playableIndexes = getRealPuzzleIndexes();
       if (!playableIndexes.length) {
         const feedback = document.getElementById("realPuzzleFeedback");
-        const validation = document.getElementById("realPuzzleValidation");
-        if (feedback) feedback.textContent = realPuzzleValidationErrors[0] || "No validated puzzles are available yet.";
-        if (validation) validation.textContent = "No valid puzzles";
+        if (feedback) feedback.textContent = "Puzzles need a moment to prepare. Refresh the page and try again.";
         renderRealPuzzleBoard();
         return;
       }
@@ -36935,7 +37146,7 @@
       document.getElementById("realPuzzleRecommend").textContent = getRealPuzzleRecommendation();
       document.getElementById("realPuzzleTitle").textContent = puzzle.title;
       document.getElementById("realPuzzlePrompt").textContent = puzzle.prompt;
-      document.getElementById("realPuzzleHint").textContent = puzzle.note || "Use the hint button if the first candidate move is not clear.";
+      document.getElementById("realPuzzleHint").textContent = puzzle.note || "Use a hint when you want a gentle nudge.";
       const modeNote = {
         Daily: "Daily puzzle: one focused win today.",
         Trainer: "Trainer: learn the full line at your pace.",
@@ -36943,14 +37154,9 @@
         Streak: "Streak: keep the chain alive with clean solves.",
         Battle: "Battle: mistakes cost more rating, rewards hit harder."
       }[realPuzzleMode] || "Choose a piece.";
-      document.getElementById("realPuzzleFeedback").textContent = `${modeNote} The full line is checked by chess.js before rewards are paid.`;
+      document.getElementById("realPuzzleFeedback").textContent = `${modeNote} Take a breath, then make your move.`;
       document.getElementById("realPuzzleMoves").textContent = "";
-      const source = document.getElementById("realPuzzleSource");
-      if (source) source.textContent = `${realPuzzleValidIndexes.length || realPuzzleBank.length} playable puzzles loaded. Optional JSON collections can scale this trainer without using legacy puzzle UI.`;
-      const validation = document.getElementById("realPuzzleValidation");
-      if (validation) validation.textContent = realPuzzleValidationErrors.length
-        ? `${realPuzzleValidIndexes.length} valid, ${realPuzzleValidationErrors.length} removed`
-        : `${realPuzzleValidIndexes.length || realPuzzleBank.length} validated`;
+      document.getElementById("realPuzzles")?.setAttribute("data-loading", "false");
       updateRealPuzzleClock();
       renderRealPuzzleBoard();
       renderRealPuzzleAchievements();
@@ -37013,7 +37219,7 @@
         updateRealPuzzleRating(realPuzzleMode === "Battle" ? -10 : -6);
         realPuzzleSelected = "";
         realPuzzleLegalMoves = [];
-        document.getElementById("realPuzzleFeedback").textContent = `Legal move, but not the validated solution. Mistakes: ${realPuzzleMistakes}. Try a forcing check, capture, or threat.`;
+        document.getElementById("realPuzzleFeedback").textContent = "Nice try. Look for a forcing check, capture, or threat, then try again.";
         playPuzzleTone("wrong");
         renderRealPuzzleBoard();
         saveRealPuzzleState();
@@ -37029,7 +37235,7 @@
       if (realPuzzleStep >= realPuzzleLine.length) {
         completeRealPuzzle();
       } else {
-        document.getElementById("realPuzzleFeedback").textContent = `Good: ${move.san}. Keep following the validated line.`;
+        document.getElementById("realPuzzleFeedback").textContent = `Great move: ${move.san}. Keep the pressure on.`;
       }
       renderRealPuzzleBoard();
     }
@@ -37072,7 +37278,7 @@
       if (!realPuzzleGame || realPuzzleReplaying) return;
       resetRealPuzzleGame();
       realPuzzleReplaying = true;
-      document.getElementById("realPuzzleFeedback").textContent = "Replaying validated solution.";
+      document.getElementById("realPuzzleFeedback").textContent = "Replaying the winning idea.";
       playAudioCue("replay");
       renderRealPuzzleBoard();
       await wait(280);
@@ -37096,6 +37302,7 @@
     async function setupRealPuzzles() {
       if (!document.getElementById("realPuzzleBoard") || setupRealPuzzles.ready) return;
       setupRealPuzzles.ready = true;
+      document.getElementById("realPuzzles")?.setAttribute("data-loading", "true");
       try {
         await loadChessRules();
         await loadRealPuzzleCollection();
@@ -37104,6 +37311,7 @@
       } catch {
         realPuzzleValidationErrors = ["Could not load chess.js for real puzzles."];
       }
+      reportRealPuzzleDiagnostics();
       document.querySelectorAll("[data-real-mode]").forEach((button) => {
         button.addEventListener("click", () => {
           realPuzzleMode = button.dataset.realMode || "Trainer";
