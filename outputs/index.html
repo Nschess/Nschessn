@@ -24252,12 +24252,44 @@
       ];
     }
 
+    function createPuzzleDatabase(sourcePuzzles) {
+      const ids = new Set();
+      const positions = new Set();
+      const records = [];
+      const report = { total: Array.isArray(sourcePuzzles) ? sourcePuzzles.length : 0, accepted: 0, duplicateIds: 0, duplicatePositions: 0, invalid: 0 };
+      (Array.isArray(sourcePuzzles) ? sourcePuzzles : []).forEach((puzzle, index) => {
+        const fen = String(puzzle?.fen || "").trim();
+        const line = Array.isArray(puzzle?.line) ? puzzle.line.map((move) => String(move || "").trim()).filter(Boolean) : [];
+        const id = String(puzzle?.id || `puzzle-${index + 1}`).trim();
+        const positionKey = fen.split(/\s+/).slice(0, 4).join(" ");
+        if (!id || !positionKey || !line.length) {
+          report.invalid += 1;
+          return;
+        }
+        if (ids.has(id)) {
+          report.duplicateIds += 1;
+          return;
+        }
+        if (positions.has(positionKey)) {
+          report.duplicatePositions += 1;
+          return;
+        }
+        ids.add(id);
+        positions.add(positionKey);
+        records.push({ ...puzzle, id, fen, line });
+      });
+      report.accepted = records.length;
+      return { records: Object.freeze(records), report: Object.freeze(report) };
+    }
+
     // Keep the historical tiered bank independent from optional imports and
     // the legacy puzzle surface. This is a non-overlapping 50-puzzle selection
     // per difficulty from the existing project records, then current rule and
     // engine validation decides what becomes playable.
     const historicalPuzzleSourceBank = Object.freeze(buildPuzzleEssentialsBank());
-    const originalTieredPuzzleBank = Object.freeze(buildProductionPuzzleTiers(historicalPuzzleSourceBank));
+    const puzzleDatabase = createPuzzleDatabase(buildProductionPuzzleTiers(historicalPuzzleSourceBank));
+    const originalTieredPuzzleBank = puzzleDatabase.records;
+    window.checkmatePuzzleDatabase = puzzleDatabase.report;
     puzzles = [...originalTieredPuzzleBank];
     const progressAutosaveStorageKey = "checkmateQuest.progressAutosave.v1";
     const visitSnapshotStorageKey = "checkmateQuest.visitSnapshot.v1";
@@ -26545,8 +26577,9 @@
     }
 
     function sanitizeActivePuzzleBank() {
-      const before = puzzles.length;
-      puzzles = sanitizePuzzleCollection(puzzles);
+      const database = createPuzzleDatabase(puzzles);
+      window.checkmatePuzzleDatabase = database.report;
+      puzzles = sanitizePuzzleCollection(database.records);
       playablePuzzleIndexes = null;
       currentPuzzle = Math.max(0, Math.min(currentPuzzle, puzzles.length - 1));
       const status = document.getElementById("puzzleCollectionStatus");
@@ -30790,7 +30823,8 @@
 
     function tryInstallPuzzleList(list, source) {
       const normalized = list.map(normalizePuzzleCollectionItem).filter((puzzle) => puzzle.fen && puzzle.line.length);
-      const sanitized = sanitizePuzzleCollection(normalized);
+      const database = createPuzzleDatabase(normalized);
+      const sanitized = sanitizePuzzleCollection(database.records);
       if (sanitized.length < 3) return false;
       installPuzzleCollection(sanitized, source);
       return true;
@@ -36877,15 +36911,22 @@
       if (!CoachChess) return [];
       const errors = [];
       const seen = new Set();
+      const seenIds = new Set();
       realPuzzleValidIndexes = [];
       realPuzzleBank.forEach((puzzle, index) => {
         const validation = validateRealPuzzleRecord(puzzle);
         if (validation.ok) {
+          const id = String(puzzle?.id || "");
+          if (!id || seenIds.has(id)) {
+            errors.push(`${puzzle?.title || `Puzzle ${index + 1}`}: duplicate id`);
+            return;
+          }
           const key = getRealPuzzlePositionKey(puzzle);
           if (seen.has(key)) {
             errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: duplicate position`);
             return;
           }
+          seenIds.add(id);
           seen.add(key);
           realPuzzleValidIndexes.push(index);
         } else {
@@ -36953,10 +36994,15 @@
         if (!Array.isArray(items) || !items.length) return false;
         const normalized = items.map((item, index) => normalizeRealPuzzleRecord(item, index, source)).filter(Boolean);
         const existing = new Set(realPuzzleBank.map(getRealPuzzleKey));
+        const existingIds = new Set(realPuzzleBank.map((puzzle) => String(puzzle?.id || "")).filter(Boolean));
+        const existingPositions = new Set(realPuzzleBank.map(getRealPuzzlePositionKey));
         const fresh = normalized.filter((puzzle) => {
           const key = getRealPuzzleKey(puzzle);
-          if (!puzzle.fen || !puzzle.moves.length || existing.has(key)) return false;
+          const positionKey = getRealPuzzlePositionKey(puzzle);
+          if (!puzzle.fen || !puzzle.moves.length || !puzzle.id || existing.has(key) || existingIds.has(puzzle.id) || existingPositions.has(positionKey)) return false;
           existing.add(key);
+          existingIds.add(puzzle.id);
+          existingPositions.add(positionKey);
           return true;
         });
         if (!fresh.length) return false;
@@ -37028,13 +37074,18 @@
       if (!Array.isArray(sourcePuzzles) || !sourcePuzzles.length) return 0;
       if (replaceExisting) realPuzzleBank = [];
       const existing = new Set(realPuzzleBank.map(getRealPuzzleKey));
+      const existingIds = new Set(realPuzzleBank.map((puzzle) => String(puzzle?.id || "")).filter(Boolean));
+      const existingPositions = new Set(realPuzzleBank.map(getRealPuzzlePositionKey));
       const additions = [];
       sourcePuzzles.forEach((puzzle, index) => {
         const converted = normalizeLegacyPuzzleForReal(puzzle, index);
         if (!converted) return;
         const key = getRealPuzzleKey(converted);
-        if (existing.has(key)) return;
+        const positionKey = getRealPuzzlePositionKey(converted);
+        if (existing.has(key) || existingIds.has(converted.id) || existingPositions.has(positionKey)) return;
         existing.add(key);
+        existingIds.add(converted.id);
+        existingPositions.add(positionKey);
         additions.push(converted);
       });
       if (additions.length) realPuzzleBank = [...realPuzzleBank, ...additions];
