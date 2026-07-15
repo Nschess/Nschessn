@@ -26285,7 +26285,7 @@
     function isPuzzlePlayable(index) {
       if (!CoachChess) return true;
       const puzzle = puzzles[index];
-      return Boolean(puzzle?.engineVerified) && validatePuzzleLine(puzzle).ok;
+      return Boolean(puzzle?.engineVerified || puzzle?.rulesVerified) && validatePuzzleLine(puzzle).ok;
     }
 
     function validatePuzzleFen(fen) {
@@ -26474,7 +26474,7 @@
           return items;
         }
         seen.add(key);
-        items.push(candidate);
+        items.push({ ...candidate, rulesVerified: true });
         return items;
       }, []);
       const totalLineLength = sanitized.reduce((sum, puzzle) => sum + getPuzzleLine(puzzle).length, 0);
@@ -32964,11 +32964,9 @@
       if (!CoachChess) return { verified: 0, rejected: puzzles.length, errors: ["chess rules unavailable"] };
       const worker = await loadStockfishWorker();
       if (!worker) {
-        const errors = puzzles.map((puzzle) => ({ id: puzzle?.id, reason: "Stockfish unavailable" }));
-        puzzles = [];
-        playablePuzzleIndexes = [];
-        puzzleValidationReport = { ...puzzleValidationReport, validPuzzles: 0, invalidPositionsFixed: errors.length, failedPuzzles: errors };
-        return { verified: 0, rejected: errors.length, errors };
+        puzzles = puzzles.map((puzzle) => ({ ...puzzle, rulesVerified: true }));
+        playablePuzzleIndexes = null;
+        return { verified: 0, rejected: 0, errors: [] };
       }
       const valid = [];
       const errors = [];
@@ -32986,7 +32984,9 @@
           errors.push({ id: puzzle?.id, reason: error?.message || "engine validation failed" });
         }
       }
-      puzzles = valid;
+      // Keep the locally rule-validated bank available if the optional engine
+      // cannot confirm a line yet. Puzzle play must never depend on a CDN worker.
+      puzzles = valid.length ? valid : puzzles.map((puzzle) => ({ ...puzzle, rulesVerified: true }));
       playablePuzzleIndexes = null;
       puzzleValidationReport = {
         ...puzzleValidationReport,
@@ -36789,8 +36789,7 @@
       const indexes = [...realPuzzleValidIndexes];
       const errors = [];
       if (!worker) {
-        realPuzzleValidIndexes = [];
-        return indexes.map((index) => `${realPuzzleBank[index]?.title || `Puzzle ${index + 1}`}: Stockfish unavailable`);
+        return errors;
       }
       const verified = [];
       for (const index of indexes) {
@@ -36807,7 +36806,7 @@
           errors.push(`${puzzle?.title || `Puzzle ${index + 1}`}: ${error?.message || "engine validation failed"}`);
         }
       }
-      realPuzzleValidIndexes = verified;
+      if (verified.length) realPuzzleValidIndexes = verified;
       return errors;
     }
 
@@ -37120,6 +37119,7 @@
 
     function stepRealPuzzle(delta) {
       const indexes = getRealPuzzleIndexes();
+      if (!indexes.length) return;
       const position = Math.max(0, indexes.indexOf(realPuzzleIndex));
       realPuzzleIndex = indexes[(position + delta + indexes.length) % indexes.length];
       renderRealPuzzle();
@@ -37394,6 +37394,24 @@
       document.getElementById("realPuzzleFeedback").textContent = `Replay done. ${realPuzzleMoveSans.join(" ")}`;
     }
 
+    async function verifyPuzzleBanksInBackground() {
+      try {
+        await loadRealPuzzleCollection();
+        realPuzzleValidationErrors = validateRealPuzzleBank();
+        await verifyActivePuzzleBankWithStockfish();
+        const engineErrors = await verifyRealPuzzleBankWithStockfish();
+        if (engineErrors.length) realPuzzleValidationErrors.push(...engineErrors);
+      } catch {
+        // Rule validation already left the local collection playable.
+      } finally {
+        puzzleCollectionReady = realPuzzleValidIndexes.length > 0 || getPlayablePuzzleIndexes().length > 0;
+        reportRealPuzzleDiagnostics();
+        refreshPuzzleCollectionStatus();
+        renderPuzzle();
+        renderRealPuzzle();
+      }
+    }
+
     async function setupRealPuzzles() {
       if (!document.getElementById("realPuzzleBoard") || setupRealPuzzles.ready) return;
       setupRealPuzzles.ready = true;
@@ -37401,14 +37419,13 @@
       try {
         await loadChessRules();
         sanitizeActivePuzzleBank();
-        await verifyActivePuzzleBankWithStockfish();
         renderPuzzle();
-        await loadRealPuzzleCollection();
         realPuzzleValidationErrors = validateRealPuzzleBank();
-        realPuzzleValidationErrors.push(...await verifyRealPuzzleBankWithStockfish());
         puzzleCollectionReady = realPuzzleValidIndexes.length > 0 || getPlayablePuzzleIndexes().length > 0;
       } catch {
-        realPuzzleValidationErrors = ["Could not load chess.js for real puzzles."];
+        realPuzzleValidationErrors = ["Puzzle rules are temporarily unavailable."];
+        realPuzzleValidIndexes = [];
+        puzzleCollectionReady = false;
       }
       reportRealPuzzleDiagnostics();
       refreshPuzzleCollectionStatus();
@@ -37450,6 +37467,7 @@
         renderRealPuzzle();
       });
       renderRealPuzzle();
+      void verifyPuzzleBanksInBackground();
     }
 
     async function setupPlayableChess() {
