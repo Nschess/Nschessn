@@ -24992,6 +24992,18 @@
     let realPuzzleMoveSans = [];
     let realPuzzleFlipped = false;
     let realPuzzleReplaying = false;
+    const realPuzzlePhases = Object.freeze(["Loading", "PlayerTurn", "Validate", "OpponentMove", "Success", "Failed", "Completed"]);
+    const realPuzzleTransitions = Object.freeze({
+      Loading: new Set(["PlayerTurn", "Failed", "Success", "Completed"]),
+      PlayerTurn: new Set(["Loading", "Validate", "OpponentMove"]),
+      Validate: new Set(["Loading", "OpponentMove", "Success", "Failed"]),
+      OpponentMove: new Set(["Loading", "PlayerTurn", "Success", "Failed"]),
+      Success: new Set(["Loading", "Completed"]),
+      Failed: new Set(["Loading", "PlayerTurn"]),
+      Completed: new Set(["Loading"])
+    });
+    let realPuzzlePhase = "Loading";
+    let realPuzzleTransitionId = 0;
     let realPuzzleValidationErrors = [];
     let realPuzzleValidIndexes = realPuzzleBank.map((_, index) => index);
     let realPuzzleAutoNextTimer = 0;
@@ -37179,8 +37191,16 @@
       updateRealPuzzleClock();
     }
 
+    function setRealPuzzlePhase(phase) {
+      if (!realPuzzlePhases.includes(phase) || (phase !== "Loading" && !realPuzzleTransitions[realPuzzlePhase]?.has(phase))) return false;
+      realPuzzlePhase = phase;
+      return true;
+    }
+
     function resetRealPuzzleGame() {
       const puzzle = realPuzzleBank[realPuzzleIndex];
+      realPuzzleTransitionId += 1;
+      setRealPuzzlePhase("Loading");
       realPuzzleSelected = "";
       realPuzzleLegalMoves = [];
       realPuzzleLastMove = null;
@@ -37189,15 +37209,18 @@
       realPuzzleStartedAt = 0;
       realPuzzleMistakes = 0;
       realPuzzleMoveSans = [];
+      realPuzzleReplaying = false;
       stopRealPuzzleTimer();
       try {
         const prepared = prepareRealPuzzle(puzzle);
         realPuzzleGame = prepared.game;
         realPuzzleLine = prepared.line;
         realPuzzleSide = realPuzzleGame.turn();
+        setRealPuzzlePhase("PlayerTurn");
       } catch {
         realPuzzleGame = null;
         realPuzzleLine = [];
+        setRealPuzzlePhase("Failed");
       }
     }
 
@@ -37369,15 +37392,18 @@
       saveRealPuzzleState();
     }
 
-    function applyRealPuzzleAutoReplies() {
-      while (realPuzzleStep < realPuzzleLine.length && realPuzzleGame.turn() !== realPuzzleSide) {
+    function applyRealPuzzleAutoReplies(limit = Infinity) {
+      let applied = 0;
+      while (applied < limit && realPuzzleStep < realPuzzleLine.length && realPuzzleGame.turn() !== realPuzzleSide) {
         const reply = findRealUciMove(realPuzzleGame, realPuzzleLine[realPuzzleStep]);
         if (!reply) break;
         const played = realPuzzleGame.move(toCoachMoveInput(reply));
         realPuzzleStep += 1;
         realPuzzleLastMove = played;
         realPuzzleMoveSans.push(played.san);
+        applied += 1;
       }
+      return applied;
     }
 
     function completeRealPuzzle() {
@@ -37409,10 +37435,14 @@
       document.getElementById("realPuzzleMoves").textContent = realPuzzleMoveSans.join(" ");
       renderRealPuzzleAchievements();
       saveRealPuzzleState();
+      setRealPuzzlePhase("Completed");
       autoAdvanceRealPuzzleIfNeeded();
     }
 
-    function finishRealPuzzleMove(move) {
+    async function finishRealPuzzleMove(move) {
+      if (!realPuzzleGame || realPuzzlePhase !== "PlayerTurn") return;
+      const transitionId = realPuzzleTransitionId;
+      setRealPuzzlePhase("Validate");
       const expected = realPuzzleLine[realPuzzleStep];
       const playedUci = moveToUci(move);
       if (playedUci !== expected) {
@@ -37426,8 +37456,11 @@
         realPuzzleLegalMoves = [];
         document.getElementById("realPuzzleFeedback").textContent = "Nice try. Look for a forcing check, capture, or threat, then try again.";
         playPuzzleTone("wrong");
+        setRealPuzzlePhase("Failed");
         renderRealPuzzleBoard();
         saveRealPuzzleState();
+        await wait(180);
+        if (transitionId === realPuzzleTransitionId && realPuzzlePhase === "Failed") setRealPuzzlePhase("PlayerTurn");
         return;
       }
 
@@ -37435,18 +37468,38 @@
       realPuzzleLastMove = move;
       realPuzzleMoveSans.push(move.san);
       playPuzzleTone("correct");
-      applyRealPuzzleAutoReplies();
       document.getElementById("realPuzzleMoves").textContent = realPuzzleMoveSans.join(" ");
       if (realPuzzleStep >= realPuzzleLine.length) {
+        setRealPuzzlePhase("Success");
+        completeRealPuzzle();
+        renderRealPuzzleBoard();
+        return;
+      }
+
+      setRealPuzzlePhase("OpponentMove");
+      document.getElementById("realPuzzleFeedback").textContent = `Great move: ${move.san}. Watch the reply.`;
+      renderRealPuzzleBoard();
+      await wait(220);
+      if (transitionId !== realPuzzleTransitionId || realPuzzlePhase !== "OpponentMove" || !realPuzzleGame) return;
+      if (!applyRealPuzzleAutoReplies(1)) {
+        setRealPuzzlePhase("Failed");
+        document.getElementById("realPuzzleFeedback").textContent = "This puzzle line could not continue. Try another verified puzzle.";
+        renderRealPuzzleBoard();
+        return;
+      }
+      document.getElementById("realPuzzleMoves").textContent = realPuzzleMoveSans.join(" ");
+      if (realPuzzleStep >= realPuzzleLine.length) {
+        setRealPuzzlePhase("Success");
         completeRealPuzzle();
       } else {
-        document.getElementById("realPuzzleFeedback").textContent = `Great move: ${move.san}. Keep the pressure on.`;
+        setRealPuzzlePhase("PlayerTurn");
+        document.getElementById("realPuzzleFeedback").textContent = "Your turn. Keep the pressure on.";
       }
       renderRealPuzzleBoard();
     }
 
     function handleRealPuzzleSquare(square) {
-      if (!realPuzzleGame || realPuzzleReplaying) return;
+      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
       startRealPuzzleTimer();
       const piece = realPuzzleGame.get(square);
       if (realPuzzleSelected && square !== realPuzzleSelected) {
@@ -37454,7 +37507,7 @@
         if (legalMoves.length) {
           const promotion = legalMoves.find((move) => move.promotion === "q")?.promotion || legalMoves[0].promotion;
           const move = realPuzzleGame.move({ from: realPuzzleSelected, to: square, ...(promotion ? { promotion } : {}) });
-          if (move) finishRealPuzzleMove(move);
+          if (move) void finishRealPuzzleMove(move);
           return;
         }
       }
@@ -37480,14 +37533,17 @@
     }
 
     async function replayRealPuzzleSolution() {
-      if (!realPuzzleGame || realPuzzleReplaying) return;
+      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
       resetRealPuzzleGame();
+      const transitionId = realPuzzleTransitionId;
+      setRealPuzzlePhase("Loading");
       realPuzzleReplaying = true;
       document.getElementById("realPuzzleFeedback").textContent = "Replaying the winning idea.";
       playAudioCue("replay");
       renderRealPuzzleBoard();
       await wait(280);
       while (realPuzzleStep < realPuzzleLine.length) {
+        if (transitionId !== realPuzzleTransitionId || !realPuzzleReplaying) return;
         const move = findRealUciMove(realPuzzleGame, realPuzzleLine[realPuzzleStep]);
         if (!move) break;
         const played = realPuzzleGame.move(toCoachMoveInput(move));
@@ -37500,7 +37556,9 @@
         renderRealPuzzleBoard();
         await wait(520);
       }
+      if (transitionId !== realPuzzleTransitionId) return;
       realPuzzleReplaying = false;
+      setRealPuzzlePhase("Completed");
       document.getElementById("realPuzzleFeedback").textContent = `Replay done. ${realPuzzleMoveSans.join(" ")}`;
     }
 
