@@ -19925,6 +19925,16 @@
           <p class="section-intro">Compare puzzle growth and AI victories with registered players. Offline builds clearly show a local-only fallback.</p>
         </div>
 
+        <div class="leaderboard-toolbar" aria-label="Leaderboard filters">
+          <button type="button" data-leaderboard-scope="global" aria-pressed="true">Global</button>
+          <button type="button" data-leaderboard-scope="country" aria-pressed="false">Country</button>
+          <button type="button" data-leaderboard-scope="friends" aria-pressed="false">Friends</button>
+          <button type="button" data-leaderboard-period="daily" aria-pressed="false">Daily</button>
+          <button type="button" data-leaderboard-period="weekly" aria-pressed="false">Weekly</button>
+          <button type="button" data-leaderboard-period="monthly" aria-pressed="false">Monthly</button>
+          <button type="button" data-leaderboard-period="all" aria-pressed="true">All-time</button>
+        </div>
+
         <div class="leaderboard-grid" aria-live="polite">
           <article class="leaderboard-card" aria-labelledby="puzzleLeaderboardTitle">
             <div class="leaderboard-head">
@@ -19949,7 +19959,20 @@
             </div>
             <div class="leaderboard-list" id="aiLeaderboardList"></div>
           </article>
+
+          <article class="leaderboard-card is-wide" aria-labelledby="tournamentLeaderboardTitle">
+            <div class="leaderboard-head">
+              <span class="leaderboard-rank" aria-hidden="true">T</span>
+              <div>
+                <h3 id="tournamentLeaderboardTitle">Tournament Rankings</h3>
+                <p class="trainer-note">Live standings from active and recent tournaments.</p>
+              </div>
+              <span class="badge" id="tournamentLeaderboardBadge">Live</span>
+            </div>
+            <div class="leaderboard-list" id="tournamentLeaderboardList"></div>
+          </article>
         </div>
+        <p class="leaderboard-status" id="leaderboardStatus">Rankings update automatically when player data changes.</p>
       </div>
     </section>
 
@@ -29113,7 +29136,18 @@
       return Array.isArray(bossBattleState?.cleared) ? bossBattleState.cleared.length : 0;
     }
 
-    const leaderboardRuntime = { accounts: null, status: "local", lastRefresh: 0, refreshPromise: null, lastSyncSignature: "", subscribed: false, localListener: false };
+    const leaderboardRuntime = {
+      accounts: null,
+      status: "local",
+      lastRefresh: 0,
+      refreshPromise: null,
+      lastSyncSignature: "",
+      subscribed: false,
+      localListener: false,
+      controlsBound: false,
+      scope: "global",
+      period: "all"
+    };
 
     function getLeaderboardAccountId(account = {}) {
       return String(account.publicId || account.id || account.userId || account.email || "").trim().toLowerCase();
@@ -29195,7 +29229,7 @@
       if (leaderboardRuntime.refreshPromise) return leaderboardRuntime.refreshPromise;
       if (!force && Date.now() - leaderboardRuntime.lastRefresh < 5000) return;
       leaderboardRuntime.status = "syncing";
-      leaderboardRuntime.refreshPromise = Promise.resolve(fetchRows.call(provider, { limit: 100, cursor: null, include: ["puzzles", "ai"] }))
+      leaderboardRuntime.refreshPromise = Promise.resolve(fetchRows.call(provider, { limit: 500, cursor: null, include: ["puzzles", "ai", "tournaments"] }))
         .then((payload) => {
           leaderboardRuntime.accounts = normalizeGlobalLeaderboardAccounts(payload);
           leaderboardRuntime.status = "global";
@@ -29266,13 +29300,159 @@
       saveAuthRegistry({ ...registry, accounts: nextAccounts });
     }
 
+    function getLeaderboardUpdatedAt(account = {}) {
+      return Date.parse(account.updatedAt || account.updated_at || account.lastSynced || account.lastLogin || "") || 0;
+    }
+
+    function isWithinLeaderboardPeriod(account = {}) {
+      if (leaderboardRuntime.period === "all") return true;
+      const updated = getLeaderboardUpdatedAt(account);
+      if (!updated) return false;
+      const days = leaderboardRuntime.period === "daily" ? 1 : leaderboardRuntime.period === "weekly" ? 7 : 31;
+      return Date.now() - updated <= days * 86400000;
+    }
+
+    function getLeaderboardFriendIds() {
+      const ids = readFriendDirectoryState().friends.map((friend) => String(friend.id || friend.publicId || "").toLowerCase()).filter(Boolean);
+      const current = getLeaderboardAccountId(getAuthProvider()?.getCachedAccount?.() || {});
+      if (current) ids.push(current);
+      return new Set(ids);
+    }
+
+    function isInLeaderboardScope(account = {}) {
+      if (leaderboardRuntime.scope === "global") return true;
+      if (leaderboardRuntime.scope === "country") {
+        const playerCountry = normalizeCountryFlagValue(readLearnerProfile().countryFlag);
+        return Boolean(playerCountry) && normalizeCountryFlagValue(account.countryFlag || account.country_flag || "") === playerCountry;
+      }
+      if (leaderboardRuntime.scope === "friends") {
+        const friendIds = getLeaderboardFriendIds();
+        return friendIds.has(getLeaderboardAccountId(account));
+      }
+      return true;
+    }
+
+    function filterLeaderboardAccounts(accounts = []) {
+      return accounts.filter((account) => isRealLeaderboardAccount(account) && isInLeaderboardScope(account) && isWithinLeaderboardPeriod(account));
+    }
+
+    function getLeaderboardScopeLabel() {
+      return ({ global: "Global", country: "Country", friends: "Friends" })[leaderboardRuntime.scope] || "Global";
+    }
+
+    function getLeaderboardPeriodLabel() {
+      return ({ daily: "Daily", weekly: "Weekly", monthly: "Monthly", all: "All-time" })[leaderboardRuntime.period] || "All-time";
+    }
+
+    function ensureLeaderboardControls() {
+      if (leaderboardRuntime.controlsBound) return;
+      leaderboardRuntime.controlsBound = true;
+      document.querySelectorAll("[data-leaderboard-scope]").forEach((button) => {
+        button.addEventListener("click", () => {
+          leaderboardRuntime.scope = button.dataset.leaderboardScope || "global";
+          renderLeaderboards();
+        });
+      });
+      document.querySelectorAll("[data-leaderboard-period]").forEach((button) => {
+        button.addEventListener("click", () => {
+          leaderboardRuntime.period = button.dataset.leaderboardPeriod || "all";
+          renderLeaderboards();
+        });
+      });
+    }
+
+    function renderLeaderboardControls() {
+      document.querySelectorAll("[data-leaderboard-scope]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.leaderboardScope === leaderboardRuntime.scope));
+      });
+      document.querySelectorAll("[data-leaderboard-period]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.leaderboardPeriod === leaderboardRuntime.period));
+      });
+    }
+
+    function getLeaderboardEmptyMessage() {
+      const filter = `${getLeaderboardScopeLabel()} ${getLeaderboardPeriodLabel()}`;
+      if (leaderboardRuntime.status === "syncing") return "Loading shared rankings...";
+      if (leaderboardRuntime.status === "offline") return "The shared leaderboard is unavailable right now.";
+      if (leaderboardRuntime.status === "local") return `${filter} local rankings are empty on this device.`;
+      return `No registered players match ${filter} yet.`;
+    }
+
+    function getLeaderboardDataSourceLabel() {
+      return leaderboardRuntime.status === "global" ? "Live global"
+        : leaderboardRuntime.status === "syncing" ? "Syncing"
+          : leaderboardRuntime.status === "offline" ? "Offline"
+            : "Local";
+    }
+
+    function getTournamentLeaderboardUpdatedAt(event = {}) {
+      return Date.parse(event.endsAt || event.ends_at || event.startsAt || event.starts_at || "") || 0;
+    }
+
+    function isTournamentWithinLeaderboardPeriod(event = {}) {
+      if (leaderboardRuntime.period === "all") return true;
+      const updated = getTournamentLeaderboardUpdatedAt(event);
+      if (!updated) return true;
+      const days = leaderboardRuntime.period === "daily" ? 1 : leaderboardRuntime.period === "weekly" ? 7 : 31;
+      return Date.now() - updated <= days * 86400000;
+    }
+
+    function isTournamentEntryInScope(entry = {}) {
+      if (leaderboardRuntime.scope === "global") return true;
+      if (leaderboardRuntime.scope === "country") {
+        const playerCountry = normalizeCountryFlagValue(readLearnerProfile().countryFlag);
+        return Boolean(playerCountry) && normalizeCountryFlagValue(entry.countryFlag || entry.country_flag || "") === playerCountry;
+      }
+      if (leaderboardRuntime.scope === "friends") {
+        return getLeaderboardFriendIds().has(String(entry.id || entry.publicId || entry.public_id || "").toLowerCase());
+      }
+      return true;
+    }
+
+    function buildTournamentLeaderboardEntries() {
+      const currentId = String(getFriendCurrentUserId?.() || getLeaderboardAccountId(getAuthProvider()?.getCachedAccount?.() || {})).toLowerCase();
+      const rows = [];
+      (tournamentRuntime?.events || []).filter(isTournamentWithinLeaderboardPeriod).forEach((event) => {
+        (event.standings || []).forEach((entry) => {
+          if (!isTournamentEntryInScope(entry)) return;
+          const wins = Math.max(0, Number(entry.wins) || 0);
+          const draws = Math.max(0, Number(entry.draws) || 0);
+          const losses = Math.max(0, Number(entry.losses) || 0);
+          const games = Math.max(0, Number(entry.gamesPlayed ?? entry.games_played) || wins + draws + losses);
+          const scoreValue = Math.max(0, Number(entry.score) || 0);
+          rows.push({
+            id: String(entry.id || entry.publicId || entry.public_id || `${event.code}-${entry.username || rows.length}`).toLowerCase(),
+            name: normalizeAuthUsername(entry.username || "Player"),
+            title: entry.title || "",
+            flag: formatCountryFlag(entry.countryFlag || entry.country_flag || ""),
+            countryCode: entry.countryFlag || entry.country_flag || "",
+            icons: event.status === "completed" && Number(entry.playerRank || entry.player_rank) === 1 ? [{ icon: "T", label: "Tournament winner" }] : [],
+            score: Math.round(scoreValue * 100 + wins * 25 + draws * 8 + games),
+            tieRating: Math.max(400, Number(entry.rating) || 400),
+            tieWins: wins,
+            tieGames: games,
+            primary: `${scoreValue.toFixed(scoreValue % 1 ? 1 : 0)} pts`,
+            meta: [`${event.title}`, `${wins}W ${draws}D ${losses}L`, `${games} games`],
+            isPlayer: Boolean(currentId && String(entry.id || entry.publicId || entry.public_id || "").toLowerCase() === currentId)
+          });
+        });
+      });
+      return rows.sort((a, b) =>
+        (b.score - a.score)
+        || (b.tieRating - a.tieRating)
+        || (b.tieWins - a.tieWins)
+        || (b.tieGames - a.tieGames)
+        || a.name.localeCompare(b.name)
+      );
+    }
+
     function buildLeaderboardEntries(type = "puzzles") {
       const currentName = normalizeAuthUsername(readLearnerProfile().name).toLowerCase();
       const seen = new Set();
       const useSharedAccounts = getLeaderboardProvider() && leaderboardRuntime.status !== "local";
       const accounts = useSharedAccounts ? (leaderboardRuntime.accounts || []) : readAuthRegistry().accounts;
       return accounts
-        .filter(isRealLeaderboardAccount)
+        .filter(filterLeaderboardAccounts)
         .map((account) => {
           const id = getLeaderboardAccountId(account);
           if (seen.has(id)) return null;
@@ -29323,12 +29503,7 @@
       const list = document.getElementById(targetId);
       if (!list) return;
       if (!entries.length) {
-        const message = leaderboardRuntime.status === "syncing" ? "Loading shared rankings..."
-          : leaderboardRuntime.status === "offline" ? "The shared leaderboard is unavailable right now."
-            : leaderboardRuntime.status === "local" ? "Local-only rankings. Connect Vercel KV for global standings."
-              : getLeaderboardProvider() ? "No registered players have ranked yet."
-              : "Local-only rankings. Connect the account service for global standings.";
-        list.replaceChildren(createBookText("p", "trainer-note", message));
+        list.replaceChildren(createBookText("p", "trainer-note", getLeaderboardEmptyMessage()));
         return;
       }
       list.replaceChildren(...entries.map((entry, index) => {
@@ -29376,11 +29551,15 @@
 
     function renderLeaderboards() {
       syncCurrentPlayerStatsToRegistry();
+      ensureLeaderboardControls();
       ensureSharedLeaderboardSync();
+      renderLeaderboardControls();
       const puzzleEntries = buildLeaderboardEntries("puzzles");
       const aiEntries = buildLeaderboardEntries("ai");
+      const tournamentEntries = buildTournamentLeaderboardEntries();
       renderLeaderboardList("puzzleLeaderboardList", puzzleEntries);
       renderLeaderboardList("aiLeaderboardList", aiEntries);
+      renderLeaderboardList("tournamentLeaderboardList", tournamentEntries);
       const puzzleBadge = document.getElementById("puzzleLeaderboardBadge");
       const aiBadge = document.getElementById("aiLeaderboardBadge");
       const label = leaderboardRuntime.status === "global" ? "Global"
@@ -29389,6 +29568,14 @@
             : "Local only";
       if (puzzleBadge) puzzleBadge.textContent = `${label} ${puzzleEntries.length ? `• ${puzzleEntries.length}` : ""}`.trim();
       if (aiBadge) aiBadge.textContent = `${label} ${aiEntries.length ? `• ${aiEntries.length}` : ""}`.trim();
+      const source = getLeaderboardDataSourceLabel();
+      const filterLabel = `${getLeaderboardScopeLabel()} ${getLeaderboardPeriodLabel()}`;
+      const tournamentBadge = document.getElementById("tournamentLeaderboardBadge");
+      const status = document.getElementById("leaderboardStatus");
+      if (puzzleBadge) puzzleBadge.textContent = `${source} ${puzzleEntries.length ? `- ${puzzleEntries.length}` : ""}`.trim();
+      if (aiBadge) aiBadge.textContent = `${source} ${aiEntries.length ? `- ${aiEntries.length}` : ""}`.trim();
+      if (tournamentBadge) tournamentBadge.textContent = `${tournamentEntries.length} ranked`;
+      if (status) status.textContent = `${filterLabel} rankings. ${source === "Live global" ? "Live updates are enabled." : source === "Local" ? "Showing local fallback until shared data is available." : `${source} data source.`}`;
       renderStyledUsernames(getDragonProfileSnapshot().name);
     }
 
