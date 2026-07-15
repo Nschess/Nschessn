@@ -1008,6 +1008,14 @@
       --piece-svg-filter: saturate(1.08) contrast(1.04) drop-shadow(0 1px 1px rgba(4, 43, 70, 0.34)) drop-shadow(0 0 5px rgba(126, 228, 255, 0.24));
     }
 
+    body.piece-finish-marble {
+      --piece-svg-filter: grayscale(0.32) saturate(0.54) contrast(1.08) drop-shadow(0 1px 1px rgba(46, 48, 50, 0.3));
+    }
+
+    body.piece-finish-obsidian {
+      --piece-svg-filter: grayscale(0.5) saturate(0.7) contrast(1.18) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.52));
+    }
+
     .mini-square .piece-svg {
       width: 86%;
       height: 86%;
@@ -19707,6 +19715,7 @@
                 <option value="candy">Candy Quest</option>
                 <option value="slate">Slate Arena</option>
                 <option value="sunrise">Sunrise Puzzle</option>
+                <option value="tournamentPro">Tournament Board</option>
                 <option value="royalCourt">Royal Board Theme</option>
               </select>
             </label>
@@ -24264,6 +24273,14 @@
       description: `${theme.note} ${theme.vibe}.`,
       previewText: theme.icon
     }));
+    /*
+     * Inline store artwork below adapts Lucide Icons SVGs (ISC License):
+     * https://github.com/lucide-icons/lucide/tree/main/icons
+     * Copyright (c) 2026 Lucide Icons and Contributors.
+     * Permission to use, copy, modify, and/or distribute this software for any
+     * purpose with or without fee is hereby granted, provided that this notice
+     * appears in all copies. The software is provided "AS IS" without warranty.
+     */
     const flexBadgeThemes = {
       rookie: { label: "Rookie Spark", rarity: "Common", cost: 0, icon: "Spark", description: "A clean starter badge for showing up and learning one idea." },
       daily: { label: "Daily Flame", rarity: "Common", cost: 45, icon: "Flame", description: "For players building a steady practice habit." },
@@ -24274,6 +24291,7 @@
       dragon: { label: "Dragon Slayer", rarity: "Legendary", cost: 520, icon: "Dragon", description: "Premium animated badge for brave campaign wins." },
       mate: { label: "Checkmate Artist", rarity: "Legendary", cost: 650, icon: "Mate", description: "Premium badge for clean finishes and calm attacks." },
       master: { label: "Chess Master Crown", rarity: "Mythic", cost: 1200, icon: "Mythic", description: "A mythic flex badge for the final champion path." },
+      grandmasterCrown: { label: "GM Crown", storeName: "Grandmaster Crown", rarity: "Legendary", cost: 1480, icon: "GM", description: "A compact crown badge for players who have earned their grandmaster glow.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Grandmaster Crown" fill="none" stroke="#ffd36b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z"/><path d="M5 20h14"/></svg>' },
       tacticalMaster: { label: "Tactical Master", storeName: "Tactical Master Badge", rarity: "Epic", cost: 340, icon: "Tactics", description: "A clean tactical crest for players who spot the forcing move.", inlineSvg: '<svg viewBox="0 0 64 64" role="img" aria-label="Tactical Master Badge"><path fill="#23364a" d="M32 5 55 14v16c0 14-9 24-23 29C18 54 9 44 9 30V14z"/><path fill="#8fc4ef" d="m32 10 18 7v13c0 10-6 18-18 23-12-5-18-13-18-23V17z"/><path fill="#f8f6f0" d="m30 17 4 0 2 12 10 3-3 4-9-2-2 10-4 0-2-10-9 2-3-4 10-3z"/><circle cx="32" cy="30" r="4" fill="#e7b65d"/></svg>' }
     };
     const flexBadgeStoreItems = Object.entries(flexBadgeThemes).map(([value, badge]) => ({
@@ -24477,6 +24495,7 @@
       candy: { label: "Candy Quest", rarity: "Rare", cost: 82, light: "#f8d7e9", dark: "#6aa6a8", glow: "rgba(255, 139, 180, 0.24)", description: "Playful no-pressure colors that stay readable." },
       slate: { label: "Slate Arena", rarity: "Epic", cost: 96, light: "#d7dde3", dark: "#56616b", glow: "rgba(111, 128, 143, 0.26)", description: "Clean tournament-style contrast for serious practice." },
       tournament: { label: "Tournament Green", rarity: "Epic", cost: 118, light: "#eee5c8", dark: "#6a8852", glow: "rgba(151, 190, 107, 0.3)", description: "A clean competition board with timeless green squares and no distractions." },
+      tournamentPro: { label: "Tournament Board", storeName: "Tournament Board", rarity: "Epic", cost: 245, light: "#f1ebdc", dark: "#496b58", glow: "rgba(180, 206, 156, 0.34)", lightTexture: "linear-gradient(135deg, rgba(255,255,255,.3), transparent 52%)", darkTexture: "linear-gradient(135deg, rgba(255,255,255,.1), transparent 52%)", description: "A clean championship green board with calm ivory squares and crisp competition contrast.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Tournament Board" fill="none" stroke="#dcecc2" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>' },
       sunrise: { label: "Sunrise Puzzle", rarity: "Epic", cost: 110, light: "#ffe2b8", dark: "#c6654b", glow: "rgba(255, 174, 90, 0.3)", description: "A bright reward board for daily habits." },
       sakura: { label: "Sakura Breeze", rarity: "Epic", cost: 135, light: "#ffe8ef", dark: "#b86f8c", glow: "rgba(255, 168, 194, 0.32)", description: "Gentle pink board for relaxed study and replay." },
       royal: { label: "Royal Violet", rarity: "Legendary", cost: 220, light: "#f6e6b9", dark: "#7b4f9e", glow: "rgba(174, 135, 255, 0.42)", animated: true, description: "Legendary royal board with a subtle glowing preview." },
@@ -24506,7 +24525,9 @@
       inlineSvg: theme.inlineSvg || ""
     }));
     const pieceFinishStoreItems = [
-      { id: "piecefinish-crystal", type: "pieceFinish", value: "crystal", name: "Crystal Chess Set", cost: 440, rarity: "Rare", tag: "Piece Finish", description: "A cool crystal sheen that keeps every tournament silhouette crisp.", inlineSvg: '<svg viewBox="0 0 64 64" role="img" aria-label="Crystal Chess Set"><path fill="#244d6d" d="m32 5 17 15-7 36H22l-7-36z"/><path fill="#9eeaff" d="m32 9 10 12-10 8-10-8z"/><path fill="#dffbff" d="m22 21 10 8v23l-8-8zm20 0-10 8v23l8-8z"/><path fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" d="m32 5 17 15-7 36H22l-7-36zM22 21l10 8 10-8M32 29v23"/></svg>' }
+      { id: "piecefinish-crystal", type: "pieceFinish", value: "crystal", name: "Crystal Chess Set", cost: 440, rarity: "Rare", tag: "Piece Finish", description: "A cool crystal sheen that keeps every tournament silhouette crisp.", inlineSvg: '<svg viewBox="0 0 64 64" role="img" aria-label="Crystal Chess Set"><path fill="#244d6d" d="m32 5 17 15-7 36H22l-7-36z"/><path fill="#9eeaff" d="m32 9 10 12-10 8-10-8z"/><path fill="#dffbff" d="m22 21 10 8v23l-8-8zm20 0-10 8v23l8-8z"/><path fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" d="m32 5 17 15-7 36H22l-7-36zM22 21l10 8 10-8M32 29v23"/></svg>' },
+      { id: "piecefinish-marble", type: "pieceFinish", value: "marble", name: "Marble Chess Set", cost: 510, rarity: "Epic", tag: "Piece Finish", description: "A calm stone-polish finish for crisp, focused tournament pieces.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Marble Chess Set" fill="none" stroke="#e7e2d7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>' },
+      { id: "piecefinish-obsidian", type: "pieceFinish", value: "obsidian", name: "Obsidian Chess Set", cost: 620, rarity: "Legendary", tag: "Piece Finish", description: "A deep graphite finish with clean edges that keeps both sides easy to read.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Obsidian Chess Set" fill="none" stroke="#9aa8b6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V5a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 2.81 17 4 19 4a1 1 0 0 1 1 1z"/></svg>' }
     ];
     const avatarEffectThemes = {
       none: { label: "No Effect", rarity: "Common", cost: 0, accent: "#e7b65d", description: "Clean avatar with no extra glow." },
@@ -24590,6 +24611,7 @@
       { id: "title-fm", type: "title", value: "FM FIDE Master", name: "FM FIDE Master Title", cost: 2200, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2200 Elo AI.", previewText: "FM FIDE Master" },
       { id: "title-im", type: "title", value: "IM International Master", name: "IM International Master Title", cost: 2300, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2300 Elo AI.", previewText: "IM International Master" },
       { id: "title-gm", type: "title", value: "GM Grandmaster", name: "GM Grandmaster Title", cost: 2500, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2500 Elo AI.", previewText: "GM Grandmaster" },
+      { id: "title-champion-trophy", type: "title", value: "Champion Trophy", name: "Champion Trophy", cost: 980, rarity: "Legendary", tag: "Title", description: "A trophy title for players who keep showing up, learning, and finishing strong.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Champion Trophy" fill="none" stroke="#ffd36b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H6v7a6 6 0 0 0 12 0z"/><path d="M6 5H4.5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1H6M18 5h1.5a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H18M10 17v1.3a3 3 0 0 1-2 2.7L4 22M14 17v1.3a3 3 0 0 0 2 2.7l4 1M4 22h16"/></svg>' },
       { id: "title-champion", type: "title", value: "Champion", name: "Champion Title", cost: 5000, tag: "Legendary title", description: "Awarded for clearing the full Stockfish campaign.", previewText: "Champion" },
       { id: "trail-stars", type: "trail", value: "stars", name: "Star Confetti Trail", cost: 30, tag: "Celebration", description: "Make lesson and puzzle celebrations sparkle.", previewText: "Star burst" },
       { id: "trail-sparks", type: "trail", value: "sparks", name: "Boss Spark Trail", cost: 45, tag: "Celebration", description: "A sharper victory effect for boss clears.", previewText: "Boss sparks" }
@@ -39797,7 +39819,7 @@
       if (!boardBorderThemes[prefs.boardBorder]) prefs.boardBorder = "classic";
       if (!backgroundThemes[prefs.backgroundTheme]) prefs.backgroundTheme = "classic";
       if (!supportedPieceSvgSets.has(prefs.pieceSkin)) prefs.pieceSkin = "classic";
-      if (prefs.pieceFinish !== "crystal") prefs.pieceFinish = "classic";
+      if (!["classic", "crystal", "marble", "obsidian"].includes(prefs.pieceFinish)) prefs.pieceFinish = "classic";
       if (!archetypeThemes[prefs.archetype]) prefs.archetype = "balanced";
       if (!nameStyleThemes[prefs.nameStyle]) prefs.nameStyle = "classic";
       if (!avatarEffectThemes[prefs.avatarEffect]) prefs.avatarEffect = "none";
@@ -39900,7 +39922,9 @@
       [...supportedPieceSvgSets].forEach((skin) => {
         document.body.classList.toggle(`skin-${skin}`, prefs.pieceSkin === skin);
       });
-      document.body.classList.toggle("piece-finish-crystal", prefs.pieceFinish === "crystal");
+      ["crystal", "marble", "obsidian"].forEach((finish) => {
+        document.body.classList.toggle(`piece-finish-${finish}`, prefs.pieceFinish === finish);
+      });
       document.body.dataset.pieceSet = getPieceSetTheme(prefs.pieceSkin).name;
       document.body.classList.toggle("coords-off", prefs.coords === "off");
       document.body.classList.toggle("speed-slow", prefs.speed === "slow");
