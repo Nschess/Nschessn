@@ -26472,6 +26472,13 @@
       return getPuzzleFen(puzzle).split(/\s+/).slice(0, 4).join(" ");
     }
 
+    // Generated records can differ only by harmless background pawns. Treat an
+    // identical principal variation as the same training idea when selecting.
+    function getPuzzleTacticalKey(puzzle) {
+      const line = getPuzzleLine(puzzle).map((move) => String(move || "").trim().toLowerCase()).filter(Boolean);
+      return line.join(" ") || getPuzzleUniqueKey(puzzle);
+    }
+
     function puzzleMoveToUci(move) {
       return `${move.from}${move.to}${move.promotion || ""}`;
     }
@@ -26616,6 +26623,14 @@
       const currentPosition = indexes.indexOf(currentPuzzle);
       if (currentPosition < 0) return direction < 0 ? indexes[indexes.length - 1] : indexes[0];
 
+      if (avoidCurrent) {
+        const currentTactic = getPuzzleTacticalKey(puzzles[currentPuzzle]);
+        for (let offset = 1; offset < indexes.length; offset += 1) {
+          const candidate = indexes[(currentPosition + direction * offset + indexes.length) % indexes.length];
+          if (getPuzzleTacticalKey(puzzles[candidate]) !== currentTactic) return candidate;
+        }
+      }
+
       return indexes[(currentPosition + direction + indexes.length) % indexes.length];
     }
 
@@ -26637,6 +26652,9 @@
         seen.clear();
         candidates = activePool;
       }
+      const currentTactic = getPuzzleTacticalKey(puzzles[currentPuzzle]);
+      const variedTactics = candidates.filter((index) => getPuzzleTacticalKey(puzzles[index]) !== currentTactic);
+      if (variedTactics.length) candidates = variedTactics;
       if (candidates.length) {
         currentPuzzle = candidates[Math.floor(Math.random() * candidates.length)];
         seen.add(currentPuzzle);
@@ -36715,6 +36733,11 @@
       return `${getRealPuzzlePositionKey(puzzle)}|${(puzzle?.moves || []).join(" ")}`;
     }
 
+    function getRealPuzzleTacticalKey(puzzle) {
+      const line = Array.isArray(puzzle?.moves) ? puzzle.moves : [];
+      return line.map((move) => String(move || "").trim().toLowerCase()).filter(Boolean).join(" ") || getRealPuzzlePositionKey(puzzle);
+    }
+
     function reportRealPuzzleRuntime(event, puzzle = realPuzzleBank[realPuzzleIndex]) {
       const indexes = getRealPuzzleIndexes();
       const tiers = Object.fromEntries(realPuzzleDifficultyLevels.slice(1).map((difficulty) => [
@@ -37228,6 +37251,15 @@
       const indexes = getRealPuzzleIndexes();
       if (!indexes.length) return;
       const position = Math.max(0, indexes.indexOf(realPuzzleIndex));
+      const currentTactic = getRealPuzzleTacticalKey(realPuzzleBank[realPuzzleIndex]);
+      for (let offset = 1; offset < indexes.length; offset += 1) {
+        const candidate = indexes[(position + delta * offset + indexes.length) % indexes.length];
+        if (getRealPuzzleTacticalKey(realPuzzleBank[candidate]) !== currentTactic) {
+          realPuzzleIndex = candidate;
+          renderRealPuzzle();
+          return;
+        }
+      }
       realPuzzleIndex = indexes[(position + delta + indexes.length) % indexes.length];
       renderRealPuzzle();
     }
@@ -37255,9 +37287,9 @@
       const currentTheme = getRealPuzzleThemes(currentPuzzle).map((theme) => String(theme).toLowerCase()).sort().join("|");
       const variedTheme = pool.filter((index) => getRealPuzzleThemes(realPuzzleBank[index]).map((theme) => String(theme).toLowerCase()).sort().join("|") !== currentTheme);
       if (variedTheme.length) pool = variedTheme;
-      const currentLine = (currentPuzzle?.moves || []).join(" ");
-      const variedLine = pool.filter((index) => (realPuzzleBank[index]?.moves || []).join(" ") !== currentLine);
-      if (variedLine.length) pool = variedLine;
+      const currentTactic = getRealPuzzleTacticalKey(currentPuzzle);
+      const variedTactics = pool.filter((index) => getRealPuzzleTacticalKey(realPuzzleBank[index]) !== currentTactic);
+      if (variedTactics.length) pool = variedTactics;
       const next = pool[Math.floor(Math.random() * pool.length)];
       const nextId = realPuzzleBank[next]?.id;
       if (nextId) realPuzzleSeenByDifficulty[difficultyKey] = [...new Set([...seen, nextId])];
@@ -37265,7 +37297,14 @@
     }
 
     function chooseNextUnsolvedRealPuzzle() {
-      return getRealPuzzleIndexes().find((index) => !realPuzzleSolved.has(realPuzzleBank[index].id)) ?? getRealPuzzleIndexes()[0] ?? 0;
+      const indexes = getRealPuzzleIndexes();
+      const unsolved = indexes.filter((index) => !realPuzzleSolved.has(realPuzzleBank[index].id));
+      const currentTactic = getRealPuzzleTacticalKey(realPuzzleBank[realPuzzleIndex]);
+      return unsolved.find((index) => getRealPuzzleTacticalKey(realPuzzleBank[index]) !== currentTactic)
+        ?? unsolved[0]
+        ?? indexes.find((index) => getRealPuzzleTacticalKey(realPuzzleBank[index]) !== currentTactic)
+        ?? indexes[0]
+        ?? 0;
     }
 
     function renderRealPuzzleSelectors() {
