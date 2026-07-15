@@ -987,8 +987,8 @@
     }
 
     .piece-svg {
-      width: 86%;
-      height: 86%;
+      width: 88%;
+      height: 88%;
       max-width: 5.05rem;
       max-height: 5.05rem;
       display: block;
@@ -998,6 +998,17 @@
       filter: var(--piece-svg-filter, none);
       transform: translateZ(0);
       contain: paint;
+    }
+
+    .piece-svg .piece-body,
+    .piece-svg .piece-inset,
+    .piece-svg .piece-shine {
+      vector-effect: non-scaling-stroke;
+      shape-rendering: geometricPrecision;
+    }
+
+    .piece-svg .piece-shine {
+      pointer-events: none;
     }
 
     .mini-square .piece-svg {
@@ -20815,16 +20826,16 @@
     }
 
     function createPremiumClassicPiece(type, fill, stroke, accent, shine) {
-      const solid = pieceAttrs(fill, stroke, 3.15);
-      const detail = `fill="none" stroke="${accent}" stroke-width="2.05" stroke-linecap="round" stroke-linejoin="round" opacity=".62"`;
-      const highlight = `fill="none" stroke="${shine}" stroke-width="2.05" stroke-linecap="round" opacity=".52"`;
+      const solid = pieceAttrs(fill, stroke, 3.2);
+      const inset = `fill="${accent}" opacity=".17"`;
+      const shineFill = `fill="${shine}" opacity=".34"`;
       const art = {
-        k: `<path d="M20 88h60l-6-9H26z" ${solid}/><path d="M30 79c2-13 7-22 14-28h12c7 6 12 15 14 28z" ${solid}/><path d="M37 55c3-8 7-12 13-12s10 4 13 12l-3 11H40z" ${solid}/><path d="M47 12h6v10h10v7H53v14h-6V29H37v-7h10z" ${solid}/><path d="M39 69c7 3 15 3 22 0M42 59h16" ${highlight}/><path d="M31 79h38" ${detail}/>`,
-        q: `<path d="M19 88h62l-7-9H26z" ${solid}/><path d="M29 79c3-14 7-23 13-29h16c6 6 10 15 13 29z" ${solid}/><path d="M28 49l6-27 15 15 11-22 7 22 14-15 3 27-13-6-11 10-11-10z" ${solid}/><circle cx="34" cy="20" r="4" ${solid}/><circle cx="60" cy="13" r="4" ${solid}/><circle cx="80" cy="20" r="4" ${solid}/><path d="M36 61c7 4 17 4 25 0M34 72h32" ${highlight}/><path d="M29 79h42" ${detail}/>`,
-        r: `<path d="M18 88h64l-7-10H25z" ${solid}/><path d="M27 78V40h46v38z" ${solid}/><path d="M24 41V20h11v9h9v-9h12v9h9v-9h11v21z" ${solid}/><path d="M35 48v23M50 48v23M65 48v23" ${detail}/><path d="M32 59h36M29 76h42" ${highlight}/>`,
-        b: `<path d="M21 88h58l-7-9H28z" ${solid}/><path d="M31 79c2-14 6-23 19-31 13 8 17 17 19 31z" ${solid}/><path d="M50 13c13 10 20 21 19 33-1 11-8 19-19 25-11-6-18-14-19-25-1-12 6-23 19-33z" ${solid}/><path d="M59 25L41 55" ${detail}/><path d="M41 67c6 4 12 4 18 0M35 77h30" ${highlight}/>`,
-        n: `<path d="M18 88h64l-7-10H25z" ${solid}/><path d="M28 78c4-18 11-37 27-54 14 2 23 13 24 27l-14-4 8 10c-10 12-24 19-45 21z" ${solid}/><path d="M52 28l-8-13M61 30l4-15" ${detail}/><circle cx="61" cy="40" r="2.5" fill="${accent}"/><path d="M38 66c9-2 18-8 24-17M32 76h37" ${highlight}/>`,
-        p: `<path d="M22 88h56l-7-9H29z" ${solid}/><path d="M32 79c2-14 6-23 18-28 12 5 16 14 18 28z" ${solid}/><path d="M38 50c-4-5-6-11-6-17 0-11 8-20 18-20s18 9 18 20c0 6-2 12-6 17-7 5-17 5-24 0z" ${solid}/><path d="M40 61c6 3 14 3 20 0M35 77h30" ${highlight}/>`
+        k: `<path class="piece-body" d="M20 109H108L99 96H29z" ${solid}/><path class="piece-body" d="M33 96C36 79 43 67 52 62H76C85 67 92 79 95 96z" ${solid}/><path class="piece-body" d="M43 66C43 56 51 49 64 49s21 7 21 17l-5 10H48z" ${solid}/><path class="piece-body" d="M59 15h10v13h13v10H69v21H59V38H46V28h13z" ${solid}/><path class="piece-inset" d="M45 78c7-7 31-7 38 0l-4 10H49z" ${inset}/><path class="piece-shine" d="M51 68c4-4 10-5 16-4l-5 13H50z" ${shineFill}/>`,
+        q: `<path class="piece-body" d="M18 109H110L100 96H28z" ${solid}/><path class="piece-body" d="M30 96c4-18 10-29 19-36h30c9 7 15 18 19 36z" ${solid}/><path class="piece-body" d="M24 61l5-34 18 19 17-32 17 32 18-19 5 34-18-7-12 13-10-12-10 12-12-13z" ${solid}/><circle class="piece-body" cx="29" cy="23" r="5" ${solid}/><circle class="piece-body" cx="64" cy="12" r="5" ${solid}/><circle class="piece-body" cx="99" cy="23" r="5" ${solid}/><path class="piece-inset" d="M43 76l21-13 21 13-6 12H49z" ${inset}/><path class="piece-shine" d="M41 61l17-20 5 17-10 18z" ${shineFill}/>`,
+        r: `<path class="piece-body" d="M17 109H111l-10-13H27z" ${solid}/><path class="piece-body" d="M28 96V55h72v41z" ${solid}/><path class="piece-body" d="M24 56V26h15v11h12V26h13v11h13V26h12v11h15v19z" ${solid}/><path class="piece-inset" d="M38 61h14v27H38zM76 61h14v27H76z" ${inset}/><path class="piece-shine" d="M32 61h8v28h-8z" ${shineFill}/><path class="piece-shine" d="M55 61h7v28h-7z" ${shineFill}/>`,
+        b: `<path class="piece-body" d="M19 109h90l-10-13H29z" ${solid}/><path class="piece-body" d="M31 96c3-18 10-30 33-40 23 10 30 22 33 40z" ${solid}/><path class="piece-body" d="M64 14c18 14 27 29 25 43-2 13-11 24-25 31-14-7-23-18-25-31-2-14 7-29 25-43z" ${solid}/><path class="piece-inset" d="M76 27L47 62l8 7 29-34z" ${inset}/><path class="piece-shine" d="M50 30c-6 10-7 20-3 29l13-18z" ${shineFill}/><path class="piece-body" d="M43 78c6 5 30 5 42 0l-6 12H49z" ${solid}/>`,
+        n: `<path class="piece-body" d="M16 109h96l-11-14H28z" ${solid}/><path class="piece-body" d="M26 95c5-25 15-49 37-70 18 3 29 16 30 34l-18-5 9 13c-12 17-31 26-58 28z" ${solid}/><path class="piece-body" d="M49 31l-9-17 20 11 10-15 3 21z" ${solid}/><path class="piece-inset" d="M56 61l19-5 9 11c-8 10-17 16-29 19z" ${inset}/><circle cx="70" cy="43" r="3.5" fill="${accent}"/><path class="piece-shine" d="M38 76c7-3 15-9 21-18l7 6c-6 11-15 18-27 22z" ${shineFill}/>`,
+        p: `<path class="piece-body" d="M20 109h88l-10-13H30z" ${solid}/><path class="piece-body" d="M33 96c3-19 12-30 31-36 19 6 28 17 31 36z" ${solid}/><path class="piece-body" d="M41 54c-6-6-9-14-9-23 0-14 14-24 32-24s32 10 32 24c0 9-3 17-9 23-12 8-34 8-46 0z" ${solid}/><path class="piece-inset" d="M43 67c10-6 26-6 42 0l-6 13H49z" ${inset}/><path class="piece-shine" d="M47 18c-6 6-8 15-5 23l14-6 2-18z" ${shineFill}/>`
       };
       return art[type] || art.p;
     }
@@ -21036,7 +21047,7 @@
       const accent = info.color === "w" ? theme.blackFill : theme.whiteFill;
       const shine = info.color === "w" ? "rgba(255,255,255,.82)" : "rgba(255,248,237,.72)";
       const silhouette = createPremiumClassicPiece(info.type, fill, stroke, accent, shine);
-      const markup = `<svg class="piece-svg ${colorClass}" viewBox="0 0 100 100" aria-hidden="true" focusable="false" data-piece="${info.color}${info.type}" data-symbol="${symbol}" data-style="${resolvedStyle}" data-rarity="${theme.rarity}" shape-rendering="geometricPrecision">${silhouette}</svg>`;
+      const markup = `<svg class="piece-svg ${colorClass}" viewBox="0 0 128 128" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" role="presentation" data-piece="${info.color}${info.type}" data-symbol="${symbol}" data-style="${resolvedStyle}" data-rarity="${theme.rarity}" shape-rendering="geometricPrecision">${silhouette}</svg>`;
       pieceSvgMarkupCache.set(cacheKey, markup);
       return markup;
     }
@@ -24551,7 +24562,29 @@
       if (duplicates.length) console.warn("Piece theme geometry duplicates:", duplicates.join(", "));
       return duplicates.length === 0;
     }
+
+    function validatePremiumPieceSvgSet() {
+      const types = ["k", "q", "r", "b", "n", "p"];
+      const errors = [];
+      const artwork = types.map((type) => ({ type, markup: createPremiumClassicPiece(type, "#f8f6f0", "#2a211a", "#161310", "#ffffff") }));
+      if (new Set(artwork.map(({ markup }) => markup)).size !== artwork.length) errors.push("duplicate piece geometry");
+      artwork.forEach(({ type, markup }) => {
+        const svg = new DOMParser().parseFromString(`<svg viewBox="0 0 128 128" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" role="presentation">${markup}</svg>`, "image/svg+xml");
+        if (svg.querySelector("parsererror")) errors.push(`${type}: invalid SVG`);
+        if (svg.documentElement.getAttribute("viewBox") !== "0 0 128 128") errors.push(`${type}: invalid viewBox`);
+        svg.querySelectorAll("path").forEach((path) => {
+          const data = String(path.getAttribute("d") || "").trim();
+          if (!data || !/z$/i.test(data)) errors.push(`${type}: open path`);
+        });
+      });
+      const report = { set: "Quest Staunton", pieces: artwork.length, valid: errors.length === 0, errors };
+      window.checkmatePieceSetReport = report;
+      if (errors.length) console.error("[Checkmate Quest pieces] SVG validation failed", report);
+      return report.valid;
+    }
+
     validateUniquePieceThemes();
+    validatePremiumPieceSvgSet();
     const pieceSetStoreItems = Object.entries(pieceSetThemes).filter(([value]) => supportedPieceSvgSets.has(value)).map(([value, set]) => ({
       id: `skin-${value}`,
       type: "skin",
