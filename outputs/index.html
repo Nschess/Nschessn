@@ -24226,10 +24226,30 @@
         }));
     }
 
+    function buildProductionPuzzleTiers(sourceBank) {
+      const take = (level) => sourceBank
+        .filter((puzzle) => puzzle.level === level)
+        .sort((left, right) => left.rating - right.rating || left.id.localeCompare(right.id))
+        .slice(0, 50)
+        .map((puzzle) => ({ ...puzzle, level, difficulty: level }));
+      const expertSource = sourceBank
+        .filter((puzzle) => puzzle.level === "Expert")
+        .sort((left, right) => left.rating - right.rating || left.id.localeCompare(right.id));
+      return [
+        ...take("Beginner"),
+        ...take("Intermediate"),
+        ...take("Advanced"),
+        ...expertSource.slice(0, 50).map((puzzle) => ({ ...puzzle, level: "Expert", difficulty: "Expert" })),
+        ...expertSource.slice(50, 100).map((puzzle) => ({ ...puzzle, level: "Master", difficulty: "Master" }))
+      ];
+    }
+
     // Keep the historical tiered bank independent from optional imports and
-    // the legacy puzzle surface. The visible trainer always restores from this
-    // source, then applies the current validation rules.
-    const originalTieredPuzzleBank = Object.freeze(buildPuzzleEssentialsBank());
+    // the legacy puzzle surface. This is a non-overlapping 50-puzzle selection
+    // per difficulty from the existing project records, then current rule and
+    // engine validation decides what becomes playable.
+    const historicalPuzzleSourceBank = Object.freeze(buildPuzzleEssentialsBank());
+    const originalTieredPuzzleBank = Object.freeze(buildProductionPuzzleTiers(historicalPuzzleSourceBank));
     puzzles = [...originalTieredPuzzleBank];
     const progressAutosaveStorageKey = "checkmateQuest.progressAutosave.v1";
     const visitSnapshotStorageKey = "checkmateQuest.visitSnapshot.v1";
@@ -36894,7 +36914,10 @@
         }
         const rating = Math.max(600, Math.min(3000, Number(puzzle.rating) || 900));
         const theme = getPuzzlePattern(puzzle);
-        const difficulty = rating >= 2400 ? "Master" : realPuzzleDifficultyAliases[puzzle.difficulty] || puzzle.difficulty || normalizePuzzleLevel(rating, "Beginner");
+        const declaredDifficulty = realPuzzleDifficultyAliases[puzzle.difficulty] || puzzle.difficulty;
+        const difficulty = realPuzzleDifficultyLevels.includes(declaredDifficulty)
+          ? declaredDifficulty
+          : rating >= 2400 ? "Master" : normalizePuzzleLevel(rating, "Beginner");
         return {
           id: `essentials-${puzzle.id || index + 1}`,
           source: "Local validated essentials pack",
@@ -37144,15 +37167,18 @@
         : indexes;
       const seen = new Set((Array.isArray(realPuzzleSeenByDifficulty[difficultyKey]) ? realPuzzleSeenByDifficulty[difficultyKey] : [])
         .filter((id) => candidates.some((index) => realPuzzleBank[index]?.id === id)));
-      let pool = candidates.filter((index) => index !== realPuzzleIndex && !seen.has(realPuzzleBank[index]?.id));
+      const currentId = realPuzzleBank[realPuzzleIndex]?.id;
+      if (currentId && candidates.some((index) => realPuzzleBank[index]?.id === currentId)) seen.add(currentId);
+      let pool = candidates.filter((index) => !seen.has(realPuzzleBank[index]?.id));
       if (!pool.length) {
+        seen.clear();
         realPuzzleSeenByDifficulty[difficultyKey] = [];
         pool = candidates.filter((index) => index !== realPuzzleIndex);
       }
       if (!pool.length) pool = candidates;
       const next = pool[Math.floor(Math.random() * pool.length)];
       const nextId = realPuzzleBank[next]?.id;
-      if (nextId) realPuzzleSeenByDifficulty[difficultyKey] = [...new Set([...(realPuzzleSeenByDifficulty[difficultyKey] || []), nextId])];
+      if (nextId) realPuzzleSeenByDifficulty[difficultyKey] = [...new Set([...seen, nextId])];
       return next;
     }
 
