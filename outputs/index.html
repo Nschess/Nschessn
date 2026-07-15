@@ -24943,6 +24943,9 @@
     let realPuzzleRating = Math.max(600, Number(savedRealPuzzleState.rating) || 600);
     let realPuzzleRatingHistory = Array.isArray(savedRealPuzzleState.ratingHistory) ? savedRealPuzzleState.ratingHistory.slice(-100) : [];
     let realPuzzleRecentlyPlayed = Array.isArray(savedRealPuzzleState.recentlyPlayed) ? savedRealPuzzleState.recentlyPlayed.slice(-200) : [];
+    let realPuzzleSeenByDifficulty = savedRealPuzzleState.seenByDifficulty && typeof savedRealPuzzleState.seenByDifficulty === "object"
+      ? savedRealPuzzleState.seenByDifficulty
+      : {};
     let realPuzzleGame = null;
     let realPuzzleLine = [];
     let realPuzzleStep = 0;
@@ -36622,7 +36625,8 @@
         bestStreak: 0,
         rating: 600,
         ratingHistory: [],
-        recentlyPlayed: []
+        recentlyPlayed: [],
+        seenByDifficulty: {}
       };
       const state = readJsonStorage(realPuzzleStorageKey, fallback);
       if (state && typeof state === "object" && realPuzzleDifficultyAliases[state.difficulty]) state.difficulty = realPuzzleDifficultyAliases[state.difficulty];
@@ -36645,7 +36649,8 @@
         bestStreak: realPuzzleBestStreak,
         rating: realPuzzleRating,
         ratingHistory: realPuzzleRatingHistory.slice(-100),
-        recentlyPlayed: realPuzzleRecentlyPlayed.slice(-200)
+        recentlyPlayed: realPuzzleRecentlyPlayed.slice(-200),
+        seenByDifficulty: realPuzzleSeenByDifficulty
       });
       saveProgressSnapshot("real puzzles");
     }
@@ -36676,8 +36681,8 @@
           return realPuzzleDifficulty === "All" || getRealPuzzleDifficulty(puzzle) === realPuzzleDifficulty ? index : -1;
         })
         .filter((index) => index >= 0);
-      if (realPuzzleMode === "Daily") return [getRealDailyIndex(indexes)];
-      return indexes.length ? indexes : sourceIndexes;
+      if (realPuzzleMode === "Daily") return indexes.length ? [getRealDailyIndex(indexes)] : [];
+      return indexes;
     }
 
     function getRealPuzzlePositionLabel() {
@@ -37128,9 +37133,22 @@
     function chooseRandomRealPuzzle() {
       const indexes = getRealPuzzleIndexes();
       if (indexes.length <= 1) return indexes[0] || 0;
-      const fresh = indexes.filter((index) => index !== realPuzzleIndex && !realPuzzleRecentlyPlayed.includes(realPuzzleBank[index]?.id));
-      const pool = fresh.length ? fresh : indexes.filter((index) => index !== realPuzzleIndex);
+      const difficultyKey = realPuzzleDifficulty === "All" ? "all" : realPuzzleDifficulty.toLowerCase();
+      const solved = indexes.filter((index) => realPuzzleSolved.has(realPuzzleBank[index]?.id));
+      const candidates = solved.length < indexes.length
+        ? indexes.filter((index) => !realPuzzleSolved.has(realPuzzleBank[index]?.id))
+        : indexes;
+      const seen = new Set((Array.isArray(realPuzzleSeenByDifficulty[difficultyKey]) ? realPuzzleSeenByDifficulty[difficultyKey] : [])
+        .filter((id) => candidates.some((index) => realPuzzleBank[index]?.id === id)));
+      let pool = candidates.filter((index) => index !== realPuzzleIndex && !seen.has(realPuzzleBank[index]?.id));
+      if (!pool.length) {
+        realPuzzleSeenByDifficulty[difficultyKey] = [];
+        pool = candidates.filter((index) => index !== realPuzzleIndex);
+      }
+      if (!pool.length) pool = candidates;
       const next = pool[Math.floor(Math.random() * pool.length)];
+      const nextId = realPuzzleBank[next]?.id;
+      if (nextId) realPuzzleSeenByDifficulty[difficultyKey] = [...new Set([...(realPuzzleSeenByDifficulty[difficultyKey] || []), nextId])];
       return next;
     }
 
@@ -37419,6 +37437,10 @@
       try {
         await loadChessRules();
         sanitizeActivePuzzleBank();
+        // Restore the original tiered essentials bank in the visible trainer.
+        // This conversion keeps its existing FENs and continuations intact and
+        // filters them through the same validation used by the new UI.
+        installLegacyRealPuzzlePack();
         renderPuzzle();
         realPuzzleValidationErrors = validateRealPuzzleBank();
         puzzleCollectionReady = realPuzzleValidIndexes.length > 0 || getPlayablePuzzleIndexes().length > 0;
