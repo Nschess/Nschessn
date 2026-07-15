@@ -20206,7 +20206,7 @@
               <span id="puzzleEstimate">~1 min</span>
               <span id="puzzleClock">00:00</span>
               <span id="puzzleMistakes">0 mistakes</span>
-              <span id="puzzleCollectionStatus">Built-in pack</span>
+              <span id="puzzleCollectionStatus">Preparing puzzles</span>
             </div>
             <div class="trainer-patterns puzzle-tags" id="puzzleTags" aria-label="Puzzle themes"></div>
             <div class="puzzle-level-picker" role="group" aria-label="Choose puzzle level">
@@ -20764,6 +20764,28 @@
       bq: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/bQ.svg",
       br: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/chessnut/bR.svg"
     });
+    // The Chessnut migration keeps the existing board API intact: callers still
+    // pass either FEN characters or chess.js piece objects to this renderer.
+    const pieceCodeLookup = Object.freeze({
+      K: { color: "w", type: "k" }, Q: { color: "w", type: "q" }, R: { color: "w", type: "r" },
+      B: { color: "w", type: "b" }, N: { color: "w", type: "n" }, P: { color: "w", type: "p" },
+      k: { color: "b", type: "k" }, q: { color: "b", type: "q" }, r: { color: "b", type: "r" },
+      b: { color: "b", type: "b" }, n: { color: "b", type: "n" }, p: { color: "b", type: "p" }
+    });
+
+    function getPieceCodeInfo(piece) {
+      if (!piece) return null;
+      if (typeof piece === "object" && /^(w|b)$/.test(piece.color) && /^[kqrbnp]$/.test(piece.type)) {
+        return { color: piece.color, type: piece.type };
+      }
+      return pieceCodeLookup[String(piece)] || null;
+    }
+
+    function resolvePieceSvgSet(style) {
+      const requested = String(style || "classic").toLowerCase();
+      return supportedPieceSvgSets.has(requested) ? requested : "classic";
+    }
+
     const prewarmedPieceAssets = new Set();
     function getPieceSvgTheme(style) {
       const theme = pieceSetThemes?.[style] || pieceSetThemes?.classic || {};
@@ -23574,7 +23596,7 @@
 
     const puzzleStorageKey = "checkmateQuest.puzzles.v1";
     const progressBackupStorageKey = "checkmateQuest.progressBackup.v1";
-    const puzzleBankVersion = "stable-verified-primer-v5";
+    const puzzleBankVersion = "strict-stockfish-verified-v6";
 
     const realPuzzleStorageKey = "checkmateQuest.realPuzzles.v1";
     const realPuzzleCollectionCacheKey = "checkmateQuest.realPuzzleCollection.v1";
@@ -26261,26 +26283,127 @@
     function isPuzzlePlayable(index) {
       if (!CoachChess) return true;
       const puzzle = puzzles[index];
-      return validatePuzzleLine(puzzle).ok;
+      return Boolean(puzzle?.engineVerified) && validatePuzzleLine(puzzle).ok;
+    }
+
+    function validatePuzzleFen(fen) {
+      const fields = String(fen || "").trim().split(/\s+/);
+      if (fields.length !== 6) return { ok: false, reason: "FEN must have six fields" };
+      const [placement, turn, castling, enPassant, halfmove, fullmove] = fields;
+      const ranks = placement.split("/");
+      if (ranks.length !== 8) return { ok: false, reason: "FEN must have eight ranks" };
+      const pieces = { K: 0, k: 0 };
+      for (const [rankIndex, rank] of ranks.entries()) {
+        let files = 0;
+        for (const token of rank) {
+          if (/^[1-8]$/.test(token)) files += Number(token);
+          else if (/^[prnbqkPRNBQK]$/.test(token)) {
+            files += 1;
+            if (token === "K" || token === "k") pieces[token] += 1;
+            if ((rankIndex === 0 || rankIndex === 7) && token.toLowerCase() === "p") return { ok: false, reason: "pawn on promotion rank" };
+          } else return { ok: false, reason: "invalid FEN piece" };
+        }
+        if (files !== 8) return { ok: false, reason: "FEN rank width is not eight" };
+      }
+      if (pieces.K !== 1 || pieces.k !== 1) return { ok: false, reason: "position needs one king per side" };
+      if (!/^[wb]$/.test(turn)) return { ok: false, reason: "invalid active color" };
+      if (!(castling === "-" || /^(?!.*(.).*\1)[KQkq]+$/.test(castling))) return { ok: false, reason: "invalid castling field" };
+      if (!(enPassant === "-" || /^[a-h][36]$/.test(enPassant))) return { ok: false, reason: "invalid en passant field" };
+      if (!/^\d+$/.test(halfmove) || !/^[1-9]\d*$/.test(fullmove)) return { ok: false, reason: "invalid FEN counters" };
+      return { ok: true, fields };
+    }
+
+    function validatePuzzlePosition(game, fen) {
+      const fields = String(fen).split(/\s+/);
+      const turn = fields[1];
+      const locateKing = (color) => {
+        for (const rank of "12345678") for (const file of "abcdefgh") {
+          const piece = game.get(`${file}${rank}`);
+          if (piece?.type === "k" && piece.color === color) return `${file}${rank}`;
+        }
+        return "";
+      };
+      const whiteSquare = locateKing("w");
+      const blackSquare = locateKing("b");
+      if (!whiteSquare || !blackSquare) return { ok: false, reason: "missing king" };
+      const kingDistance = Math.max(Math.abs(whiteSquare.charCodeAt(0) - blackSquare.charCodeAt(0)), Math.abs(Number(whiteSquare[1]) - Number(blackSquare[1])));
+      if (kingDistance <= 1) return { ok: false, reason: "kings are adjacent" };
+      const inactiveFields = [...fields];
+      inactiveFields[1] = turn === "w" ? "b" : "w";
+      inactiveFields[3] = "-";
+      try {
+        const inactiveGame = new CoachChess(inactiveFields.join(" "));
+        if (callCoachRule(inactiveGame, "isCheck", "in_check")) return { ok: false, reason: "inactive king is in check" };
+      } catch {
+        return { ok: false, reason: "position cannot be loaded" };
+      }
+      const castlingPieces = {
+        K: [["e1", "k", "w"], ["h1", "r", "w"]], Q: [["e1", "k", "w"], ["a1", "r", "w"]],
+        k: [["e8", "k", "b"], ["h8", "r", "b"]], q: [["e8", "k", "b"], ["a8", "r", "b"]]
+      };
+      for (const right of fields[2] === "-" ? "" : fields[2]) {
+        if (!castlingPieces[right].every(([square, type, color]) => {
+          const piece = game.get(square);
+          return piece?.type === type && piece.color === color;
+        })) return { ok: false, reason: "castling right has no matching king and rook" };
+      }
+      if (fields[3] !== "-") {
+        const file = fields[3][0];
+        const pawnSquare = `${file}${turn === "w" ? "5" : "4"}`;
+        const pawn = game.get(pawnSquare);
+        if (!pawn || pawn.type !== "p" || pawn.color === turn) return { ok: false, reason: "invalid en passant target" };
+      }
+      return { ok: true };
+    }
+
+    function getPuzzleThemeText(puzzle) {
+      return [puzzle?.theme, ...(Array.isArray(puzzle?.themes) ? puzzle.themes : [])].filter(Boolean).join(" ").toLowerCase();
+    }
+
+    function getPuzzleThemeEvidence(puzzle, moveHistory, finalGame) {
+      const theme = getPuzzleThemeText(puzzle);
+      const first = moveHistory[0];
+      const finalMove = moveHistory.at(-1);
+      const finalMate = callCoachRule(finalGame, "isCheckmate", "in_checkmate");
+      if (/mate|checkmate/.test(theme) && !finalMate) return "mate theme does not end in checkmate";
+      if (/promotion/.test(theme) && !moveHistory.some((move) => move.promotion)) return "promotion theme has no promotion";
+      if (/(fork|double attack)/.test(theme) && !(first?.san.includes("+") || first?.piece === "n")) return "fork theme lacks a forcing fork move";
+      if (/(deflection|decoy|attraction|sacrifice)/.test(theme) && !moveHistory.some((move) => move.captured)) return "sacrifice theme has no capture";
+      if (/discovered/.test(theme) && !moveHistory.some((move) => move.san.includes("+"))) return "discovered-attack theme has no check";
+      if (/back.?rank/.test(theme) && !(finalMate && ["1", "8"].includes(finalMove?.to?.[1]))) return "back-rank theme does not finish on the back rank";
+      if (/smothered/.test(theme) && !(finalMate && finalMove?.piece === "n")) return "smothered-mate theme lacks a knight mate";
+      if (/opening/.test(theme) && Number(String(puzzle?.fen || "").split(/\s+/)[5]) > 14) return "opening theme starts too late";
+      return "";
     }
 
     function validatePuzzleLine(puzzle) {
       if (!CoachChess) return { ok: true, reason: "rules loading" };
+      if (!String(puzzle?.title || "").trim()) return { ok: false, reason: "missing title metadata" };
+      if (!getPuzzleThemeText(puzzle)) return { ok: false, reason: "missing tactical theme" };
+      if (!/^(white|black)\s+to\s+move$/i.test(String(puzzle?.side || ""))) return { ok: false, reason: "invalid side metadata" };
       const fen = getPuzzleFen(puzzle);
       try {
+        const fenValidation = validatePuzzleFen(fen);
+        if (!fenValidation.ok) return fenValidation;
         const game = new CoachChess(fen);
+        const positionValidation = validatePuzzlePosition(game, fen);
+        if (!positionValidation.ok) return positionValidation;
         const line = getPuzzleLine(puzzle);
         if (!puzzleHasBothKings(game)) return { ok: false, reason: "missing king" };
         if (fen.split(/\s+/)[1] !== getPuzzleSideColor(puzzle)) return { ok: false, reason: "wrong side" };
         if (!line.length) return { ok: false, reason: "missing solution" };
         if (line.length < 2) return { ok: false, reason: "needs continuation" };
+        const moveHistory = [];
         for (const expected of line) {
           const move = findPuzzleMoveInGame(game, expected);
           if (!move) return { ok: false, reason: `illegal ${expected}` };
-          game.move(toCoachMoveInput(move));
+          const played = game.move(toCoachMoveInput(move));
+          moveHistory.push(played);
           if (String(expected).includes("#") && !callCoachRule(game, "isCheckmate", "in_checkmate")) return { ok: false, reason: "mate marker mismatch" };
           if (String(expected).includes("+") && !String(move.san).includes("+") && !String(move.san).includes("#")) return { ok: false, reason: "check marker mismatch" };
         }
+        const themeIssue = getPuzzleThemeEvidence(puzzle, moveHistory, game);
+        if (themeIssue) return { ok: false, reason: themeIssue };
         return { ok: true, finalFen: game.fen(), checkmate: callCoachRule(game, "isCheckmate", "in_checkmate"), stalemate: callCoachRule(game, "isStalemate", "in_stalemate"), draw: callCoachRule(game, "isDraw", "in_draw") };
       } catch {
         return { ok: false, reason: "invalid fen" };
@@ -26337,7 +26460,7 @@
       const failedPuzzles = [];
       let duplicatePuzzlesRemoved = 0;
       const sanitized = collection.reduce((items, puzzle) => {
-        const candidate = ensurePuzzleContinuation(puzzle);
+        const candidate = puzzle;
         const validation = validatePuzzleLine(candidate);
         if (!validation.ok) {
           failedPuzzles.push({ id: candidate.id, title: candidate.title, reason: validation.reason });
@@ -26368,17 +26491,16 @@
     function sanitizeActivePuzzleBank() {
       const before = puzzles.length;
       puzzles = sanitizePuzzleCollection(puzzles);
-      if (!puzzles.length) puzzles = buildPuzzleEssentialsBank();
       playablePuzzleIndexes = null;
       currentPuzzle = Math.max(0, Math.min(currentPuzzle, puzzles.length - 1));
       const status = document.getElementById("puzzleCollectionStatus");
-      if (status) status.textContent = `Validated ${puzzles.length}/${before} puzzles`;
+      if (status) status.textContent = puzzles.length ? "Ready to solve" : "Puzzle pack needs a verified update";
     }
 
     function getPlayablePuzzleIndexes() {
-      if (!CoachChess) return puzzles.map((_, index) => index);
+      if (!CoachChess) return [];
       playablePuzzleIndexes ||= puzzles.map((_, index) => isPuzzlePlayable(index) ? index : -1).filter((index) => index >= 0);
-      return playablePuzzleIndexes.length ? playablePuzzleIndexes : puzzles.map((_, index) => index);
+      return playablePuzzleIndexes;
     }
 
     function getActivePuzzleIndexes() {
@@ -30494,7 +30616,7 @@
     }
 
     function getPuzzleSideColor(puzzle) {
-      return puzzle.side.toLowerCase().includes("black") ? "b" : "w";
+      return String(puzzle?.side || "").toLowerCase().includes("black") ? "b" : "w";
     }
 
     function getPuzzleFen(puzzle) {
@@ -30624,9 +30746,7 @@
     function refreshPuzzleCollectionStatus() {
       const status = document.getElementById("puzzleCollectionStatus");
       if (!status) return;
-      status.textContent = externalPuzzleCollection.length
-        ? `${puzzleCollectionSource}: ${loadedPuzzleCount}/${externalPuzzleCollection.length}`
-        : "Built-in pack";
+      status.textContent = getPlayablePuzzleIndexes().length ? "Verified tactics" : "Preparing puzzles";
     }
 
     function cleanPuzzleSan(move) {
@@ -31362,6 +31482,19 @@
 
     function renderPuzzle() {
       const indexes = getActivePuzzleIndexes();
+      if (!indexes.length) {
+        const feedback = document.getElementById("feedback");
+        if (feedback) feedback.textContent = "This puzzle pack is being verified. Please choose another verified set shortly.";
+        ["startPuzzle", "hintPuzzle", "revealPuzzle", "retryPuzzle", "replayPuzzle"].forEach((id) => {
+          const control = document.getElementById(id);
+          if (control) control.disabled = true;
+        });
+        return;
+      }
+      ["startPuzzle", "hintPuzzle", "revealPuzzle", "retryPuzzle", "replayPuzzle"].forEach((id) => {
+        const control = document.getElementById(id);
+        if (control) control.disabled = false;
+      });
       if (indexes.length && !indexes.includes(currentPuzzle)) {
         currentPuzzle = indexes[0];
       }
@@ -32793,6 +32926,75 @@
         writeReviewAnalysisCache(cache);
       }
       return analysis;
+    }
+
+    const puzzleVerificationConfig = Object.freeze({
+      skill: 20,
+      depth: 7,
+      movetime: 90,
+      nodes: 1800,
+      multipv: 1,
+      hash: 16,
+      threads: 1,
+      moveOverhead: 8,
+      limitStrength: false,
+      uciElo: 2500,
+      elo: 2500
+    });
+
+    async function verifyPuzzleSequenceWithStockfish(game, expectedMoves) {
+      const config = normalizeStockfishConfig(puzzleVerificationConfig);
+      const played = [];
+      for (const expected of expectedMoves) {
+        const move = typeof expected === "string" ? findPuzzleMoveInGame(game, expected) : expected;
+        if (!move) return { ok: false, reason: `illegal ${expected}` };
+        const analysis = await analyzeFenWithStockfish(game.fen(), config);
+        const expectedUci = moveToUci(move);
+        if (!analysis?.bestMove) return { ok: false, reason: "Stockfish did not return a best move" };
+        if (analysis.bestMove !== expectedUci) return { ok: false, reason: `engine expects ${analysis.bestMove}, not ${expectedUci}` };
+        played.push(game.move(toCoachMoveInput(move)));
+        if (played.length % 4 === 0) await wait(0);
+      }
+      return { ok: true, played };
+    }
+
+    async function verifyActivePuzzleBankWithStockfish() {
+      if (!CoachChess) return { verified: 0, rejected: puzzles.length, errors: ["chess rules unavailable"] };
+      const worker = await loadStockfishWorker();
+      if (!worker) {
+        const errors = puzzles.map((puzzle) => ({ id: puzzle?.id, reason: "Stockfish unavailable" }));
+        puzzles = [];
+        playablePuzzleIndexes = [];
+        puzzleValidationReport = { ...puzzleValidationReport, validPuzzles: 0, invalidPositionsFixed: errors.length, failedPuzzles: errors };
+        return { verified: 0, rejected: errors.length, errors };
+      }
+      const valid = [];
+      const errors = [];
+      for (const puzzle of puzzles) {
+        const rules = validatePuzzleLine(puzzle);
+        if (!rules.ok) {
+          errors.push({ id: puzzle?.id, reason: rules.reason });
+          continue;
+        }
+        try {
+          const result = await verifyPuzzleSequenceWithStockfish(new CoachChess(getPuzzleFen(puzzle)), getPuzzleLine(puzzle));
+          if (result.ok) valid.push({ ...puzzle, engineVerified: true });
+          else errors.push({ id: puzzle?.id, reason: result.reason });
+        } catch (error) {
+          errors.push({ id: puzzle?.id, reason: error?.message || "engine validation failed" });
+        }
+      }
+      puzzles = valid;
+      playablePuzzleIndexes = null;
+      puzzleValidationReport = {
+        ...puzzleValidationReport,
+        totalPuzzles: puzzleValidationReport.totalPuzzles || valid.length + errors.length,
+        validPuzzles: valid.length,
+        invalidPositionsFixed: errors.length,
+        failedPuzzles: errors
+      };
+      window.checkmatePuzzleReport = puzzleValidationReport;
+      return { verified: valid.length, rejected: errors.length, errors };
     }
 
     function scoreCoachMove(move, careful = false) {
@@ -36492,6 +36694,28 @@
       return game.moves({ verbose: true }).find((move) => moveToUci(move) === uci) || null;
     }
 
+    function getDeclaredPuzzleSide(side) {
+      const value = String(side || "").trim().toLowerCase();
+      if (!value) return "";
+      return value === "b" || value.includes("black") ? "b" : value === "w" || value.includes("white") ? "w" : "";
+    }
+
+    function normalizeRealPuzzleMoves(item) {
+      if (!CoachChess || !item?.fen) return [];
+      const rawMoves = splitPuzzleLine(item.moves || item.line || item.pv || item.solution);
+      try {
+        const game = new CoachChess(item.fen);
+        return rawMoves.map((notation) => {
+          const move = findPuzzleMoveInGame(game, notation);
+          if (!move) throw new Error(`illegal ${notation}`);
+          game.move(toCoachMoveInput(move));
+          return moveToUci(move);
+        });
+      } catch {
+        return [];
+      }
+    }
+
     function prepareRealPuzzle(puzzle = realPuzzleBank[realPuzzleIndex]) {
       const game = new CoachChess(puzzle.fen);
       const line = Array.isArray(puzzle.moves) ? [...puzzle.moves] : [];
@@ -36504,40 +36728,90 @@
       return { game, line };
     }
 
+    function validateRealPuzzleRecord(puzzle) {
+      if (!puzzle || typeof puzzle !== "object") return { ok: false, reason: "bad puzzle object" };
+      if (!puzzle.id || !puzzle.fen || !Array.isArray(puzzle.moves)) return { ok: false, reason: "missing id, FEN, or move line" };
+      const fenValidation = validatePuzzleFen(puzzle.fen);
+      if (!fenValidation.ok) return fenValidation;
+      try {
+        const initialGame = new CoachChess(puzzle.fen);
+        const positionValidation = validatePuzzlePosition(initialGame, puzzle.fen);
+        if (!positionValidation.ok) return positionValidation;
+        const prepared = prepareRealPuzzle(puzzle);
+        if (!puzzleHasBothKings(prepared.game)) return { ok: false, reason: "position needs one king per side" };
+        const declaredSide = getDeclaredPuzzleSide(puzzle.side);
+        if (puzzle.side && !declaredSide) return { ok: false, reason: "invalid declared side" };
+        if (declaredSide && declaredSide !== prepared.game.turn()) return { ok: false, reason: "declared side does not match solution position" };
+        if (!prepared.line.length) return { ok: false, reason: "empty continuation" };
+        const moveHistory = [];
+        for (const uci of prepared.line) {
+          const move = findRealUciMove(prepared.game, uci);
+          if (!move) return { ok: false, reason: `illegal ${uci}` };
+          moveHistory.push(prepared.game.move(toCoachMoveInput(move)));
+        }
+        if (prepared.line.length === 1 && !callCoachRule(prepared.game, "isCheckmate", "in_checkmate")) {
+          return { ok: false, reason: "one-move non-mate needs a continuation" };
+        }
+        const themeIssue = getPuzzleThemeEvidence(puzzle, moveHistory, prepared.game);
+        if (themeIssue) return { ok: false, reason: themeIssue };
+        return { ok: true, finalFen: prepared.game.fen(), moveHistory };
+      } catch (error) {
+        return { ok: false, reason: error?.message || "invalid FEN or continuation" };
+      }
+    }
+
     function validateRealPuzzleBank() {
       if (!CoachChess) return [];
       const errors = [];
       const seen = new Set();
       realPuzzleValidIndexes = [];
       realPuzzleBank.forEach((puzzle, index) => {
-        try {
-          if (!puzzle || typeof puzzle !== "object") throw new Error("bad puzzle object");
-          if (!puzzle.id || !puzzle.fen || !Array.isArray(puzzle.moves)) throw new Error("missing id, FEN, or move line");
+        const validation = validateRealPuzzleRecord(puzzle);
+        if (validation.ok) {
           const key = getRealPuzzleKey(puzzle);
-          if (seen.has(key)) throw new Error("duplicate FEN/line");
+          if (seen.has(key)) {
+            errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: duplicate FEN/line`);
+            return;
+          }
           seen.add(key);
-          const prepared = prepareRealPuzzle(puzzle);
-          const testGame = prepared.game;
-          if (!prepared.line.length) throw new Error("empty continuation");
-          for (const uci of prepared.line) {
-            const move = findRealUciMove(testGame, uci);
-            if (!move) throw new Error(`illegal ${uci}`);
-            testGame.move(toCoachMoveInput(move));
-          }
-          if (prepared.line.length === 1 && !callCoachRule(testGame, "isCheckmate", "in_checkmate")) {
-            throw new Error("one-move non-mate needs a continuation");
-          }
           realPuzzleValidIndexes.push(index);
-        } catch (error) {
-          errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: ${error.message}`);
+        } else {
+          errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: ${validation.reason}`);
         }
       });
       return errors;
     }
 
+    async function verifyRealPuzzleBankWithStockfish() {
+      const worker = await loadStockfishWorker();
+      const indexes = [...realPuzzleValidIndexes];
+      const errors = [];
+      if (!worker) {
+        realPuzzleValidIndexes = [];
+        return indexes.map((index) => `${realPuzzleBank[index]?.title || `Puzzle ${index + 1}`}: Stockfish unavailable`);
+      }
+      const verified = [];
+      for (const index of indexes) {
+        const puzzle = realPuzzleBank[index];
+        try {
+          const prepared = prepareRealPuzzle(puzzle);
+          const result = await verifyPuzzleSequenceWithStockfish(prepared.game, prepared.line);
+          if (result.ok) {
+            puzzle.engineVerified = true;
+            verified.push(index);
+          }
+          else errors.push(`${puzzle.title}: ${result.reason}`);
+        } catch (error) {
+          errors.push(`${puzzle?.title || `Puzzle ${index + 1}`}: ${error?.message || "engine validation failed"}`);
+        }
+      }
+      realPuzzleValidIndexes = verified;
+      return errors;
+    }
+
     function normalizeRealPuzzleRecord(item, index = 0, source = "External verified JSON") {
       if (!item || typeof item !== "object") return null;
-      const moves = Array.isArray(item.moves) ? item.moves : Array.isArray(item.line) ? item.line : [];
+      const moves = normalizeRealPuzzleMoves(item);
       const difficulty = realPuzzleDifficultyAliases[item.difficulty] || item.difficulty || (
         Number(item.rating) >= 2400 ? "Master" :
         Number(item.rating) >= 1900 ? "Expert" :
@@ -36555,6 +36829,7 @@
         prompt: item.prompt || `${item.side || "Find the best move"} and follow the full continuation.`,
         fen: item.fen,
         moves,
+        side: item.side || "",
         primer: Boolean(item.primer),
         hints: Array.isArray(item.hints) && item.hints.length ? item.hints.slice(0, 3) : ["Find forcing moves.", "Check, capture, threat.", `Line starts: ${moves[0] || "best move"}.`],
         note: item.note || item.explanation || "Each move keeps the pressure on until the idea is complete."
@@ -36646,17 +36921,65 @@
 
     function reportRealPuzzleDiagnostics() {
       const report = {
-        loaded: realPuzzleBank.length,
-        playable: realPuzzleValidIndexes.length,
-        removed: realPuzzleValidationErrors.length,
-        errors: [...realPuzzleValidationErrors]
+        generatedAt: new Date().toISOString(),
+        trainer: {
+          total: puzzleValidationReport.totalPuzzles,
+          valid: puzzleValidationReport.validPuzzles,
+          duplicatesRemoved: puzzleValidationReport.duplicatePuzzlesRemoved,
+          invalid: puzzleValidationReport.invalidPositionsFixed,
+          averageContinuationLength: puzzleValidationReport.averageContinuationLength,
+          failed: [...puzzleValidationReport.failedPuzzles]
+        },
+        real: {
+          total: realPuzzleBank.length,
+          valid: realPuzzleValidIndexes.length,
+          invalid: realPuzzleValidationErrors.length,
+          failed: [...realPuzzleValidationErrors]
+        }
       };
       window.checkmateRealPuzzleReport = report;
+      window.checkmatePuzzleValidationReport = report;
       try {
         const debug = new URLSearchParams(window.location.search).has("debug")
           || window.localStorage.getItem("checkmateQuest.debug") === "true";
         if (debug) console.info("[Checkmate Quest Puzzle diagnostics]", report);
       } catch {}
+    }
+
+    async function runPuzzleValidationTests() {
+      await loadChessRules();
+      const foolFen = "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2";
+      const base = {
+        id: "validation-fools-mate",
+        title: "Validation Fools Mate",
+        fen: foolFen,
+        side: "Black to move",
+        line: ["Qh4#"],
+        answers: [{ move: "Qh4#", correct: true }],
+        theme: "Opening mate",
+        themes: ["Opening mate"]
+      };
+      const cases = [
+        ["legal SAN and mate", base, true],
+        ["invalid FEN", { ...base, fen: "8/8/8/8/8/8/8/8 w - - 0 1" }, false],
+        ["wrong side", { ...base, side: "White to move" }, false],
+        ["illegal solution", { ...base, line: ["Qa4"], answers: [{ move: "Qa4", correct: true }] }, false],
+        ["incorrect theme", { ...base, theme: "Promotion", themes: ["Promotion"] }, false]
+      ].map(([name, puzzle, expected]) => {
+        const actual = validatePuzzleLine(puzzle).ok;
+        return { name, passed: actual === expected, expected, actual };
+      });
+      const parsed = normalizeRealPuzzleMoves({ fen: foolFen, moves: ["Qh4#"] });
+      cases.push({ name: "SAN importer normalizes to UCI", passed: parsed.join(" ") === "d8h4", expected: "d8h4", actual: parsed.join(" ") });
+      try {
+        const engine = await verifyPuzzleSequenceWithStockfish(new CoachChess(foolFen), ["Qh4#"]);
+        cases.push({ name: "Stockfish confirms forced mate", passed: engine.ok, expected: true, actual: engine.ok ? "d8h4" : engine.reason });
+      } catch (error) {
+        cases.push({ name: "Stockfish confirms forced mate", passed: false, expected: true, actual: error?.message || "engine unavailable" });
+      }
+      const report = { passed: cases.every((test) => test.passed), tests: cases };
+      window.checkmatePuzzleValidationTests = report;
+      return report;
     }
 
     function getRealPuzzleReward(puzzle, seconds) {
@@ -37070,9 +37393,12 @@
       document.getElementById("realPuzzles")?.setAttribute("data-loading", "true");
       try {
         await loadChessRules();
+        sanitizeActivePuzzleBank();
+        await verifyActivePuzzleBankWithStockfish();
+        renderPuzzle();
         await loadRealPuzzleCollection();
-        installLegacyRealPuzzlePack();
         realPuzzleValidationErrors = validateRealPuzzleBank();
+        realPuzzleValidationErrors.push(...await verifyRealPuzzleBankWithStockfish());
       } catch {
         realPuzzleValidationErrors = ["Could not load chess.js for real puzzles."];
       }
