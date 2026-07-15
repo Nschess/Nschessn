@@ -25032,7 +25032,7 @@
       Validate: new Set(["Loading", "OpponentMove", "Success", "Failed"]),
       OpponentMove: new Set(["Loading", "PlayerTurn", "Success", "Failed"]),
       Success: new Set(["Loading", "Completed"]),
-      Failed: new Set(["Loading", "PlayerTurn"]),
+      Failed: new Set(["Loading"]),
       Completed: new Set(["Loading"])
     });
     let realPuzzlePhase = "Loading";
@@ -37292,7 +37292,13 @@
       const board = document.getElementById("realPuzzleBoard");
       const acceptingMove = realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying;
       if (root) root.dataset.puzzlePhase = realPuzzlePhase;
-      if (board) board.setAttribute("aria-busy", String(!acceptingMove));
+      if (board) {
+        board.setAttribute("aria-busy", String(!acceptingMove));
+        board.querySelectorAll(".puzzle-square").forEach((square) => {
+          square.disabled = !acceptingMove;
+          if (!acceptingMove) square.draggable = false;
+        });
+      }
       ["realPuzzleHintButton", "realPuzzleReplay"].forEach((id) => {
         const button = document.getElementById(id);
         if (button) button.disabled = !acceptingMove;
@@ -37339,15 +37345,18 @@
       if (!indexes.length) return;
       const position = Math.max(0, indexes.indexOf(realPuzzleIndex));
       const currentTactic = getRealPuzzleTacticalKey(realPuzzleBank[realPuzzleIndex]);
+      const unsolved = indexes.filter((index) => index !== realPuzzleIndex && !realPuzzleSolved.has(realPuzzleBank[index]?.id));
+      const candidates = delta > 0 && unsolved.length ? new Set(unsolved) : new Set(indexes);
       for (let offset = 1; offset < indexes.length; offset += 1) {
         const candidate = indexes[(position + delta * offset + indexes.length) % indexes.length];
-        if (getRealPuzzleTacticalKey(realPuzzleBank[candidate]) !== currentTactic) {
+        if (candidates.has(candidate) && getRealPuzzleTacticalKey(realPuzzleBank[candidate]) !== currentTactic) {
           realPuzzleIndex = candidate;
           renderRealPuzzle();
           return;
         }
       }
-      realPuzzleIndex = indexes[(position + delta + indexes.length) % indexes.length];
+      realPuzzleIndex = indexes.find((index) => candidates.has(index) && index !== realPuzzleIndex)
+        ?? indexes[(position + delta + indexes.length) % indexes.length];
       renderRealPuzzle();
     }
 
@@ -37612,11 +37621,6 @@
         setRealPuzzlePhase("Failed");
         renderRealPuzzleBoard();
         saveRealPuzzleState();
-        await wait(180);
-        if (transitionId === realPuzzleTransitionId && realPuzzlePhase === "Failed") {
-          setRealPuzzlePhase("PlayerTurn");
-          renderRealPuzzleBoard();
-        }
         return;
       }
 
