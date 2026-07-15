@@ -24226,7 +24226,11 @@
         }));
     }
 
-    puzzles = buildPuzzleEssentialsBank();
+    // Keep the historical tiered bank independent from optional imports and
+    // the legacy puzzle surface. The visible trainer always restores from this
+    // source, then applies the current validation rules.
+    const originalTieredPuzzleBank = Object.freeze(buildPuzzleEssentialsBank());
+    puzzles = [...originalTieredPuzzleBank];
     const progressAutosaveStorageKey = "checkmateQuest.progressAutosave.v1";
     const visitSnapshotStorageKey = "checkmateQuest.visitSnapshot.v1";
     const soundPrefsStorageKey = "checkmateQuest.sound.v1";
@@ -36914,11 +36918,11 @@
       }
     }
 
-    function installLegacyRealPuzzlePack() {
-      if (!Array.isArray(puzzles) || !puzzles.length) return 0;
+    function installLegacyRealPuzzlePack(sourcePuzzles = originalTieredPuzzleBank) {
+      if (!Array.isArray(sourcePuzzles) || !sourcePuzzles.length) return 0;
       const existing = new Set(realPuzzleBank.map(getRealPuzzleKey));
       const additions = [];
-      puzzles.forEach((puzzle, index) => {
+      sourcePuzzles.forEach((puzzle, index) => {
         const converted = normalizeLegacyPuzzleForReal(puzzle, index);
         if (!converted) return;
         const key = getRealPuzzleKey(converted);
