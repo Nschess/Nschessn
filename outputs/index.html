@@ -23600,11 +23600,19 @@
     const puzzleBankVersion = "strict-stockfish-verified-v6";
 
     const realPuzzleStorageKey = "checkmateQuest.realPuzzles.v1";
-    const realPuzzleCollectionCacheKey = "checkmateQuest.realPuzzleCollection.v1";
+    const realPuzzleCollectionCacheKey = "checkmateQuest.realPuzzleCollection.v2";
+    const puzzleRuntimeDebug = (() => {
+      try {
+        return new URLSearchParams(window.location.search).has("puzzleDebug");
+      } catch {
+        return false;
+      }
+    })();
     const realPuzzleDifficultyLevels = ["All", "Beginner", "Intermediate", "Advanced", "Expert", "Master"];
     const realPuzzleModes = ["Daily", "Trainer", "Rush", "Streak", "Battle"];
     const realPuzzleDifficultyAliases = { Easy: "Beginner", Medium: "Intermediate", Hard: "Advanced" };
     let puzzleCollectionReady = false;
+    let realPuzzleCollectionSource = "legacy embedded samples";
     let realPuzzleBank = [
       {
         id: "verified-00sHx",
@@ -36695,6 +36703,34 @@
       return `${getRealPuzzlePositionKey(puzzle)}|${(puzzle?.moves || []).join(" ")}`;
     }
 
+    function reportRealPuzzleRuntime(event, puzzle = realPuzzleBank[realPuzzleIndex]) {
+      const indexes = getRealPuzzleIndexes();
+      const tiers = Object.fromEntries(realPuzzleDifficultyLevels.slice(1).map((difficulty) => [
+        difficulty,
+        new Set(realPuzzleValidIndexes
+          .map((index) => realPuzzleBank[index])
+          .filter((item) => getRealPuzzleDifficulty(item) === difficulty)
+          .map(getRealPuzzlePositionKey)).size
+      ]));
+      const snapshot = {
+        event,
+        collection: realPuzzleCollectionSource,
+        sourceArray: realPuzzleCollectionSource,
+        source: puzzle?.source || "built-in",
+        tier: realPuzzleDifficulty,
+        puzzleId: puzzle?.id || "",
+        fen: getRealPuzzlePositionKey(puzzle),
+        solution: (puzzle?.moves || []).join(" "),
+        themes: getRealPuzzleThemes(puzzle),
+        playableInTier: indexes.length,
+        uniqueFensInTier: new Set(indexes.map((index) => getRealPuzzlePositionKey(realPuzzleBank[index]))).size,
+        tierCounts: tiers
+      };
+      window.checkmatePuzzleRuntime = snapshot;
+      if (puzzleRuntimeDebug) console.info("[Checkmate Quest Puzzles]", snapshot);
+      return snapshot;
+    }
+
     function getRealDailyIndex(indexes = getRealPuzzleIndexes()) {
       if (!indexes.length) return 0;
       const daySeed = Math.floor(Date.now() / 86400000);
@@ -36878,7 +36914,6 @@
     }
 
     async function loadRealPuzzleCollection() {
-      const cached = readJsonStorage(realPuzzleCollectionCacheKey, null);
       const install = (items, source) => {
         if (!Array.isArray(items) || !items.length) return false;
         const normalized = items.map((item, index) => normalizeRealPuzzleRecord(item, index, source)).filter(Boolean);
@@ -36891,13 +36926,15 @@
         });
         if (!fresh.length) return false;
         realPuzzleBank = [...realPuzzleBank, ...fresh];
+        realPuzzleCollectionSource = `${realPuzzleCollectionSource} + ${source}`;
         return true;
       };
-      if (cached?.version === puzzleBankVersion) install(cached.puzzles, "Cached verified JSON");
       const collectionUrl = String(document.documentElement.dataset.puzzleCollectionUrl || window.CHECKMATE_PUZZLE_PACK_URL || "").trim();
       // A hosted collection is optional. The verified local bank is the default,
       // so deployments never request a file that has not been included.
       if (!collectionUrl) return false;
+      const cached = readJsonStorage(realPuzzleCollectionCacheKey, null);
+      if (cached?.version === puzzleBankVersion) install(cached.puzzles, "Cached verified JSON");
       try {
         const response = await fetch(collectionUrl, { cache: "force-cache" });
         if (!response.ok) return false;
@@ -36952,8 +36989,9 @@
       }
     }
 
-    function installLegacyRealPuzzlePack(sourcePuzzles = originalTieredPuzzleBank) {
+    function installLegacyRealPuzzlePack(sourcePuzzles = originalTieredPuzzleBank, replaceExisting = false) {
       if (!Array.isArray(sourcePuzzles) || !sourcePuzzles.length) return 0;
+      if (replaceExisting) realPuzzleBank = [];
       const existing = new Set(realPuzzleBank.map(getRealPuzzleKey));
       const additions = [];
       sourcePuzzles.forEach((puzzle, index) => {
@@ -36965,6 +37003,7 @@
         additions.push(converted);
       });
       if (additions.length) realPuzzleBank = [...realPuzzleBank, ...additions];
+      if (replaceExisting) realPuzzleCollectionSource = "originalTieredPuzzleBank";
       return additions.length;
     }
 
@@ -37290,6 +37329,7 @@
       if (!playableIndexes.includes(realPuzzleIndex)) realPuzzleIndex = playableIndexes[0] || 0;
       const puzzle = realPuzzleBank[realPuzzleIndex];
       resetRealPuzzleGame();
+      reportRealPuzzleRuntime("puzzle-loaded", puzzle);
       renderRealPuzzleSelectors();
       recordRealPuzzleVisit(puzzle);
       document.querySelectorAll("[data-real-mode]").forEach((button) => {
@@ -37492,10 +37532,11 @@
         // Restore the original tiered essentials bank in the visible trainer.
         // This conversion keeps its existing FENs and continuations intact and
         // filters them through the same validation used by the new UI.
-        installLegacyRealPuzzlePack();
+        installLegacyRealPuzzlePack(originalTieredPuzzleBank, true);
         renderPuzzle();
         realPuzzleValidationErrors = validateRealPuzzleBank();
         puzzleCollectionReady = realPuzzleValidIndexes.length > 0 || getPlayablePuzzleIndexes().length > 0;
+        reportRealPuzzleRuntime("collection-ready");
       } catch {
         realPuzzleValidationErrors = ["Puzzle rules are temporarily unavailable."];
         realPuzzleValidIndexes = [];
