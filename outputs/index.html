@@ -36687,8 +36687,12 @@
       return Array.isArray(puzzle?.themes) && puzzle.themes.length ? puzzle.themes : [puzzle?.theme || "Tactic"];
     }
 
+    function getRealPuzzlePositionKey(puzzle) {
+      return String(puzzle?.fen || "").trim().split(/\s+/).slice(0, 4).join(" ");
+    }
+
     function getRealPuzzleKey(puzzle) {
-      return `${String(puzzle?.fen || "").split(/\s+/).slice(0, 4).join(" ")}|${(puzzle?.moves || []).join(" ")}`;
+      return `${getRealPuzzlePositionKey(puzzle)}|${(puzzle?.moves || []).join(" ")}`;
     }
 
     function getRealDailyIndex(indexes = getRealPuzzleIndexes()) {
@@ -36699,12 +36703,19 @@
 
     function getRealPuzzleIndexes() {
       const sourceIndexes = realPuzzleValidIndexes.length ? realPuzzleValidIndexes : (realPuzzleValidationErrors.length ? [] : realPuzzleBank.map((_, index) => index));
+      const seenPositions = new Set();
       const indexes = sourceIndexes
         .map((index) => {
           const puzzle = realPuzzleBank[index];
           return realPuzzleDifficulty === "All" || getRealPuzzleDifficulty(puzzle) === realPuzzleDifficulty ? index : -1;
         })
-        .filter((index) => index >= 0);
+        .filter((index) => {
+          if (index < 0) return false;
+          const key = getRealPuzzlePositionKey(realPuzzleBank[index]);
+          if (!key || seenPositions.has(key)) return false;
+          seenPositions.add(key);
+          return true;
+        });
       if (realPuzzleMode === "Daily") return indexes.length ? [getRealDailyIndex(indexes)] : [];
       return indexes;
     }
@@ -36799,9 +36810,9 @@
       realPuzzleBank.forEach((puzzle, index) => {
         const validation = validateRealPuzzleRecord(puzzle);
         if (validation.ok) {
-          const key = getRealPuzzleKey(puzzle);
+          const key = getRealPuzzlePositionKey(puzzle);
           if (seen.has(key)) {
-            errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: duplicate FEN/line`);
+            errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: duplicate position`);
             return;
           }
           seen.add(key);
@@ -37069,7 +37080,9 @@
 
     function autoAdvanceRealPuzzleIfNeeded() {
       window.clearTimeout(realPuzzleAutoNextTimer);
-      if (!["Rush", "Streak", "Battle"].includes(realPuzzleMode)) return;
+      // Daily deliberately stays on its one daily position. Every other mode
+      // advances after a short celebration without a manual Next click.
+      if (realPuzzleMode === "Daily" || getRealPuzzleIndexes().length < 2) return;
       realPuzzleAutoNextTimer = window.setTimeout(() => {
         realPuzzleIndex = realPuzzleMode === "Streak" ? chooseNextUnsolvedRealPuzzle() : chooseRandomRealPuzzle();
         renderRealPuzzle();
@@ -37167,7 +37180,8 @@
         : indexes;
       const seen = new Set((Array.isArray(realPuzzleSeenByDifficulty[difficultyKey]) ? realPuzzleSeenByDifficulty[difficultyKey] : [])
         .filter((id) => candidates.some((index) => realPuzzleBank[index]?.id === id)));
-      const currentId = realPuzzleBank[realPuzzleIndex]?.id;
+      const currentPuzzle = realPuzzleBank[realPuzzleIndex];
+      const currentId = currentPuzzle?.id;
       if (currentId && candidates.some((index) => realPuzzleBank[index]?.id === currentId)) seen.add(currentId);
       let pool = candidates.filter((index) => !seen.has(realPuzzleBank[index]?.id));
       if (!pool.length) {
@@ -37176,6 +37190,12 @@
         pool = candidates.filter((index) => index !== realPuzzleIndex);
       }
       if (!pool.length) pool = candidates;
+      const currentTheme = getRealPuzzleThemes(currentPuzzle).map((theme) => String(theme).toLowerCase()).sort().join("|");
+      const variedTheme = pool.filter((index) => getRealPuzzleThemes(realPuzzleBank[index]).map((theme) => String(theme).toLowerCase()).sort().join("|") !== currentTheme);
+      if (variedTheme.length) pool = variedTheme;
+      const currentLine = (currentPuzzle?.moves || []).join(" ");
+      const variedLine = pool.filter((index) => (realPuzzleBank[index]?.moves || []).join(" ") !== currentLine);
+      if (variedLine.length) pool = variedLine;
       const next = pool[Math.floor(Math.random() * pool.length)];
       const nextId = realPuzzleBank[next]?.id;
       if (nextId) realPuzzleSeenByDifficulty[difficultyKey] = [...new Set([...seen, nextId])];
@@ -37258,6 +37278,8 @@
 
     function renderRealPuzzle() {
       if (!document.getElementById("realPuzzleBoard")) return;
+      window.clearTimeout(realPuzzleAutoNextTimer);
+      realPuzzleAutoNextTimer = 0;
       const playableIndexes = getRealPuzzleIndexes();
       if (!playableIndexes.length) {
         const feedback = document.getElementById("realPuzzleFeedback");
