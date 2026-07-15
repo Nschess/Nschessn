@@ -20206,7 +20206,7 @@
               <span id="puzzleEstimate">~1 min</span>
               <span id="puzzleClock">00:00</span>
               <span id="puzzleMistakes">0 mistakes</span>
-              <span id="puzzleCollectionStatus">Preparing puzzles</span>
+              <span id="puzzleCollectionStatus">Preparing puzzles...</span>
             </div>
             <div class="trainer-patterns puzzle-tags" id="puzzleTags" aria-label="Puzzle themes"></div>
             <div class="puzzle-level-picker" role="group" aria-label="Choose puzzle level">
@@ -23603,6 +23603,7 @@
     const realPuzzleDifficultyLevels = ["All", "Beginner", "Intermediate", "Advanced", "Expert", "Master"];
     const realPuzzleModes = ["Daily", "Trainer", "Rush", "Streak", "Battle"];
     const realPuzzleDifficultyAliases = { Easy: "Beginner", Medium: "Intermediate", Hard: "Advanced" };
+    let puzzleCollectionReady = false;
     let realPuzzleBank = [
       {
         id: "verified-00sHx",
@@ -30746,7 +30747,7 @@
     function refreshPuzzleCollectionStatus() {
       const status = document.getElementById("puzzleCollectionStatus");
       if (!status) return;
-      status.textContent = getPlayablePuzzleIndexes().length ? "Verified tactics" : "Preparing puzzles";
+      status.textContent = puzzleCollectionReady ? "Verified tactics ready" : "Preparing puzzles...";
     }
 
     function cleanPuzzleSan(move) {
@@ -36853,17 +36854,22 @@
         return true;
       };
       if (cached?.version === puzzleBankVersion) install(cached.puzzles, "Cached verified JSON");
+      const collectionUrl = String(document.documentElement.dataset.puzzleCollectionUrl || window.CHECKMATE_PUZZLE_PACK_URL || "").trim();
+      // A hosted collection is optional. The verified local bank is the default,
+      // so deployments never request a file that has not been included.
+      if (!collectionUrl) return false;
       try {
-        const response = await fetch("assets/puzzles.json", { cache: "force-cache" });
-        if (!response.ok) return;
+        const response = await fetch(collectionUrl, { cache: "force-cache" });
+        if (!response.ok) return false;
         const payload = await response.json();
         const items = Array.isArray(payload) ? payload : payload.puzzles;
         if (install(items, payload.source || "Verified JSON collection")) {
           writeJsonStorage(realPuzzleCollectionCacheKey, { version: puzzleBankVersion, puzzles: items });
         }
       } catch {
-        // Offline-first: the built-in seed bank remains playable.
+        // The local verified bank remains available when an optional pack fails.
       }
+      return true;
     }
 
     function normalizeLegacyPuzzleForReal(puzzle, index = 0) {
@@ -37399,10 +37405,12 @@
         await loadRealPuzzleCollection();
         realPuzzleValidationErrors = validateRealPuzzleBank();
         realPuzzleValidationErrors.push(...await verifyRealPuzzleBankWithStockfish());
+        puzzleCollectionReady = realPuzzleValidIndexes.length > 0 || getPlayablePuzzleIndexes().length > 0;
       } catch {
         realPuzzleValidationErrors = ["Could not load chess.js for real puzzles."];
       }
       reportRealPuzzleDiagnostics();
+      refreshPuzzleCollectionStatus();
       document.querySelectorAll("[data-real-mode]").forEach((button) => {
         button.addEventListener("click", () => {
           realPuzzleMode = button.dataset.realMode || "Trainer";
