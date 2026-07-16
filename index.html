@@ -36030,47 +36030,89 @@
       }));
     }
 
+    function bindRealPuzzleBoardEvents(board) {
+      if (board.dataset.eventsBound === "true") return;
+      board.dataset.eventsBound = "true";
+      const squareFromEvent = (event) => event.target instanceof Element ? event.target.closest(".real-puzzle-square") : null;
+
+      board.addEventListener("dragstart", (event) => {
+        const square = squareFromEvent(event);
+        if (!square?.draggable || !realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return event.preventDefault();
+        const from = square.dataset.square;
+        if (!from) return event.preventDefault();
+        realPuzzleSelected = from;
+        realPuzzleLegalMoves = realPuzzleGame.moves({ square: from, verbose: true });
+        event.dataTransfer?.setData("text/plain", from);
+        square.classList.add("dragging");
+      });
+      board.addEventListener("dragend", (event) => squareFromEvent(event)?.classList.remove("dragging"));
+      board.addEventListener("dragover", (event) => {
+        if (squareFromEvent(event)) event.preventDefault();
+      });
+      board.addEventListener("drop", (event) => {
+        const square = squareFromEvent(event);
+        const from = event.dataTransfer?.getData("text/plain");
+        if (!square || !from) return;
+        event.preventDefault();
+        realPuzzleSelected = from;
+        handleRealPuzzleSquare(square.dataset.square);
+      });
+      board.addEventListener("click", (event) => {
+        const square = squareFromEvent(event);
+        if (square) handleRealPuzzleSquare(square.dataset.square);
+      });
+    }
+
+    function ensureRealPuzzleBoardSquares(board, squareNames) {
+      const order = squareNames.join(",");
+      if (board._realPuzzleSquareOrder === order && board._realPuzzleSquares) return board._realPuzzleSquares;
+      const squares = new Map();
+      const fragment = document.createDocumentFragment();
+      squareNames.forEach((squareNameValue) => {
+        const square = document.createElement("button");
+        square.type = "button";
+        square.dataset.square = squareNameValue;
+        square.classList.add("real-puzzle-square");
+        squares.set(squareNameValue, square);
+        fragment.appendChild(square);
+      });
+      board.replaceChildren(fragment);
+      board._realPuzzleSquareOrder = order;
+      board._realPuzzleSquares = squares;
+      return squares;
+    }
+
     function renderRealPuzzleBoard() {
       const board = document.getElementById("realPuzzleBoard");
       if (!board) return;
+      bindRealPuzzleBoardEvents(board);
       const legalByTarget = new Map(realPuzzleLegalMoves.map((move) => [move.to, move]));
       const lastSquares = realPuzzleLastMove ? [realPuzzleLastMove.from, realPuzzleLastMove.to] : [];
       const checkedKing = realPuzzleGame && callCoachRule(realPuzzleGame, "isCheck", "in_check")
         ? getRealPuzzleSquares().find((square) => realPuzzleGame.get(square)?.type === "k" && realPuzzleGame.get(square)?.color === realPuzzleGame.turn()) || ""
         : "";
-      board.replaceChildren(...getRealPuzzleSquares().map((squareNameValue) => {
+      const squareNames = getRealPuzzleSquares();
+      const boardSquares = ensureRealPuzzleBoardSquares(board, squareNames);
+      squareNames.forEach((squareNameValue) => {
         const piece = realPuzzleGame?.get(squareNameValue);
         const legalMove = legalByTarget.get(squareNameValue);
-        const square = document.createElement("button");
-        square.type = "button";
-        square.className = `puzzle-square play-square ${isLightCoachSquare(squareNameValue) ? "light" : "dark"}`;
+        const square = boardSquares.get(squareNameValue);
+        if (!square) return;
+        square.className = `real-puzzle-square puzzle-square play-square ${isLightCoachSquare(squareNameValue) ? "light" : "dark"}`;
         if (piece) square.classList.add(piece.color === "w" ? "white-piece" : "black-piece");
         if (squareNameValue === realPuzzleSelected) square.classList.add("selected");
         if (legalMove) square.classList.add(legalMove.captured || legalMove.flags.includes("e") ? "capture" : "legal");
         if (lastSquares.includes(squareNameValue)) square.classList.add("last-move");
         if (squareNameValue === checkedKing) square.classList.add("in-check");
-        renderPieceOnSquare(square, piece, activePieceSvgSet, false);
+        const pieceKey = piece ? `${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}` : "empty";
+        if (square.dataset.pieceKey !== pieceKey) {
+          renderPieceOnSquare(square, piece, activePieceSvgSet, false);
+          square.dataset.pieceKey = pieceKey;
+        }
         square.setAttribute("aria-label", `${squareNameValue}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${piece.type}` : " empty"}`);
         square.disabled = realPuzzlePhase !== "PlayerTurn" || realPuzzleReplaying;
         square.draggable = Boolean(piece && piece.color === realPuzzleGame?.turn() && !square.disabled);
-        square.addEventListener("dragstart", (event) => {
-          if (!square.draggable) return event.preventDefault();
-          realPuzzleSelected = squareNameValue;
-          realPuzzleLegalMoves = realPuzzleGame.moves({ square: squareNameValue, verbose: true });
-          event.dataTransfer.setData("text/plain", squareNameValue);
-        });
-        square.addEventListener("dragover", (event) => event.preventDefault());
-        square.addEventListener("drop", (event) => {
-          event.preventDefault();
-          const from = event.dataTransfer.getData("text/plain");
-          if (from) {
-            realPuzzleSelected = from;
-            handleRealPuzzleSquare(squareNameValue);
-          }
-        });
-        square.addEventListener("click", () => handleRealPuzzleSquare(squareNameValue));
-        return square;
-      }));
+      });
     }
 
     function renderRealPuzzle() {
