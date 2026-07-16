@@ -19027,6 +19027,31 @@
         font-size: 0.79rem;
         font-weight: 900;
       }
+      .nav-mobile-community { grid-column: 1 / -1; }
+      .nav-mobile-community summary {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 12px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 10px;
+        background: rgba(30, 41, 59, 0.58);
+        color: #e2e8f0;
+        cursor: pointer;
+        font-size: 0.79rem;
+        font-weight: 900;
+        list-style: none;
+      }
+      .nav-mobile-community summary::-webkit-details-marker { display: none; }
+      .nav-mobile-community summary::after { content: "+"; margin-left: auto; color: #facc15; font-size: 1rem; }
+      .nav-mobile-community[open] summary { border-color: rgba(34, 197, 94, 0.56); background: rgba(34, 197, 94, 0.13); }
+      .nav-mobile-community[open] summary::after { content: "-"; }
+      .nav-mobile-community-links {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+        padding-top: 7px;
+      }
       .nav-mobile-panel a:hover,
       .nav-mobile-panel a:focus-visible { border-color: rgba(34, 197, 94, 0.56); background: rgba(34, 197, 94, 0.13); outline: none; }
     }
@@ -19542,10 +19567,77 @@
       #store .store-showcase-card { min-height: 108px; }
     }
 
+    /* Final cross-site polish. These rules refine existing layouts without changing routes or game behavior. */
+    html { scroll-behavior: smooth; }
+
+    body {
+      min-width: 320px;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    :where(img, video, canvas) { max-width: 100%; }
+    :where(button, a, input, select, textarea) { touch-action: manipulation; }
+
+    :where(a, button, summary, input, select, textarea):focus-visible {
+      outline: 3px solid rgba(34, 197, 94, 0.72);
+      outline-offset: 3px;
+    }
+
+    :where(h1, h2, h3) { text-wrap: balance; }
+    :where(p, li) { text-wrap: pretty; }
+
+    section { padding-block: clamp(54px, 6vw, 82px); }
+    .wrap { width: min(100% - clamp(24px, 4vw, 48px), var(--max)); }
+
+    .section-head {
+      gap: clamp(16px, 2.4vw, 28px);
+      margin-bottom: clamp(20px, 3vw, 32px);
+    }
+
+    .section-intro { line-height: 1.65; }
+
+    :where(.lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+      .notation-card, .book-card, .video-card, .leaderboard-card, .home-feature-card,
+      .home-summary-card, .home-lower-card, .store-card, .store-showcase-card) {
+      transition: transform var(--ui-standard) ease, border-color var(--ui-standard) ease,
+        box-shadow var(--ui-standard) ease, background var(--ui-standard) ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      :where(.lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+        .notation-card, .book-card, .video-card, .leaderboard-card, .home-feature-card,
+        .home-summary-card, .home-lower-card):hover {
+        transform: translateY(-2px);
+        border-color: rgba(34, 197, 94, 0.34);
+        box-shadow: 0 20px 42px rgba(2, 6, 23, 0.26), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+      }
+    }
+
+    @media (max-width: 900px) {
+      .section-head { align-items: start; flex-direction: column; }
+      .section-intro { max-width: 68ch; }
+      .site-panel { overflow-x: clip; }
+    }
+
+    @media (max-width: 640px) {
+      section { padding-block: 42px; }
+      .wrap { width: min(100% - 24px, var(--max)); }
+      .section-head { margin-bottom: 20px; }
+      :where(.button, .mission-button, .tab-button) { min-height: 44px; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :where(.button, .mission-button, .tab-button) { transition: none; }
       :where(.button, .mission-button, .tab-button):hover,
       :where(.button, .mission-button, .tab-button):focus-visible { transform: none; }
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   </style>
 </head>
@@ -19609,7 +19701,22 @@
           <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Tournaments</a>
           <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">Leaderboard</a>
           <a href="#store" data-site-tab="store" data-site-panel="store">Store</a>
-          <a href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Community</a>
+          <details class="nav-mobile-community">
+            <summary>Community</summary>
+            <div class="nav-mobile-community-links">
+              <a href="#academy" data-site-tab="academy" data-site-panel="academy">Academy</a>
+              <a href="#paths" data-site-tab="paths" data-site-panel="paths">Learning Path</a>
+              <a href="#adventures" data-site-tab="adventures" data-site-panel="adventures">Adventures</a>
+              <a href="#rules" data-site-tab="rules" data-site-panel="rules">Rules</a>
+              <a href="#openings" data-site-tab="openings" data-site-panel="openings">Openings</a>
+              <a href="#videos" data-site-tab="videos" data-site-panel="videos">Videos</a>
+              <a href="#books" data-site-tab="books" data-site-panel="books">Chess Books</a>
+              <a href="#notation" data-site-tab="notation" data-site-panel="notation">Notation</a>
+              <a href="#plan" data-site-tab="plan" data-site-panel="plan">Study Plan</a>
+              <a href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Friend Challenge</a>
+              <a href="#settings" data-site-tab="settings" data-site-panel="settings">Settings</a>
+            </div>
+          </details>
         </div>
       </details>
     </nav>
