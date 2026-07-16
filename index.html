@@ -38249,6 +38249,85 @@
       else setLocked();
     }
 
+    const deferredFeatureInitializers = {
+      play: () => {
+        preloadStockfishWhenIdle();
+        setupCoachAvatarAssets();
+        renderCoordinates();
+        return setupPlayableChess();
+      },
+      puzzles: () => {
+        syncPuzzleSoundButton();
+        return setupRealPuzzles();
+      },
+      store: setupStore,
+      settings: setupSettingsPage,
+      admin: setupAdminPanel,
+      tutorial: setupBeginnerTutorial,
+      academy: setupAcademy,
+      paths: setupLessonFlow,
+      adventures: () => {
+        renderAdventureMission();
+        renderMiniBoards();
+      },
+      openings: setupOpeningFavorites,
+      books: setupBooks,
+      videos: () => {
+        renderShortFeed();
+        setupVideoTheater();
+      },
+      plan: setupDailyTraining,
+      leaderboards: renderLeaderboards,
+      hero: () => {
+        buildHeroBoard();
+      },
+      coachQuotes: setupCoachQuotes,
+      dailyGoals: setupDailyGoals,
+      gentleStart: setupGentleStart,
+      miniBoards: renderMiniBoards,
+      tour: setupFirstTimeTour,
+      audio: setupAudioSystem,
+      performance: setupPerformanceOptimizations
+    };
+    const deferredFeaturePromises = new Map();
+
+    function initializeDeferredFeature(name) {
+      const existing = deferredFeaturePromises.get(name);
+      if (existing) return existing;
+      const initializer = deferredFeatureInitializers[name];
+      if (typeof initializer !== "function") return Promise.resolve(false);
+
+      const task = Promise.resolve()
+        .then(initializer)
+        .catch((error) => {
+          console.warn(`[Checkmate Quest] Deferred ${name} setup failed.`, error);
+          deferredFeaturePromises.delete(name);
+          return false;
+        });
+      deferredFeaturePromises.set(name, task);
+      return task;
+    }
+
+    function initializePanelFeatures(panel) {
+      const featureNames = {
+        play: ["play"],
+        puzzles: ["puzzles"],
+        store: ["store"],
+        settings: ["settings"],
+        admin: ["admin"],
+        tutorial: ["tutorial"],
+        academy: ["academy"],
+        paths: ["paths"],
+        adventures: ["adventures"],
+        openings: ["openings"],
+        books: ["books"],
+        videos: ["videos"],
+        plan: ["plan"],
+        leaderboards: ["leaderboards"]
+      }[panel] || [];
+      featureNames.forEach((name) => void initializeDeferredFeature(name));
+    }
+
     function setupSiteTabs() {
       const panelIds = ["login", "settings", "store", "admin", "tutorial", "academy", "paths", "adventures", "rules", "openings", "videos", "books", "notation", "play", "leaderboards", "puzzles", "plan"];
       const links = [...document.querySelectorAll("[data-site-tab]")];
@@ -38258,6 +38337,7 @@
         .filter(Boolean);
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       let activePanel = panels.find((panel) => panel.classList.contains("is-active-panel")) || null;
+      let panelInitFrame = 0;
 
       panels.forEach((panel) => {
         panel.classList.add("site-panel");
@@ -38354,6 +38434,10 @@
       });
 
       function showHome(shouldScroll = false) {
+        if (panelInitFrame) {
+          window.cancelAnimationFrame(panelInitFrame);
+          panelInitFrame = 0;
+        }
         document.body.classList.remove("site-tab-mode");
         document.body.classList.remove("friend-challenge-mode", "tournament-mode");
         clearActiveTabs();
@@ -38389,8 +38473,6 @@
         document.body.classList.add("site-tab-mode");
         document.body.classList.toggle("friend-challenge-mode", config.tab === "friendChallenge");
         document.body.classList.toggle("tournament-mode", config.tab === "tournaments");
-        if (config.panel === "play") preloadStockfishWhenIdle();
-        if (config.panel === "puzzles") void setupRealPuzzles();
         if (activePanel !== panel) {
           if (activePanel) {
             activePanel.classList.remove("is-active-panel");
@@ -38400,6 +38482,11 @@
           panel.setAttribute("aria-hidden", "false");
           activePanel = panel;
         }
+        if (panelInitFrame) window.cancelAnimationFrame(panelInitFrame);
+        panelInitFrame = window.requestAnimationFrame(() => {
+          panelInitFrame = 0;
+          initializePanelFeatures(config.panel);
+        });
 
         clearActiveTabs();
         if (activeLink) {
@@ -43271,39 +43358,24 @@
     document.getElementById("restartAdventure").addEventListener("click", renderAdventureMission);
 
     setupLearnerPreferences();
-    syncPuzzleSoundButton();
-    setupStore();
-    setupAudioSystem();
     setupLoginProfile();
     setupSecureAuth();
     void setupSupabaseAuthUi();
-    setupCoachAvatarAssets();
-    setupSettingsPage();
-    setupAdminPanel();
-    buildHeroBoard();
-    setupCoachQuotes();
-    setupLessonFlow();
-    renderAdventureMission();
-    renderMiniBoards();
-    setupOpeningFavorites();
-    renderCoordinates();
-    scheduleBackgroundTask(setupRealPuzzles, 1200);
     wireTabs();
-    setupBeginnerTutorial();
-    setupAcademy();
-    setupSiteTabs();
-    setupFirstTimeTour();
-    setupDailyGoals();
-    setupGentleStart();
-    setupDailyTraining();
-    setupPlayableChess();
-    setupBooks();
-    renderShortFeed();
-    setupVideoTheater();
     setupRuntimeSafety();
-    setupPerformanceOptimizations();
-    claimDailyLoginReward();
-    saveProgressSnapshot("page load");
+    setupSiteTabs();
+    window.requestAnimationFrame(() => {
+      scheduleBackgroundTask(() => initializeDeferredFeature("hero"), 80);
+      scheduleBackgroundTask(() => initializeDeferredFeature("coachQuotes"), 180);
+      scheduleBackgroundTask(() => initializeDeferredFeature("dailyGoals"), 320);
+      scheduleBackgroundTask(() => initializeDeferredFeature("gentleStart"), 460);
+      scheduleBackgroundTask(() => initializeDeferredFeature("miniBoards"), 620);
+      scheduleBackgroundTask(() => initializeDeferredFeature("tour"), 820);
+      scheduleBackgroundTask(() => initializeDeferredFeature("audio"), 1100);
+      scheduleBackgroundTask(() => initializeDeferredFeature("performance"), 1400);
+      scheduleBackgroundTask(claimDailyLoginReward, 1800);
+      scheduleBackgroundTask(() => saveProgressSnapshot("page load"), 2200);
+    });
   </script>
 </body>
 </html>
