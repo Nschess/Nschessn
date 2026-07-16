@@ -19992,6 +19992,107 @@
       .hero-stage-halo::after { right: 2%; }
     }
 
+    /* Hero sidebar only: existing Quick Play, Daily Puzzle, Progress, and Online Players cards. */
+    .hero-command-center .hero-dashboard {
+      gap: 12px;
+      padding: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(30, 41, 59, 0.34), rgba(8, 15, 28, 0.18));
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.06);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero-command-center .hero-quick-card,
+    .hero-command-center .hero-progress-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 78px;
+      padding: 16px;
+      border-color: rgba(148, 163, 184, 0.23);
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 92% 10%, rgba(34, 197, 94, 0.14), transparent 38%),
+        linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.88));
+      box-shadow: 0 16px 32px rgba(2, 6, 23, 0.26), inset 0 1px 0 rgba(248, 250, 252, 0.09);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+    }
+
+    .hero-command-center .hero-quick-card::before,
+    .hero-command-center .hero-progress-card::before {
+      content: "";
+      position: absolute;
+      top: 12px;
+      bottom: 12px;
+      left: 0;
+      width: 2px;
+      border-radius: 999px;
+      background: linear-gradient(#86efac, rgba(34, 197, 94, 0));
+      opacity: 0.82;
+    }
+
+    .hero-command-center .hero-quick-card--play {
+      border-color: rgba(34, 197, 94, 0.58);
+      background:
+        radial-gradient(circle at 92% 14%, rgba(34, 197, 94, 0.23), transparent 38%),
+        linear-gradient(145deg, rgba(27, 65, 47, 0.72), rgba(15, 23, 42, 0.92));
+      box-shadow: 0 17px 34px rgba(2, 6, 23, 0.3), 0 0 26px rgba(34, 197, 94, 0.11), inset 0 1px 0 rgba(248, 250, 252, 0.12);
+    }
+
+    .hero-command-center .hero-quick-icon {
+      width: 44px;
+      height: 44px;
+      border: 1px solid rgba(134, 239, 172, 0.28);
+      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(34, 197, 94, 0.24), rgba(15, 23, 42, 0.58));
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.09), 0 8px 18px rgba(2, 6, 23, 0.18);
+      color: #dcfce7;
+      font-size: 0.58rem;
+    }
+
+    .hero-command-center .hero-quick-card--play .hero-quick-icon {
+      border-radius: 50%;
+      background: linear-gradient(145deg, #4ade80, #15803d);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12), 0 8px 20px rgba(34, 197, 94, 0.25);
+      color: #052e16;
+    }
+
+    .hero-command-center .hero-quick-card strong { font-size: 0.88rem; }
+    .hero-command-center .hero-quick-card small { margin-top: 3px; font-size: 0.69rem; line-height: 1.35; }
+    .hero-command-center .hero-quick-card b { align-self: center; font-size: 1.18rem; }
+
+    .hero-command-center .hero-progress-card { min-height: 126px; padding: 17px; }
+    .hero-command-center .hero-progress-card > div:first-child strong { font-size: 0.98rem; }
+    .hero-command-center .hero-progress-card > div:first-child span { color: #a8b8ce; }
+    .hero-command-center .hero-progress-metrics { gap: 8px; }
+    .hero-command-center .hero-progress-metrics .home-stat {
+      padding: 8px 4px;
+      border-color: rgba(148, 163, 184, 0.16);
+      border-radius: 9px;
+      background: rgba(2, 6, 23, 0.32);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .hero-command-center .hero-quick-card:hover,
+      .hero-command-center .hero-quick-card:focus-visible {
+        transform: translateX(4px) translateY(-1px);
+        border-color: rgba(34, 197, 94, 0.64);
+        box-shadow: 0 22px 38px rgba(2, 6, 23, 0.36), 0 0 26px rgba(34, 197, 94, 0.13), inset 0 1px 0 rgba(248, 250, 252, 0.12);
+      }
+    }
+
+    @media (max-width: 1180px) {
+      .hero-command-center .hero-dashboard { padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none; }
+    }
+
+    @media (max-width: 520px) {
+      .hero-command-center .hero-dashboard { gap: 9px; }
+      .hero-command-center .hero-quick-card,
+      .hero-command-center .hero-progress-card { padding: 14px; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :where(.button, .mission-button, .tab-button) { transition: none; }
       :where(.button, .mission-button, .tab-button):hover,
