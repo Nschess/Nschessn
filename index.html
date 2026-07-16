@@ -19162,6 +19162,141 @@
       .home-feature-card:hover,
       .home-feature-card:focus-visible { transform: none; }
     }
+
+    /* Lower homepage dashboard. */
+    .home-lower-dashboard {
+      padding: 0 0 clamp(50px, 7vw, 96px);
+      background: linear-gradient(180deg, rgba(8, 15, 28, 0.76), #0b1220 72%);
+    }
+
+    .home-lower-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: clamp(12px, 1.5vw, 22px);
+    }
+
+    .home-lower-card {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-width: 0;
+      min-height: 218px;
+      padding: clamp(15px, 1.6vw, 21px);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 17px;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(34, 197, 94, 0.1), transparent 34%),
+        linear-gradient(145deg, rgba(248, 250, 252, 0.06), rgba(15, 23, 42, 0.78));
+      box-shadow: 0 18px 36px rgba(2, 6, 23, 0.25), inset 0 1px 0 rgba(248, 250, 252, 0.06);
+    }
+
+    .home-lower-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .home-lower-card-head h3 { margin: 0; color: #f8fafc; font-size: clamp(0.9rem, 1.1vw, 1.05rem); }
+    .home-lower-card-head a { color: #86efac; font-size: 0.68rem; font-weight: 950; white-space: nowrap; }
+    .home-lower-card-head a:hover,
+    .home-lower-card-head a:focus-visible { color: #facc15; outline: none; }
+
+    .home-lower-game-row,
+    .home-lower-tournament {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      margin-top: 18px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .home-lower-tournament { grid-template-columns: auto minmax(0, 1fr); }
+
+    .home-lower-mark {
+      display: grid;
+      width: 37px;
+      height: 37px;
+      place-items: center;
+      border-radius: 11px;
+      color: #dbeafe;
+      font-size: 0.7rem;
+      font-weight: 1000;
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.16);
+    }
+
+    .home-lower-mark--game { background: linear-gradient(135deg, #334155, #0f172a); }
+    .home-lower-mark--tournament { background: linear-gradient(135deg, #facc15, #a16207); color: #1c1917; }
+    .home-lower-game-row strong,
+    .home-lower-tournament strong { display: block; overflow: hidden; color: #e2e8f0; font-size: 0.79rem; text-overflow: ellipsis; white-space: nowrap; }
+    .home-lower-game-row p,
+    .home-lower-tournament p { display: -webkit-box; margin: 4px 0 0; overflow: hidden; color: #94a3b8; font-size: 0.68rem; line-height: 1.38; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+    .home-lower-row-action {
+      display: grid;
+      width: 27px;
+      height: 27px;
+      place-items: center;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 8px;
+      color: #86efac;
+      font-size: 0.83rem;
+    }
+
+    .home-lower-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      align-self: end;
+      margin-top: 16px;
+      color: #cbd5e1;
+      font-size: 0.72rem;
+      font-weight: 900;
+    }
+
+    .home-lower-footer span { color: #86efac; font-size: 0.95rem; transition: transform 180ms ease; }
+    .home-lower-footer:hover,
+    .home-lower-footer:focus-visible { color: #f8fafc; outline: none; }
+    .home-lower-footer:hover span,
+    .home-lower-footer:focus-visible span { transform: translateX(3px); }
+
+    .home-lower-rankings {
+      display: grid;
+      gap: 0;
+      align-content: start;
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .home-lower-rankings li {
+      display: grid;
+      grid-template-columns: 27px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    }
+
+    .home-lower-rankings li:last-child { border-bottom: 0; }
+    .home-lower-rankings b { color: #facc15; font-size: 0.69rem; }
+    .home-lower-rankings strong,
+    .home-lower-rankings small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .home-lower-rankings strong { color: #e2e8f0; font-size: 0.74rem; }
+    .home-lower-rankings small { margin-top: 2px; color: #94a3b8; font-size: 0.6rem; }
+
+    @media (max-width: 820px) {
+      .home-lower-grid { grid-template-columns: 1fr; }
+      .home-lower-card { min-height: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .home-lower-footer span { transition: none; }
+      .home-lower-footer:hover span,
+      .home-lower-footer:focus-visible span { transform: none; }
+    }
   </style>
 </head>
 <body>
@@ -19375,7 +19510,47 @@
           </article>
         </aside>
 
-        <span class="home-feature-runtime" id="homeRecentGames" aria-hidden="true">Play a game and it will appear here.</span>
+      </div>
+    </section>
+
+    <section class="home-lower-dashboard" aria-label="Chess activity overview">
+      <div class="wrap home-lower-grid">
+        <article class="home-lower-card">
+          <div class="home-lower-card-head">
+            <h3>Recent Games</h3>
+            <a href="#play" data-site-tab="play" data-site-panel="play">View all</a>
+          </div>
+          <div class="home-lower-game-row">
+            <span class="home-lower-mark home-lower-mark--game" aria-hidden="true">G</span>
+            <div><strong>Your latest board</strong><p id="homeRecentGames">Play a game and it will appear here.</p></div>
+            <a class="home-lower-row-action" href="#play" data-site-tab="play" data-site-panel="play" aria-label="Open Play">&gt;</a>
+          </div>
+          <a class="home-lower-footer" href="#play" data-site-tab="play" data-site-panel="play">Play a new game <span aria-hidden="true">&gt;</span></a>
+        </article>
+
+        <article class="home-lower-card">
+          <div class="home-lower-card-head">
+            <h3>Upcoming Tournaments</h3>
+            <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">View all</a>
+          </div>
+          <div class="home-lower-tournament">
+            <span class="home-lower-mark home-lower-mark--tournament" aria-hidden="true">T</span>
+            <div><strong>Friendly Arena</strong><p>Join a live event or create one with friends.</p></div>
+          </div>
+          <a class="home-lower-footer" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Open tournament lobby <span aria-hidden="true">&gt;</span></a>
+        </article>
+
+        <article class="home-lower-card">
+          <div class="home-lower-card-head">
+            <h3>Top Players</h3>
+            <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">View all</a>
+          </div>
+          <ol class="home-lower-rankings" aria-label="Leaderboard categories">
+            <li><b>#1</b><span><strong>Global rankings</strong><small>Registered players</small></span></li>
+            <li><b>#2</b><span><strong>Puzzle trainers</strong><small>Daily tactics leaders</small></span></li>
+            <li><b>#3</b><span><strong>AI beaters</strong><small>Coach battle results</small></span></li>
+          </ol>
+        </article>
       </div>
     </section>
 
