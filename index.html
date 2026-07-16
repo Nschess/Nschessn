@@ -19763,6 +19763,133 @@
       .site-header .nav-mobile-panel { top: 62px; }
     }
 
+    /* Hero-only rebuild: existing copy, controls, board, and bindings are retained. */
+    .hero-command-center {
+      min-height: min(760px, calc(100svh - 68px));
+      padding-block: clamp(20px, 2.7vw, 42px) clamp(28px, 3.4vw, 52px);
+      background:
+        radial-gradient(circle at 52% 44%, rgba(34, 197, 94, 0.2), transparent 26rem),
+        radial-gradient(circle at 8% 10%, rgba(250, 204, 21, 0.1), transparent 19rem),
+        linear-gradient(135deg, #08111f 0%, #0d1c31 52%, #070e1b 100%);
+    }
+
+    .hero-command-center::before {
+      background:
+        linear-gradient(90deg, rgba(8, 17, 31, 0.96) 0%, rgba(8, 17, 31, 0.46) 34%, rgba(8, 17, 31, 0.12) 56%, rgba(8, 17, 31, 0.9) 100%),
+        radial-gradient(circle at 54% 46%, rgba(34, 197, 94, 0.13), transparent 44%);
+    }
+
+    .hero-command-center .hero-inner { width: min(100% - clamp(28px, 4vw, 72px), 1500px); }
+
+    .hero-command-center .hero-layout {
+      grid-template-columns: minmax(245px, 0.76fr) minmax(500px, 1.65fr) 280px;
+      align-items: center;
+      gap: clamp(18px, 2.3vw, 36px);
+    }
+
+    .hero-command-center .hero-copy { max-width: 365px; padding-block: 14px; }
+    .hero-welcome-badge { font-size: 0.66rem; }
+    .hero-welcome-note { margin: 8px 0 15px; font-size: 0.8rem; }
+
+    .hero-command-center .hero-copy h1 {
+      max-width: 8.5ch;
+      font-size: clamp(3rem, 4.55vw, 5.45rem);
+      line-height: 0.9;
+      letter-spacing: -0.06em;
+    }
+
+    .hero-command-center .hero-description { max-width: 31ch; margin-top: 18px; font-size: 0.93rem; }
+    .hero-command-center .hero-actions { margin-top: 22px; }
+    .hero-command-center .hero-actions .button { min-height: 42px; padding-inline: 15px; border-radius: 10px; font-size: 0.82rem; }
+    .hero-stat-row { gap: 7px; margin-top: 24px; }
+    .hero-command-center .home-stat { padding: 8px 5px; border-radius: 9px; }
+    .hero-command-center .home-stat small { font-size: 0.56rem; }
+
+    .hero-stage {
+      min-height: clamp(500px, 42vw, 650px);
+      padding: clamp(22px, 2.2vw, 34px);
+    }
+
+    .hero-stage-halo {
+      inset: 4% -2%;
+      background:
+        radial-gradient(ellipse at 52% 50%, rgba(34, 197, 94, 0.28), rgba(34, 197, 94, 0.06) 42%, transparent 72%),
+        radial-gradient(circle at 70% 34%, rgba(250, 204, 21, 0.14), transparent 28%);
+      filter: blur(14px);
+    }
+
+    .hero-command-center .hero-board.hero-board--center {
+      width: min(100%, 680px);
+      border-width: clamp(7px, 0.75vw, 11px);
+      border-radius: clamp(14px, 1.5vw, 22px);
+      background: linear-gradient(145deg, #475569, #111827);
+      transform: perspective(1200px) rotateX(5deg) rotateZ(-2.8deg) translateY(-4px);
+      box-shadow:
+        0 42px 76px rgba(2, 6, 23, 0.6),
+        0 0 0 1px rgba(250, 204, 21, 0.28),
+        0 0 68px rgba(34, 197, 94, 0.24),
+        inset 0 1px 0 rgba(248, 250, 252, 0.2);
+    }
+
+    .hero-command-center .hero-board.hero-board--center::after {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      inset: 0;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: inherit;
+      box-shadow: inset 0 0 42px rgba(2, 6, 23, 0.2);
+      pointer-events: none;
+    }
+
+    .hero-command-center .hero-board-grid { position: relative; z-index: 1; }
+    .hero-command-center .hero-stage:hover .hero-board { transform: perspective(1200px) rotateX(3deg) rotateZ(-1.4deg) translateY(-8px); }
+
+    .hero-player-card { width: min(56%, 238px); padding: 7px 9px; border-radius: 11px; }
+    .hero-player-card--opponent { top: 4%; right: -2%; }
+    .hero-player-card--you { bottom: 4%; left: -2%; }
+
+    .hero-command-center .hero-dashboard {
+      width: 280px;
+      justify-self: end;
+      gap: 9px;
+    }
+
+    .hero-quick-card,
+    .hero-progress-card { padding: 12px; border-radius: 12px; }
+    .hero-quick-card { min-height: 68px; gap: 9px; }
+    .hero-quick-card strong { font-size: 0.8rem; }
+    .hero-quick-card small { font-size: 0.64rem; }
+    .hero-quick-icon { width: 34px; height: 34px; border-radius: 9px; font-size: 0.53rem; }
+    .hero-progress-card { gap: 9px; }
+    .hero-progress-metrics { gap: 5px; }
+
+    @media (max-width: 1180px) {
+      .hero-command-center .hero-layout { grid-template-columns: minmax(245px, 0.82fr) minmax(480px, 1.45fr); }
+      .hero-command-center .hero-dashboard { grid-column: 1 / -1; width: auto; justify-self: stretch; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .hero-command-center .hero-progress-card { grid-column: span 2; }
+      .hero-command-center .hero-dashboard > .hero-quick-card:nth-of-type(3) { grid-column: span 2; }
+    }
+
+    @media (max-width: 820px) {
+      .hero-command-center .hero-inner { width: min(100% - 28px, 680px); }
+      .hero-command-center .hero-layout { grid-template-columns: 1fr; gap: 20px; }
+      .hero-command-center .hero-copy { max-width: 560px; padding-block: 0; }
+      .hero-command-center .hero-copy h1 { max-width: 9.5ch; font-size: clamp(3rem, 11vw, 5.25rem); }
+      .hero-stage { min-height: min(100vw, 620px); padding: 16px; }
+      .hero-command-center .hero-dashboard { grid-column: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero-command-center .hero-progress-card,
+      .hero-command-center .hero-dashboard > .hero-quick-card:nth-of-type(3) { grid-column: auto; }
+    }
+
+    @media (max-width: 520px) {
+      .hero-command-center { padding-block: 18px 26px; }
+      .hero-command-center .hero-description { font-size: 0.9rem; }
+      .hero-stage { min-height: min(106vw, 510px); }
+      .hero-player-card { width: min(76%, 230px); }
+      .hero-command-center .hero-dashboard { grid-template-columns: 1fr; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :where(.button, .mission-button, .tab-button) { transition: none; }
       :where(.button, .mission-button, .tab-button):hover,
