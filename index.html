@@ -19190,28 +19190,38 @@
 
     /* Lower homepage dashboard. */
     .home-lower-dashboard {
-      padding: 0 0 clamp(50px, 7vw, 96px);
-      background: linear-gradient(180deg, rgba(8, 15, 28, 0.76), #0b1220 72%);
+      padding: clamp(12px, 1.5vw, 20px) 0 clamp(52px, 7vw, 96px);
+      background:
+        linear-gradient(180deg, rgba(5, 11, 22, 0), rgba(5, 11, 22, 0.46) 28%, #0b1220 86%);
     }
 
     .home-lower-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: clamp(12px, 1.5vw, 22px);
+      align-items: stretch;
+      gap: clamp(12px, 1.35vw, 18px);
     }
 
     .home-lower-card {
       display: grid;
       grid-template-rows: auto 1fr auto;
       min-width: 0;
-      min-height: 218px;
-      padding: clamp(15px, 1.6vw, 21px);
-      border: 1px solid rgba(148, 163, 184, 0.18);
-      border-radius: 17px;
+      min-height: clamp(202px, 16vw, 226px);
+      padding: clamp(16px, 1.45vw, 20px);
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 15px;
       background:
-        radial-gradient(circle at 100% 0%, rgba(34, 197, 94, 0.1), transparent 34%),
-        linear-gradient(145deg, rgba(248, 250, 252, 0.06), rgba(15, 23, 42, 0.78));
-      box-shadow: 0 18px 36px rgba(2, 6, 23, 0.25), inset 0 1px 0 rgba(248, 250, 252, 0.06);
+        radial-gradient(circle at 90% -15%, rgba(34, 197, 94, 0.12), transparent 38%),
+        linear-gradient(145deg, rgba(25, 39, 60, 0.9), rgba(11, 19, 35, 0.92));
+      box-shadow: 0 14px 28px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+      transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+    }
+
+    .home-lower-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(74, 222, 128, 0.42);
+      box-shadow: 0 20px 34px rgba(2, 6, 23, 0.38), inset 0 1px 0 rgba(248, 250, 252, 0.1);
     }
 
     .home-lower-card-head {
@@ -19221,8 +19231,8 @@
       gap: 12px;
     }
 
-    .home-lower-card-head h3 { margin: 0; color: #f8fafc; font-size: clamp(0.9rem, 1.1vw, 1.05rem); }
-    .home-lower-card-head a { color: #86efac; font-size: 0.68rem; font-weight: 950; white-space: nowrap; }
+    .home-lower-card-head h3 { margin: 0; color: #f8fafc; font-size: clamp(0.9rem, 1.05vw, 1.04rem); letter-spacing: 0; }
+    .home-lower-card-head a { color: #86efac; font-size: 0.66rem; font-weight: 900; white-space: nowrap; }
     .home-lower-card-head a:hover,
     .home-lower-card-head a:focus-visible { color: #facc15; outline: none; }
 
@@ -19231,9 +19241,9 @@
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
-      gap: 10px;
-      margin-top: 18px;
-      padding: 12px 0;
+      gap: 11px;
+      margin-top: 15px;
+      padding: 12px 0 13px;
       border-bottom: 1px solid rgba(148, 163, 184, 0.14);
     }
 
@@ -19241,10 +19251,10 @@
 
     .home-lower-mark {
       display: grid;
-      width: 37px;
-      height: 37px;
+      width: 39px;
+      height: 39px;
       place-items: center;
-      border-radius: 11px;
+      border-radius: 12px;
       color: #dbeafe;
       font-size: 0.7rem;
       font-weight: 1000;
@@ -19254,7 +19264,7 @@
     .home-lower-mark--game { background: linear-gradient(135deg, #334155, #0f172a); }
     .home-lower-mark--tournament { background: linear-gradient(135deg, #facc15, #a16207); color: #1c1917; }
     .home-lower-game-row strong,
-    .home-lower-tournament strong { display: block; overflow: hidden; color: #e2e8f0; font-size: 0.79rem; text-overflow: ellipsis; white-space: nowrap; }
+    .home-lower-tournament strong { display: block; overflow: hidden; color: #f1f5f9; font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
     .home-lower-game-row p,
     .home-lower-tournament p { display: -webkit-box; margin: 4px 0 0; overflow: hidden; color: #94a3b8; font-size: 0.68rem; line-height: 1.38; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 
@@ -19275,9 +19285,9 @@
       justify-content: space-between;
       gap: 10px;
       align-self: end;
-      margin-top: 16px;
+      margin-top: 14px;
       color: #cbd5e1;
-      font-size: 0.72rem;
+      font-size: 0.69rem;
       font-weight: 900;
     }
 
@@ -19291,7 +19301,7 @@
       display: grid;
       gap: 0;
       align-content: start;
-      margin: 14px 0 0;
+      margin: 13px 0 0;
       padding: 0;
       list-style: none;
     }
@@ -19301,19 +19311,24 @@
       grid-template-columns: 27px minmax(0, 1fr);
       align-items: center;
       gap: 10px;
-      min-height: 42px;
+      min-height: 41px;
       border-bottom: 1px solid rgba(148, 163, 184, 0.12);
     }
 
     .home-lower-rankings li:last-child { border-bottom: 0; }
-    .home-lower-rankings b { color: #facc15; font-size: 0.69rem; }
+    .home-lower-rankings b { color: #facc15; font-size: 0.67rem; }
     .home-lower-rankings strong,
     .home-lower-rankings small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .home-lower-rankings strong { color: #e2e8f0; font-size: 0.74rem; }
     .home-lower-rankings small { margin-top: 2px; color: #94a3b8; font-size: 0.6rem; }
 
     @media (max-width: 820px) {
-      .home-lower-grid { grid-template-columns: 1fr; }
+      .home-lower-grid { grid-template-columns: repeat(3, minmax(220px, 1fr)); overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; }
+      .home-lower-card { scroll-snap-align: start; }
+    }
+
+    @media (max-width: 620px) {
+      .home-lower-grid { grid-template-columns: 1fr; overflow: visible; }
       .home-lower-card { min-height: 0; }
     }
 
@@ -19552,6 +19567,25 @@
     #store .store-card p { color: #cbd5e1; line-height: 1.55; }
     #store .store-card .button { min-height: 42px; }
 
+    #store .store-currency-card {
+      grid-column: 1 / -1;
+      min-height: 184px;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+      align-items: end;
+      gap: 14px 24px;
+      padding: clamp(20px, 2.4vw, 30px);
+      border-color: rgba(250, 204, 21, 0.36);
+      background:
+        radial-gradient(circle at 88% 16%, rgba(250, 204, 21, 0.22), transparent 27%),
+        radial-gradient(circle at 10% 82%, rgba(34, 197, 94, 0.12), transparent 32%),
+        linear-gradient(145deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.96));
+    }
+
+    #store .store-currency-card .section-kicker { grid-column: 1 / -1; margin: 0; color: var(--gold); }
+    #store .store-currency-card h3 { margin: 0; font-size: clamp(1.3rem, 2.1vw, 1.8rem); }
+    #store .store-currency-card p:not(.section-kicker) { max-width: 62ch; margin: 0; }
+    #store .store-currency-card .button { align-self: end; margin: 0; }
+
     #store .game-reward-row { gap: 8px; }
     #store .game-unlock { border-color: rgba(148, 163, 184, 0.2); background: rgba(15, 23, 42, 0.56); }
 
@@ -19565,6 +19599,8 @@
       #store .store-balance { justify-self: stretch; grid-template-columns: auto auto; align-items: baseline; justify-content: center; gap: 7px; }
       #store .store-showcase { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       #store .store-showcase-card { min-height: 108px; }
+      #store .store-currency-card { grid-template-columns: 1fr; min-height: 0; }
+      #store .store-currency-card .button { width: 100%; }
     }
 
     /* Final cross-site polish. These rules refine existing layouts without changing routes or game behavior. */
@@ -20093,6 +20129,55 @@
       .hero-command-center .hero-progress-card { padding: 14px; }
     }
 
+    /* Feature strip only: Puzzles, Learn, Tournaments, Leaderboard, and Store. */
+    .home-feature-strip {
+      margin-top: clamp(-18px, -1.1vw, -10px);
+      padding-bottom: clamp(24px, 3.2vw, 42px);
+      background: linear-gradient(180deg, rgba(8, 17, 31, 0.06), rgba(8, 17, 31, 0.72));
+    }
+
+    .home-feature-grid { gap: clamp(8px, 0.9vw, 12px); }
+
+    .home-feature-card {
+      min-height: 66px;
+      gap: 9px;
+      padding: 11px 12px;
+      border-color: rgba(148, 163, 184, 0.2);
+      border-radius: 12px;
+      background:
+        linear-gradient(120deg, rgba(248, 250, 252, 0.08), transparent 42%),
+        linear-gradient(145deg, rgba(30, 41, 59, 0.86), rgba(15, 23, 42, 0.9));
+      box-shadow: 0 12px 24px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+    }
+
+    .home-feature-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.1), 0 6px 14px rgba(2, 6, 23, 0.16);
+    }
+
+    .home-feature-card strong { font-size: clamp(0.74rem, 0.82vw, 0.86rem); }
+    .home-feature-card small { margin-top: 2px; font-size: clamp(0.56rem, 0.62vw, 0.64rem); }
+    .home-feature-card > b { font-size: 1.05rem; }
+
+    @media (hover: hover) and (pointer: fine) {
+      .home-feature-card:hover,
+      .home-feature-card:focus-visible {
+        transform: translateY(-3px);
+        border-color: rgba(34, 197, 94, 0.58);
+        box-shadow: 0 18px 32px rgba(2, 6, 23, 0.34), 0 0 22px rgba(34, 197, 94, 0.1), inset 0 1px 0 rgba(248, 250, 252, 0.1);
+      }
+    }
+
+    @media (max-width: 620px) {
+      .home-feature-strip { margin-top: -8px; padding-bottom: 24px; }
+      .home-feature-card { min-height: 62px; padding: 10px; }
+      .home-feature-icon { width: 30px; height: 30px; font-size: 0.86rem; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :where(.button, .mission-button, .tab-button) { transition: none; }
       :where(.button, .mission-button, .tab-button):hover,
@@ -20102,6 +20187,150 @@
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
+      }
+    }
+    /* Cross-page visual language: shared treatment for the existing pages only. */
+    :root {
+      --premium-surface: linear-gradient(145deg, rgba(27, 42, 64, 0.86), rgba(10, 18, 33, 0.94));
+      --premium-card: linear-gradient(145deg, rgba(255, 255, 255, 0.065), rgba(22, 35, 56, 0.82) 42%, rgba(10, 18, 33, 0.93));
+      --premium-line: rgba(148, 163, 184, 0.18);
+      --premium-radius: 16px;
+      --premium-shadow: 0 16px 36px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+    }
+
+    :where(.section-dark, .section-warm) {
+      position: relative;
+      border-color: var(--premium-line);
+      background-image:
+        radial-gradient(circle at 12% 0%, rgba(34, 197, 94, 0.07), transparent 26rem),
+        radial-gradient(circle at 88% 4%, rgba(250, 204, 21, 0.045), transparent 23rem);
+    }
+
+    :where(.section-kicker, .eyebrow) {
+      color: #86efac;
+      font-size: 0.68rem;
+      letter-spacing: 0.11em;
+    }
+
+    :where(.section-head h2, .section-head h3) {
+      line-height: 1.08;
+      text-wrap: balance;
+    }
+
+    :where(.section-intro, .section-head > p) {
+      color: #a8b7ca;
+      line-height: 1.65;
+    }
+
+    :where(
+      .site-panel, .play-shell, .puzzle-shell, .settings-shell, .store-shell,
+      .preference-panel, .academy-shell, .academy-panel, .books-shell, .reader-shell,
+      .tutorial-shell, .auth-panel, .auth-account-panel, .login-shell, .login-card,
+      .admin-shell, .coach-panel, .beginner-bot-panel, .boss-battle-panel,
+      .friend-lobby, .friend-search-panel, .friend-code-card, .friend-request-card,
+      .friend-game-chat, .friend-challenge-notice, .tournament-detail, .tournament-section,
+      .engine-panel, .review-focus-card, .review-summary-card
+    ) {
+      border-color: var(--premium-line);
+      border-radius: var(--premium-radius);
+      background: var(--premium-surface);
+      box-shadow: var(--premium-shadow);
+    }
+
+    :where(
+      .lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+      .notation-card, .book-card, .video-card, .video-path-card, .store-card,
+      .store-showcase-card, .leaderboard-card, .academy-card, .academy-hero-card,
+      .admin-card, .ai-player-card, .beginner-bot-card, .boss-card, .coach-adventure-panel,
+      .daily-goals-card, .day-card, .first-tour-card, .friend-card, .friend-result-card,
+      .hero-player-card, .hero-progress-card, .home-feature-card, .home-summary-card,
+      .home-lower-card, .home-quick-card, .home-sidebar-tile, .match-player-card,
+      .next-step-card, .puzzle-story-card, .real-puzzle-card, .settings-card,
+      .story-mode-card, .tournament-card, .board-theme-preview-panel,
+      .highlight-preview-panel, .name-style-preview-panel
+    ) {
+      border-color: var(--premium-line);
+      border-radius: var(--premium-radius);
+      background: var(--premium-card);
+      box-shadow: var(--premium-shadow);
+    }
+
+    :where(.badge, .pill, .tag, .status-pill, .achievement-badge, .xp-pill) {
+      border-color: rgba(148, 163, 184, 0.22);
+      background: rgba(15, 23, 42, 0.58);
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.06);
+    }
+
+    :where(.button, .mission-button, .tab-button, .store-category-tab, .auth-tab) {
+      border-radius: 11px;
+      font-weight: 850;
+      letter-spacing: 0.005em;
+      transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease,
+        background 200ms ease, color 200ms ease;
+    }
+
+    :where(.button, .mission-button, .tab-button, .store-category-tab, .auth-tab):not(.secondary) {
+      box-shadow: 0 8px 20px rgba(34, 197, 94, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.13);
+    }
+
+    :where(.button, .mission-button, .tab-button, .store-category-tab, .auth-tab).secondary {
+      border-color: rgba(148, 163, 184, 0.26);
+      background: rgba(15, 23, 42, 0.58);
+    }
+
+    :where(input, select, textarea) {
+      border-color: rgba(148, 163, 184, 0.28);
+      background-color: rgba(8, 15, 28, 0.58);
+      color: var(--text);
+    }
+
+    :where(input, select, textarea)::placeholder { color: #8291a6; }
+
+    :where(.nav-icon, .home-feature-icon, .hero-quick-icon, .home-lower-mark, .store-icon) {
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.11), 0 6px 14px rgba(2, 6, 23, 0.18);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      :where(
+        .lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+        .notation-card, .book-card, .video-card, .video-path-card, .store-card,
+        .store-showcase-card, .leaderboard-card, .academy-card, .ai-player-card,
+        .beginner-bot-card, .boss-card, .friend-result-card, .home-feature-card,
+        .home-summary-card, .home-lower-card, .home-quick-card, .home-sidebar-tile,
+        .match-player-card, .puzzle-story-card, .real-puzzle-card, .tournament-card
+      ):hover {
+        transform: translateY(-2px);
+        border-color: rgba(74, 222, 128, 0.4);
+        box-shadow: 0 22px 42px rgba(2, 6, 23, 0.36), inset 0 1px 0 rgba(248, 250, 252, 0.1);
+      }
+
+      :where(.button, .mission-button, .tab-button, .store-category-tab, .auth-tab):hover {
+        transform: translateY(-1px);
+        border-color: rgba(134, 239, 172, 0.56);
+      }
+    }
+
+    @media (max-width: 640px) {
+      :where(
+        .site-panel, .play-shell, .puzzle-shell, .settings-shell, .store-shell,
+        .preference-panel, .academy-shell, .academy-panel, .books-shell, .reader-shell,
+        .tutorial-shell, .auth-panel, .auth-account-panel, .login-shell, .login-card,
+        .admin-shell, .coach-panel, .beginner-bot-panel, .boss-battle-panel,
+        .friend-lobby, .friend-search-panel, .friend-code-card, .friend-request-card,
+        .friend-game-chat, .friend-challenge-notice, .tournament-detail, .tournament-section,
+        .engine-panel, .review-focus-card, .review-summary-card
+      ) { border-radius: 13px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :where(.button, .mission-button, .tab-button, .store-category-tab, .auth-tab),
+      :where(.lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+        .notation-card, .book-card, .video-card, .video-path-card, .store-card,
+        .store-showcase-card, .leaderboard-card, .academy-card, .ai-player-card,
+        .beginner-bot-card, .boss-card, .friend-result-card, .home-feature-card,
+        .home-summary-card, .home-lower-card, .home-quick-card, .home-sidebar-tile,
+        .match-player-card, .puzzle-story-card, .real-puzzle-card, .tournament-card) {
+        transition: none;
       }
     }
   </style>
@@ -29175,7 +29404,7 @@
       return panel;
     }
 
-    let activeStoreCategory = "Backgrounds";
+    let activeStoreCategory = "Featured";
 
     function getStoreCategory(item) {
       return item.type === "backgroundTheme" ? "Backgrounds"
@@ -29190,18 +29419,38 @@
             : "Profile";
     }
 
+    function getStoreItemsForCategory(category) {
+      const categoryItems = storeItems.filter((item) => getStoreCategory(item) === category);
+      const cosmeticTypes = new Set(["backgroundTheme", "board", "skin", "avatar", "frame", "avatarEffect"]);
+      const rarityRank = { Divine: 6, Mythic: 5, Legendary: 4, Epic: 3, Rare: 2, Common: 1 };
+      if (category === "Featured") {
+        return storeItems
+          .filter((item) => cosmeticTypes.has(item.type))
+          .slice()
+          .sort((first, second) => (rarityRank[second.rarity] || 0) - (rarityRank[first.rarity] || 0))
+          .slice(0, 12);
+      }
+      if (category === "Bundles") {
+        return storeItems
+          .filter((item) => cosmeticTypes.has(item.type) && (rarityRank[item.rarity] || 0) >= rarityRank.Epic)
+          .slice()
+          .sort((first, second) => (rarityRank[second.rarity] || 0) - (rarityRank[first.rarity] || 0));
+      }
+      return categoryItems;
+    }
+
     function renderStoreShowcase(prefs) {
       const showcase = document.getElementById("storeShowcase");
       if (!showcase) return;
       const picks = [
-        { label: "Featured items", item: storeItems.find((item) => item.type === "backgroundTheme" && /royal|aurora|galaxy/i.test(item.name)) },
-        { label: "Chess boards", item: storeItems.find((item) => item.type === "board" && /royal|crystal|galaxy/i.test(item.name)) },
-        { label: "Piece sets", item: storeItems.find((item) => item.type === "skin" && /classic|royal|dragon/i.test(item.name)) },
-        { label: "Themes", item: storeItems.find((item) => item.type === "backgroundTheme" && /forest|sakura|ocean|sunset/i.test(item.name)) },
-        { label: "Avatars", item: storeItems.find((item) => ["avatar", "avatarEffect"].includes(item.type) && /divine|galaxy|phoenix/i.test(item.name)) },
-        { label: "Bundle drop", item: storeItems.find((item) => item.type === "nameStyle" && /divine|phoenix|holographic/i.test(item.name)) }
+        { label: "Featured", category: "Featured", item: storeItems.find((item) => item.type === "backgroundTheme" && /royal|aurora|galaxy/i.test(item.name)) },
+        { label: "Boards", category: "Boards", item: storeItems.find((item) => item.type === "board" && /royal|crystal|galaxy/i.test(item.name)) },
+        { label: "Piece Sets", category: "Chess Pieces", item: storeItems.find((item) => item.type === "skin" && /classic|royal|dragon/i.test(item.name)) },
+        { label: "Themes", category: "Backgrounds", item: storeItems.find((item) => item.type === "backgroundTheme" && /forest|sakura|ocean|sunset/i.test(item.name)) },
+        { label: "Avatars", category: "Avatars", item: storeItems.find((item) => ["avatar", "avatarEffect"].includes(item.type) && /divine|galaxy|phoenix/i.test(item.name)) },
+        { label: "Bundles", category: "Bundles", item: storeItems.find((item) => item.type === "nameStyle" && /divine|phoenix|holographic/i.test(item.name)) }
       ].filter((pick) => pick.item);
-      showcase.replaceChildren(...picks.map(({ label, item }) => {
+      showcase.replaceChildren(...picks.map(({ label, category, item }) => {
         const card = document.createElement("button");
         card.type = "button";
         card.className = "store-showcase-card";
@@ -29209,7 +29458,7 @@
         card.style.setProperty("--rarity-color", item.rarity === "Divine" ? "#fff2b8" : item.rarity === "Mythic" ? "#ff7adf" : item.rarity === "Legendary" ? "#ffd36b" : item.rarity === "Epic" ? "#ae87ff" : item.rarity === "Rare" ? "#6fa8dc" : "rgba(255,248,237,.34)");
         card.append(createBookText("strong", "", label), createBookText("span", "", item.name));
         card.addEventListener("click", () => {
-          activeStoreCategory = getStoreCategory(item);
+          activeStoreCategory = category;
           renderStore();
           document.getElementById("storeGrid")?.scrollIntoView({ block: "start", behavior: "smooth" });
         });
@@ -29248,6 +29497,7 @@
       inventory.replaceChildren(...inventoryItems.map((item) => createBookText("span", "game-unlock", item)));
       renderStoreShowcase(prefs);
       const categoryNotes = {
+        Featured: "Premium cosmetic picks, ready to preview, unlock, and equip.",
         Backgrounds: "Premium site backdrops for every page. Boards stay clear and readable.",
         "Chess Pieces": "Choose your style. Play in your legend. Premium themes stay readable on every board.",
         Style: "Choose the personality shown on your board. One archetype equips at a time.",
@@ -29255,20 +29505,25 @@
         "Name Styles": "Cosmetic username effects only. They never change gameplay.",
         Boards: "Live board themes with readable squares, premium glow previews, and cosmetic-only animations.",
         Avatars: "Premium avatars, pet companions, frames, and lightweight visual effects.",
+        Bundles: "Curated high-tier collections. Every cosmetic still equips independently.",
+        Currency: "Your live coin wallet and the fastest ways to earn more rewards.",
         Profile: "Titles and celebrations.",
         Highlights: "Last-move colors and board borders. Highlights stay transparent so pieces remain clear."
       };
       const categoryLabels = {
+        Featured: "Featured",
         Backgrounds: "Themes",
         "Chess Pieces": "Piece Sets",
         Avatars: "Avatars",
-        Boards: "Chess Boards"
+        Boards: "Boards",
+        Bundles: "Bundles",
+        Currency: "Currency"
       };
-      const categoryOrder = ["Backgrounds", "Chess Pieces", "Avatars", "Flex Badges", "Name Styles", "Boards", "Highlights", "Profile"];
-      if (!categoryOrder.includes(activeStoreCategory)) activeStoreCategory = "Backgrounds";
+      const categoryOrder = ["Featured", "Boards", "Chess Pieces", "Backgrounds", "Avatars", "Bundles", "Currency", "Flex Badges", "Name Styles", "Highlights", "Profile"];
+      if (!categoryOrder.includes(activeStoreCategory)) activeStoreCategory = "Featured";
       if (tabs) {
         tabs.replaceChildren(...categoryOrder.map((category) => {
-          const count = storeItems.filter((item) => getStoreCategory(item) === category).length;
+          const count = category === "Currency" ? 1 : getStoreItemsForCategory(category).length;
           const button = document.createElement("button");
           button.type = "button";
           button.className = "store-category-tab";
@@ -29286,7 +29541,25 @@
       renderBoardThemeDesigner(prefs);
       const nodes = [];
       categoryOrder.filter((category) => category === activeStoreCategory).forEach((category) => {
-        const categoryItems = storeItems.filter((item) => getStoreCategory(item) === category);
+        if (category === "Currency") {
+          const currencyCard = document.createElement("article");
+          currencyCard.className = "store-card store-currency-card";
+          const earnCoins = document.createElement("a");
+          earnCoins.className = "button";
+          earnCoins.href = "#puzzles";
+          earnCoins.dataset.homeAction = "puzzle-plan";
+          earnCoins.dataset.homePlan = "adaptive";
+          earnCoins.textContent = "Earn coins";
+          currencyCard.append(
+            createBookText("p", "section-kicker", "Currency"),
+            createBookText("h3", "", "Your coin vault"),
+            createBookText("p", "", `${formatProfileNumber(puzzleCoins)} coins available. Solve puzzles, complete missions, and play games to grow your collection.`),
+            earnCoins
+          );
+          nodes.push(currencyCard);
+          return;
+        }
+        const categoryItems = getStoreItemsForCategory(category);
         const items = category === "Name Styles"
           ? getFilteredNameStyleItems(categoryItems)
           : category === "Boards"
