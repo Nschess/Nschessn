@@ -23324,6 +23324,10 @@
     let realPuzzleTransitionId = 0;
     let realPuzzleValidationErrors = [];
     let realPuzzleValidIndexes = realPuzzleBank.map((_, index) => index);
+    const realPuzzleInvalidIndexes = new Set();
+    const realPuzzlePrefetchedIndexes = new Set();
+    const realPuzzleIndexCache = new Map();
+    let realPuzzlePrefetchQueued = false;
     let realPuzzleCollectionLoaded = false;
     let realPuzzleAutoNextTimer = 0;
     let streak = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.streak) || 0) : 0;
@@ -35280,7 +35284,10 @@
     }
 
     function getRealPuzzleIndexes() {
-      const sourceIndexes = realPuzzleValidIndexes.length ? realPuzzleValidIndexes : (realPuzzleValidationErrors.length ? [] : realPuzzleBank.map((_, index) => index));
+      const cacheKey = `${realPuzzleMode}|${realPuzzleDifficulty}|${realPuzzleBank.length}|${realPuzzleValidIndexes.length}|${realPuzzleInvalidIndexes.size}`;
+      const cached = realPuzzleIndexCache.get(cacheKey);
+      if (cached) return cached;
+      const sourceIndexes = realPuzzleValidIndexes.length ? realPuzzleValidIndexes : realPuzzleBank.map((_, index) => index);
       const seenPositions = new Set();
       const indexes = sourceIndexes
         .map((index) => {
@@ -35289,13 +35296,15 @@
         })
         .filter((index) => {
           if (index < 0) return false;
+          if (realPuzzleInvalidIndexes.has(index)) return false;
           const key = getRealPuzzlePositionKey(realPuzzleBank[index]);
           if (!key || seenPositions.has(key)) return false;
           seenPositions.add(key);
           return true;
         });
-      if (realPuzzleMode === "Daily") return indexes.length ? [getRealDailyIndex(indexes)] : [];
-      return indexes;
+      const result = realPuzzleMode === "Daily" ? (indexes.length ? [getRealDailyIndex(indexes)] : []) : indexes;
+      realPuzzleIndexCache.set(cacheKey, result);
+      return result;
     }
 
     function getRealPuzzlePositionLabel() {
@@ -35438,7 +35447,48 @@
         }
         if ((index + 1) % 24 === 0) await yieldBackgroundWork();
       }
+      realPuzzleIndexCache.clear();
       return errors;
+    }
+
+    function validateRealPuzzleIndex(index) {
+      if (realPuzzlePrefetchedIndexes.has(index)) return true;
+      const puzzle = realPuzzleBank[index];
+      const validation = validateRealPuzzleRecord(puzzle);
+      if (validation.ok) {
+        realPuzzlePrefetchedIndexes.add(index);
+        return true;
+      }
+      realPuzzleInvalidIndexes.add(index);
+      realPuzzleIndexCache.clear();
+      if (puzzle?.id) realPuzzleValidationErrors.push(`${puzzle.title || puzzle.id}: ${validation.reason}`);
+      return false;
+    }
+
+    async function prefetchRealPuzzleWindow(limit = 8) {
+      if (!CoachChess || !realPuzzleBank.length) return;
+      const indexes = getRealPuzzleIndexes();
+      const start = Math.max(0, indexes.indexOf(realPuzzleIndex));
+      let checked = 0;
+      for (let offset = 1; offset <= indexes.length && checked < limit; offset += 1) {
+        const index = indexes[(start + offset) % indexes.length];
+        if (realPuzzlePrefetchedIndexes.has(index) || realPuzzleInvalidIndexes.has(index)) continue;
+        validateRealPuzzleIndex(index);
+        checked += 1;
+        if (checked % 2 === 0) await yieldBackgroundWork();
+      }
+    }
+
+    function scheduleRealPuzzlePrefetch() {
+      if (realPuzzlePrefetchQueued) return;
+      realPuzzlePrefetchQueued = true;
+      scheduleBackgroundTask(async () => {
+        try {
+          await prefetchRealPuzzleWindow(8);
+        } finally {
+          realPuzzlePrefetchQueued = false;
+        }
+      }, 180);
     }
 
     async function verifyRealPuzzleBankWithStockfish() {
@@ -35465,6 +35515,33 @@
       }
       if (verified.length) realPuzzleValidIndexes = verified;
       return errors;
+    }
+
+    function createRealPuzzleCatalogRecord(item, index = 0, source = "External verified JSON") {
+      if (!item || typeof item !== "object") return null;
+      const moves = splitPuzzleLine(item.moves || item.line || item.pv || item.solution);
+      const difficulty = realPuzzleDifficultyAliases[item.difficulty] || item.difficulty || (
+        Number(item.rating) >= 2400 ? "Master" :
+        Number(item.rating) >= 1900 ? "Expert" :
+        Number(item.rating) >= 1400 ? "Advanced" :
+        Number(item.rating) >= 950 ? "Intermediate" : "Beginner"
+      );
+      return {
+        id: String(item.id || item.PuzzleId || `external-${index + 1}`),
+        source: item.source || source,
+        difficulty,
+        rating: Math.max(600, Math.min(3000, Number(item.rating || item.Rating) || 900)),
+        theme: item.theme || (Array.isArray(item.themes) ? item.themes[0] : "Tactic") || "Tactic",
+        themes: getRealPuzzleThemes(item),
+        title: item.title || `Puzzle ${index + 1}`,
+        prompt: item.prompt || `${item.side || "Find the best move"} and follow the full continuation.`,
+        fen: item.fen || item.FEN || "",
+        moves,
+        side: item.side || "",
+        primer: Boolean(item.primer),
+        hints: Array.isArray(item.hints) && item.hints.length ? item.hints.slice(0, 3) : ["Find forcing moves.", "Check, capture, threat.", `Line starts: ${moves[0] || "best move"}.`],
+        note: item.note || item.explanation || item.description || "Each move keeps the pressure on until the idea is complete."
+      };
     }
 
     function normalizeRealPuzzleRecord(item, index = 0, source = "External verified JSON") {
@@ -35542,7 +35619,7 @@
       if (realPuzzleCollectionLoaded) return true;
       const install = (items, source, replaceExisting = true) => {
         if (!Array.isArray(items) || !items.length) return false;
-        const normalized = items.map((item, index) => normalizeRealPuzzleRecord(item, index, source)).filter(Boolean);
+        const normalized = items.map((item, index) => createRealPuzzleCatalogRecord(item, index, source)).filter(Boolean);
         const existing = new Set((replaceExisting ? [] : realPuzzleBank).map(getRealPuzzleKey));
         const existingIds = new Set((replaceExisting ? [] : realPuzzleBank).map((puzzle) => String(puzzle?.id || "")).filter(Boolean));
         const existingPositions = new Set((replaceExisting ? [] : realPuzzleBank).map(getRealPuzzlePositionKey));
@@ -35557,6 +35634,11 @@
         });
         if (!fresh.length) return false;
         realPuzzleBank = replaceExisting ? fresh : [...realPuzzleBank, ...fresh];
+        realPuzzleValidIndexes = [];
+        realPuzzleValidationErrors = [];
+        realPuzzleInvalidIndexes.clear();
+        realPuzzlePrefetchedIndexes.clear();
+        realPuzzleIndexCache.clear();
         realPuzzleCollectionSource = source;
         return true;
       };
@@ -35564,20 +35646,26 @@
       const collectionUrl = configuredUrl || new URL(`data/puzzles.json?v=${encodeURIComponent(puzzleBankVersion)}`, window.location.href).href;
       const cached = readJsonStorage(realPuzzleCollectionCacheKey, null);
       let installed = cached?.version === puzzleBankVersion && install(cached.puzzles, "Cached Lichess puzzles");
-      try {
-        const response = await fetch(collectionUrl, { cache: "force-cache" });
-        if (!response.ok) return installed;
-        const payload = await response.json();
-        const items = Array.isArray(payload) ? payload : payload.puzzles;
-        if (install(items, payload.source || "Lichess puzzle database")) {
-          installed = true;
-          writeJsonStorage(realPuzzleCollectionCacheKey, { version: puzzleBankVersion, puzzles: items });
+      const refreshCollection = async () => {
+        try {
+          const response = await fetch(collectionUrl, { cache: "force-cache" });
+          if (!response.ok) return;
+          const payload = await response.json();
+          const items = Array.isArray(payload) ? payload : payload.puzzles;
+          if (install(items, payload.source || "Lichess puzzle database")) {
+            installed = true;
+            scheduleBackgroundTask(() => writeJsonStorage(realPuzzleCollectionCacheKey, { version: puzzleBankVersion, puzzles: items }), 1200);
+          }
+        } catch {
+          // The cached JSON collection remains available when the deployed file cannot load.
         }
-      } catch {
-        // The cached JSON collection remains available when the deployed file cannot load.
+      };
+      if (installed) {
+        realPuzzleCollectionLoaded = true;
+        return true;
       }
+      await refreshCollection();
       realPuzzleCollectionLoaded = installed;
-      if (installed) syncLegacyPuzzleTrainer();
       return installed;
     }
 
@@ -35718,7 +35806,7 @@
     function getRealAchievementDefs() {
       const solvedPuzzles = realPuzzleBank.filter((puzzle) => realPuzzleSolved.has(puzzle.id));
       const solvedByDifficulty = (difficulty) => solvedPuzzles.filter((puzzle) => getRealPuzzleDifficulty(puzzle) === difficulty).length;
-      const totalByDifficulty = (difficulty) => realPuzzleValidIndexes.map((index) => realPuzzleBank[index]).filter((puzzle) => getRealPuzzleDifficulty(puzzle) === difficulty).length;
+      const totalByDifficulty = (difficulty) => getRealPuzzleIndexes().filter((index) => getRealPuzzleDifficulty(realPuzzleBank[index]) === difficulty).length;
       return [
         ["real-first", "Real Solver", realPuzzleSolved.size >= 1],
         ["real-five", "Five Real Wins", realPuzzleSolved.size >= 5],
@@ -35913,12 +36001,13 @@
       progress: getRealPuzzleProgress
     });
 
-    function renderRealPuzzleSelectors() {
+    function renderRealPuzzleSelectors(indexes = getRealPuzzleIndexes()) {
       const select = document.getElementById("realPuzzleSelect");
       const list = document.getElementById("realPuzzleNameList");
       if (!select || !list) return;
-      const indexes = getRealPuzzleIndexes();
-      select.replaceChildren(...indexes.map((index) => {
+      const position = Math.max(0, indexes.indexOf(realPuzzleIndex));
+      const selectorIndexes = indexes.slice(Math.max(0, position - 16), position + 17);
+      select.replaceChildren(...selectorIndexes.map((index) => {
         const puzzle = realPuzzleBank[index];
         const option = document.createElement("option");
         option.value = String(index);
@@ -35926,7 +36015,7 @@
         return option;
       }));
       select.value = String(realPuzzleIndex);
-      list.replaceChildren(...indexes.map((index) => {
+      list.replaceChildren(...selectorIndexes.slice(0, 12).map((index) => {
         const puzzle = realPuzzleBank[index];
         const button = document.createElement("button");
         button.type = "button";
@@ -35996,6 +36085,15 @@
         return;
       }
       if (!playableIndexes.includes(realPuzzleIndex)) realPuzzleIndex = playableIndexes[0] || 0;
+      if (!validateRealPuzzleIndex(realPuzzleIndex)) {
+        const replacement = playableIndexes.find((index) => index !== realPuzzleIndex && validateRealPuzzleIndex(index));
+        if (replacement === undefined) {
+          const feedback = document.getElementById("realPuzzleFeedback");
+          if (feedback) feedback.textContent = "Preparing another verified tactic...";
+          return;
+        }
+        realPuzzleIndex = replacement;
+      }
       const puzzle = realPuzzleBank[realPuzzleIndex];
       resetRealPuzzleGame();
       reportRealPuzzleRuntime("puzzle-loaded", puzzle);
@@ -36022,6 +36120,7 @@
       document.getElementById("realPuzzleTitle").textContent = puzzle.title;
       document.getElementById("realPuzzlePrompt").textContent = puzzle.prompt;
       document.getElementById("realPuzzleHint").textContent = puzzle.note || "Use a hint when you want a gentle nudge.";
+      scheduleRealPuzzlePrefetch();
       const modeNote = {
         Daily: "Daily puzzle: one focused win today.",
         Trainer: "Trainer: learn the full line at your pace.",
@@ -36212,21 +36311,21 @@
     async function verifyPuzzleBanksInBackground() {
       try {
         await loadRealPuzzleCollection();
-        realPuzzleValidationErrors = await validateRealPuzzleBank();
         const deepAudit = new URLSearchParams(window.location.search).get("verifyPuzzles") === "1";
         if (deepAudit) {
+          realPuzzleValidationErrors = await validateRealPuzzleBank();
           await verifyActivePuzzleBankWithStockfish();
           const engineErrors = await verifyRealPuzzleBankWithStockfish();
           if (engineErrors.length) realPuzzleValidationErrors.push(...engineErrors);
+        } else {
+          await prefetchRealPuzzleWindow(8);
         }
       } catch {
-        // Runtime validation is best-effort; the JSON collection remains playable when it loaded.
+        // The current puzzle remains playable if an optional background warm-up fails.
       } finally {
-        puzzleCollectionReady = realPuzzleValidIndexes.length > 0;
+        puzzleCollectionReady = realPuzzleBank.length > 0;
         reportRealPuzzleDiagnostics();
         refreshPuzzleCollectionStatus();
-        renderPuzzle();
-        renderRealPuzzle();
       }
     }
 
@@ -36236,11 +36335,8 @@
       document.getElementById("realPuzzles")?.setAttribute("data-loading", "true");
       try {
         await loadChessRules();
-        initializeLegacyPuzzleDatabase();
         await loadRealPuzzleCollection();
-        renderPuzzle();
-        realPuzzleValidationErrors = await validateRealPuzzleBank();
-        puzzleCollectionReady = realPuzzleValidIndexes.length > 0;
+        puzzleCollectionReady = realPuzzleBank.length > 0;
         reportRealPuzzleRuntime("collection-ready");
       } catch {
         realPuzzleValidationErrors = ["Puzzle rules are temporarily unavailable."];
@@ -36281,7 +36377,6 @@
       });
       document.getElementById("realPuzzleNextUnsolved")?.addEventListener("click", () => realPuzzleManager.nextUnsolved());
       renderRealPuzzle();
-      scheduleBackgroundTask(verifyPuzzleBanksInBackground, 2600);
     }
 
     async function setupPlayableChess() {
