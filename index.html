@@ -19053,6 +19053,115 @@
       .nav-icon-button:hover,
       .nav-icon-button:focus-visible { transform: none; }
     }
+
+    /* Homepage feature entry points. */
+    .home-feature-strip {
+      position: relative;
+      z-index: 2;
+      margin-top: clamp(-26px, -1.6vw, -12px);
+      padding: 0 0 clamp(28px, 4vw, 54px);
+      background: linear-gradient(180deg, rgba(8, 15, 28, 0.1), rgba(8, 15, 28, 0.76));
+    }
+
+    .home-feature-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: clamp(8px, 1vw, 14px);
+    }
+
+    .home-feature-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 80px;
+      padding: 13px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 15px;
+      background:
+        linear-gradient(135deg, rgba(248, 250, 252, 0.07), transparent 38%),
+        rgba(15, 23, 42, 0.72);
+      box-shadow: 0 14px 28px rgba(2, 6, 23, 0.22), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+    }
+
+    .home-feature-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background: linear-gradient(110deg, transparent 20%, rgba(248, 250, 252, 0.16) 48%, transparent 76%);
+      transform: translateX(-105%);
+      transition: opacity 180ms ease, transform 420ms ease;
+    }
+
+    .home-feature-card:hover,
+    .home-feature-card:focus-visible {
+      border-color: rgba(34, 197, 94, 0.56);
+      background:
+        linear-gradient(135deg, rgba(34, 197, 94, 0.16), transparent 48%),
+        rgba(15, 23, 42, 0.88);
+      box-shadow: 0 20px 38px rgba(2, 6, 23, 0.35), 0 0 0 1px rgba(34, 197, 94, 0.08);
+      outline: none;
+      transform: translateY(-4px);
+    }
+
+    .home-feature-card:hover::after,
+    .home-feature-card:focus-visible::after { opacity: 1; transform: translateX(105%); }
+
+    .home-feature-icon {
+      display: grid;
+      width: 35px;
+      height: 35px;
+      place-items: center;
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      border-radius: 10px;
+      background: rgba(34, 197, 94, 0.12);
+      color: #86efac;
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+
+    .home-feature-card:nth-child(3) .home-feature-icon { border-color: rgba(250, 204, 21, 0.28); background: rgba(250, 204, 21, 0.12); color: #facc15; }
+    .home-feature-card:nth-child(4) .home-feature-icon { border-color: rgba(192, 132, 252, 0.28); background: rgba(192, 132, 252, 0.12); color: #d8b4fe; }
+    .home-feature-card:nth-child(5) .home-feature-icon { border-color: rgba(251, 191, 36, 0.28); background: rgba(251, 191, 36, 0.12); color: #fde68a; }
+
+    .home-feature-card > span:nth-child(2) { min-width: 0; }
+    .home-feature-card strong,
+    .home-feature-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .home-feature-card strong { color: #f8fafc; font-size: clamp(0.76rem, 0.9vw, 0.9rem); }
+    .home-feature-card small { margin-top: 3px; color: #94a3b8; font-size: clamp(0.59rem, 0.68vw, 0.68rem); font-weight: 750; }
+    .home-feature-card > b { color: #64748b; font-size: 0.96rem; transition: color 180ms ease, transform 180ms ease; }
+    .home-feature-card:hover > b,
+    .home-feature-card:focus-visible > b { color: #86efac; transform: translateX(2px); }
+    .home-feature-runtime { display: none; }
+
+    @media (max-width: 980px) {
+      .home-feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .home-feature-card { min-height: 72px; }
+    }
+
+    @media (max-width: 620px) {
+      .home-feature-strip { margin-top: -10px; padding-bottom: 28px; }
+      .home-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .home-feature-card { min-height: 68px; gap: 8px; padding: 10px; border-radius: 12px; }
+      .home-feature-card:last-child { grid-column: 1 / -1; }
+      .home-feature-icon { width: 31px; height: 31px; border-radius: 9px; font-size: 0.9rem; }
+      .home-feature-card small { font-size: 0.58rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .home-feature-card,
+      .home-feature-card::after,
+      .home-feature-card > b { transition: none; }
+      .home-feature-card:hover,
+      .home-feature-card:focus-visible { transform: none; }
+    }
   </style>
 </head>
 <body>
@@ -19201,6 +19310,36 @@
       </div>
     </section>
 
+    <section class="home-feature-strip" aria-label="Explore Checkmate Quest">
+      <div class="wrap home-feature-grid">
+        <a class="home-feature-card" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">
+          <span class="home-feature-icon" aria-hidden="true">&#9671;</span>
+          <span><strong>Puzzles</strong><small>Train your tactics</small></span>
+          <b aria-hidden="true">&gt;</b>
+        </a>
+        <a class="home-feature-card" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">
+          <span class="home-feature-icon" aria-hidden="true">&#8961;</span>
+          <span><strong>Learn</strong><small>Lessons in small steps</small></span>
+          <b aria-hidden="true">&gt;</b>
+        </a>
+        <a class="home-feature-card" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">
+          <span class="home-feature-icon" aria-hidden="true">&#9819;</span>
+          <span><strong>Tournaments</strong><small>Compete at your pace</small></span>
+          <b aria-hidden="true">&gt;</b>
+        </a>
+        <a class="home-feature-card" href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">
+          <span class="home-feature-icon" aria-hidden="true">&#9650;</span>
+          <span><strong>Leaderboard</strong><small>See your progress</small></span>
+          <b aria-hidden="true">&gt;</b>
+        </a>
+        <a class="home-feature-card" href="#store" data-site-tab="store" data-site-panel="store">
+          <span class="home-feature-icon" aria-hidden="true">&#10022;</span>
+          <span><strong>Store</strong><small>Style your board</small></span>
+          <b aria-hidden="true">&gt;</b>
+        </a>
+      </div>
+    </section>
+
     <section class="home-main-section" aria-labelledby="home-board-title">
       <div class="wrap home-main-grid">
         <article class="home-board-panel">
@@ -19236,28 +19375,7 @@
           </article>
         </aside>
 
-        <div class="home-board-followups" aria-label="Chess activity">
-          <article class="home-summary-card">
-            <h3>Recent Games</h3>
-            <p id="homeRecentGames">Play a game and it will appear here.</p>
-            <a href="#play" data-site-tab="play" data-site-panel="play">Open Play</a>
-          </article>
-          <article class="home-summary-card">
-            <h3>Active Tournaments</h3>
-            <p>Join an event or create a friendly competition.</p>
-            <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">View Tournaments</a>
-          </article>
-          <article class="home-summary-card">
-            <h3>Leaderboard</h3>
-            <p>See puzzle, AI, and tournament progress from registered players.</p>
-            <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">View Rankings</a>
-          </article>
-          <article class="home-summary-card">
-            <h3>Chess News</h3>
-            <p>Fresh lessons, daily tactics, and practical coach updates.</p>
-            <a href="#videos" data-site-tab="videos" data-site-panel="videos">Explore Lessons</a>
-          </article>
-        </div>
+        <span class="home-feature-runtime" id="homeRecentGames" aria-hidden="true">Play a game and it will appear here.</span>
       </div>
     </section>
 
