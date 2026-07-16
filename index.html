@@ -18415,6 +18415,644 @@
         transform: none;
       }
     }
+
+    /* Homepage command center: visual composition only; existing routes and bindings stay shared. */
+    .hero-command-center {
+      min-height: min(820px, calc(100svh - 70px));
+      padding: clamp(24px, 3vw, 48px) 0;
+      background:
+        radial-gradient(circle at 49% 43%, rgba(34, 197, 94, 0.18), transparent 23rem),
+        radial-gradient(circle at 5% 18%, rgba(250, 204, 21, 0.09), transparent 20rem),
+        linear-gradient(135deg, #0b1220, #101b2f 56%, #0a1220);
+    }
+
+    .hero-command-center::before {
+      background:
+        linear-gradient(90deg, rgba(8, 15, 28, 0.94), rgba(8, 15, 28, 0.3) 48%, rgba(8, 15, 28, 0.86)),
+        radial-gradient(circle at 50% 50%, rgba(34, 197, 94, 0.1), transparent 46%);
+    }
+
+    .hero-command-center::after {
+      inset: 6% 10%;
+      opacity: 0.12;
+      background-size: 42px 42px;
+      -webkit-mask-image: radial-gradient(ellipse at center, #000 18%, transparent 72%);
+      mask-image: radial-gradient(ellipse at center, #000 18%, transparent 72%);
+    }
+
+    .hero-command-center .hero-inner {
+      width: min(100% - clamp(28px, 5vw, 92px), 1540px);
+      margin-inline: auto;
+      padding: 0;
+    }
+
+    .hero-command-center .hero-layout {
+      display: grid;
+      grid-template-columns: minmax(230px, 0.82fr) minmax(400px, 1.46fr) minmax(254px, 0.78fr);
+      align-items: center;
+      gap: clamp(20px, 2.8vw, 52px);
+    }
+
+    .hero-command-center .hero-copy {
+      max-width: 410px;
+      color: var(--text);
+    }
+
+    .hero-welcome-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      color: #b8f7c9;
+      font-size: 0.74rem;
+      font-weight: 900;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .hero-welcome-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12), 0 0 16px rgba(34, 197, 94, 0.72);
+    }
+
+    .hero-welcome-note {
+      min-height: 1.25rem;
+      margin: 10px 0 18px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .hero-command-center .hero-copy h1 {
+      max-width: 9ch;
+      margin: 0;
+      color: #f8fafc;
+      font-size: clamp(3.1rem, 5.6vw, 6.25rem);
+      line-height: 0.89;
+      letter-spacing: -0.055em;
+      text-wrap: balance;
+    }
+
+    .hero-command-center .hero-copy h1 span {
+      display: block;
+      color: var(--green);
+      text-shadow: 0 0 32px rgba(34, 197, 94, 0.18);
+    }
+
+    .hero-command-center .hero-description {
+      max-width: 34ch;
+      margin: 22px 0 0;
+      color: #cbd5e1;
+      font-size: clamp(0.98rem, 1.25vw, 1.08rem);
+      line-height: 1.62;
+    }
+
+    .hero-command-center .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 11px;
+      margin-top: 28px;
+    }
+
+    .hero-command-center .hero-actions .button {
+      min-height: 48px;
+      padding-inline: 19px;
+      border-radius: 12px;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.24);
+    }
+
+    .hero-command-center .hero-actions .button:not(.secondary) {
+      background: linear-gradient(135deg, #22c55e, #65a30d);
+    }
+
+    .hero-command-center .hero-actions .button.secondary {
+      border-color: rgba(148, 163, 184, 0.3);
+      background: rgba(30, 41, 59, 0.68);
+      color: #f8fafc;
+    }
+
+    .hero-stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+      margin-top: 30px;
+    }
+
+    .hero-command-center .home-stat {
+      min-width: 0;
+      padding: 9px 7px;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 11px;
+      background: rgba(15, 23, 42, 0.48);
+      text-align: center;
+    }
+
+    .hero-command-center .home-stat strong {
+      display: block;
+      overflow: hidden;
+      color: #f8fafc;
+      font-size: clamp(0.9rem, 1.15vw, 1.08rem);
+      line-height: 1.1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hero-command-center .home-stat small {
+      display: block;
+      margin-top: 4px;
+      overflow: hidden;
+      color: #94a3b8;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-overflow: ellipsis;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .hero-command-center .home-stat.is-highlight strong { color: #facc15; }
+
+    .hero-stage {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      min-height: min(56vw, 640px);
+      padding: clamp(18px, 2vw, 32px);
+      isolation: isolate;
+    }
+
+    .hero-stage-halo {
+      position: absolute;
+      inset: 8% 6%;
+      z-index: -1;
+      border-radius: 42%;
+      background: radial-gradient(ellipse, rgba(34, 197, 94, 0.22), rgba(34, 197, 94, 0.02) 54%, transparent 70%);
+      filter: blur(12px);
+      transform: rotate(-8deg);
+    }
+
+    .hero-command-center .hero-board.hero-board--center {
+      position: relative;
+      top: auto;
+      right: auto;
+      width: min(100%, 620px);
+      aspect-ratio: 1;
+      transform: rotate(-2.4deg) perspective(1200px) rotateX(4deg);
+      overflow: hidden;
+      border: clamp(6px, 0.85vw, 11px) solid #1e293b;
+      border-radius: clamp(14px, 1.6vw, 23px);
+      background: #1e293b;
+      box-shadow: 0 34px 72px rgba(2, 6, 23, 0.54), 0 0 0 1px rgba(250, 204, 21, 0.14), 0 0 54px rgba(34, 197, 94, 0.17);
+      transition: transform 260ms ease, box-shadow 260ms ease;
+    }
+
+    .hero-command-center .hero-stage:hover .hero-board {
+      transform: rotate(-1deg) perspective(1200px) rotateX(2deg) translateY(-4px);
+      box-shadow: 0 44px 78px rgba(2, 6, 23, 0.58), 0 0 0 1px rgba(250, 204, 21, 0.28), 0 0 68px rgba(34, 197, 94, 0.22);
+    }
+
+    .hero-command-center .hero-board-grid {
+      width: 100%;
+      height: 100%;
+    }
+
+    .hero-command-center .hero-square {
+      font-size: clamp(1.45rem, 4.1vw, 4.45rem);
+    }
+
+    .hero-player-card {
+      position: absolute;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      width: min(72%, 260px);
+      min-width: 0;
+      padding: 8px 10px;
+      border: 1px solid rgba(226, 232, 240, 0.2);
+      border-radius: 13px;
+      background: rgba(15, 23, 42, 0.82);
+      box-shadow: 0 14px 30px rgba(2, 6, 23, 0.42), inset 0 1px 0 rgba(248, 250, 252, 0.08);
+      backdrop-filter: blur(13px);
+    }
+
+    .hero-player-card--opponent { top: 3%; right: 0; }
+    .hero-player-card--you { bottom: 3%; left: 0; border-color: rgba(34, 197, 94, 0.45); }
+    .hero-player-avatar {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #e2e8f0, #64748b);
+      color: #0f172a;
+      font-size: 0.77rem;
+      font-weight: 950;
+    }
+
+    .hero-player-avatar--you { background: linear-gradient(135deg, #facc15, #65a30d); }
+    .hero-player-card span:not(.hero-player-avatar) { min-width: 0; }
+    .hero-player-card strong,
+    .hero-player-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hero-player-card strong { color: #f8fafc; font-size: 0.76rem; }
+    .hero-player-card small { margin-top: 2px; color: #94a3b8; font-size: 0.64rem; }
+    .hero-player-card b { color: #facc15; font-size: 0.72rem; }
+
+    .hero-command-center .hero-dashboard {
+      display: grid;
+      gap: 11px;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+      box-shadow: none;
+    }
+
+    .hero-command-center .hero-dashboard::before { display: none; }
+
+    .hero-quick-card,
+    .hero-progress-card {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 15px;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.88), rgba(15, 23, 42, 0.78));
+      box-shadow: 0 16px 28px rgba(2, 6, 23, 0.2), inset 0 1px 0 rgba(248, 250, 252, 0.06);
+      transition: transform 200ms ease, border-color 200ms ease, background 200ms ease;
+    }
+
+    .hero-quick-card:hover,
+    .hero-quick-card:focus-visible {
+      transform: translateX(3px);
+      border-color: rgba(34, 197, 94, 0.6);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.16), rgba(15, 23, 42, 0.84));
+    }
+
+    .hero-quick-card--play { border-color: rgba(34, 197, 94, 0.52); }
+    .hero-quick-icon {
+      display: grid;
+      width: 39px;
+      height: 39px;
+      place-items: center;
+      border-radius: 11px;
+      background: rgba(34, 197, 94, 0.16);
+      color: #bbf7d0;
+      font-size: 0.61rem;
+      font-weight: 950;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .hero-quick-card span:not(.hero-quick-icon) { min-width: 0; }
+    .hero-quick-card strong,
+    .hero-quick-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hero-quick-card strong { color: #f8fafc; font-size: 0.88rem; }
+    .hero-quick-card small { margin-top: 2px; color: #94a3b8; font-size: 0.72rem; }
+    .hero-quick-card b { color: #facc15; font-size: 1rem; }
+
+    .hero-progress-card {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+      gap: 12px;
+      padding: 15px;
+    }
+
+    .hero-progress-card > div:first-child {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .hero-progress-card > div:first-child strong { color: #f8fafc; font-size: 0.9rem; }
+    .hero-progress-card > div:first-child span { color: #94a3b8; font-size: 0.68rem; }
+    .hero-progress-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+    .hero-progress-metrics .home-stat { padding: 7px 3px; background: rgba(15, 23, 42, 0.5); }
+    .hero-progress-metrics .home-stat strong { font-size: 0.77rem; }
+    .hero-progress-metrics .home-stat small { font-size: 0.57rem; }
+
+    .hero-logic-cache { display: none; }
+
+    .hero-ambient { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+    .hero-float {
+      position: absolute;
+      color: rgba(248, 250, 252, 0.08);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(5rem, 12vw, 11rem);
+      filter: drop-shadow(0 18px 18px rgba(2, 6, 23, 0.3));
+      user-select: none;
+    }
+
+    .hero-float-knight { top: 6%; left: 34%; transform: rotate(-17deg); }
+    .hero-float-queen { top: 58%; right: 2%; transform: rotate(11deg); }
+    .hero-float-rook { right: 27%; bottom: -11%; transform: rotate(-10deg); }
+
+    @media (max-width: 1180px) {
+      .hero-command-center { min-height: auto; }
+      .hero-command-center .hero-layout {
+        grid-template-columns: minmax(230px, 0.8fr) minmax(390px, 1.28fr);
+      }
+      .hero-command-center .hero-dashboard {
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .hero-command-center .hero-progress-card { grid-column: span 2; }
+      .hero-command-center .hero-quick-card { min-height: 92px; }
+      .hero-command-center .hero-dashboard > .hero-quick-card:nth-of-type(3) { grid-column: span 2; }
+    }
+
+    @media (max-width: 820px) {
+      .hero-command-center .hero-inner { width: min(100% - 28px, 660px); }
+      .hero-command-center .hero-layout { grid-template-columns: 1fr; gap: 26px; }
+      .hero-command-center .hero-copy { max-width: 580px; }
+      .hero-command-center .hero-copy h1 { max-width: 10ch; font-size: clamp(3rem, 11vw, 5.4rem); }
+      .hero-stage { order: 2; min-height: min(98vw, 610px); padding: 14px; }
+      .hero-command-center .hero-dashboard { order: 3; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero-command-center .hero-progress-card,
+      .hero-command-center .hero-dashboard > .hero-quick-card:nth-of-type(3) { grid-column: auto; }
+    }
+
+    @media (max-width: 520px) {
+      .hero-command-center { padding-block: 22px 30px; }
+      .hero-command-center .hero-copy h1 { letter-spacing: -0.05em; }
+      .hero-command-center .hero-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .hero-command-center .hero-actions .button { width: 100%; padding-inline: 10px; font-size: 0.84rem; }
+      .hero-stat-row { margin-top: 20px; }
+      .hero-stage { min-height: min(105vw, 520px); }
+      .hero-player-card { width: min(82%, 246px); padding: 7px 8px; }
+      .hero-player-card--opponent { top: 0; right: -4px; }
+      .hero-player-card--you { bottom: 0; left: -4px; }
+      .hero-command-center .hero-dashboard { grid-template-columns: 1fr; }
+      .hero-command-center .hero-quick-card { min-height: 0; }
+      .hero-float { font-size: 5rem; }
+      .hero-float-knight { left: 68%; top: 8%; }
+      .hero-float-queen, .hero-float-rook { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-command-center .hero-board,
+      .hero-quick-card { transition: none; }
+      .hero-command-center .hero-stage:hover .hero-board,
+      .hero-quick-card:hover,
+      .hero-quick-card:focus-visible { transform: none; }
+    }
+
+    /* Navigation refresh: route bindings remain unchanged. */
+    .site-header {
+      z-index: 70;
+      border-bottom-color: rgba(148, 163, 184, 0.16);
+      background: rgba(8, 15, 28, 0.76);
+      box-shadow: 0 10px 34px rgba(2, 6, 23, 0.22), inset 0 -1px 0 rgba(248, 250, 252, 0.03);
+      -webkit-backdrop-filter: blur(18px) saturate(1.25);
+      backdrop-filter: blur(18px) saturate(1.25);
+    }
+
+    .nav {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      width: min(100% - clamp(24px, 4vw, 72px), 1540px);
+      min-height: 64px;
+      gap: clamp(12px, 1.6vw, 26px);
+      padding-block: 7px;
+    }
+
+    .brand { gap: 8px; }
+
+    .brand-mark {
+      width: 35px;
+      height: 35px;
+      border: 1px solid rgba(250, 204, 21, 0.62);
+      border-radius: 10px;
+      background:
+        linear-gradient(45deg, rgba(15, 23, 42, 0.9) 25%, transparent 25% 75%, rgba(15, 23, 42, 0.9) 75%),
+        linear-gradient(45deg, rgba(15, 23, 42, 0.9) 25%, transparent 25% 75%, rgba(15, 23, 42, 0.9) 75%),
+        #f8f6f0;
+      background-position: 0 0, 8px 8px, 0 0;
+      background-size: 16px 16px, 16px 16px, auto;
+      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.08);
+      color: #0f172a;
+      font-size: 0.62rem;
+    }
+
+    .brand-copy { display: grid; gap: 0; line-height: 1; }
+    .brand-copy strong { color: #f8fafc; font-size: 0.78rem; font-weight: 1000; letter-spacing: -0.02em; }
+    .brand-copy small { color: #86efac; font-size: 0.57rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; }
+
+    .nav-links {
+      justify-self: stretch;
+      display: flex;
+      justify-content: center;
+      gap: 3px;
+      min-width: 0;
+      padding: 4px;
+      border-color: rgba(148, 163, 184, 0.14);
+      border-radius: 13px;
+      background: rgba(15, 23, 42, 0.48);
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.05);
+    }
+
+    .nav-links > a,
+    .nav-group-label {
+      min-height: 36px;
+      gap: 6px;
+      padding-inline: clamp(8px, 1vw, 13px);
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: #cbd5e1;
+      font-size: clamp(0.68rem, 0.8vw, 0.78rem);
+      letter-spacing: 0.01em;
+      text-transform: none;
+    }
+
+    .nav-links > a:hover,
+    .nav-links > a:focus-visible,
+    .nav-group-label:hover,
+    .nav-group-label:focus-visible {
+      background: rgba(148, 163, 184, 0.13);
+      color: #f8fafc;
+      transform: none;
+    }
+
+    .nav-links a.is-active-tab,
+    .nav-links a[aria-current="page"],
+    .nav-group.is-active-group > .nav-group-label {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.92), rgba(101, 163, 13, 0.9));
+      box-shadow: 0 8px 18px rgba(34, 197, 94, 0.19);
+      color: #06230f;
+    }
+
+    .nav-icon {
+      width: 1.1em;
+      color: #facc15;
+      font-size: 0.86rem;
+    }
+
+    .nav-links a.is-active-tab .nav-icon,
+    .nav-group.is-active-group .nav-icon { color: #06230f; }
+    .nav-group-label::after { display: none; }
+
+    .nav-menu {
+      top: calc(100% + 9px);
+      min-width: 215px;
+      padding: 7px;
+      border-color: rgba(148, 163, 184, 0.2);
+      border-radius: 13px;
+      background: rgba(15, 23, 42, 0.96);
+      box-shadow: 0 18px 42px rgba(2, 6, 23, 0.48), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav-menu a { min-height: 35px; border-radius: 8px; color: #cbd5e1; }
+    .nav-menu a:hover,
+    .nav-menu a:focus-visible { color: #f8fafc; background: rgba(34, 197, 94, 0.13); }
+
+    .nav-utilities {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .nav-coin-chip,
+    .nav-icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.56);
+      color: #f8fafc;
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.05);
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+    }
+
+    .nav-coin-chip { gap: 5px; min-width: 58px; padding-inline: 9px; font-size: 0.69rem; font-weight: 950; }
+    .nav-utility-icon { color: #facc15; font-size: 0.8rem; }
+    .nav-icon-button { position: relative; width: 36px; color: #cbd5e1; font-size: 1rem; }
+    .nav-icon-button i { position: absolute; top: 7px; right: 7px; width: 5px; height: 5px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px #0f172a; }
+    .nav-coin-chip:hover,
+    .nav-coin-chip:focus-visible,
+    .nav-icon-button:hover,
+    .nav-icon-button:focus-visible { border-color: rgba(250, 204, 21, 0.58); background: rgba(30, 41, 59, 0.88); transform: translateY(-1px); outline: none; }
+
+    .nav-utilities .player-flex-chip {
+      min-width: 148px;
+      max-width: 184px;
+      padding: 5px 8px 5px 5px;
+      border-color: rgba(250, 204, 21, 0.42);
+      border-radius: 11px;
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(15, 23, 42, 0.7));
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.07);
+    }
+
+    .nav-utilities .player-flex-chip .player-profile-avatar { width: 32px; height: 32px; min-height: 32px; border-radius: 9px; font-size: 0.92rem; }
+    .nav-utilities .player-flex-name { font-size: 0.72rem; }
+    .nav-utilities .player-flex-title { font-size: 0.52rem; }
+    .nav-utilities .player-flex-progress { height: 3px; }
+
+    .nav-mobile-menu { display: none; }
+
+    @media (max-width: 1210px) {
+      .nav { gap: 10px; width: min(100% - 28px, 1540px); }
+      .nav-links > a,
+      .nav-group-label { padding-inline: 8px; }
+      .nav-links > a > span:last-child,
+      .nav-group-label > span:last-child { font-size: 0.68rem; }
+      .nav-utilities .player-flex-chip { min-width: 138px; max-width: 154px; }
+    }
+
+    @media (max-width: 910px) {
+      .nav { grid-template-columns: auto 1fr auto; min-height: 60px; }
+      .nav-links { display: none; }
+      .nav-mobile-menu { position: relative; display: block; justify-self: start; }
+      .nav-mobile-menu summary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 36px;
+        padding: 0 10px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.56);
+        color: #f8fafc;
+        cursor: pointer;
+        font-size: 0.68rem;
+        font-weight: 950;
+        letter-spacing: 0.04em;
+        list-style: none;
+        text-transform: uppercase;
+      }
+      .nav-mobile-menu summary::-webkit-details-marker { display: none; }
+      .nav-mobile-menu summary span { color: #facc15; font-size: 0.58rem; }
+      .nav-mobile-panel {
+        position: fixed;
+        top: 68px;
+        right: 14px;
+        left: 14px;
+        z-index: 90;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+        padding: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.21);
+        border-radius: 15px;
+        background: rgba(15, 23, 42, 0.98);
+        box-shadow: 0 24px 54px rgba(2, 6, 23, 0.56), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+        -webkit-backdrop-filter: blur(18px);
+        backdrop-filter: blur(18px);
+      }
+      .nav-mobile-panel a {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 12px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 10px;
+        background: rgba(30, 41, 59, 0.58);
+        color: #e2e8f0;
+        font-size: 0.79rem;
+        font-weight: 900;
+      }
+      .nav-mobile-panel a:hover,
+      .nav-mobile-panel a:focus-visible { border-color: rgba(34, 197, 94, 0.56); background: rgba(34, 197, 94, 0.13); outline: none; }
+    }
+
+    @media (max-width: 560px) {
+      .nav { width: min(100% - 18px, 100%); gap: 6px; }
+      .brand-copy { display: none; }
+      .nav-coin-chip { min-width: 34px; width: 34px; padding: 0; }
+      .nav-coin-chip > span:last-child { display: none; }
+      .nav-utilities { gap: 5px; }
+      .nav-utilities .player-flex-chip { min-width: 41px; width: 41px; padding: 4px; }
+      .nav-utilities .player-flex-main { display: none; }
+      .nav-utilities .player-flex-chip .player-profile-avatar { width: 31px; height: 31px; min-height: 31px; }
+      .nav-mobile-menu summary { padding-inline: 8px; }
+      .nav-mobile-menu summary b { display: none; }
+      .nav-mobile-panel { top: 64px; right: 9px; left: 9px; grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .nav-coin-chip,
+      .nav-icon-button { transition: none; }
+      .nav-coin-chip:hover,
+      .nav-coin-chip:focus-visible,
+      .nav-icon-button:hover,
+      .nav-icon-button:focus-visible { transform: none; }
+    }
   </style>
 </head>
 <body>
@@ -18423,7 +19061,7 @@
     <nav class="nav" aria-label="Main navigation">
       <a class="brand" href="#top" data-home-link aria-label="Checkmate Quest home">
         <span class="brand-mark" aria-hidden="true">CQ</span>
-        <span>Checkmate Quest</span>
+        <span class="brand-copy"><strong>Checkmate</strong><small>Quest</small></span>
       </a>
       <div class="nav-links" aria-label="Primary navigation">
         <a href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" aria-hidden="true">&#9822;</span><span>Play</span></a>
@@ -18433,8 +19071,8 @@
         <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-icon" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
         <a href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-icon" aria-hidden="true">&#10022;</span><span>Store</span></a>
         <details class="nav-group">
-          <summary class="nav-group-label"><span class="nav-icon" aria-hidden="true">&middot;&middot;&middot;</span><span>More</span></summary>
-          <div class="nav-menu" aria-label="More chess features">
+          <summary class="nav-group-label"><span class="nav-icon" aria-hidden="true">&#9673;</span><span>Community</span></summary>
+          <div class="nav-menu" aria-label="Community and more chess features">
             <a href="#academy" data-site-tab="academy" data-site-panel="academy">Academy</a>
             <a href="#paths" data-site-tab="paths" data-site-panel="paths">Learning Path</a>
             <a href="#adventures" data-site-tab="adventures" data-site-panel="adventures">Adventures</a>
@@ -18449,111 +19087,116 @@
           </div>
         </details>
       </div>
-      <a class="player-flex-chip" href="#login" data-site-tab="login" data-site-panel="login" aria-label="Open Profile or Login">
-        <span class="player-profile-avatar" aria-hidden="true">&#10022;</span>
-        <span class="player-flex-main">
-          <span class="player-flex-name">
-            <span data-profile-field="name">Guest Explorer</span>
+      <div class="nav-utilities" aria-label="Account actions">
+        <a class="nav-coin-chip" href="#store" data-site-tab="store" data-site-panel="store" aria-label="Open Store and view coins">
+          <span class="nav-utility-icon" aria-hidden="true">&#9670;</span>
+          <span data-profile-field="tokens">0</span>
+        </a>
+        <a class="nav-icon-button" href="#settings" data-site-tab="settings" data-site-panel="settings" aria-label="Open notification settings" title="Notifications">
+          <span aria-hidden="true">&#9673;</span><i aria-hidden="true"></i>
+        </a>
+        <a class="player-flex-chip" href="#login" data-site-tab="login" data-site-panel="login" aria-label="Open Profile or Login">
+          <span class="player-profile-avatar" aria-hidden="true">&#10022;</span>
+          <span class="player-flex-main">
+            <span class="player-flex-name">
+              <span data-profile-field="name">Guest Explorer</span>
+            </span>
+            <span class="player-flex-title" data-profile-field="rank">Rank: Explorer</span>
+            <span class="player-flex-progress" aria-hidden="true"><span data-profile-progress-fill></span></span>
           </span>
-          <span class="player-flex-title" data-profile-field="rank">Rank: Explorer</span>
-          <span class="player-flex-progress" aria-hidden="true"><span data-profile-progress-fill></span></span>
-        </span>
-        <span class="player-flex-main">
-          <span class="player-flex-meta"><span data-profile-field="level">Level 1 Explorer</span></span>
-          <span class="player-flex-meta"><span data-profile-field="tokens">0</span> coins</span>
-          <span class="player-flex-achievements" data-profile-achievements aria-label="Current badges"></span>
-        </span>
-      </a>
+        </a>
+      </div>
+      <details class="nav-mobile-menu">
+        <summary aria-label="Open navigation menu"><span aria-hidden="true">Menu</span><b>Menu</b></summary>
+        <div class="nav-mobile-panel" aria-label="Mobile navigation">
+          <a href="#play" data-site-tab="play" data-site-panel="play">Play</a>
+          <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">Puzzles</a>
+          <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">Learn</a>
+          <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Tournaments</a>
+          <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">Leaderboard</a>
+          <a href="#store" data-site-tab="store" data-site-panel="store">Store</a>
+          <a href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Community</a>
+        </div>
+      </details>
     </nav>
   </header>
 
   <main id="top">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-board" aria-hidden="true">
-        <div class="hero-board-grid" id="heroBoard"></div>
+    <section class="hero hero-command-center" aria-labelledby="hero-title">
+      <div class="hero-ambient" aria-hidden="true">
+        <span class="hero-float hero-float-knight">&#9816;</span>
+        <span class="hero-float hero-float-queen">&#9819;</span>
+        <span class="hero-float hero-float-rook">&#9820;</span>
       </div>
       <div class="hero-inner">
         <div class="hero-layout">
-          <div class="hero-copy">
-            <p class="eyebrow">Beginner chess that feels like a game</p>
-            <h1 id="hero-title">Play Chess. Improve Every Move.</h1>
-            <p>Play focused games, solve practical puzzles, and build confidence one clear idea at a time.</p>
+          <div class="hero-copy hero-copy--welcome">
+            <p class="hero-welcome-badge"><span class="hero-welcome-dot"></span><span id="homeWelcome">Welcome back!</span></p>
+            <p class="hero-welcome-note" id="homeWelcomeDelta">Your next tiny win is ready.</p>
+            <h1 id="hero-title">Play Chess.<span>Master</span> Every Move.</h1>
+            <p class="hero-description">Play focused games, solve practical puzzles, and build confidence one clear idea at a time.</p>
             <div class="hero-actions">
               <a class="button" href="#play" id="heroContinueLearning" data-site-tab="play" data-site-panel="play">Play Now</a>
-              <a class="button" href="#tutorial" id="newToChessButton" data-site-tab="tutorial" data-site-panel="tutorial">Learn Chess</a>
+              <a class="button secondary" href="#tutorial" id="newToChessButton" data-site-tab="tutorial" data-site-panel="tutorial">Learn Chess</a>
             </div>
-            <div class="home-start-flow" aria-label="Start here">
-              <a class="home-step" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><strong>1. Learn</strong><span>One tiny rule.</span></a>
-              <a class="home-step" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive"><strong>2. Try</strong><span>One mini puzzle.</span></a>
-              <a class="home-step" href="#play"><strong>3. Play</strong><span>Ask the coach why.</span></a>
-            </div>
-            <div class="guided-path-strip" aria-label="Guided learning path">
-              <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">Beginner</a>
-              <a href="#academy" data-site-tab="academy" data-site-panel="academy">Explorer</a>
-              <a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Tactics">Tactician</a>
-              <a href="#openings" data-site-tab="openings" data-site-panel="openings">Strategist</a>
-              <a href="#play" data-site-tab="play" data-site-panel="play">Advanced</a>
-            </div>
-            <div class="trust-strip" aria-label="Site promises">
-              <span>Free learning</span>
-              <span>No account required</span>
-              <span>Legal book sources</span>
-              <span>Official chess rules</span>
+            <div class="hero-stat-row" aria-label="Your chess progress">
+              <span class="home-stat hero-stat"><strong id="homeGamesPlayed">0</strong><small>Games</small></span>
+              <span class="home-stat hero-stat"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
+              <span class="home-stat hero-stat is-highlight"><strong id="homeStreak">0 days</strong><small>Day streak</small></span>
             </div>
           </div>
-          <div class="home-dashboard" aria-label="Personal chess dashboard">
-            <h3 id="homeWelcome">Welcome back!</h3>
-            <p class="welcome-delta" id="homeWelcomeDelta">Your next tiny win is ready.</p>
-            <div class="home-sidebar-actions" aria-label="Quick chess actions">
-              <a class="home-sidebar-tile is-primary" href="#play" data-site-tab="play" data-site-panel="play">
-                <strong>Quick Play</strong><span>Start a focused game with the coach.</span>
-              </a>
-              <a class="home-sidebar-tile" href="#puzzles" data-home-action="daily-puzzle">
-                <strong>Daily Puzzle</strong><span>One practical tactic and a small reward.</span>
-              </a>
-              <a class="home-sidebar-tile" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">
-                <strong>Online Players</strong><span>Challenge a friend when you are ready.</span>
-              </a>
+
+          <div class="hero-stage" aria-label="Chess board preview">
+            <div class="hero-stage-halo" aria-hidden="true"></div>
+            <div class="hero-board hero-board--center" aria-hidden="true">
+              <div class="hero-board-grid" id="heroBoard"></div>
             </div>
-            <div class="home-progress-title">
-              <strong>Progress</strong>
-              <span>Small wins, real growth</span>
+            <div class="hero-player-card hero-player-card--opponent" aria-label="Featured coach">
+              <span class="hero-player-avatar">N</span>
+              <span><strong>Nova Rookie</strong><small>Friendly chess coach</small></span>
+              <b>1050</b>
             </div>
-            <div class="home-stat-grid" aria-label="Progress dashboard">
-              <span class="home-stat"><strong id="homeGamesPlayed">0</strong><small>Games played</small></span>
-              <span class="home-stat"><strong id="homeThemesMastered">0</strong><small>Tactical themes mastered</small></span>
-              <span class="home-stat is-highlight"><strong id="homeStreak">0 days</strong><small>Current streak</small></span>
-              <span class="home-stat"><strong id="homeLearningTime">0 min</strong><small>Time spent learning</small></span>
-              <span class="home-stat"><strong id="homeSkillsUnlocked">0</strong><small>Skills unlocked</small></span>
-              <span class="home-stat"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
+            <div class="hero-player-card hero-player-card--you" aria-label="Your player card">
+              <span class="hero-player-avatar hero-player-avatar--you">Y</span>
+              <span><strong data-profile-field="name">You</strong><small data-profile-field="title">Ready to play</small></span>
+              <b data-profile-field="gameRating">600</b>
             </div>
-            <div class="next-step-card" aria-live="polite">
-              <strong>Next best step</strong>
-              <span id="homeNextReason">Solve one puzzle, then stop while it still feels fun.</span>
-              <a class="button" href="#puzzles" id="homeNextAction">Start 3-minute quest</a>
-            </div>
-            <div class="daily-goals-card" id="homeDailyGoals" aria-live="polite">
-              <div class="daily-goals-head">
-                <strong>Today's Goal</strong>
-                <span class="badge" id="dailyGoalsProgress">0/3</span>
-              </div>
-              <ul class="daily-goals-list" id="dailyGoalsList"></ul>
-              <div class="daily-goals-reward">
-                <span id="dailyGoalsReward">Reward: +50 Coins</span>
-                <button class="button" type="button" id="claimDailyGoals" disabled>Claim</button>
-              </div>
-            </div>
-            <div class="quick-practice" aria-label="Quick practice">
-              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">2-minute practice</a>
-              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Puzzle Rush">5 puzzles</a>
-              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Endgames">One endgame</a>
-              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Checkmates">Checkmate challenge</a>
-            </div>
-            <p id="homeInsight">One puzzle today is better than none.</p>
-            <div class="achievement-roadmap" id="homeUnlocks" aria-label="Achievement roadmap"></div>
-            <div class="recommendation-list" id="homeRecommendations" aria-label="Recommended practice"></div>
-            <a class="home-dashboard-link" href="#login" data-site-tab="login" data-site-panel="login">Open full dashboard</a>
           </div>
+
+          <aside class="home-dashboard hero-dashboard" aria-label="Quick chess actions">
+            <a class="hero-quick-card hero-quick-card--play" href="#play" data-site-tab="play" data-site-panel="play">
+              <span class="hero-quick-icon">Play</span>
+              <span><strong>Quick Play</strong><small>Start a focused game</small></span>
+              <b aria-hidden="true">&gt;</b>
+            </a>
+            <a class="hero-quick-card" href="#puzzles" data-home-action="daily-puzzle">
+              <span class="hero-quick-icon">Daily</span>
+              <span><strong>Daily Puzzle</strong><small>One tactic, one reward</small></span>
+              <b aria-hidden="true">&gt;</b>
+            </a>
+            <section class="hero-progress-card" aria-label="Progress">
+              <div><strong>Progress</strong><span>Keep your momentum</span></div>
+              <div class="hero-progress-metrics">
+                <span class="home-stat"><strong id="homeThemesMastered">0</strong><small>Themes</small></span>
+                <span class="home-stat"><strong id="homeLearningTime">0 min</strong><small>Learning</small></span>
+                <span class="home-stat"><strong id="homeSkillsUnlocked">0</strong><small>Skills</small></span>
+              </div>
+            </section>
+            <a class="hero-quick-card" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">
+              <span class="hero-quick-icon">Live</span>
+              <span><strong>Online Players</strong><small>Find a friendly match</small></span>
+              <b aria-hidden="true">&gt;</b>
+            </a>
+
+            <div class="hero-logic-cache" aria-hidden="true">
+              <div class="next-step-card"><span id="homeNextReason">Solve one puzzle, then stop while it still feels fun.</span><a href="#puzzles" id="homeNextAction">Start 3-minute quest</a></div>
+              <div class="daily-goals-card" id="homeDailyGoals"><span id="dailyGoalsProgress">0/3</span><ul id="dailyGoalsList"></ul><span id="dailyGoalsReward">Reward: +50 Coins</span><button type="button" id="claimDailyGoals" disabled>Claim</button></div>
+              <div class="quick-practice"><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">2-minute practice</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Puzzle Rush">5 puzzles</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Endgames">One endgame</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Checkmates">Checkmate challenge</a></div>
+              <p id="homeInsight">One puzzle today is better than none.</p>
+              <div id="homeUnlocks"></div>
+              <div id="homeRecommendations"></div>
+            </div>
+          </aside>
         </div>
       </div>
     </section>
