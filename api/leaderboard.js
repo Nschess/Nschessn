@@ -2,8 +2,11 @@ const { supabaseRequest } = require("./_supabase");
 const namePattern = /^[A-Za-z0-9_-]{3,20}$/;
 const idPattern = /^[A-Za-z0-9_-]{8,80}$/;
 
-function send(response, status, payload) {
-  response.status(status).setHeader("Cache-Control", "no-store").json(payload);
+const readCache = new Map();
+const readCacheTtlMs = 5000;
+
+function send(response, status, payload, cacheControl = "no-store") {
+  response.status(status).setHeader("Cache-Control", cacheControl).json(payload);
 }
 
 function number(value, minimum, maximum) {
@@ -37,9 +40,51 @@ function normalizeEntry(input = {}) {
   };
 }
 
-async function readEntries() {
-  const rows = await supabaseRequest("leaderboard_entries?select=public_id,username,country_flag,title,puzzle_rating,game_rating,achievements,statistics,updated_at&order=updated_at.desc&limit=500");
-  return (Array.isArray(rows) ? rows : [])
+function getQueryValue(request, key) {
+  const direct = request?.query?.[key];
+  if (direct !== undefined) return Array.isArray(direct) ? direct[0] : direct;
+  try { return new URL(request?.url || "", "https://checkmate.local").searchParams.get(key); } catch { return null; }
+}
+
+function getPageLimit(value) {
+  return Math.max(1, Math.min(100, Number.parseInt(value, 10) || 50));
+}
+
+function decodeCursor(value) {
+  if (!value || typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(parsed?.updatedAt || "") || !idPattern.test(parsed?.publicId || "")) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function encodeCursor(row) {
+  return Buffer.from(JSON.stringify({ updatedAt: row.updated_at, publicId: row.public_id })).toString("base64url");
+}
+
+async function readEntries({ limit, cursor } = {}) {
+  const pageLimit = getPageLimit(limit);
+  const decodedCursor = decodeCursor(cursor);
+  const cacheKey = `${pageLimit}:${cursor || ""}`;
+  const cached = readCache.get(cacheKey);
+  if (cached && Date.now() - cached.createdAt < readCacheTtlMs) return cached.payload;
+
+  const filters = [
+    "select=public_id,username,country_flag,title,puzzle_rating,game_rating,achievements,statistics,updated_at",
+    "order=updated_at.desc,public_id.asc",
+    `limit=${pageLimit + 1}`
+  ];
+  if (decodedCursor) {
+    const after = `(updated_at.lt.${decodedCursor.updatedAt},and(updated_at.eq.${decodedCursor.updatedAt},public_id.gt.${decodedCursor.publicId}))`;
+    filters.push(`or=${encodeURIComponent(after)}`);
+  }
+  const rows = await supabaseRequest(`leaderboard_entries?${filters.join("&")}`);
+  const source = Array.isArray(rows) ? rows : [];
+  const page = source.slice(0, pageLimit);
+  const entries = page
     .map((row) => normalizeEntry({
       publicId: row.public_id,
       username: row.username,
@@ -52,13 +97,21 @@ async function readEntries() {
       updatedAt: row.updated_at
     }))
     .filter(Boolean)
-    .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))
-    .slice(0, 500);
+    .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)) || left.publicId.localeCompare(right.publicId));
+  const payload = {
+    entries,
+    nextCursor: source.length > pageLimit && page.length ? encodeCursor(page[page.length - 1]) : null
+  };
+  readCache.set(cacheKey, { createdAt: Date.now(), payload });
+  return payload;
 }
 
 module.exports = async (request, response) => {
   try {
-    if (request.method === "GET") return send(response, 200, { entries: await readEntries() });
+    if (request.method === "GET") {
+      const payload = await readEntries({ limit: getQueryValue(request, "limit"), cursor: getQueryValue(request, "cursor") });
+      return send(response, 200, payload, "public, max-age=5, s-maxage=5, stale-while-revalidate=25");
+    }
     if (request.method !== "POST") return send(response, 405, { error: "Method not allowed." });
     const body = typeof request.body === "string" ? JSON.parse(request.body) : request.body;
     const entry = normalizeEntry(body?.entry || body);
@@ -79,6 +132,7 @@ module.exports = async (request, response) => {
       headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify(row)
     });
+    readCache.clear();
     return send(response, 200, { entry });
   } catch (error) {
     const status = error?.code === "SUPABASE_NOT_CONFIGURED" ? 503 : (error?.status || 500);

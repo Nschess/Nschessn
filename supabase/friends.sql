@@ -159,6 +159,11 @@ grant execute on function public.get_friend_directory() to authenticated;
 -- friend-request section above. All writes go through security-definer RPCs.
 alter table public.profiles add column if not exists is_bot boolean not null default false;
 
+create extension if not exists pg_trgm;
+create index if not exists profiles_username_search_idx
+  on public.profiles using gin (username gin_trgm_ops)
+  where not is_bot;
+
 drop function if exists public.search_registered_players(text);
 create function public.search_registered_players(p_query text)
 returns table (
@@ -212,6 +217,8 @@ create table if not exists public.game_challenges (
 
 create index if not exists game_challenges_participant_idx on public.game_challenges (creator_id, opponent_id, status, updated_at desc);
 create index if not exists game_challenges_code_idx on public.game_challenges (code);
+create index if not exists game_challenges_creator_recent_idx on public.game_challenges (creator_id, updated_at desc);
+create index if not exists game_challenges_opponent_recent_idx on public.game_challenges (opponent_id, updated_at desc);
 alter table public.game_challenges add column if not exists white_ms bigint not null default 600000 check (white_ms >= 0);
 alter table public.game_challenges add column if not exists black_ms bigint not null default 600000 check (black_ms >= 0);
 alter table public.game_challenges add column if not exists increment_ms integer not null default 0 check (increment_ms >= 0);
