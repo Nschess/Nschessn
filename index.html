@@ -19297,6 +19297,256 @@
       .home-lower-footer:hover span,
       .home-lower-footer:focus-visible span { transform: none; }
     }
+
+    /* Shared premium design tokens. Presentation only: no layout or route changes. */
+    :root {
+      --bg: #0b1220;
+      --panel: #111c30;
+      --panel-2: #1a2942;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --soft: #e2e8f0;
+      --green: #22c55e;
+      --green-dark: #15803d;
+      --gold: #facc15;
+      --blue: #60a5fa;
+      --danger: #fb7185;
+      --line: rgba(148, 163, 184, 0.2);
+      --radius: 14px;
+      --ui-radius-sm: 10px;
+      --ui-radius-lg: 18px;
+      --shadow: 0 20px 48px rgba(2, 6, 23, 0.32);
+      --surface-shell: linear-gradient(145deg, rgba(30, 41, 59, 0.88), rgba(15, 23, 42, 0.94));
+      --surface-card: linear-gradient(145deg, rgba(248, 250, 252, 0.07), rgba(30, 41, 59, 0.78) 45%, rgba(15, 23, 42, 0.92));
+      --site-bg-image: radial-gradient(circle at 8% 0%, rgba(34, 197, 94, 0.12), transparent 26rem), radial-gradient(circle at 92% 4%, rgba(250, 204, 21, 0.08), transparent 24rem);
+      --move-speed: 160ms;
+      --ui-fast: 180ms;
+      --ui-standard: 240ms;
+    }
+
+    body:not(.theme-light) {
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    body:not(.theme-light) :is(.site-panel, .section-dark, .section-warm) {
+      border-color: rgba(148, 163, 184, 0.14);
+    }
+
+    body:not(.theme-light) :is(
+      .lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+      .notation-card, .book-card, .video-card, .store-card, .leaderboard-card,
+      .home-quick-card, .home-summary-card, .home-lower-card, .home-feature-card,
+      .puzzle-shell, .play-shell, .settings-shell, .store-shell, .preference-panel
+    ) {
+      border-color: var(--line);
+      background: var(--surface-card);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(248, 250, 252, 0.06);
+    }
+
+    :where(.button, .mission-button, .tab-button) {
+      border-radius: var(--ui-radius-sm);
+      font-weight: 900;
+      letter-spacing: 0.01em;
+      transition: transform var(--ui-fast) ease, box-shadow var(--ui-fast) ease, background var(--ui-fast) ease, border-color var(--ui-fast) ease;
+    }
+
+    :where(.button, .mission-button, .tab-button):not(.secondary) {
+      background: linear-gradient(135deg, var(--green), var(--green-dark));
+      box-shadow: 0 10px 24px rgba(34, 197, 94, 0.18);
+    }
+
+    :where(.button, .mission-button, .tab-button).secondary {
+      border-color: rgba(148, 163, 184, 0.3);
+      background: rgba(30, 41, 59, 0.76);
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.05);
+    }
+
+    :where(.button, .mission-button, .tab-button):hover,
+    :where(.button, .mission-button, .tab-button):focus-visible {
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    :where(input, select, textarea) {
+      border-color: rgba(148, 163, 184, 0.26);
+      border-radius: var(--ui-radius-sm);
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.03);
+    }
+
+    :where(input, select, textarea):focus-visible {
+      border-color: rgba(34, 197, 94, 0.74);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+      outline: none;
+    }
+
+    :where(h1, h2, h3, h4) {
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    :where(.section-kicker, .eyebrow, .badge) {
+      font-weight: 900;
+      letter-spacing: 0.06em;
+    }
+
+    :where(.nav-icon, .home-feature-icon, .hero-quick-icon, .home-lower-mark) {
+      border-radius: var(--ui-radius-sm);
+    }
+
+    /* Storefront skin: scoped to the existing Store only. */
+    #store.store-page {
+      position: relative;
+      isolation: isolate;
+      overflow: clip;
+    }
+
+    #store.store-page::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 14% 8%, rgba(34, 197, 94, 0.13), transparent 22rem),
+        radial-gradient(circle at 88% 14%, rgba(250, 204, 21, 0.1), transparent 24rem);
+    }
+
+    #store .section-head {
+      align-items: end;
+      padding-bottom: 8px;
+    }
+
+    #store .store-shell {
+      gap: 18px;
+      padding: clamp(12px, 1.8vw, 22px);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: var(--ui-radius-lg);
+      background: linear-gradient(145deg, rgba(30, 41, 59, 0.62), rgba(15, 23, 42, 0.78));
+      box-shadow: 0 28px 64px rgba(2, 6, 23, 0.34), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+    }
+
+    #store .store-wallet {
+      min-height: 128px;
+      padding: clamp(16px, 2vw, 24px);
+      border-color: rgba(250, 204, 21, 0.32);
+      border-radius: var(--ui-radius-lg);
+      background:
+        linear-gradient(110deg, rgba(250, 204, 21, 0.11), transparent 34%),
+        radial-gradient(circle at 92% 12%, rgba(34, 197, 94, 0.17), transparent 30%),
+        linear-gradient(145deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
+    }
+
+    #store .store-wallet-kicker {
+      margin: 0 0 5px;
+      color: var(--gold);
+      font-size: 0.67rem;
+      font-weight: 950;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    #store .store-wallet h3 { font-size: clamp(1.16rem, 1.7vw, 1.55rem); }
+    #store .store-wallet p:not(.store-wallet-kicker) { color: var(--soft); max-width: 60ch; }
+
+    #store .store-balance {
+      min-width: clamp(132px, 14vw, 180px);
+      min-height: 86px;
+      align-content: center;
+      border-color: rgba(250, 204, 21, 0.54);
+      background: linear-gradient(145deg, rgba(250, 204, 21, 0.2), rgba(15, 23, 42, 0.62));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 12px 28px rgba(250, 204, 21, 0.1);
+    }
+
+    #store .store-balance strong { font-size: clamp(1.55rem, 2.7vw, 2.25rem); }
+
+    #store .store-showcase {
+      grid-template-columns: repeat(6, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    #store .store-showcase-card {
+      min-height: 124px;
+      padding: 15px;
+      border-radius: var(--ui-radius-sm);
+      background:
+        radial-gradient(circle at 86% 18%, color-mix(in srgb, var(--rarity-color, var(--gold)) 24%, transparent), transparent 32%),
+        linear-gradient(145deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.9));
+    }
+
+    #store .store-showcase-card strong { color: color-mix(in srgb, var(--rarity-color, var(--gold)) 80%, white); }
+    #store .store-showcase-card span { color: var(--text); font-size: 0.94rem; }
+
+    #store .store-category-tabs {
+      gap: 8px;
+      padding: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: var(--ui-radius-sm);
+      background: rgba(15, 23, 42, 0.6);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+
+    #store .store-category-tab {
+      min-height: 42px;
+      border-radius: 9px;
+      color: var(--soft);
+    }
+
+    #store .store-category-tab[aria-pressed="true"] {
+      border-color: rgba(34, 197, 94, 0.62);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(21, 128, 61, 0.28));
+      color: #f0fdf4;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 8px 18px rgba(34, 197, 94, 0.12);
+    }
+
+    #store .store-category-header {
+      grid-column: 1 / -1;
+      padding: 4px 2px 2px;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    #store .store-category-header h3 { margin: 0; color: var(--text); font-size: clamp(1.18rem, 1.6vw, 1.45rem); }
+    #store .store-category-header p { margin: 4px 0 0; color: var(--muted); }
+
+    #store .store-grid { gap: 16px; }
+
+    #store .store-card {
+      min-height: 100%;
+      padding: 16px;
+      border-radius: var(--ui-radius-sm);
+      background:
+        radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--rarity-color, var(--green)) 17%, transparent), transparent 36%),
+        linear-gradient(150deg, rgba(30, 41, 59, 0.86), rgba(15, 23, 42, 0.94));
+    }
+
+    #store .store-card h3 { font-size: 1.04rem; }
+    #store .store-card p { color: #cbd5e1; line-height: 1.55; }
+    #store .store-card .button { min-height: 42px; }
+
+    #store .game-reward-row { gap: 8px; }
+    #store .game-unlock { border-color: rgba(148, 163, 184, 0.2); background: rgba(15, 23, 42, 0.56); }
+
+    @media (max-width: 1180px) {
+      #store .store-showcase { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 650px) {
+      #store .store-shell { padding: 10px; }
+      #store .store-wallet { grid-template-columns: 1fr; }
+      #store .store-balance { justify-self: stretch; grid-template-columns: auto auto; align-items: baseline; justify-content: center; gap: 7px; }
+      #store .store-showcase { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #store .store-showcase-card { min-height: 108px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :where(.button, .mission-button, .tab-button) { transition: none; }
+      :where(.button, .mission-button, .tab-button):hover,
+      :where(.button, .mission-button, .tab-button):focus-visible { transform: none; }
+    }
   </style>
 </head>
 <body>
@@ -20170,6 +20420,7 @@
         <div class="store-shell store-premium-shell">
           <div class="store-wallet" aria-live="polite">
             <div>
+              <p class="store-wallet-kicker">Your currency</p>
               <h3>Adventure wallet</h3>
               <p>Earn coins by solving puzzles, watching Shorts, finishing videos, reviewing mistakes, and completing daily challenges.</p>
               <p class="store-status" id="storeStatus">Pick a reward to unlock or equip.</p>
@@ -28371,11 +28622,12 @@
       const showcase = document.getElementById("storeShowcase");
       if (!showcase) return;
       const picks = [
-        { label: "Featured", item: storeItems.find((item) => item.type === "backgroundTheme" && /royal|aurora|galaxy/i.test(item.name)) },
-        { label: "New", item: storeItems.find((item) => ["avatar", "avatarEffect"].includes(item.type) && /divine|galaxy|phoenix/i.test(item.name)) },
-        { label: "Popular", item: storeItems.find((item) => item.type === "skin" && /classic|royal|dragon/i.test(item.name)) },
-        { label: "Limited-Time", item: storeItems.find((item) => item.type === "nameStyle" && /divine|phoenix|holographic/i.test(item.name)) },
-        { label: "Bundle", item: storeItems.find((item) => item.type === "board" && /royal|crystal|galaxy/i.test(item.name)) }
+        { label: "Featured items", item: storeItems.find((item) => item.type === "backgroundTheme" && /royal|aurora|galaxy/i.test(item.name)) },
+        { label: "Chess boards", item: storeItems.find((item) => item.type === "board" && /royal|crystal|galaxy/i.test(item.name)) },
+        { label: "Piece sets", item: storeItems.find((item) => item.type === "skin" && /classic|royal|dragon/i.test(item.name)) },
+        { label: "Themes", item: storeItems.find((item) => item.type === "backgroundTheme" && /forest|sakura|ocean|sunset/i.test(item.name)) },
+        { label: "Avatars", item: storeItems.find((item) => ["avatar", "avatarEffect"].includes(item.type) && /divine|galaxy|phoenix/i.test(item.name)) },
+        { label: "Bundle drop", item: storeItems.find((item) => item.type === "nameStyle" && /divine|phoenix|holographic/i.test(item.name)) }
       ].filter((pick) => pick.item);
       showcase.replaceChildren(...picks.map(({ label, item }) => {
         const card = document.createElement("button");
@@ -28434,6 +28686,12 @@
         Profile: "Titles and celebrations.",
         Highlights: "Last-move colors and board borders. Highlights stay transparent so pieces remain clear."
       };
+      const categoryLabels = {
+        Backgrounds: "Themes",
+        "Chess Pieces": "Piece Sets",
+        Avatars: "Avatars",
+        Boards: "Chess Boards"
+      };
       const categoryOrder = ["Backgrounds", "Chess Pieces", "Avatars", "Flex Badges", "Name Styles", "Boards", "Highlights", "Profile"];
       if (!categoryOrder.includes(activeStoreCategory)) activeStoreCategory = "Backgrounds";
       if (tabs) {
@@ -28443,7 +28701,7 @@
           button.type = "button";
           button.className = "store-category-tab";
           button.setAttribute("aria-pressed", String(category === activeStoreCategory));
-          button.append(createBookText("span", "", category), createBookText("small", "", count));
+          button.append(createBookText("span", "", categoryLabels[category] || category), createBookText("small", "", count));
           button.addEventListener("click", () => {
             activeStoreCategory = category;
             renderStore();
@@ -28471,7 +28729,7 @@
         const header = document.createElement("article");
         header.className = "store-category-header";
         header.append(
-          createBookText("h3", "", category),
+          createBookText("h3", "", categoryLabels[category] || category),
           createBookText("p", "", categoryNotes[category] || "")
         );
         nodes.push(header);
