@@ -4,11 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
-  <link rel="preconnect" href="https://www.youtube-nocookie.com" />
-  <link rel="preconnect" href="https://www.youtube.com" />
-  <link rel="preconnect" href="https://i.ytimg.com" />
-  <link rel="preconnect" href="https://www.google.com" />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <title>Checkmate Quest - Learn Chess From First Move to Strategy</title>
   <style>
     :root {
@@ -698,9 +693,14 @@
       display: none;
     }
 
+    .site-panel[hidden] {
+      display: none !important;
+      contain: layout paint style;
+    }
+
     body.site-tab-mode main > .site-panel.is-active-panel {
       min-height: calc(100svh - 68px);
-      animation: sitePanelIn var(--ui-standard) ease both;
+      animation: sitePanelIn var(--ui-fast) ease both;
     }
 
     @keyframes sitePanelIn {
@@ -15619,7 +15619,9 @@
     .mission-button,
     .button,
     .store-category-tab,
-    .tab-button {
+    .tab-button,
+    [data-site-tab],
+    [data-home-link] {
       touch-action: manipulation;
     }
 
@@ -20756,7 +20758,6 @@
     </div>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <aside class="audio-player" id="audioPlayer" aria-label="Premium music player">
     <span class="audio-wave" aria-hidden="true"></span>
     <div class="audio-now">
@@ -21050,1705 +21051,13 @@
       }));
     }
 
-    let puzzles = [
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Forks",
-        side: "White to move",
-        title: "The Knight's Secret Jump Mission",
-        prompt: "Jump to the L-shaped hideout and attack two big targets.",
-        fen: "r2qkbnr/pppp2pp/8/6N1/8/8/PPPPPPPP/RNBQKB1R",
-        targets: ["f7"],
-        hint: "The knight on g5 can jump to f7.",
-        line: ["Nf7"],
-        answers: [
-          { move: "Nf7", correct: true },
-          { move: "Nh7", correct: false },
-          { move: "Ne4", correct: false }
-        ],
-        feedback: "Nf7 uses the knight's L-shape to fork the queen on d8 and rook on h8."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Winning material",
-        side: "White to move",
-        title: "The Queen's Superhero Rescue",
-        prompt: "The queen removes the strongest attacker and gives check.",
-        fen: "4k3/8/8/4q2Q/8/8/8/4K3",
-        targets: ["e5"],
-        hint: "Move the queen straight left from h5 to e5.",
-        line: ["Qxe5+"],
-        answers: [
-          { move: "Qxe5+", correct: true },
-          { move: "Qh8+", correct: false },
-          { move: "Qh3", correct: false }
-        ],
-        feedback: "Qxe5+ wins the enemy queen and turns defense into a safe checking move."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Winning material",
-        side: "White to move",
-        title: "The Rook's Castle Wall Patrol",
-        prompt: "Use the open file like a hallway and capture the treasure.",
-        fen: "4k3/q7/8/8/8/8/8/R3K3",
-        targets: ["a7"],
-        hint: "The a-file is open for the rook.",
-        line: ["Rxa7"],
-        answers: [
-          { move: "Rxa7", correct: true },
-          { move: "Ra8+", correct: false },
-          { move: "Rh1", correct: false }
-        ],
-        feedback: "Rxa7 shows the rook's superpower: straight-line control on an open file."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Tactics",
-        side: "White to move",
-        title: "The Bishop's Hidden Sniper Trail",
-        prompt: "Follow the diagonal trail and catch the hidden queen.",
-        fen: "4k3/8/7q/8/8/8/8/2B1K3",
-        targets: ["h6"],
-        hint: "Bishops move diagonally. Trace c1-d2-e3-f4-g5-h6.",
-        line: ["Bxh6"],
-        answers: [
-          { move: "Bxh6", correct: true },
-          { move: "Bg5", correct: false },
-          { move: "Bb2", correct: false }
-        ],
-        feedback: "Bxh6 follows one clean diagonal and wins the queen."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Endgames",
-        side: "White to move",
-        title: "The Rookie Soldier's Promotion Quest",
-        prompt: "Reach the final rank and become a queen.",
-        fen: "k7/7P/5K2/8/8/8/8/8",
-        targets: ["h8"],
-        hint: "Push the h-pawn to h8 and choose queen.",
-        line: ["h8=Q+"],
-        answers: [
-          { move: "h8=Q+", correct: true },
-          { move: "Kf7", correct: false },
-          { move: "hxa8=Q", correct: false }
-        ],
-        feedback: "h8=Q+ shows why passed pawns are heroes: they can become a new queen."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Protect the Nervous Boss",
-        prompt: "Castle the king into shelter before the adventure gets wild.",
-        fen: "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
-        targets: ["g1"],
-        hint: "Move the king two squares toward the rook: castle kingside.",
-        line: ["O-O"],
-        answers: [
-          { move: "O-O", correct: true },
-          { move: "Kd2", correct: false },
-          { move: "Rh1", correct: false }
-        ],
-        feedback: "O-O moves the king to safety and brings the rook closer to the game."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Opening tactics",
-        side: "White to move",
-        title: "Mission Puzzle 1: Center Spark",
-        prompt: "Control the center with one brave pawn move.",
-        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
-        targets: ["e4"],
-        hint: "Put a pawn on e4 so it controls d5 and f5.",
-        line: ["e4"],
-        answers: [
-          { move: "e4", correct: true },
-          { move: "h4", correct: false },
-          { move: "a3", correct: false }
-        ],
-        feedback: "e4 grabs space and controls two center squares. That is the first opening habit."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Opening tactics",
-        side: "White to move",
-        title: "Mission Puzzle 2: Knight Wake-Up",
-        prompt: "Develop a piece toward the center before chasing attacks.",
-        fen: "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
-        targets: ["f3"],
-        hint: "The g1 knight wants f3, where it attacks e5 and d4.",
-        line: ["Nf3"],
-        answers: [
-          { move: "Nf3", correct: true },
-          { move: "Qh5", correct: false },
-          { move: "a4", correct: false }
-        ],
-        feedback: "Nf3 develops a knight, fights the center, and helps the king castle soon."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Mission Puzzle 3: Castle Shelter",
-        prompt: "Your path is clear. Move the king into safety.",
-        fen: "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPPBPPP/RNBQK2R w KQkq - 2 3",
-        targets: ["g1"],
-        hint: "Castle kingside: the king moves two squares toward the rook.",
-        line: ["O-O"],
-        answers: [
-          { move: "O-O", correct: true },
-          { move: "Kd1", correct: false },
-          { move: "Ng5", correct: false }
-        ],
-        feedback: "O-O tucks the king away and brings the rook closer to the game."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Mission Puzzle 4: Save the Rook",
-        prompt: "The queen is attacking your rook. Protect your piece by removing the attacker.",
-        fen: "4k3/8/8/8/8/6q1/7P/6RK w - - 0 1",
-        targets: ["g3"],
-        hint: "Your rook can climb the g-file and capture the queen.",
-        line: ["Rxg3"],
-        answers: [
-          { move: "Rxg3", correct: true },
-          { move: "Kh1", correct: false },
-          { move: "Rg2", correct: false }
-        ],
-        feedback: "Rxg3 saves the rook and wins the queen. Protecting pieces often starts by checking what attacks them."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Mission Puzzle 5: First Checkmate",
-        prompt: "Use developed pieces together and finish the game in one move.",
-        fen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/5N2/PPPP1PPP/RNB1K2R w KQkq - 0 4",
-        targets: ["f7"],
-        hint: "The bishop on c4 protects f7, so the queen can land there.",
-        line: ["Qxf7#"],
-        answers: [
-          { move: "Qxf7#", correct: true },
-          { move: "Qxe5+", correct: false },
-          { move: "Ng5", correct: false }
-        ],
-        feedback: "Qxf7# works because the queen attacks the king and the bishop protects the queen."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Tactics",
-        side: "White to move",
-        title: "Classic Game 1: Legal's Trap",
-        prompt: "Classic-game mini mission: ignore the queen loss and finish with a knight mate.",
-        fen: "rn1qkbnr/ppp2p1p/3p2p1/4N3/2B1P3/2N5/PPPP1PPP/R1BbK2R w KQkq - 0 6",
-        targets: ["f7", "d5"],
-        hint: "Start with Bxf7+. The bishop pulls the king onto a square where the knight can jump.",
-        line: ["Bxf7+", "Ke7", "Nd5#"],
-        answers: [
-          { move: "Bxf7+", correct: true },
-          { move: "Nxd1", correct: false },
-          { move: "Bxf7", correct: false }
-        ],
-        feedback: "Bxf7+ forces the king to e7, then Nd5# closes every escape square. This is the Legal mate pattern."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Adventure",
-        theme: "Tactics",
-        side: "White to move",
-        title: "Classic Game 2: Morphy Opera Finale",
-        prompt: "Classic-game continuation: every move is forcing, and the rook delivers the curtain call.",
-        fen: "4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 0 16",
-        targets: ["b8", "d8"],
-        hint: "Start with Qb8+. If the knight captures, the rook owns the open file.",
-        line: ["Qb8+", "Nxb8", "Rd8#"],
-        answers: [
-          { move: "Qb8+", correct: true },
-          { move: "Rd8+", correct: false },
-          { move: "Qxe6+", correct: false }
-        ],
-        feedback: "Qb8+ deflects the knight. After Nxb8, Rd8# uses the pinned back rank from Morphy's Opera Game."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Adventure",
-        theme: "Tactics",
-        side: "White to move",
-        title: "Classic Game 3: Reti's King Walk",
-        prompt: "Classic-game tactic: sacrifice the queen, pull the king forward, then lock the diagonal.",
-        fen: "rnb1kb1r/pp3ppp/2p5/4q3/4n3/3Q4/PPPB1PPP/2KR1BNR w kq - 0 9",
-        targets: ["d8", "g5", "d8"],
-        hint: "Begin with Qd8+. The queen is bait; the bishop pair finishes the chase.",
-        line: ["Qd8+", "Kxd8", "Bg5+", "Kc7", "Bd8#"],
-        answers: [
-          { move: "Qd8+", correct: true },
-          { move: "Qxe4", correct: false },
-          { move: "Bg5", correct: false }
-        ],
-        feedback: "Qd8+ forces Kxd8, then Bg5+ drives the king to c7 and Bd8# seals the famous Reti-Tartakower finish."
-      },
-      {
-        level: "Advanced",
-        mode: "Puzzle Adventure",
-        theme: "Tactics",
-        side: "White to move",
-        title: "Classic Game 4: Immortal Spark",
-        prompt: "Classic-game attack: sacrifice the queen and let the bishop give the final check.",
-        fen: "r1bk2nr/p2p1pNp/n2B4/1p1NP2P/6P1/3P1Q2/P1P1K3/q5b1 w - - 1 22",
-        targets: ["f6", "e7"],
-        hint: "Qf6+ looks impossible, but the bishop on d6 is waiting for the final square.",
-        line: ["Qf6+", "Nxf6", "Be7#"],
-        answers: [
-          { move: "Qf6+", correct: true },
-          { move: "Be7+", correct: false },
-          { move: "Nf6", correct: false }
-        ],
-        feedback: "Qf6+ deflects the knight. After Nxf6, Be7# completes Anderssen's Immortal Game mating picture."
-      },
-      {
-        level: "Advanced",
-        mode: "Boss Puzzle",
-        theme: "Tactics",
-        side: "Black to move",
-        title: "Classic Boss: Mate in 4 Trap",
-        prompt: "Continuation boss: four black moves, one clean trap line, no random guessing.",
-        fen: "r1bqkbnr/pppp1ppp/8/4N3/2BnP3/8/PPPP1PPP/RNBQK2R b KQkq - 0 4",
-        targets: ["g5", "g2", "e4", "f3"],
-        hint: "Start with Qg5. Keep checking and pulling defenders away until Nf3# lands.",
-        line: ["Qg5", "Nxf7", "Qxg2", "Rf1", "Qxe4+", "Be2", "Nf3#"],
-        answers: [
-          { move: "Qg5", correct: true },
-          { move: "Qf6", correct: false },
-          { move: "Nxc2+", correct: false }
-        ],
-        feedback: "Qg5 attacks g2 and keeps threats alive. The line finishes with Qxe4+ and Nf3#, a classic mate-in-4 trap."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Village Bell: Mate in 1",
-        prompt: "One idea: climb the open file and ring the final bell.",
-        fen: "6k1/5ppp/8/8/8/8/5PPP/3R2K1",
-        targets: ["d8"],
-        hint: "Check with the rook on the back rank.",
-        line: ["Rd8#"],
-        answers: [
-          { move: "Rd8#", correct: true },
-          { move: "Rd7", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rd8# works because the rook controls the rank and the pawns trap the king."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Forest Lantern: Mate in 2",
-        prompt: "Light the path with one check, then finish beside your king.",
-        fen: "7k/5K2/4Q3/8/8/8/8/8",
-        targets: ["f6", "g7"],
-        hint: "Start with Qf6+. The king protects the final queen landing.",
-        line: ["Qf6+", "Kh7", "Qg7#"],
-        answers: [
-          { move: "Qf6+", correct: true },
-          { move: "Qg8+", correct: false },
-          { move: "Qh3+", correct: false }
-        ],
-        feedback: "Qf6+ forces Kh7. Qg7# is protected by the king on f7."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Adventure",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Castle Steps: Mate in 3",
-        prompt: "Use queen checks like stairs until the king has no door.",
-        fen: "7k/8/4QK2/8/8/8/8/8",
-        targets: ["e8", "g6", "g7"],
-        hint: "Start with Qe8+, then keep the queen close to your king.",
-        line: ["Qe8+", "Kh7", "Qg6+", "Kh8", "Qg7#"],
-        answers: [
-          { move: "Qe8+", correct: true },
-          { move: "Qg8+", correct: false },
-          { move: "Qh3+", correct: false }
-        ],
-        feedback: "Qe8+ starts the staircase, Qg6+ boxes the king, and Qg7# ends it."
-      },
-      {
-        level: "Advanced",
-        mode: "Boss Puzzle",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Dragon Gate: Mate in 4",
-        prompt: "A boss escort mission: move the queen and king together until the gate shuts.",
-        fen: "8/8/8/8/8/k7/8/KQ6",
-        targets: ["b7", "b2", "c3", "b4"],
-        hint: "Start with Qb7. Keep the king close enough to protect the final queen check.",
-        line: ["Qb7", "Ka4", "Kb2", "Ka5", "Kc3", "Ka4", "Qb4#"],
-        answers: [
-          { move: "Qb7", correct: true },
-          { move: "Qa2", correct: false },
-          { move: "Kc2", correct: false }
-        ],
-        feedback: "Qb7 starts the net. The king walks closer, then Qb4# closes the dragon gate."
-      },
-      {
-        level: "Advanced",
-        mode: "Boss Puzzle",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Grandmaster Citadel: Mate in 5",
-        prompt: "Long boss path: build the net slowly, then finish with the queen on d1.",
-        fen: "8/8/8/8/8/8/3k4/KQ6",
-        targets: ["e4", "d4", "a2", "b3", "d1"],
-        hint: "Start with Qe4. Do not rush; every step shrinks the king's room.",
-        line: ["Qe4", "Kc1", "Qd4", "Kc2", "Ka2", "Kc1", "Kb3", "Kb1", "Qd1#"],
-        answers: [
-          { move: "Qe4", correct: true },
-          { move: "Qa2", correct: false },
-          { move: "Qh1", correct: false }
-        ],
-        feedback: "Qe4 and Qd4 build the wall. The king joins, then Qd1# seals the citadel."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Rush",
-        theme: "Tactics",
-        side: "White to move",
-        title: "Tactic Spark: Knight Fork",
-        prompt: "One knight jump attacks king and queen.",
-        fen: "8/8/4k3/7q/8/3N4/8/4K3",
-        targets: ["f4"],
-        hint: "Find the knight check that also touches h5.",
-        answers: [
-          { move: "Nf4+", correct: true },
-          { move: "Nc5+", correct: false },
-          { move: "Nf2", correct: false }
-        ],
-        feedback: "Nf4+ is a fork: check first, queen next."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Rush",
-        theme: "Tactics",
-        side: "White to move",
-        title: "Tactic Spark: Frozen Queen",
-        prompt: "The queen is pinned to the king. Take it with tempo.",
-        fen: "4k3/4q3/8/8/8/8/8/4R1K1",
-        targets: ["e7"],
-        hint: "A pinned piece cannot run away from the rook.",
-        answers: [
-          { move: "Rxe7+", correct: true },
-          { move: "Re8+", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rxe7+ wins the pinned queen and keeps the move forcing."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Rush",
-        theme: "Tactics",
-        side: "White to move",
-        title: "Tactic Spark: Bishop Grab",
-        prompt: "Capture the queen with check.",
-        fen: "r3k2r/pppq1ppp/5N2/1B6/8/8/PPPP1PPP/R3K2R",
-        targets: ["d7"],
-        hint: "Your bishop can take on d7 and the knight helps.",
-        answers: [
-          { move: "Bxd7+", correct: true },
-          { move: "Nxd7", correct: false },
-          { move: "Bf1", correct: false }
-        ],
-        feedback: "Bxd7+ wins the queen with check."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Rush",
-        theme: "Tactics",
-        side: "Black to move",
-        title: "Tactic Spark: Battery Strike",
-        prompt: "The bishop guards the target. Let the queen strike.",
-        fen: "6k1/5ppp/8/2b5/8/6q1/5PPP/6K1",
-        targets: ["f2"],
-        hint: "The queen can capture on f2 because the bishop protects it.",
-        answers: [
-          { move: "Qxf2+", correct: true },
-          { move: "Qg4", correct: false },
-          { move: "Bxf2+", correct: false }
-        ],
-        feedback: "Qxf2+ works because the queen is protected and the check is forcing."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Rush",
-        theme: "Tactics",
-        side: "White to move",
-        title: "Tactic Spark: Loose Bishop",
-        prompt: "Win the loose bishop with check.",
-        fen: "4k3/8/8/8/4b3/8/8/4R1K1",
-        targets: ["e4"],
-        hint: "Take the undefended piece while checking the king.",
-        answers: [
-          { move: "Rxe4+", correct: true },
-          { move: "Re8+", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rxe4+ wins material and keeps the initiative."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Endgames",
-        side: "White to move",
-        title: "Endgame Trail: Pawn Push",
-        prompt: "Use your king to support a forcing pawn push.",
-        fen: "8/4k3/8/3P4/3K4/8/8/8",
-        targets: ["d6"],
-        hint: "Advance with check so the king must step back.",
-        answers: [
-          { move: "d6+", correct: true },
-          { move: "Kc5", correct: false },
-          { move: "Ke4", correct: false }
-        ],
-        feedback: "d6+ gains time in the pawn race."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Endgames",
-        side: "White to move",
-        title: "Endgame Trail: Opposition Step",
-        prompt: "Use your king first, then your pawn can run safely.",
-        fen: "8/8/4k3/3P4/2K5/8/8/8",
-        targets: ["c5"],
-        hint: "Step beside the pawn and take the important squares away.",
-        line: ["Kc5"],
-        answers: [
-          { move: "Kc5", correct: true },
-          { move: "d6", correct: false },
-          { move: "Kb4", correct: false }
-        ],
-        feedback: "Kc5 uses opposition: the king protects the passer and blocks the defender."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Adventure",
-        theme: "Endgames",
-        side: "White to move",
-        title: "Endgame Trail: Two-Step Tempo",
-        prompt: "The pawn can move two squares and check.",
-        fen: "8/8/8/3k4/8/3K4/4P3/8",
-        targets: ["e4"],
-        hint: "The king on d3 protects the pawn's landing square.",
-        answers: [
-          { move: "e4+", correct: true },
-          { move: "Kc3", correct: false },
-          { move: "Kd4", correct: false }
-        ],
-        feedback: "e4+ uses king support and gains a tempo."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Adventure",
-        theme: "Endgames",
-        side: "White to move",
-        title: "Endgame Trail: Rook Cut",
-        prompt: "Cut the king off with one rook check.",
-        fen: "6k1/6p1/7p/8/8/8/6PP/R5K1",
-        targets: ["a8"],
-        hint: "Use the open a-file to check along the back rank.",
-        answers: [
-          { move: "Ra8+", correct: true },
-          { move: "Kf2", correct: false },
-          { move: "Ra7", correct: false }
-        ],
-        feedback: "Ra8+ cuts the king off and makes the rook active."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Adventure",
-        theme: "Endgames",
-        side: "White to move",
-        title: "Endgame Trail: Safe Break",
-        prompt: "Use a protected pawn check to push the king away.",
-        fen: "8/8/8/8/3k4/8/3KP3/8",
-        targets: ["e3"],
-        hint: "Your king protects e3.",
-        answers: [
-          { move: "e3+", correct: true },
-          { move: "Kc2", correct: false },
-          { move: "Kd1", correct: false }
-        ],
-        feedback: "e3+ is safe because the king protects the pawn."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Shield Drill: Catch the Queen",
-        prompt: "The attacker came too close. Capture it calmly.",
-        fen: "k7/8/8/8/8/8/6qP/7K",
-        targets: ["g2"],
-        hint: "Your king can capture the loose queen.",
-        answers: [
-          { move: "Kxg2", correct: true },
-          { move: "Kh2", correct: false },
-          { move: "Kf1", correct: false }
-        ],
-        feedback: "Kxg2 removes the attacker. Defense can be a capture."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "Black to move",
-        title: "Shield Drill: King Capture",
-        prompt: "White's queen is checking, but it is not protected.",
-        fen: "7k/6Q1/8/8/8/8/8/K7",
-        targets: ["g7"],
-        hint: "Capture the checking queen.",
-        answers: [
-          { move: "Kxg7", correct: true },
-          { move: "Kh7", correct: false },
-          { move: "Qg1", correct: false }
-        ],
-        feedback: "Kxg7 removes the check and wins the queen."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Shield Drill: Rook Rescue",
-        prompt: "The queen attacks your king. Take away the danger.",
-        fen: "6k1/8/8/8/8/8/5q2/5RK1",
-        targets: ["f2"],
-        hint: "Your rook can capture on f2.",
-        answers: [
-          { move: "Rxf2", correct: true },
-          { move: "Kh1", correct: false },
-          { move: "Rf1", correct: false }
-        ],
-        feedback: "Rxf2 removes the queen and makes the king safe."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Shield Drill: Pawn Guard",
-        prompt: "A bishop is attacking your corner. Use the pawn.",
-        fen: "6k1/8/8/8/8/5b2/6PP/6K1",
-        targets: ["f3"],
-        hint: "The g-pawn can capture the bishop.",
-        answers: [
-          { move: "gxf3", correct: true },
-          { move: "Kh1", correct: false },
-          { move: "g3", correct: false }
-        ],
-        feedback: "gxf3 removes the attacker and keeps the king safer."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Shield Drill: Knight Blocker",
-        prompt: "The queen is active. Your knight can erase the threat.",
-        fen: "6k1/8/8/8/3q4/5N2/8/6K1",
-        targets: ["d4"],
-        hint: "Knights can capture on d4 from f3.",
-        answers: [
-          { move: "Nxd4", correct: true },
-          { move: "Kf1", correct: false },
-          { move: "Ne5", correct: false }
-        ],
-        feedback: "Nxd4 wins the queen and ends the danger."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Rush",
-        theme: "Opening tactics",
-        side: "Black to move",
-        title: "Opening Spark: Fool's Mate",
-        prompt: "White opened the king too early. Finish the opening lesson.",
-        fen: "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR",
-        targets: ["h4"],
-        hint: "The queen can fly to h4.",
-        answers: [
-          { move: "Qh4#", correct: true },
-          { move: "Nc6", correct: false },
-          { move: "d5", correct: false }
-        ],
-        feedback: "Qh4# works because the diagonal is open and the king has no safe square."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Rush",
-        theme: "Opening tactics",
-        side: "White to move",
-        title: "Opening Spark: Scholar Finish",
-        prompt: "Queen and bishop team up on f7.",
-        fen: "rnbqkbnr/pppp1ppp/8/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR",
-        targets: ["f7"],
-        hint: "The bishop protects f7.",
-        answers: [
-          { move: "Qxf7#", correct: true },
-          { move: "Qxf7+", correct: false },
-          { move: "Bb5", correct: false }
-        ],
-        feedback: "Qxf7# is mate because the queen is protected by the bishop."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Rush",
-        theme: "Opening tactics",
-        side: "White to move",
-        title: "Opening Spark: Scandinavian Gift",
-        prompt: "The queen wandered too far. Take it.",
-        fen: "rnb1kbnr/ppp1pppp/8/3q4/4P3/2N5/PPPP1PPP/R1BQKBNR",
-        targets: ["d5"],
-        hint: "The knight on c3 can capture d5.",
-        answers: [
-          { move: "Nxd5", correct: true },
-          { move: "exd5", correct: false },
-          { move: "Nf3", correct: false }
-        ],
-        feedback: "Nxd5 wins the queen. Development with tempo is powerful."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Rush",
-        theme: "Opening tactics",
-        side: "White to move",
-        title: "Opening Spark: Bishop Takes Queen",
-        prompt: "The queen is lined up with the king. Capture with check.",
-        fen: "r3kbnr/pppq1ppp/8/1B6/8/5N2/PPPP1PPP/RNBQK2R",
-        targets: ["d7"],
-        hint: "The bishop on b5 can take d7.",
-        answers: [
-          { move: "Bxd7+", correct: true },
-          { move: "Nxd7", correct: false },
-          { move: "Bxc6", correct: false }
-        ],
-        feedback: "Bxd7+ wins the queen and checks the king."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Rush",
-        theme: "Opening tactics",
-        side: "White to move",
-        title: "Opening Spark: Fried Liver Fork",
-        prompt: "The knight jumps into f7 and attacks two treasures.",
-        fen: "rnbqkb1r/pppp1ppp/5n2/6N1/2B1P3/8/PPPP1PPP/RNBQK2R",
-        targets: ["f7"],
-        hint: "Nxf7 attacks the queen and rook.",
-        answers: [
-          { move: "Nxf7", correct: true },
-          { move: "Bxf7+", correct: false },
-          { move: "Nxh7", correct: false }
-        ],
-        feedback: "Nxf7 forks the queen on d8 and rook on h8."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Lava Gate: Corner Zap",
-        prompt: "Puzzle #CQ-001. The king is trapped in the corner. Slide the rook to close the gate.",
-        fen: "7k/5ppp/8/8/8/8/5PPP/3R2K1",
-        targets: ["d8"],
-        hint: "Scan checks first. The rook can climb the open d-file.",
-        line: ["Rd8#"],
-        answers: [
-          { move: "Rd8#", correct: true },
-          { move: "Rd7", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rd8# locks the back rank. The rook cuts the escape squares while the pawns trap the king."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Rush",
-        theme: "Forks",
-        side: "White to move",
-        title: "Crystal Fork: Two Targets Glow",
-        prompt: "Puzzle #CQ-002. Make one knight jump that checks the king and attacks the queen.",
-        fen: "8/8/4k3/7q/8/3N4/8/4K3",
-        targets: ["f4"],
-        hint: "The knight wants a square where it touches e6 and h5 at the same time.",
-        answers: [
-          { move: "Nf4+", correct: true },
-          { move: "Nc5+", correct: false },
-          { move: "Nf2", correct: false }
-        ],
-        feedback: "Nf4+ is a fork: check first, queen next. Forcing moves make tactics easier to see."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Shadow Rescue: Rook Shield",
-        prompt: "Puzzle #CQ-003. Your king is checked, but the rook can erase the danger.",
-        fen: "7k/8/8/8/8/6q1/7K/6R1",
-        targets: ["g3"],
-        hint: "Move the rook up the open file and capture the checking queen.",
-        line: ["Rxg3"],
-        answers: [
-          { move: "Rxg3", correct: true },
-          { move: "Kh1", correct: false },
-          { move: "Rg2", correct: false }
-        ],
-        feedback: "Rxg3 removes the checking queen. The fastest defense is often a calm capture."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Back-rank mate",
-        prompt: "Black's king is trapped by its own pawns. Which move ends the game?",
-        fen: "6k1/pppp1ppp/8/8/8/8/PPPP1PPP/4R1K1",
-        targets: ["e8"],
-        hint: "Look for a rook move that uses the open file and attacks the king from the back rank.",
-        answers: [
-          { move: "Re8#", correct: true },
-          { move: "Rg1", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Re8# uses the open e-file. The king cannot capture, block, or run because its escape squares are occupied."
-      },
-      {
-        level: "Intermediate",
-        side: "White to move",
-        title: "Knight fork",
-        prompt: "White can attack the black king and queen at the same time.",
-        fen: "r6r/pppp1ppp/4k3/7q/8/3N4/PPPP1PPP/R3K2R",
-        targets: ["f4"],
-        hint: "The knight wants a square where it checks the king and also points at h5.",
-        answers: [
-          { move: "Nf4+", correct: true },
-          { move: "Nc1", correct: false },
-          { move: "Kd2", correct: false }
-        ],
-        feedback: "Nf4+ checks the king on e6 and also attacks the queen on h5. One knight move creates two threats."
-      },
-      {
-        level: "Advanced",
-        side: "Black to move",
-        title: "Overloaded defender",
-        prompt: "White's queen is guarding too much. Find the forcing capture.",
-        fen: "r5k1/pppp1ppp/8/2b5/8/6q1/PPPP1QPP/R5K1",
-        targets: ["f2"],
-        hint: "The bishop on c5 quietly protects the square next to White's king.",
-        answers: [
-          { move: "Qxf2+", correct: true },
-          { move: "Qg4", correct: false },
-          { move: "Kh7", correct: false }
-        ],
-        feedback: "Qxf2+ removes the defender and gives check. The bishop on c5 protects f2, so the capture cannot be answered by Kxf2."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Queen joins the attack",
-        prompt: "The bishop already controls the key diagonal. Which queen move finishes the game?",
-        fen: "r5kr/5ppp/8/8/2B5/5Q2/PPPP2PP/R5K1",
-        targets: ["f7"],
-        hint: "The queen can capture a pawn next to the king, and the bishop protects that landing square.",
-        answers: [
-          { move: "Qxf7#", correct: true },
-          { move: "Qxf7+", correct: false },
-          { move: "Bc4", correct: false }
-        ],
-        feedback: "Qxf7# is mate because the queen attacks g8, the bishop protects f7, and Black's own pieces block the escape squares."
-      },
-      {
-        level: "Intermediate",
-        side: "White to move",
-        title: "Opera Pin: Capture the Queen",
-        prompt: "The queen is lined up with the king. Capture it, but only with the protected bishop.",
-        fen: "4k3/3q4/5N2/1B6/8/8/8/4K3",
-        targets: ["d7"],
-        hint: "Your bishop can take the queen, and your knight protects the bishop afterward.",
-        line: ["Bxd7+"],
-        answers: [
-          { move: "Bxd7+", correct: true },
-          { move: "Nxd7", correct: false },
-          { move: "Bf1", correct: false }
-        ],
-        feedback: "Bxd7+ wins the queen with check. The knight on f6 protects d7, so Black cannot simply recapture."
-      },
-      {
-        level: "Advanced",
-        side: "White to move",
-        title: "Pawn break with opposition",
-        prompt: "Use the king's support to push the pawn and force the black king backward.",
-        fen: "r6r/ppp2ppp/8/3k4/8/3K4/PPP1P1PP/R6R",
-        targets: ["e4"],
-        hint: "The pawn can advance two squares because it is still on its starting square.",
-        answers: [
-          { move: "e4+", correct: true },
-          { move: "Kc3", correct: false },
-          { move: "Kd4", correct: false }
-        ],
-        feedback: "e4+ works because the white king protects e4. The pawn checks the black king and gains space for the endgame."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Scholar's Warning",
-        prompt: "The queen and bishop are aimed at f7. One opening mistake is enough.",
-        fen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 3",
-        targets: ["f7"],
-        hint: "The bishop on c4 protects the queen when she lands beside the king.",
-        line: ["Qxf7#"],
-        answers: [
-          { move: "Qxf7#", correct: true },
-          { move: "Qxf7+", correct: false },
-          { move: "Bb5", correct: false }
-        ],
-        feedback: "Qxf7# works because the queen attacks the king and the bishop protects f7."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Rook lift mate",
-        prompt: "Black's king has no safe square. Find the clean mate.",
-        fen: "6k1/5ppp/8/8/8/8/5PPP/R5K1",
-        targets: ["a8"],
-        hint: "Use the rook to attack along the back rank.",
-        answers: [
-          { move: "Ra8#", correct: true },
-          { move: "Kf2", correct: false },
-          { move: "Ra7", correct: false }
-        ],
-        feedback: "Ra8# traps the king on g8. The rook controls the rank and the pawns block escape."
-      },
-      {
-        level: "Intermediate",
-        side: "Black to move",
-        title: "Battery Strike: Long Diagonal",
-        prompt: "The bishop quietly guards the target. Let the queen strike with check.",
-        fen: "6k1/5ppp/1b6/8/8/6q1/5PPP/6K1",
-        targets: ["f2"],
-        hint: "The bishop guards f2, so the queen can move there with force.",
-        line: ["Qxf2+"],
-        answers: [
-          { move: "Qxf2+", correct: true },
-          { move: "Qg4", correct: false },
-          { move: "Bxf2+", correct: false }
-        ],
-        feedback: "Qxf2+ is the forcing strike because the bishop on c5 protects the queen and the king must answer the check."
-      },
-      {
-        level: "Intermediate",
-        side: "White to move",
-        title: "Remove the defender",
-        prompt: "The knight is pinned and the king is boxed in. Which capture finishes the attack?",
-        fen: "6kr/5ppp/8/8/2B5/5Q2/5PPP/6K1",
-        targets: ["f7"],
-        hint: "The queen can capture on f7 with bishop support.",
-        answers: [
-          { move: "Qxf7#", correct: true },
-          { move: "Bxf7+", correct: false },
-          { move: "Qd5", correct: false }
-        ],
-        feedback: "Qxf7# combines queen pressure with bishop protection. Black cannot take the queen or escape."
-      },
-      {
-        level: "Advanced",
-        side: "White to move",
-        title: "Quiet back-rank killer",
-        prompt: "The direct check is available, but only one rook move is mate.",
-        fen: "6k1/5ppp/8/8/8/8/5PPP/4R1K1",
-        targets: ["e8"],
-        hint: "Put the rook on the back rank where it cuts every escape.",
-        answers: [
-          { move: "Re8#", correct: true },
-          { move: "Re7", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Re8# controls the eighth rank while Black's own pawns trap the king."
-      },
-      {
-        level: "Advanced",
-        side: "Black to move",
-        title: "Corner net",
-        prompt: "White's king is stuck in the corner. Find the forcing queen move.",
-        fen: "6k1/5ppp/8/8/8/8/5qPP/7K",
-        targets: ["f1"],
-        hint: "The queen can attack from f1 and cover the escape squares.",
-        answers: [
-          { move: "Qf1#", correct: true },
-          { move: "Qxg2+", correct: false },
-          { move: "Qe1+", correct: false }
-        ],
-        feedback: "Qf1# seals the corner. The king cannot capture the queen or move away from check."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Loose queen",
-        prompt: "A black queen is undefended. Which move wins it with check?",
-        fen: "4k3/8/8/8/8/8/4q3/4R1K1",
-        targets: ["e2"],
-        hint: "Use the rook on the open file.",
-        answers: [
-          { move: "Rxe2+", correct: true },
-          { move: "Re8+", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rxe2+ removes the hanging queen and keeps the move forcing with check."
-      },
-      {
-        level: "Intermediate",
-        side: "White to move",
-        title: "Fork warm-up: Royal Jump",
-        prompt: "The knight can check the king and attack the queen.",
-        fen: "4k3/5q2/8/5N2/8/8/8/4K3",
-        targets: ["d6"],
-        hint: "Jump to a square that touches both e8 and f7.",
-        line: ["Nd6+"],
-        answers: [
-          { move: "Nd6+", correct: true },
-          { move: "Nh6", correct: false },
-          { move: "Ne7", correct: false }
-        ],
-        feedback: "Nd6+ checks the king on e8 and attacks the queen on f7. One knight jump creates two threats."
-      },
-      {
-        level: "Intermediate",
-        side: "Black to move",
-        title: "Pinned defender",
-        prompt: "White's queen is tied to king safety. Find the forcing capture.",
-        fen: "6k1/5ppp/8/2b5/8/5q2/5QPP/6K1",
-        targets: ["f2"],
-        hint: "The bishop and queen are already working on the same square.",
-        answers: [
-          { move: "Qxf2+", correct: true },
-          { move: "Qg4", correct: false },
-          { move: "Bxf2+", correct: false }
-        ],
-        feedback: "Qxf2+ removes the defender and keeps White's king under direct pressure."
-      },
-      {
-        level: "Intermediate",
-        side: "White to move",
-        title: "Candidate checks",
-        prompt: "Use checks, captures, and threats. Which check wins the queen?",
-        fen: "4k3/3q1ppp/5N2/1B6/8/8/5PPP/6K1",
-        targets: ["d7"],
-        hint: "The bishop can take the queen because the knight protects the landing square.",
-        answers: [
-          { move: "Bxd7+", correct: true },
-          { move: "Nxd7", correct: false },
-          { move: "Bf1", correct: false }
-        ],
-        feedback: "Bxd7+ is the forcing candidate: it wins the queen and checks the king."
-      },
-      {
-        level: "Intermediate",
-        side: "White to move",
-        title: "Back-rank theme: Corner Gate",
-        prompt: "The king is boxed in by pawns. Which rook move closes the corner?",
-        fen: "7k/5ppp/8/8/8/8/5PPP/4R1K1",
-        targets: ["e8"],
-        hint: "Move the rook to the eighth rank.",
-        line: ["Re8#"],
-        answers: [
-          { move: "Re8#", correct: true },
-          { move: "Re7", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Re8# turns the open file into a mating net."
-      },
-      {
-        level: "Intermediate",
-        side: "Black to move",
-        title: "Battery strike",
-        prompt: "The bishop guards the target. Which queen capture is strongest?",
-        fen: "6k1/5ppp/8/2b5/8/6q1/5PPP/5RK1",
-        targets: ["f2"],
-        hint: "Capture the defender next to the king.",
-        answers: [
-          { move: "Qxf2+", correct: true },
-          { move: "Qg4", correct: false },
-          { move: "Bxf2+", correct: false }
-        ],
-        feedback: "Qxf2+ uses the bishop's protection and forces White to answer the attack."
-      },
-      {
-        level: "Intermediate",
-        side: "White to move",
-        title: "Hanging piece check: File Pin",
-        prompt: "A loose piece sits on the open file. Capture it with tempo.",
-        fen: "4k3/8/8/8/8/8/4b3/4R1K1",
-        targets: ["e2"],
-        hint: "Take the bishop and keep the rook on the e-file.",
-        line: ["Rxe2+"],
-        answers: [
-          { move: "Rxe2+", correct: true },
-          { move: "Re8+", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rxe2+ wins material and keeps the open-file check."
-      },
-      {
-        level: "Intermediate",
-        side: "White to move",
-        title: "Threat first",
-        prompt: "Choose the move that creates a direct mate threat.",
-        fen: "6k1/5ppp/8/8/2B5/5Q2/5PPP/6K1",
-        targets: ["a8"],
-        hint: "The queen can join the bishop on a long diagonal.",
-        answers: [
-          { move: "Qa8+", correct: true },
-          { move: "Qxf7+", correct: false },
-          { move: "Bc4", correct: false }
-        ],
-        feedback: "Qa8+ uses the diagonal battery and forces Black to solve an immediate king problem."
-      },
-      {
-        level: "Intermediate",
-        side: "Black to move",
-        title: "Count the guards",
-        prompt: "White's f-pawn is pinned. Which capture keeps the attack alive?",
-        fen: "6k1/5ppp/8/2b5/8/5q2/5PPP/4R1K1",
-        targets: ["f2"],
-        hint: "The queen can capture because the bishop controls f2.",
-        answers: [
-          { move: "Qxf2+", correct: true },
-          { move: "Bxf2+", correct: false },
-          { move: "Qg4", correct: false }
-        ],
-        feedback: "Qxf2+ works because the target is guarded and the king has to respond."
-      },
-      {
-        level: "Advanced",
-        side: "White to move",
-        title: "Deep back-rank check",
-        prompt: "Compare candidate rook checks. Which one gives Black no useful defense?",
-        fen: "6k1/5ppp/8/8/8/8/5PPP/2R3K1",
-        targets: ["c8"],
-        hint: "Use the farthest back-rank square available to the rook.",
-        answers: [
-          { move: "Rc8#", correct: true },
-          { move: "Rc7", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rc8# cuts the whole rank and leaves the boxed-in king with no escape."
-      },
-      {
-        level: "Advanced",
-        side: "Black to move",
-        title: "Deflection finish: Remove the Guard",
-        prompt: "White's rook guards the corner. Capture it and finish the attack.",
-        fen: "6k1/6pp/8/8/8/8/5qPP/5R1K b - - 0 1",
-        targets: ["f1"],
-        hint: "Take the rook on f1. The queen controls the king's only doorway.",
-        line: ["Qxf1#"],
-        answers: [
-          { move: "Qxf1#", correct: true },
-          { move: "Qxg2+", correct: false },
-          { move: "Qg1+", correct: false }
-        ],
-        feedback: "Qxf1# removes the defender and seals the corner. The king has no safe square."
-      },
-      {
-        level: "Advanced",
-        mode: "Puzzle Rush",
-        theme: "Endgames",
-        side: "White to move",
-        title: "Promotion race",
-        prompt: "Use the king's support to make the pawn break decisive.",
-        fen: "8/4k3/8/3P4/3K4/8/8/8",
-        targets: ["d6"],
-        hint: "Advance with check and force the king backward.",
-        answers: [
-          { move: "d6+", correct: true },
-          { move: "Kc5", correct: false },
-          { move: "Ke4", correct: false }
-        ],
-        feedback: "d6+ gains a tempo in the pawn race and pushes the defender away."
-      },
-      {
-        level: "Advanced",
-        side: "White to move",
-        title: "Calculate before capture",
-        prompt: "The tempting capture is not enough. Which forcing move starts the finish?",
-        fen: "6k1/5ppp/8/8/2B5/5Q2/5PPP/4R1K1",
-        targets: ["e8"],
-        hint: "Start with the rook check, then the bishop and queen cover escape squares.",
-        answers: [
-          { move: "Re8+", correct: true },
-          { move: "Qxf7+", correct: false },
-          { move: "Bxf7+", correct: false }
-        ],
-        feedback: "Re8+ is the strongest forcing candidate because it limits the king before any capture."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Chess Ninja fork",
-        prompt: "Learn this trick in 60 seconds: jump the knight to check the king and attack the queen.",
-        fen: "3q3k/8/8/6N1/8/8/8/4K3",
-        targets: ["f7"],
-        hint: "Knight jumps can hit two targets at once. Look for a check that also attacks d8.",
-        answers: [
-          { move: "Nf7+", correct: true },
-          { move: "Ne6", correct: false },
-          { move: "Nh7+", correct: false }
-        ],
-        feedback: "Nf7+ checks the king on h8 and attacks the queen on d8. One knight jump creates two jobs."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Pin Rescue in 60: File Freeze",
-        prompt: "The queen is frozen on the open file. Take it with check.",
-        fen: "4k3/8/4q3/8/8/8/8/4R1K1",
-        targets: ["e6"],
-        hint: "A pinned piece cannot move without exposing the king.",
-        line: ["Rxe6+"],
-        answers: [
-          { move: "Rxe6+", correct: true },
-          { move: "Re8+", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rxe6+ wins the queen because it was pinned to the king. Pins make defenders freeze."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Back Rank Blitz",
-        prompt: "60-second trick: use the open file first, then count the king's escape squares.",
-        fen: "5rk1/6pp/8/8/8/8/6PP/5RK1",
-        targets: ["f8"],
-        hint: "Rooks love open files. Capture with check before doing anything slow.",
-        answers: [
-          { move: "Rxf8+", correct: true },
-          { move: "Rf7", correct: false },
-          { move: "Kh1", correct: false }
-        ],
-        feedback: "Rxf8+ removes the defender and checks along the back rank. Open files make rook tactics fast."
-      },
-      {
-        level: "Beginner",
-        side: "White to move",
-        title: "Queen Superhero mate",
-        prompt: "Become a mate hunter: queen plus bishop can finish this in one move.",
-        fen: "6kr/5ppp/8/7Q/2B5/8/5PPP/6K1",
-        targets: ["f7"],
-        hint: "The bishop protects f7, so the queen can land there safely.",
-        answers: [
-          { move: "Qxf7#", correct: true },
-          { move: "Qxh7+", correct: false },
-          { move: "Bxf7+", correct: false }
-        ],
-        feedback: "Qxf7# works because the queen attacks the king and the bishop protects the queen. Teamwork beats theory."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Corner Trap: Queen Net",
-        prompt: "Play one forcing queen check, then finish beside your king.",
-        fen: "7k/4Q3/5K2/8/8/8/8/8",
-        targets: ["f8", "g7"],
-        hint: "Put the queen on f8 first. The king has only one doorway.",
-        line: ["Qf8+", "Kh7", "Qg7#"],
-        answers: [
-          { move: "Qf8+", correct: true },
-          { move: "Qg8+", correct: false },
-          { move: "Qe8", correct: false }
-        ],
-        feedback: "Qf8+ forces Kh7, then Qg7# works because the queen is protected by the king on f6."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Adventure",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Staircase Rescue",
-        prompt: "Use the queen and king together. One check starts the final net.",
-        fen: "8/7k/5K2/4Q3/8/8/8/8",
-        targets: ["e7", "g7"],
-        hint: "Start with Qe7+. Keep the queen close enough for your king to protect her.",
-        line: ["Qe7+", "Kh8", "Qg7#"],
-        answers: [
-          { move: "Qe7+", correct: true },
-          { move: "Qg5+", correct: false },
-          { move: "Qh5+", correct: false }
-        ],
-        feedback: "Qe7+ forces the king back, then Qg7# lands on a protected square."
-      },
-      {
-        level: "Advanced",
-        mode: "Boss Puzzle",
-        theme: "Checkmates",
-        side: "White to move",
-        title: "Boss Puzzle: Dragon Staircase Mate",
-        prompt: "Boss line: every queen move is a check. Walk the king into the final protected mate.",
-        fen: "7k/8/5K2/4Q3/8/8/8/8",
-        targets: ["e8", "g6", "g7"],
-        hint: "Start with Qe8+. Keep the queen close enough for your king to protect the final square.",
-        line: ["Qe8+", "Kh7", "Qg6+", "Kh8", "Qg7#"],
-        answers: [
-          { move: "Qe8+", correct: true },
-          { move: "Qg5", correct: false },
-          { move: "Qh5+", correct: false }
-        ],
-        feedback: "Qe8+ starts the staircase. Qg6+ keeps the king boxed in, then Qg7# is protected by the king on f6."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Winning material",
-        side: "White to move",
-        title: "Village treasure: rook claims queen",
-        prompt: "The queen wandered onto your rook's road. Take the clean material.",
-        fen: "4k3/8/8/8/8/8/3q4/3R2K1",
-        targets: ["d2"],
-        hint: "Use the rook on the same file as the loose queen.",
-        line: ["Rxd2"],
-        answers: [
-          { move: "Rxd2", correct: true },
-          { move: "Re8+", correct: false },
-          { move: "Kf2", correct: false }
-        ],
-        feedback: "Rxd2 wins the loose queen. Clean captures are progress too."
-      },
-      {
-        level: "Beginner",
-        mode: "Puzzle Adventure",
-        theme: "Defense",
-        side: "White to move",
-        title: "Forest shield: capture the danger",
-        prompt: "The queen is too close to your king. Save the day by taking the attacker.",
-        fen: "6k1/5ppp/8/8/8/8/5qPP/6K1",
-        targets: ["f2"],
-        hint: "Your king can capture the loose queen if the square is safe.",
-        answers: [
-          { move: "Kxf2", correct: true },
-          { move: "Kh1", correct: false },
-          { move: "Kf1", correct: false }
-        ],
-        feedback: "Kxf2 removes the attacker. Defense can feel heroic when you take away the threat."
-      },
-      {
-        level: "Intermediate",
-        mode: "Puzzle Rush",
-        theme: "Opening tactics",
-        side: "Black to move",
-        title: "Castle alarm: opening mate",
-        prompt: "White opened the king's door too early. Finish the opening tactic.",
-        fen: "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR",
-        targets: ["h4"],
-        hint: "The queen can fly to h4 because the diagonal is open.",
-        answers: [
-          { move: "Qh4#", correct: true },
-          { move: "Nc6", correct: false },
-          { move: "d5", correct: false }
-        ],
-        feedback: "Qh4# is the classic opening alarm. The king has no safe answer."
-      },
-      ...buildGamePuzzleBatch([
-        [
-          "Back-Rank Door",
-          "Beginner",
-          "Back-rank mates",
-          "White to move",
-          "6k1/p4ppp/8/8/8/8/P4PPP/1R4K1 w - - 0 1",
-          ["b8"],
-          ["Rb8#"],
-          "The b-file is open. Put the rook on the last rank.",
-          "Rb8# works because the rook controls the rank and Black's own pawns close every escape."
-        ],
-        [
-          "Loose Queen Scan",
-          "Beginner",
-          "Winning material",
-          "White to move",
-          "4k3/8/8/3q4/2B5/5N2/5PPP/6K1 w - - 0 1",
-          ["d5"],
-          ["Bxd5"],
-          "Scan diagonals first. The bishop on c4 sees d5.",
-          "Bxd5 wins the loose queen. Fast improvement starts with noticing undefended pieces."
-        ],
-        [
-          "Knight Alarm",
-          "Beginner",
-          "Forks",
-          "White to move",
-          "8/8/8/7k/8/3N4/4q3/6K1 w - - 0 1",
-          ["f4"],
-          ["Nf4+"],
-          "Jump with check and attack the queen at the same time.",
-          "Nf4+ checks the king on h5 and attacks the queen on e2. One knight move creates two jobs."
-        ],
-        [
-          "Take the Attacker",
-          "Beginner",
-          "Defense",
-          "White to move",
-          "6k1/6pp/8/8/8/8/5qPP/5RK1 w - - 0 1",
-          ["f2"],
-          ["Rxf2"],
-          "Defense can be a capture. Remove the queen beside your king.",
-          "Rxf2 wins the attacking queen. Beginners improve fast when they learn to capture danger calmly."
-        ],
-        [
-          "Corner Staircase",
-          "Intermediate",
-          "Checkmates",
-          "White to move",
-          "7k/p7/5K2/4Q3/8/8/8/8 w - - 0 1",
-          ["e8", "g6", "g7"],
-          ["Qe8+", "Kh7", "Qg6+", "Kh8", "Qg7#"],
-          "Use queen checks like stairs. Keep the queen protected by the king.",
-          "Qe8+ starts the staircase. Qg6+ boxes the king, and Qg7# lands on a protected square."
-        ],
-        [
-          "Deflect the Guard",
-          "Intermediate",
-          "Tactics",
-          "White to move",
-          "4k3/3r1ppp/8/8/8/8/3R1PPP/6K1 w - - 0 1",
-          ["d7"],
-          ["Rxd7"],
-          "The defender on d7 is loose. Win it before looking for fancy moves.",
-          "Rxd7 wins material and removes an active defender. Clean captures are practical tactics too."
-        ],
-        [
-          "Open King Alarm",
-          "Intermediate",
-          "Opening tactics",
-          "Black to move",
-          "rnb1k1nr/pppp1ppp/3b4/4p3/6Pq/5P2/PPPPP2P/RNBQ1RK1 b kq - 0 3",
-          ["h2"],
-          ["Qxh2+"],
-          "The bishop on d6 guards h2. The queen can safely strike there.",
-          "Qxh2+ is strong because the queen is protected by the bishop. Opening attacks work when pieces cooperate."
-        ],
-        [
-          "Rook Cutoff",
-          "Intermediate",
-          "Endgames",
-          "White to move",
-          "8/8/8/8/8/6k1/8/4R1K1 w - - 0 1",
-          ["e3"],
-          ["Re3+"],
-          "In rook endings, checks that cut the king off are gold.",
-          "Re3+ cuts across the third rank and pushes the king away. Rooks get stronger when they control files and ranks."
-        ],
-        [
-          "Queen Box Mate",
-          "Advanced",
-          "Checkmates",
-          "White to move",
-          "8/p7/8/8/8/k7/8/KQ6 w - - 0 1",
-          ["b7", "b2", "c3", "b4"],
-          ["Qb7", "Ka4", "Kb2", "Ka5", "Kc3", "Ka4", "Qb4#"],
-          "Do not rush. Box the king, walk closer, then finish.",
-          "Qb7 starts the net. The king joins the queen, and Qb4# closes the final escape."
-        ],
-        [
-          "Back-Rank Deflection",
-          "Advanced",
-          "Tactics",
-          "Black to move",
-          "6k1/6pp/8/8/8/8/5qPP/4RR1K b - - 0 1",
-          ["f1"],
-          ["Qxf1+"],
-          "Capture the defender with check before White can organize.",
-          "Qxf1+ removes a key rook and forces the king to respond. Deflection means pulling away a defender."
-        ],
-        [
-          "Promotion Timing",
-          "Advanced",
-          "Endgames",
-          "White to move",
-          "8/4k3/3P4/3K4/8/8/8/8 w - - 0 1",
-          ["c6"],
-          ["Kc6"],
-          "Before pushing, improve the king and control the promotion path.",
-          "Kc6 supports the passed pawn and controls key squares. Endgames reward calm king activity."
-        ],
-        [
-          "Final Net",
-          "Advanced",
-          "Checkmates",
-          "Black to move",
-          "6k1/5ppp/8/8/8/5q2/6PP/5R1K b - - 0 1",
-          ["f1"],
-          ["Qxf1#"],
-          "Remove the last defender and keep the king boxed in.",
-          "Qxf1# captures the rook and seals the first rank. The king has no capture, block, or escape."
-        ]
-      ]),
-      ...buildQuickPuzzleBatch("Puzzle Streaks", [
-        ["Back-rank bell", "Beginner", "Checkmates", "6k1/5ppp/8/8/8/8/5PPP/3R2K1", "d8", "Rd8#", "Use the open d-file.", "The rook reaches d8 and traps the boxed-in king."],
-        ["Corner hallway", "Beginner", "Checkmates", "7k/6pp/8/8/8/8/6PP/3R2K1", "d8", "Rd8#", "Slide the rook to the back rank.", "The rook controls the last rank while the pawns block escapes."],
-        ["A-file patrol", "Beginner", "Checkmates", "6k1/5ppp/8/8/8/8/5PPP/R5K1", "a8", "Ra8#", "The a-file is clear.", "Ra8# shows how a rook patrols a whole rank."],
-        ["Quiet rook climb", "Beginner", "Checkmates", "7k/6pp/8/8/8/8/6PP/R5K1", "a8", "Ra8#", "Climb to a8.", "The rook climbs the file and closes every door."],
-        ["Queen rescue", "Beginner", "Winning material", "4k3/8/8/4q2Q/8/8/8/4K3", "e5", "Qxe5+", "Capture the loose queen.", "Qxe5+ wins the strongest attacker with check."],
-        ["Diagonal queen grab", "Beginner", "Winning material", "4q2k/8/8/8/Q7/8/8/4K3", "e8", "Qxe8+", "Trace a4-b5-c6-d7-e8.", "The queen follows the diagonal and wins material."],
-        ["Castle treasure", "Beginner", "Winning material", "4k3/q7/8/8/8/8/8/R3K3", "a7", "Rxa7", "Move straight up the file.", "Rxa7 wins the queen because rooks love open files."],
-        ["H-file treasure", "Beginner", "Winning material", "4k3/7q/8/8/8/8/8/4K2R", "h7", "Rxh7", "The h-file is open.", "The rook races up the file and collects the queen."],
-        ["Sniper diagonal", "Beginner", "Tactics", "4k3/8/7q/8/8/8/8/2B1K3", "h6", "Bxh6", "Follow c1-d2-e3-f4-g5-h6.", "The bishop uses one clean diagonal to win the queen."],
-        ["Long bishop trail", "Beginner", "Tactics", "k7/6q1/8/8/8/8/1B6/4K3", "g7", "Bxg7", "Trace b2-c3-d4-e5-f6-g7.", "Bishops become powerful when the diagonal is open."],
-        ["Knight fork jump", "Beginner", "Forks", "r2qkbnr/pppp2pp/8/6N1/8/8/PPPPPPPP/RNBQKB1R", "f7", "Nf7", "Jump from g5 to f7.", "Nf7 attacks both the queen on d8 and rook on h8."],
-        ["Rook saves the day", "Beginner", "Defense", "4k3/8/8/8/8/8/4q3/4R1K1", "e2", "Rxe2+", "Take the queen on your file.", "Rxe2+ removes the threat and gives check."],
-        ["King captures danger", "Beginner", "Defense", "6k1/5ppp/8/8/8/8/5qPP/6K1", "f2", "Kxf2", "The queen on f2 is loose.", "Kxf2 is calm defense: remove the attacker."],
-        ["Promotion spark", "Beginner", "Endgames", "k7/7P/5K2/8/8/8/8/8", "h8", "h8=Q+", "Push to the final rank.", "h8=Q+ turns the rookie pawn into a queen."],
-        ["Queen back-rank", "Intermediate", "Checkmates", "4q2k/6pp/8/7Q/8/8/8/4K3", "e8", "Qxe8#", "Capture on e8.", "Qxe8# wins the queen and finishes the king."],
-        ["Rook checkpoint", "Intermediate", "Checkmates", "6k1/5ppp/8/8/8/8/5PPP/4R1K1", "e8", "Re8#", "The e-file is open.", "Re8# is a clean back-rank finish."],
-        ["Bishop treasure map", "Intermediate", "Winning material", "k7/7q/8/8/8/8/2B5/4K3", "h7", "Bxh7", "Follow c2-d3-e4-f5-g6-h7.", "The bishop follows the treasure map and wins material."],
-        ["Queen straight rescue", "Intermediate", "Winning material", "4k3/8/8/7q/8/8/8/4K2Q", "h5", "Qxh5", "Move straight up the h-file.", "Qxh5 removes the loose queen."],
-        ["Rook file snack", "Intermediate", "Winning material", "4k3/8/8/r7/8/8/8/R3K3", "a5", "Rxa5", "The rook moves straight up.", "Rxa5 wins the rook on the open file."],
-        ["Last-rank hero", "Intermediate", "Endgames", "7k/6P1/5K2/8/8/8/8/8", "g8", "g8=Q+", "Promote the g-pawn.", "g8=Q+ rewards the passed pawn."
-        ]
-      ]),
-      ...buildQuickPuzzleBatch("Puzzle Rush", [
-        ["Speed mate d-file", "Beginner", "Checkmates", "6k1/5ppp/8/8/8/8/5PPP/3R2K1", "d8", "Rd8#", "Open file, back rank.", "Fast eyes spot the back-rank mate."],
-        ["Speed mate a-file", "Beginner", "Checkmates", "7k/6pp/8/8/8/8/6PP/R5K1", "a8", "Ra8#", "Race to a8.", "The rook hits the final rank before the king can breathe."],
-        ["Rush queen capture", "Beginner", "Winning material", "4k3/8/8/4q2Q/8/8/8/4K3", "e5", "Qxe5+", "Take with check.", "Qxe5+ is the quickest safe win."],
-        ["Rush diagonal capture", "Beginner", "Tactics", "4k3/8/7q/8/8/8/8/2B1K3", "h6", "Bxh6", "One diagonal wins.", "The bishop wins the queen in one move."],
-        ["Rush rook treasure", "Beginner", "Winning material", "4k3/q7/8/8/8/8/8/R3K3", "a7", "Rxa7", "Open file.", "The rook grabs treasure on a7."],
-        ["Rush knight fork", "Beginner", "Forks", "r2qkbnr/pppp2pp/8/6N1/8/8/PPPPPPPP/RNBQKB1R", "f7", "Nf7", "Jump to f7.", "The knight attacks two heavy pieces."],
-        ["Rush shield", "Beginner", "Defense", "6k1/5ppp/8/8/8/8/5qPP/6K1", "f2", "Kxf2", "Capture the attacker.", "Defense is easy when the attacker is loose."],
-        ["Rush promotion", "Beginner", "Endgames", "k7/7P/5K2/8/8/8/8/8", "h8", "h8=Q+", "Promote now.", "A pawn becomes a queen and changes the game."],
-        ["Speed queen mate", "Intermediate", "Checkmates", "4q2k/6pp/8/7Q/8/8/8/4K3", "e8", "Qxe8#", "Capture with mate.", "Qxe8# is a winning capture and checkmate."],
-        ["Speed rook mate", "Intermediate", "Checkmates", "6k1/5ppp/8/8/8/8/5PPP/4R1K1", "e8", "Re8#", "Use the e-file.", "The rook finishes on e8."],
-        ["Speed bishop map", "Intermediate", "Winning material", "k7/7q/8/8/8/8/2B5/4K3", "h7", "Bxh7", "Trace the diagonal.", "The bishop wins the corner treasure."],
-        ["Speed queen file", "Intermediate", "Winning material", "4k3/8/8/7q/8/8/8/4K2Q", "h5", "Qxh5", "Same file.", "The queen climbs and captures."],
-        ["Speed rook file", "Intermediate", "Winning material", "4k3/8/8/r7/8/8/8/R3K3", "a5", "Rxa5", "Same file.", "The rook wins the rook."],
-        ["Speed g-pawn", "Intermediate", "Endgames", "7k/6P1/5K2/8/8/8/8/8", "g8", "g8=Q+", "Push to g8.", "Promotion gives you a new queen."],
-        ["Speed h-file", "Intermediate", "Winning material", "4k3/7q/8/8/8/8/8/4K2R", "h7", "Rxh7", "Straight up.", "The rook wins along the open h-file."],
-        ["Speed diagonal queen", "Intermediate", "Winning material", "4q2k/8/8/8/Q7/8/8/4K3", "e8", "Qxe8+", "Diagonal capture.", "The queen wins material with tempo."],
-        ["Speed bishop long", "Intermediate", "Tactics", "k7/6q1/8/8/8/8/1B6/4K3", "g7", "Bxg7", "Long diagonal.", "The bishop uses distance as power."],
-        ["Speed rook check", "Intermediate", "Defense", "4k3/8/8/8/8/8/4q3/4R1K1", "e2", "Rxe2+", "Remove the queen.", "Rxe2+ defends and checks."],
-        ["Speed corner mate", "Advanced", "Checkmates", "7k/6pp/8/8/8/8/6PP/3R2K1", "d8", "Rd8#", "Back rank.", "The final rank is locked."],
-        ["Speed final hero", "Advanced", "Endgames", "k7/7P/5K2/8/8/8/8/8", "h8", "h8=Q+", "Promote with confidence.", "The pawn reaches the finish line."
-        ]
-      ])
-    ];
+    // The production collection and its validated fallback are created on demand.
+    let puzzles = [];
 
-    const freeChessBooks = [
-      {
-        id: "blue-book-of-chess",
-        title: "The Blue Book of Chess",
-        author: "Howard Staunton",
-        year: "Publication year not stated in Project Gutenberg record",
-        edition: "Project Gutenberg eBook No. 16377",
-        level: "Beginner",
-        categories: ["Openings", "Strategy"],
-        topics: ["Rules", "Piece movement", "Openings", "Board basics"],
-        summary: "A beginner-friendly primer that starts with the board, piece powers, chess terms, rules, and simple opening explanations. Best for a learner who wants the game explained slowly before jumping into tactics.",
-        bestUse: "Read the rules and openings sections first, then play a slow game while naming every legal move.",
-        importantDetails: [
-          "Learn the board, piece movement, and chess terms before memorizing openings.",
-          "Use openings as simple development plans, not as long move lists.",
-          "Return to this book when a rule or special move feels confusing."
-        ],
-        printableContent: "Project Gutenberg provides public-domain reading formats including online HTML, EPUB, Kindle, and plain text.",
-        sourceName: "Project Gutenberg",
-        sourceUrl: "https://www.gutenberg.org/ebooks/16377",
-        legal: "Project Gutenberg lists this eBook as public domain in the USA and free to download."
-      },
-      {
-        id: "chess-and-checkers-way-to-mastership",
-        title: "Chess and Checkers: The Way to Mastership",
-        author: "Edward Lasker",
-        year: "1918",
-        edition: "Project Gutenberg eBook No. 4913",
-        level: "Beginner",
-        categories: ["Tactics", "Strategy"],
-        topics: ["Rules", "Tactics", "Strategy", "Illustrative games"],
-        summary: "A clear early-20th-century guide that explains rules, tactical ideas, strategy, and model play in plain language. Use the chess chapters for a practical bridge from rules to real decisions.",
-        bestUse: "Skim the rules, then focus on the chess examples that show why forcing moves matter.",
-        importantDetails: [
-          "Rules are only the start; the real goal is finding threats and replies.",
-          "Simple tactics become easier when you ask what each move attacks.",
-          "Model games help beginners copy good habits without overthinking."
-        ],
-        printableContent: "Project Gutenberg provides public-domain reading formats including online HTML, EPUB, Kindle, and plain text.",
-        sourceName: "Project Gutenberg",
-        sourceUrl: "https://www.gutenberg.org/ebooks/4913",
-        legal: "Project Gutenberg lists this eBook as public domain in the USA and free to download."
-      },
-      {
-        id: "chess-fundamentals",
-        title: "Chess Fundamentals",
-        author: "Jose Raul Capablanca",
-        year: "1921",
-        edition: "Project Gutenberg eBook No. 33870",
-        level: "Beginner",
-        categories: ["Openings", "Middlegame", "Endgame", "Strategy"],
-        topics: ["Endgames", "Simple mates", "Openings", "Middlegame principles"],
-        summary: "Capablanca teaches the basics through direct examples: mating patterns, pawn promotion, elementary endings, opening ideas, and the kind of simple plans that make beginner games easier to understand.",
-        bestUse: "Study one example at a time, then set up a board and replay the idea until it feels obvious.",
-        importantDetails: [
-          "Endgames teach piece coordination faster than memorizing opening traps.",
-          "Simple mates and pawn endings build confidence for finishing won games.",
-          "Capablanca's key lesson is clarity: improve pieces, reduce confusion, and convert."
-        ],
-        printableContent: "Project Gutenberg provides public-domain reading formats including online HTML, EPUB, Kindle, and plain text.",
-        sourceName: "Project Gutenberg",
-        sourceUrl: "https://www.gutenberg.org/ebooks/33870",
-        legal: "Project Gutenberg lists this eBook as public domain in the USA and free to download."
-      },
-      {
-        id: "chess-strategy",
-        title: "Chess Strategy",
-        author: "Edward Lasker",
-        year: "1915 second edition",
-        edition: "Project Gutenberg eBook No. 5614; translated by J. Du Mont",
-        level: "Intermediate",
-        categories: ["Openings", "Middlegame", "Endgame", "Strategy"],
-        topics: ["Strategy", "Piece activity", "Openings", "Endgames"],
-        summary: "A structured strategy course for players who know the rules and want better plans. It connects piece movement, pawn play, opening judgment, middlegame planning, and endgame thinking.",
-        bestUse: "Read the planning sections with your own recent games open, then mark where your pieces had no job.",
-        importantDetails: [
-          "Strategy means improving your worst piece and choosing useful pawn moves.",
-          "Opening moves should connect to a middlegame plan.",
-          "Endgame thinking begins earlier than most beginners expect."
-        ],
-        printableContent: "Project Gutenberg provides public-domain reading formats including online HTML, EPUB, Kindle, and plain text.",
-        sourceName: "Project Gutenberg",
-        sourceUrl: "https://www.gutenberg.org/ebooks/5614",
-        legal: "Project Gutenberg lists this eBook as public domain in the USA and free to download."
-      },
-      {
-        id: "checkmates-for-three-pieces",
-        title: "Checkmates for Three Pieces",
-        author: "William Brett Fishburne",
-        year: "Publication year not stated in Project Gutenberg record",
-        edition: "Project Gutenberg eBook No. 4542",
-        level: "Intermediate",
-        categories: ["Tactics", "Endgame"],
-        topics: ["Checkmate patterns", "Piece coordination", "Endgame tactics", "Calculation"],
-        summary: "A compact pattern book for learning how small groups of pieces finish the king. It is useful when a learner already knows legal moves but misses simple mating nets.",
-        bestUse: "Use it as a puzzle warm-up: name the checking piece, the guard, and the escape squares.",
-        importantDetails: [
-          "Checkmate usually needs one attacking piece and at least one helper.",
-          "Always count the king's escape squares before choosing the final move.",
-          "Small mating patterns make bigger attacks easier to understand."
-        ],
-        printableContent: "Project Gutenberg provides public-domain reading formats including online HTML, EPUB, Kindle, and plain text.",
-        sourceName: "Project Gutenberg",
-        sourceUrl: "https://www.gutenberg.org/ebooks/4542",
-        legal: "Project Gutenberg lists this eBook as public domain in the USA and free to download."
-      },
-      {
-        id: "chess-history-and-reminiscences",
-        title: "Chess History and Reminiscences",
-        author: "H. E. Bird",
-        year: "Publication year not stated in Project Gutenberg record",
-        edition: "Project Gutenberg eBook No. 4902",
-        level: "Intermediate",
-        categories: ["Biographies", "Strategy"],
-        topics: ["Chess history", "Classic players", "Practical lessons", "Game culture"],
-        summary: "A historical and biographical chess read that helps learners see how classic players thought about the game. It is best used for context, inspiration, and memorable strategic ideas.",
-        bestUse: "Read short sections between tactics sessions and write down one practical lesson from each story.",
-        importantDetails: [
-          "Chess history gives names and stories to ideas you already see on the board.",
-          "Classic games often show simple plans more clearly than modern engine-heavy analysis.",
-          "Use the stories as memory hooks, not as a replacement for practice."
-        ],
-        printableContent: "Project Gutenberg provides public-domain reading formats including online HTML, EPUB, Kindle, and plain text.",
-        sourceName: "Project Gutenberg",
-        sourceUrl: "https://www.gutenberg.org/ebooks/4902",
-        legal: "Project Gutenberg lists this eBook as public domain in the USA and free to download."
-      },
-      {
-        id: "my-system",
-        title: "My System",
-        author: "Aron Nimzowitsch; translated by Philip Hereford",
-        year: "1925 original; 1930 Harcourt, Brace & Co. edition",
-        edition: "Wikimedia Commons PDF sourced from Internet Archive",
-        level: "Advanced",
-        categories: ["Middlegame", "Strategy"],
-        topics: ["Prophylaxis", "Pawn chains", "Blockade", "Positional play"],
-        summary: "A classic positional manual for serious learners. Study it after the basics, because the ideas are powerful but abstract: restraint, blockade, overprotection, pawn chains, and long-term piece placement.",
-        bestUse: "Do not read it straight through. Pick one idea, find it in your own game, then move to the next idea.",
-        importantDetails: [
-          "Prophylaxis means asking what your opponent wants before choosing your move.",
-          "Blockades and pawn chains decide where pieces belong.",
-          "Overprotection is useful when a key square controls the whole position."
-        ],
-        printableContent: "Wikimedia Commons provides the public-domain PDF record and original file for reading and printing.",
-        sourceName: "Wikimedia Commons / Internet Archive",
-        sourceUrl: "https://commons.wikimedia.org/wiki/File:My_System.pdf",
-        legal: "Wikimedia Commons identifies the 1930 edition as public domain in the United States because it was published before January 1, 1931."
-      },
-      {
-        id: "chess-generalship-vol-1",
-        title: "Chess Generalship, Vol. I. Grand Reconnaissance",
-        author: "Franklin K. Young",
-        year: "Publication year not stated in Project Gutenberg record",
-        edition: "Project Gutenberg eBook No. 55278",
-        level: "Advanced",
-        categories: ["Middlegame", "Strategy"],
-        topics: ["Planning", "Evaluation", "Position reconnaissance", "Strategic discipline"],
-        summary: "An advanced strategic manual with a military-style vocabulary. Use it for the big lesson: before attacking, inspect the whole board and understand the position's weak points.",
-        bestUse: "Read it slowly as a planning checklist, then apply the checklist to one serious game.",
-        importantDetails: [
-          "Good plans begin with reconnaissance: threats, weaknesses, files, diagonals, and king safety.",
-          "Do not attack just because you can; attack when the position gives you targets.",
-          "Evaluation should happen before calculation, then calculation checks whether the plan works."
-        ],
-        printableContent: "Project Gutenberg provides public-domain reading formats including online HTML, EPUB, Kindle, and plain text.",
-        sourceName: "Project Gutenberg",
-        sourceUrl: "https://www.gutenberg.org/ebooks/55278",
-        legal: "Project Gutenberg lists this eBook as public domain in the USA and free to download."
-      },
-      {
-        id: "paul-morphy-exploits-and-triumphs",
-        title: "The Exploits and Triumphs, in Europe, of Paul Morphy, the Chess Champion",
-        author: "Frederick Milnes Edge",
-        year: "Publication year not stated in Project Gutenberg record",
-        edition: "Project Gutenberg eBook No. 34180",
-        level: "Advanced",
-        categories: ["Biographies", "Openings", "Tactics"],
-        topics: ["Paul Morphy", "Classic attacking play", "Open games", "Chess biography"],
-        summary: "A classic account of Paul Morphy's European tour. For learners, the value is seeing rapid development, open lines, initiative, and direct attacks in memorable historical context.",
-        bestUse: "Treat it as attacking inspiration: after each story or game, ask how Morphy developed faster.",
-        importantDetails: [
-          "Morphy's games reward fast development and open lines.",
-          "Attack works best when pieces join together before the queen rushes in.",
-          "Biographical context makes classic tactical patterns easier to remember."
-        ],
-        printableContent: "Project Gutenberg provides public-domain reading formats including online HTML, EPUB, Kindle, and plain text.",
-        sourceName: "Project Gutenberg",
-        sourceUrl: "https://www.gutenberg.org/ebooks/34180",
-        legal: "Project Gutenberg lists this eBook as public domain in the USA and free to download."
-      }
-    ];
-
-    const shortVideos = [
+    let shortVideos = null;
+    function getShortVideos() {
+      if (shortVideos) return shortVideos;
+      shortVideos = [
       {
         id: "Vnblc4jfJHU",
         topic: "Mate",
@@ -23581,8 +21890,13 @@
         note: "A calculation puzzle that rewards checking the candidate moves first."
       }
     ];
+      return shortVideos;
+    }
 
-    const shortLevelGroups = [
+    let shortLevelGroups = null;
+    function getShortLevelGroups() {
+      if (shortLevelGroups) return shortLevelGroups;
+      shortLevelGroups = [
       {
         title: "Beginner Shorts",
         tag: "Start here",
@@ -23633,6 +21947,8 @@
         ]
       }
     ];
+      return shortLevelGroups;
+    }
 
     const shortLessonStorageKey = "checkmateQuest.shortLessons.v1";
 
@@ -24194,15 +22510,29 @@
       return { records: Object.freeze(records), report: Object.freeze(report) };
     }
 
-    // Keep the historical tiered bank independent from optional imports and
-    // the legacy puzzle surface. This is a non-overlapping 50-puzzle selection
-    // per difficulty from the existing project records, then current rule and
-    // engine validation decides what becomes playable.
-    const historicalPuzzleSourceBank = Object.freeze(buildPuzzleEssentialsBank());
-    const puzzleDatabase = createPuzzleDatabase(buildProductionPuzzleTiers(historicalPuzzleSourceBank));
-    const originalTieredPuzzleBank = puzzleDatabase.records;
-    window.checkmatePuzzleDatabase = puzzleDatabase.report;
-    puzzles = [...originalTieredPuzzleBank];
+    // Build the legacy fallback only when Puzzle opens. The production JSON pack
+    // remains the primary source, so this work must not delay first interaction.
+    let historicalPuzzleSourceBank = null;
+    let puzzleDatabase = null;
+    let originalTieredPuzzleBank = null;
+
+    function initializeLegacyPuzzleDatabase() {
+      if (puzzleDatabase) return puzzleDatabase;
+      historicalPuzzleSourceBank = Object.freeze(buildPuzzleEssentialsBank());
+      puzzleDatabase = createPuzzleDatabase(buildProductionPuzzleTiers(historicalPuzzleSourceBank));
+      originalTieredPuzzleBank = puzzleDatabase.records;
+      window.checkmatePuzzleDatabase = puzzleDatabase.report;
+      puzzles = [...originalTieredPuzzleBank];
+      if (puzzleStateMatchesBank) {
+        currentPuzzle = Math.max(0, Math.min(puzzles.length - 1, Number(savedPuzzleState.currentPuzzle) || 0));
+        if (puzzlePlanLevels.includes(activePuzzlePlan) && puzzles[currentPuzzle]?.level !== activePuzzlePlan) {
+          currentPuzzle = Math.max(0, puzzles.findIndex((puzzle) => puzzle.level === activePuzzlePlan));
+        }
+        solvedPuzzles.clear();
+        (savedPuzzleState.solved || []).map(Number).filter((index) => index >= 0 && index < puzzles.length).forEach((index) => solvedPuzzles.add(index));
+      }
+      return puzzleDatabase;
+    }
     const progressAutosaveStorageKey = "checkmateQuest.progressAutosave.v1";
     const visitSnapshotStorageKey = "checkmateQuest.visitSnapshot.v1";
     const soundPrefsStorageKey = "checkmateQuest.sound.v1";
@@ -31822,6 +30152,21 @@
     let stockfishSourceIndex = 0;
     let stockfishSearchId = 0;
     let stockfishPanelFrame = 0;
+    let stockfishIdleTimer = 0;
+    const warmedResourceOrigins = new Set();
+
+    function warmResourceOrigins(origins) {
+      const list = Array.isArray(origins) ? origins : [origins];
+      list.forEach((origin) => {
+        if (!origin || warmedResourceOrigins.has(origin)) return;
+        warmedResourceOrigins.add(origin);
+        const hint = document.createElement("link");
+        hint.rel = "preconnect";
+        hint.href = origin;
+        hint.crossOrigin = "anonymous";
+        document.head.append(hint);
+      });
+    }
     const stockfishDebugMode = (() => {
       try {
         return new URLSearchParams(window.location.search).has("stockfishDebug")
@@ -31844,6 +30189,7 @@
 
     async function loadChessRules() {
       if (CoachChess) return CoachChess;
+      warmResourceOrigins("https://cdn.jsdelivr.net");
       chessRulesPromise ||= import(chessJsUrl).then((module) => module.Chess || module.default?.Chess || module.default);
       CoachChess = await chessRulesPromise;
       return CoachChess;
@@ -32012,6 +30358,9 @@
       setupCoachAvatarAssets();
       restartCoachGame();
       updateAiPlayerHeader();
+      window.requestAnimationFrame(() => {
+        if (document.getElementById("play")?.classList.contains("is-active-panel")) void initializeCoachEngine();
+      });
     }
 
     function getCoachSkill() {
@@ -32726,6 +31075,7 @@
         scheduleEnginePanelUpdate();
         stockfishInitResolve(stockfishWorker);
         stockfishInitResolve = null;
+        scheduleStockfishIdleRelease();
         return;
       }
       if (line === "readyok" && stockfishPending?.stage === "config") {
@@ -32758,10 +31108,30 @@
         pending.resolve(pending.purpose === "review"
           ? { ...(pending.analysis || {}), bestMove: best && best !== "(none)" ? best : pending.analysis?.bestMove || "", fen: pending.fen }
           : best);
+        scheduleStockfishIdleRelease();
       }
     }
 
+    function clearStockfishIdleRelease() {
+      window.clearTimeout(stockfishIdleTimer);
+      stockfishIdleTimer = 0;
+    }
+
+    function scheduleStockfishIdleRelease(delay = 60000) {
+      clearStockfishIdleRelease();
+      if (!stockfishWorker || stockfishPending || stockfishLoadPromise) return;
+      stockfishIdleTimer = window.setTimeout(() => {
+        stockfishIdleTimer = 0;
+        if (stockfishPending || stockfishLoadPromise || coachThinking) return;
+        stockfishInfo.loaded = false;
+        stockfishInfo.status = "Engine idle";
+        scheduleEnginePanelUpdate();
+        releaseStockfishWorker();
+      }, delay);
+    }
+
     function releaseStockfishWorker() {
+      clearStockfishIdleRelease();
       window.clearTimeout(stockfishBootTimer);
       stockfishLoadPromise = null;
       stockfishInitResolve = null;
@@ -32794,6 +31164,7 @@
     }
 
     function loadStockfishWorker() {
+      clearStockfishIdleRelease();
       if (stockfishFailed) {
         if (Date.now() - stockfishFailAt < 8000) return Promise.resolve(null);
         stockfishFailed = false;
@@ -32883,16 +31254,15 @@
       return stockfishLoadPromise;
     }
 
-    function preloadStockfishWhenIdle() {
-      if (stockfishReady || stockfishLoadPromise || stockfishFailed || navigator.onLine === false || document.body.classList.contains("perf-lite")) return;
-      const warm = () => {
-        if (!document.hidden && !stockfishReady && !stockfishLoadPromise) loadStockfishWorker().catch(() => {});
-      };
-      if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(warm, { timeout: 1800 });
-      } else {
-        window.setTimeout(warm, 450);
-      }
+    function initializeCoachEngine() {
+      if (stockfishReady) return Promise.resolve(stockfishWorker);
+      stockfishInfo.status = "Engine loading";
+      scheduleEnginePanelUpdate();
+      return loadStockfishWorker().then((worker) => {
+        stockfishInfo.status = worker ? "Engine ready" : "Engine failed";
+        scheduleEnginePanelUpdate();
+        return worker;
+      });
     }
 
     async function getStockfishMove(moves) {
@@ -34289,15 +32659,16 @@
         document.getElementById("reviewSummaryLine").textContent = "Preparing your review...";
         document.getElementById("reviewAccuracyBadge").textContent = "Analyzing";
       }
-      ensurePostGameReview();
+      ensurePostGameReview(true);
     }
 
-    function ensurePostGameReview() {
+    function ensurePostGameReview(shouldAnalyze = false) {
       if (!coachGame || (!isCoachGameOver() && !coachDrawAgreed)) {
         renderPostGameFlow(false);
         return;
       }
       renderPostGameFlow(true);
+      if (!shouldAnalyze) return;
       const pgn = coachGame.pgn();
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
       if (cached) {
@@ -37011,32 +35382,42 @@
       }
     }
 
-    function validateRealPuzzleBank() {
+    function yieldBackgroundWork() {
+      return new Promise((resolve) => {
+        const resume = () => window.setTimeout(() => window.requestAnimationFrame(resolve), 0);
+        if ("requestIdleCallback" in window) window.requestIdleCallback(resume, { timeout: 50 });
+        else resume();
+      });
+    }
+
+    async function validateRealPuzzleBank() {
       if (!CoachChess) return [];
       const errors = [];
       const seen = new Set();
       const seenIds = new Set();
       realPuzzleValidIndexes = [];
-      realPuzzleBank.forEach((puzzle, index) => {
+      for (let index = 0; index < realPuzzleBank.length; index += 1) {
+        const puzzle = realPuzzleBank[index];
         const validation = validateRealPuzzleRecord(puzzle);
         if (validation.ok) {
           const id = String(puzzle?.id || "");
           if (!id || seenIds.has(id)) {
             errors.push(`${puzzle?.title || `Puzzle ${index + 1}`}: duplicate id`);
-            return;
+          } else {
+            const key = getRealPuzzlePositionKey(puzzle);
+            if (seen.has(key)) {
+              errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: duplicate position`);
+            } else {
+              seenIds.add(id);
+              seen.add(key);
+              realPuzzleValidIndexes.push(index);
+            }
           }
-          const key = getRealPuzzlePositionKey(puzzle);
-          if (seen.has(key)) {
-            errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: duplicate position`);
-            return;
-          }
-          seenIds.add(id);
-          seen.add(key);
-          realPuzzleValidIndexes.push(index);
         } else {
           errors.push(`${puzzle?.title || puzzle?.id || `Puzzle ${index + 1}`}: ${validation.reason}`);
         }
-      });
+        if ((index + 1) % 24 === 0) await yieldBackgroundWork();
+      }
       return errors;
     }
 
@@ -37811,7 +36192,7 @@
     async function verifyPuzzleBanksInBackground() {
       try {
         await loadRealPuzzleCollection();
-        realPuzzleValidationErrors = validateRealPuzzleBank();
+        realPuzzleValidationErrors = await validateRealPuzzleBank();
         const deepAudit = new URLSearchParams(window.location.search).get("verifyPuzzles") === "1";
         if (deepAudit) {
           await verifyActivePuzzleBankWithStockfish();
@@ -37835,9 +36216,10 @@
       document.getElementById("realPuzzles")?.setAttribute("data-loading", "true");
       try {
         await loadChessRules();
+        initializeLegacyPuzzleDatabase();
         await loadRealPuzzleCollection();
         renderPuzzle();
-        realPuzzleValidationErrors = validateRealPuzzleBank();
+        realPuzzleValidationErrors = await validateRealPuzzleBank();
         puzzleCollectionReady = realPuzzleValidIndexes.length > 0;
         reportRealPuzzleRuntime("collection-ready");
       } catch {
@@ -37905,10 +36287,6 @@
       setCoachDifficulty(coachDifficulty);
       renderCoachSidePicker();
       debugStockfishDifficultyTable();
-      loadStockfishWorker().then((worker) => {
-        stockfishInfo.status = worker ? "Engine ready" : "Engine failed";
-        scheduleEnginePanelUpdate();
-      });
       document.querySelectorAll("[data-game-difficulty]").forEach((button) => {
         button.addEventListener("click", () => {
           const wasRealtimeMatch = isRealtimeMatchActive();
@@ -38250,29 +36628,47 @@
     }
 
     const deferredFeatureInitializers = {
+      preferences: setupLearnerPreferences,
+      persistence: setupProgressPersistence,
+      login: () => {
+        setupProfileControls();
+        setupLoginProfile();
+        setupSecureAuth();
+        return setupSupabaseAuthUi();
+      },
       play: () => {
-        preloadStockfishWhenIdle();
         setupCoachAvatarAssets();
         renderCoordinates();
-        return setupPlayableChess();
+        const setup = setupPlayableChess();
+        Promise.resolve(setup).then(
+          () => scheduleBackgroundTask(() => initializeDeferredFeature("performance"), 800),
+          () => scheduleBackgroundTask(() => initializeDeferredFeature("performance"), 800)
+        );
+        return setup;
       },
       puzzles: () => {
         syncPuzzleSoundButton();
         return setupRealPuzzles();
       },
+      puzzleControls: setupLegacyPuzzleControls,
       store: setupStore,
       settings: setupSettingsPage,
       admin: setupAdminPanel,
       tutorial: setupBeginnerTutorial,
       academy: setupAcademy,
-      paths: setupLessonFlow,
+      paths: () => {
+        wireTabs();
+        setupLessonFlow();
+      },
       adventures: () => {
+        setupAdventureControls();
         renderAdventureMission();
         renderMiniBoards();
       },
       openings: setupOpeningFavorites,
       books: setupBooks,
       videos: () => {
+        warmResourceOrigins(["https://www.youtube-nocookie.com", "https://www.youtube.com", "https://i.ytimg.com"]);
         renderShortFeed();
         setupVideoTheater();
       },
@@ -38310,10 +36706,11 @@
 
     function initializePanelFeatures(panel) {
       const featureNames = {
-        play: ["play"],
-        puzzles: ["puzzles"],
+        login: ["login"],
+        play: ["preferences", "play"],
+        puzzles: ["puzzleControls", "puzzles"],
         store: ["store"],
-        settings: ["settings"],
+        settings: ["preferences", "audio", "settings"],
         admin: ["admin"],
         tutorial: ["tutorial"],
         academy: ["academy"],
@@ -38325,25 +36722,36 @@
         plan: ["plan"],
         leaderboards: ["leaderboards"]
       }[panel] || [];
+      if (featureNames.length) featureNames.unshift("persistence");
       featureNames.forEach((name) => void initializeDeferredFeature(name));
     }
 
     function setupSiteTabs() {
+      if (setupSiteTabs.ready) return;
+      setupSiteTabs.ready = true;
       const panelIds = ["login", "settings", "store", "admin", "tutorial", "academy", "paths", "adventures", "rules", "openings", "videos", "books", "notation", "play", "leaderboards", "puzzles", "plan"];
       const links = [...document.querySelectorAll("[data-site-tab]")];
       const tabLinks = [...document.querySelectorAll("[data-site-tab], [data-home-link]")];
+      const hashLinks = [...document.querySelectorAll('a[href^="#"]')];
+      const navGroups = [...document.querySelectorAll(".nav-group")];
+      const homeLink = document.querySelector("[data-home-link]");
       const panels = panelIds
         .map((id) => document.getElementById(id))
         .filter(Boolean);
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       let activePanel = panels.find((panel) => panel.classList.contains("is-active-panel")) || null;
       let panelInitFrame = 0;
+      const panelScrollPositions = new Map();
 
       panels.forEach((panel) => {
         panel.classList.add("site-panel");
         panel.setAttribute("tabindex", "-1");
         panel.setAttribute("aria-hidden", String(panel !== activePanel));
+        panel.hidden = panel !== activePanel;
       });
+
+      function rememberPanelScroll(panel) {
+        if (panel) panelScrollPositions.set(panel.id, window.scrollY);
+      }
 
       function getConfigFromHash(hashValue) {
         const rawHash = String(hashValue || "").replace(/^#/, "");
@@ -38383,13 +36791,13 @@
           link.classList.remove("is-active-tab");
           link.removeAttribute("aria-current");
         });
-        document.querySelectorAll(".nav-group").forEach((group) => {
+        navGroups.forEach((group) => {
           group.classList.remove("is-active-group");
         });
       }
 
       function closeNavMenus() {
-        document.querySelectorAll(".nav-group[open]").forEach((group) => {
+        navGroups.filter((group) => group.open).forEach((group) => {
           group.removeAttribute("open");
         });
       }
@@ -38419,10 +36827,10 @@
         playAudioCue(cueMap[tab] || "menu");
       }
 
-      document.querySelectorAll(".nav-group").forEach((group) => {
+      navGroups.forEach((group) => {
         group.addEventListener("toggle", () => {
           if (!group.open) return;
-          document.querySelectorAll(".nav-group[open]").forEach((otherGroup) => {
+          navGroups.forEach((otherGroup) => {
             if (otherGroup !== group) otherGroup.removeAttribute("open");
           });
         });
@@ -38441,19 +36849,20 @@
         document.body.classList.remove("site-tab-mode");
         document.body.classList.remove("friend-challenge-mode", "tournament-mode");
         clearActiveTabs();
-        const homeLink = document.querySelector("[data-home-link]");
         homeLink?.classList.add("is-active-tab");
         homeLink?.setAttribute("aria-current", "page");
         closeNavMenus();
         if (activePanel) {
+          rememberPanelScroll(activePanel);
           activePanel.classList.remove("is-active-panel");
           activePanel.setAttribute("aria-hidden", "true");
+          activePanel.hidden = true;
           activePanel = null;
         }
 
         if (shouldScroll) {
           playAudioCue("page-home");
-          window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+          window.scrollTo({ top: 0, behavior: "auto" });
         }
       }
 
@@ -38475,11 +36884,14 @@
         document.body.classList.toggle("tournament-mode", config.tab === "tournaments");
         if (activePanel !== panel) {
           if (activePanel) {
+            rememberPanelScroll(activePanel);
             activePanel.classList.remove("is-active-panel");
             activePanel.setAttribute("aria-hidden", "true");
+            activePanel.hidden = true;
           }
           panel.classList.add("is-active-panel");
           panel.setAttribute("aria-hidden", "false");
+          panel.hidden = false;
           activePanel = panel;
         }
         if (panelInitFrame) window.cancelAnimationFrame(panelInitFrame);
@@ -38496,7 +36908,7 @@
           closeNavMenus();
           if (activeLink.closest(".nav-links")) {
             activeLink.scrollIntoView({
-              behavior: reduceMotion ? "auto" : "smooth",
+              behavior: "auto",
               block: "nearest",
               inline: "center"
             });
@@ -38508,11 +36920,13 @@
           window.requestAnimationFrame(() => {
             const target = document.getElementById(config.focus) || panel;
             target.scrollIntoView({
-              behavior: reduceMotion ? "auto" : "smooth",
+              behavior: "auto",
               block: "start"
             });
             panel.focus({ preventScroll: true });
           });
+        } else if (activePanel === panel && panelScrollPositions.has(panel.id)) {
+          window.requestAnimationFrame(() => window.scrollTo({ top: panelScrollPositions.get(panel.id), behavior: "auto" }));
         }
       }
 
@@ -38525,7 +36939,7 @@
         }
       }
 
-      document.querySelectorAll('a[href^="#"]').forEach((link) => {
+      hashLinks.forEach((link) => {
         const href = link.getAttribute("href");
         const isHomeLink = href === "#top";
         const config = getConfigFromHash(href);
@@ -38870,6 +37284,7 @@
       let configPromise = null;
       let cachedAccount = null;
       let supabaseClientPromise = null;
+      let supabaseLibraryPromise = null;
 
       const authDebug = (message, detail = {}) => {
         try {
@@ -38950,6 +37365,27 @@
         return configPromise;
       };
 
+      const loadSupabaseLibrary = () => {
+        if (typeof window.supabase?.createClient === "function") return Promise.resolve(window.supabase);
+        if (!supabaseLibraryPromise) {
+          warmResourceOrigins("https://cdn.jsdelivr.net");
+          supabaseLibraryPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+            script.async = true;
+            script.onload = () => typeof window.supabase?.createClient === "function"
+              ? resolve(window.supabase)
+              : reject(new Error("Supabase client did not load."));
+            script.onerror = () => reject(new Error("Supabase client could not load."));
+            document.head.append(script);
+          }).catch((error) => {
+            supabaseLibraryPromise = null;
+            throw error;
+          });
+        }
+        return supabaseLibraryPromise;
+      };
+
       const request = async (service, path, options = {}) => {
         const { url, anonKey } = await getConfig();
         const response = await fetch(`${url}/${service}/${path}`, {
@@ -38971,7 +37407,7 @@
 
       const getSupabaseClient = async () => {
         if (!supabaseClientPromise) {
-          supabaseClientPromise = getConfig().then(({ url, anonKey }) => {
+          supabaseClientPromise = Promise.all([loadSupabaseLibrary(), getConfig()]).then(([, { url, anonKey }]) => {
             const createClient = window.supabase?.createClient;
             if (typeof createClient !== "function") throw new Error("Supabase client did not load. Refresh and try again.");
             const clientId = `${url}:${anonKey.slice(0, 12)}`;
@@ -39232,6 +37668,7 @@
           authDebug("Global logout completed");
         },
         startGoogleLogin: async () => {
+          warmResourceOrigins("https://accounts.google.com");
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
           const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: getAuthRedirectUrl() } });
@@ -40244,7 +38681,21 @@
       syncAudioSystem(prefs.audio);
     }
 
+    function applyStartupTheme(prefs = readLearnerPrefs()) {
+      document.body.classList.toggle("theme-light", prefs.theme === "light");
+      document.body.classList.toggle("reduced-motion", prefs.motion === "reduced");
+      document.body.classList.toggle("high-contrast", prefs.contrast === "high");
+      document.body.classList.toggle("no-pressure", prefs.pressure !== "off");
+      document.body.classList.toggle("low-performance", (navigator.hardwareConcurrency || 4) <= 2 || (navigator.deviceMemory && navigator.deviceMemory <= 2));
+      applyBackgroundTheme(prefs.backgroundTheme);
+    }
+
     function setupLearnerPreferences() {
+      if (setupLearnerPreferences.ready) {
+        applyLearnerPrefs(readLearnerPrefs());
+        return;
+      }
+      setupLearnerPreferences.ready = true;
       const prefs = readLearnerPrefs();
       syncBoardBorderOptions();
       const fields = {
@@ -41749,7 +40200,7 @@
       const levels = document.getElementById("shortsLevels");
       if (!levels) return;
 
-      const videoLookup = new Map(shortVideos.map((video) => [video.id, video]));
+      const videoLookup = new Map(getShortVideos().map((video) => [video.id, video]));
       let runningIndex = 0;
       levels.innerHTML = "";
 
@@ -41797,7 +40248,7 @@
         return card;
       }
 
-      shortLevelGroups.forEach((group) => {
+      getShortLevelGroups().forEach((group) => {
         const section = document.createElement("section");
         const head = document.createElement("div");
         const copy = document.createElement("div");
@@ -41829,12 +40280,12 @@
       const feed = document.getElementById("shortsLevels");
       if (!feed) return;
 
-      const videoLookup = new Map(shortVideos.map((video) => [video.id, video]));
+      const videoLookup = new Map(getShortVideos().map((video) => [video.id, video]));
       const orderedShorts = [];
       feed.innerHTML = "";
       feed.className = "shorts-feed";
 
-      shortLevelGroups.forEach((group) => {
+      getShortLevelGroups().forEach((group) => {
         const videos = group.ids.map((id) => videoLookup.get(id)).filter(Boolean);
         videos.forEach((video, levelIndex) => {
           orderedShorts.push({
@@ -43148,13 +41599,75 @@
       });
     }
 
-    function scheduleBackgroundTask(task, timeout = 1500) {
-      const run = () => Promise.resolve().then(task).catch(() => {});
-      if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(run, { timeout });
-      } else {
-        window.setTimeout(run, Math.min(timeout, 500));
+    const backgroundTaskQueue = [];
+    let backgroundTaskTimer = 0;
+    let backgroundTaskIdleId = 0;
+    let backgroundTaskScheduledFor = 0;
+
+    function flushNextBackgroundTask(deadline) {
+      backgroundTaskIdleId = 0;
+      backgroundTaskScheduledFor = 0;
+      if (deadline && !deadline.didTimeout && deadline.timeRemaining() < 4) {
+        window.setTimeout(scheduleNextBackgroundTask, 0);
+        return;
       }
+      const now = performance.now();
+      const index = backgroundTaskQueue.findIndex((job) => job.dueAt <= now);
+      if (index < 0) {
+        scheduleNextBackgroundTask();
+        return;
+      }
+
+      const [job] = backgroundTaskQueue.splice(index, 1);
+      try {
+        const result = job.task();
+        if (result && typeof result.catch === "function") result.catch(() => {});
+      } catch {}
+
+      // One unit of deferred work per frame keeps a busy startup from becoming
+      // a single long task and lets input and painting win between jobs.
+      if (backgroundTaskQueue.length) {
+        window.setTimeout(scheduleNextBackgroundTask, 16);
+      }
+    }
+
+    function scheduleNextBackgroundTask() {
+      if (!backgroundTaskQueue.length || backgroundTaskIdleId) return;
+      const nextDueAt = Math.min(...backgroundTaskQueue.map((job) => job.dueAt));
+      if (backgroundTaskTimer && nextDueAt >= backgroundTaskScheduledFor) return;
+      if (backgroundTaskTimer) {
+        window.clearTimeout(backgroundTaskTimer);
+        backgroundTaskTimer = 0;
+      }
+      const wait = Math.max(0, nextDueAt - performance.now());
+      backgroundTaskScheduledFor = nextDueAt;
+      backgroundTaskTimer = window.setTimeout(() => {
+        backgroundTaskTimer = 0;
+        if ("requestIdleCallback" in window) {
+          backgroundTaskIdleId = window.requestIdleCallback(flushNextBackgroundTask, { timeout: 50 });
+        } else {
+          backgroundTaskIdleId = -1;
+          window.requestAnimationFrame(() => window.setTimeout(() => {
+            backgroundTaskIdleId = 0;
+            flushNextBackgroundTask();
+          }, 0));
+        }
+      }, wait);
+    }
+
+    function scheduleBackgroundTask(task, timeout = 1500) {
+      if (typeof task !== "function") return;
+      backgroundTaskQueue.push({ task, dueAt: performance.now() + Math.max(0, Number(timeout) || 0) });
+      scheduleNextBackgroundTask();
+    }
+
+    function cancelBackgroundTasks() {
+      backgroundTaskQueue.length = 0;
+      if (backgroundTaskTimer) window.clearTimeout(backgroundTaskTimer);
+      if (backgroundTaskIdleId && "cancelIdleCallback" in window) window.cancelIdleCallback(backgroundTaskIdleId);
+      backgroundTaskTimer = 0;
+      backgroundTaskIdleId = 0;
+      backgroundTaskScheduledFor = 0;
     }
 
     function setupPerformanceOptimizations() {
@@ -43231,14 +41744,31 @@
       window.addEventListener("unhandledrejection", (event) => {
         if (event.reason?.name === "AbortError") event.preventDefault();
       });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) scheduleStockfishIdleRelease(5000);
+      }, { passive: true });
       window.addEventListener("pagehide", (event) => {
         if (event.persisted) return;
+        cancelBackgroundTasks();
+        cancelStockfishSearch("Page closing", true);
+        releaseStockfishWorker();
         stopRealtimeMatchLifecycle();
         stopFriendNetworkSync();
         stopTournamentNetworkSync();
       }, { once: true });
     }
 
+    document.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+      const trigger = target?.closest("[data-home-action]");
+      if (!trigger) return;
+      event.preventDefault();
+      runHomeAction(trigger.dataset.homeAction, trigger.dataset.homePlan);
+    });
+
+    function setupLegacyPuzzleControls() {
+      if (setupLegacyPuzzleControls.ready) return;
+      setupLegacyPuzzleControls.ready = true;
     document.getElementById("nextPuzzle").addEventListener("click", () => {
       goToNextPuzzle(1);
     });
@@ -43276,14 +41806,6 @@
 
     document.querySelectorAll("[data-mini-plan]").forEach((button) => {
       button.addEventListener("click", () => startMiniGame(button.dataset.miniPlan));
-    });
-
-    document.addEventListener("click", (event) => {
-      const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-      const trigger = target?.closest("[data-home-action]");
-      if (!trigger) return;
-      event.preventDefault();
-      runHomeAction(trigger.dataset.homeAction, trigger.dataset.homePlan);
     });
 
     document.getElementById("dailyPuzzle").addEventListener("click", () => {
@@ -43324,7 +41846,11 @@
       answer.hidden = !answer.hidden;
       document.getElementById("visionAnswer").textContent = answer.hidden ? "Show Answer" : "Hide Answer";
     });
+    }
 
+    function setupProfileControls() {
+      if (setupProfileControls.ready) return;
+      setupProfileControls.ready = true;
     document.querySelectorAll("[data-player-profile-save]").forEach((button) => {
       button.addEventListener("click", () => {
         document.querySelectorAll("[data-profile-save-state]").forEach((state) => {
@@ -43337,18 +41863,26 @@
         });
       });
     });
+    }
 
-    window.addEventListener("pagehide", () => {
-      rememberVisitSnapshot();
-      saveProgressSnapshot("leaving page");
-    });
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
+    function setupProgressPersistence() {
+      if (setupProgressPersistence.ready) return;
+      setupProgressPersistence.ready = true;
+      window.addEventListener("pagehide", () => {
         rememberVisitSnapshot();
         saveProgressSnapshot("leaving page");
-      }
-    });
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+          rememberVisitSnapshot();
+          saveProgressSnapshot("leaving page");
+        }
+      });
+    }
 
+    function setupAdventureControls() {
+      if (setupAdventureControls.ready) return;
+      setupAdventureControls.ready = true;
     document.getElementById("nextAdventure").addEventListener("click", () => {
       currentAdventure = (currentAdventure + 1) % adventureMissions.length;
       currentStoryChapter = (currentStoryChapter + 1) % storyChapters.length;
@@ -43356,25 +41890,13 @@
     });
 
     document.getElementById("restartAdventure").addEventListener("click", renderAdventureMission);
+    }
 
-    setupLearnerPreferences();
-    setupLoginProfile();
-    setupSecureAuth();
-    void setupSupabaseAuthUi();
-    wireTabs();
+    applyStartupTheme();
     setupRuntimeSafety();
     setupSiteTabs();
     window.requestAnimationFrame(() => {
-      scheduleBackgroundTask(() => initializeDeferredFeature("hero"), 80);
-      scheduleBackgroundTask(() => initializeDeferredFeature("coachQuotes"), 180);
-      scheduleBackgroundTask(() => initializeDeferredFeature("dailyGoals"), 320);
-      scheduleBackgroundTask(() => initializeDeferredFeature("gentleStart"), 460);
-      scheduleBackgroundTask(() => initializeDeferredFeature("miniBoards"), 620);
-      scheduleBackgroundTask(() => initializeDeferredFeature("tour"), 820);
-      scheduleBackgroundTask(() => initializeDeferredFeature("audio"), 1100);
-      scheduleBackgroundTask(() => initializeDeferredFeature("performance"), 1400);
-      scheduleBackgroundTask(claimDailyLoginReward, 1800);
-      scheduleBackgroundTask(() => saveProgressSnapshot("page load"), 2200);
+      void initializeDeferredFeature("hero");
     });
   </script>
 </body>
