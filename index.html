@@ -22953,11 +22953,6 @@
       previewText: theme.label,
       inlineSvg: theme.inlineSvg || ""
     }));
-    const pieceFinishStoreItems = [
-      { id: "piecefinish-crystal", type: "pieceFinish", value: "crystal", name: "Crystal Chess Set", cost: 440, rarity: "Rare", tag: "Piece Finish", description: "A cool crystal sheen that keeps every tournament silhouette crisp.", inlineSvg: '<svg viewBox="0 0 64 64" role="img" aria-label="Crystal Chess Set"><path fill="#244d6d" d="m32 5 17 15-7 36H22l-7-36z"/><path fill="#9eeaff" d="m32 9 10 12-10 8-10-8z"/><path fill="#dffbff" d="m22 21 10 8v23l-8-8zm20 0-10 8v23l8-8z"/><path fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" d="m32 5 17 15-7 36H22l-7-36zM22 21l10 8 10-8M32 29v23"/></svg>' },
-      { id: "piecefinish-marble", type: "pieceFinish", value: "marble", name: "Marble Chess Set", cost: 510, rarity: "Epic", tag: "Piece Finish", description: "A calm stone-polish finish for crisp, focused tournament pieces.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Marble Chess Set" fill="none" stroke="#e7e2d7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>' },
-      { id: "piecefinish-obsidian", type: "pieceFinish", value: "obsidian", name: "Obsidian Chess Set", cost: 620, rarity: "Legendary", tag: "Piece Finish", description: "A deep graphite finish with clean edges that keeps both sides easy to read.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Obsidian Chess Set" fill="none" stroke="#9aa8b6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V5a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 2.81 17 4 19 4a1 1 0 0 1 1 1z"/></svg>' }
-    ];
     const avatarEffectThemes = {
       none: { label: "No Effect", rarity: "Common", cost: 0, accent: "#e7b65d", description: "Clean avatar with no extra glow." },
       glow: { label: "Warm Glow", rarity: "Common", cost: 45, accent: "#e7b65d", description: "A soft gold aura for daily practice." },
@@ -22996,7 +22991,6 @@
     const storeItems = [
       ...backgroundThemeStoreItems,
       ...pieceSetStoreItems,
-      ...pieceFinishStoreItems,
       ...archetypeStoreItems,
       ...flexBadgeStoreItems,
       ...nameStyleStoreItems,
@@ -30151,6 +30145,8 @@
     let stockfishBootTimer = 0;
     let stockfishSourceIndex = 0;
     let stockfishSearchId = 0;
+    let stockfishConfiguredKey = "";
+    let stockfishGamePrepared = false;
     let stockfishPanelFrame = 0;
     let stockfishIdleTimer = 0;
     const warmedResourceOrigins = new Set();
@@ -30294,7 +30290,7 @@
 
     function setCoachDifficulty(level) {
       coachDifficulty = stockfishLevels[level] ? level : "easy";
-      cancelStockfishSearch("Difficulty changed", true);
+      cancelStockfishSearch("Difficulty changed");
       if (coachThinking) {
         coachMoveToken += 1;
         coachThinking = false;
@@ -30920,6 +30916,27 @@
       sendStockfishCommand(worker, `setoption name ${name} value ${value}`);
     }
 
+    function getStockfishConfigKey(config) {
+      return ["threads", "hash", "skill", "multipv", "ponder", "moveOverhead", "limitStrength", "uciElo"]
+        .map((key) => `${key}:${config[key]}`)
+        .join("|");
+    }
+
+    function configureStockfish(worker, config) {
+      const key = getStockfishConfigKey(config);
+      if (stockfishConfiguredKey === key) return false;
+      postStockfishOption(worker, "Threads", config.threads);
+      postStockfishOption(worker, "Hash", config.hash);
+      postStockfishOption(worker, "Skill Level", config.skill);
+      postStockfishOption(worker, "MultiPV", config.multipv);
+      postStockfishOption(worker, "Ponder", config.ponder ? "true" : "false");
+      postStockfishOption(worker, "Move Overhead", config.moveOverhead);
+      postStockfishOption(worker, "UCI_LimitStrength", config.limitStrength ? "true" : "false");
+      postStockfishOption(worker, "UCI_Elo", config.uciElo);
+      stockfishConfiguredKey = key;
+      return true;
+    }
+
     function getStockfishGoCommand(config) {
       const parts = ["go"];
       if (config.depth) parts.push("depth", String(config.depth));
@@ -31123,6 +31140,11 @@
       stockfishIdleTimer = window.setTimeout(() => {
         stockfishIdleTimer = 0;
         if (stockfishPending || stockfishLoadPromise || coachThinking) return;
+        const aiSessionActive = document.getElementById("play")?.classList.contains("is-active-panel") && coachGame && !friendChallengeState?.active && !document.hidden;
+        if (aiSessionActive) {
+          scheduleStockfishIdleRelease(delay);
+          return;
+        }
         stockfishInfo.loaded = false;
         stockfishInfo.status = "Engine idle";
         scheduleEnginePanelUpdate();
@@ -31142,6 +31164,8 @@
       if (blobUrl) URL.revokeObjectURL(blobUrl);
       stockfishWorker = null;
       stockfishReady = false;
+      stockfishConfiguredKey = "";
+      stockfishGamePrepared = false;
     }
 
     function createStockfishWorker(source) {
@@ -31265,6 +31289,11 @@
       });
     }
 
+    function warmCoachEngineForPlayPage() {
+      if (!document.getElementById("play")?.classList.contains("is-active-panel")) return Promise.resolve(null);
+      return initializeCoachEngine();
+    }
+
     async function getStockfishMove(moves) {
       cancelStockfishSearch("New search started");
       const worker = await loadStockfishWorker();
@@ -31294,15 +31323,11 @@
         stockfishInfo.lastConfig = `skill=${config.skill};depth=${config.depth};movetime=${config.movetime};nodes=${config.nodes};elo=${config.uciElo}`;
         scheduleEnginePanelUpdate();
         stockfishPending = { id: searchId, stage: "config", fen, side: coachGame.turn(), config, resolve, timeout, stopTimeout: 0 };
-        postStockfishOption(worker, "Threads", config.threads);
-        postStockfishOption(worker, "Hash", config.hash);
-        postStockfishOption(worker, "Skill Level", config.skill);
-        postStockfishOption(worker, "MultiPV", config.multipv);
-        postStockfishOption(worker, "Ponder", config.ponder ? "true" : "false");
-        postStockfishOption(worker, "Move Overhead", config.moveOverhead);
-        postStockfishOption(worker, "UCI_LimitStrength", config.limitStrength ? "true" : "false");
-        postStockfishOption(worker, "UCI_Elo", config.uciElo);
-        sendStockfishCommand(worker, "ucinewgame");
+        configureStockfish(worker, config);
+        if (!stockfishGamePrepared) {
+          sendStockfishCommand(worker, "ucinewgame");
+          stockfishGamePrepared = true;
+        }
         sendStockfishCommand(worker, "isready");
       });
       const move = findMoveByUci(moves, uci);
@@ -31377,13 +31402,7 @@
         }, config.movetime + 700);
         stockfishInfo.status = "Review analysis...";
         stockfishPending = { id: searchId, purpose: "review", stage: "config", fen, side, config, resolve, timeout, stopTimeout: 0, analysis: { fen, scoreCp: 0, evalText: "0.00", pv: "", bestMove: "", depth: 0 } };
-        postStockfishOption(worker, "Threads", config.threads);
-        postStockfishOption(worker, "Hash", config.hash);
-        postStockfishOption(worker, "Skill Level", config.skill);
-        postStockfishOption(worker, "MultiPV", 1);
-        postStockfishOption(worker, "Ponder", "false");
-        postStockfishOption(worker, "Move Overhead", config.moveOverhead);
-        postStockfishOption(worker, "UCI_LimitStrength", "false");
+        configureStockfish(worker, config);
         sendStockfishCommand(worker, "isready");
       });
       if (analysis) {
@@ -33350,7 +33369,7 @@
       scheduleEnginePanelUpdate();
       updateCoachPanel();
 
-      window.setTimeout(async () => {
+      window.requestAnimationFrame(async () => {
         if (token !== coachMoveToken || !coachGame || coachGame.turn() !== botColor || isCoachGameOver()) return;
         try {
           const legalReplies = coachGame.moves({ verbose: true });
@@ -33381,7 +33400,7 @@
         scheduleCoachBoardRender();
         scheduleEnginePanelUpdate();
         updateCoachPanel();
-      }, 16);
+      });
     }
 
     function restartCoachGame() {
@@ -33400,6 +33419,7 @@
       const reviewRail = document.getElementById("reviewEvalRail");
       if (reviewRail) reviewRail.hidden = true;
       coachGame = new CoachChess();
+      stockfishGamePrepared = false;
       coachSelected = "";
       coachLegalMoves = [];
       coachPremove = null;
@@ -36640,6 +36660,7 @@
         setupCoachAvatarAssets();
         renderCoordinates();
         const setup = setupPlayableChess();
+        window.requestAnimationFrame(() => { void warmCoachEngineForPlayPage(); });
         Promise.resolve(setup).then(
           () => scheduleBackgroundTask(() => initializeDeferredFeature("performance"), 800),
           () => scheduleBackgroundTask(() => initializeDeferredFeature("performance"), 800)
@@ -37491,8 +37512,100 @@
         return data;
       };
 
+      // Keep global rankings available when the optional Vercel route is unavailable.
+      // Both paths use Supabase's shared data; profiles are a read-only recovery source.
+      let leaderboardApiAvailable = typeof baseProvider?.getLeaderboard === "function";
+      const toLeaderboardEntry = (row = {}) => {
+        const wins = Math.max(0, Number(row.wins) || 0);
+        const losses = Math.max(0, Number(row.losses) || 0);
+        const draws = Math.max(0, Number(row.draws) || 0);
+        const rating = Math.max(400, Math.min(3000, Number(row.rating || row.game_rating || row.puzzle_rating) || 400));
+        return {
+          publicId: String(row.public_id || row.publicId || row.id || ""),
+          username: normalizeAuthUsername(row.username),
+          countryFlag: normalizeCountryFlagValue(row.country_flag || row.countryFlag || ""),
+          title: String(row.title || ""),
+          puzzleRating: Math.max(400, Number(row.puzzle_rating || row.puzzleRating) || rating),
+          gameRating: Math.max(400, Number(row.game_rating || row.gameRating) || rating),
+          achievements: Array.isArray(row.achievements) ? row.achievements : [],
+          statistics: row.statistics && typeof row.statistics === "object" ? row.statistics : {
+            gamesPlayed: wins + losses + draws,
+            wins,
+            puzzlesSolved: 0,
+            puzzleAccuracy: 0,
+            lessonsCompleted: 0,
+            cleanGames: 0,
+            bossClears: 0
+          },
+          updatedAt: row.updated_at || row.updatedAt || ""
+        };
+      };
+
+      const getSupabaseLeaderboard = async (options = {}) => {
+        const limit = Math.max(1, Math.min(100, Number(options.limit) || 100));
+        try {
+          const rows = await request("rest/v1", `leaderboard_entries?select=public_id,username,country_flag,title,puzzle_rating,game_rating,achievements,statistics,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+          return { entries: (Array.isArray(rows) ? rows : []).map(toLeaderboardEntry).filter((entry) => entry.publicId && entry.username) };
+        } catch (leaderboardError) {
+          authDebug("Leaderboard table unavailable; using shared profile recovery", { message: leaderboardError?.message || "unknown" });
+          let rows;
+          try {
+            rows = await request("rest/v1", `profiles?select=public_id,username,country_flag,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+          } catch {
+            rows = await request("rest/v1", `profiles?select=public_id,username,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+          }
+          return { entries: (Array.isArray(rows) ? rows : []).map(toLeaderboardEntry).filter((entry) => entry.publicId && entry.username) };
+        }
+      };
+
+      const saveSupabaseLeaderboard = async (entry = {}) => {
+        const row = {
+          public_id: String(entry.publicId || ""),
+          username: normalizeAuthUsername(entry.username),
+          country_flag: normalizeCountryFlagValue(entry.countryFlag || ""),
+          title: String(entry.title || ""),
+          puzzle_rating: Math.max(400, Math.min(3000, Number(entry.puzzleRating) || 400)),
+          game_rating: Math.max(400, Math.min(3000, Number(entry.gameRating) || 400)),
+          achievements: Array.isArray(entry.achievements) ? entry.achievements.slice(0, 12) : [],
+          statistics: entry.statistics && typeof entry.statistics === "object" ? entry.statistics : {},
+          updated_at: entry.updatedAt || new Date().toISOString()
+        };
+        return request("rest/v1", "leaderboard_entries?on_conflict=public_id", {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+          body: JSON.stringify(row)
+        });
+      };
+
+      const getSharedLeaderboard = async (options = {}) => {
+        if (leaderboardApiAvailable && typeof baseProvider?.getLeaderboard === "function") {
+          try {
+            return await baseProvider.getLeaderboard(options);
+          } catch (error) {
+            leaderboardApiAvailable = false;
+            authDebug("Leaderboard API unavailable; switching to Supabase", { message: error?.message || "unknown" });
+          }
+        }
+        return getSupabaseLeaderboard(options);
+      };
+
+      const saveSharedLeaderboard = async (entry = {}) => {
+        if (leaderboardApiAvailable && typeof baseProvider?.upsertLeaderboardEntry === "function") {
+          try {
+            return await baseProvider.upsertLeaderboardEntry(entry);
+          } catch (error) {
+            leaderboardApiAvailable = false;
+            authDebug("Leaderboard API save unavailable; switching to Supabase", { message: error?.message || "unknown" });
+          }
+        }
+        return saveSupabaseLeaderboard(entry);
+      };
+
       return {
         ...(baseProvider || {}),
+        getLeaderboard: getSharedLeaderboard,
+        upsertLeaderboardEntry: saveSharedLeaderboard,
         getCachedAccount: () => cachedAccount,
         searchRegisteredPlayers: (query) => callFriendRpc("search_registered_players", { p_query: String(query || "") }),
         getFriendDirectory: () => callFriendRpc("get_friend_directory"),
