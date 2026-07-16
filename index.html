@@ -30878,6 +30878,7 @@
       status: "local",
       lastRefresh: 0,
       refreshPromise: null,
+      refreshTimer: 0,
       lastSyncSignature: "",
       subscribed: false,
       localListener: false,
@@ -30893,6 +30894,14 @@
     function getLeaderboardProvider() {
       const provider = getAuthProvider();
       return provider && (typeof provider.getLeaderboard === "function" || typeof provider.listLeaderboard === "function") ? provider : null;
+    }
+
+    function scheduleSharedLeaderboardRefresh(delay = 30000) {
+      if (leaderboardRuntime.refreshTimer || !getLeaderboardProvider()) return;
+      leaderboardRuntime.refreshTimer = window.setTimeout(() => {
+        leaderboardRuntime.refreshTimer = 0;
+        if (document.visibilityState === "visible") void refreshSharedLeaderboards(true);
+      }, delay);
     }
 
     function normalizeGlobalLeaderboardAccounts(payload) {
@@ -30972,11 +30981,14 @@
           leaderboardRuntime.status = "global";
           leaderboardRuntime.lastRefresh = Date.now();
           renderLeaderboards();
+          scheduleSharedLeaderboardRefresh();
         })
         .catch((error) => {
-          leaderboardRuntime.accounts = null;
-          leaderboardRuntime.status = error?.code === "SUPABASE_NOT_CONFIGURED" ? "local" : "offline";
+          const hasCachedResults = Array.isArray(leaderboardRuntime.accounts);
+          if (!hasCachedResults) leaderboardRuntime.accounts = null;
+          leaderboardRuntime.status = hasCachedResults ? "global" : (error?.code === "SUPABASE_NOT_CONFIGURED" ? "local" : "offline");
           renderLeaderboards();
+          scheduleSharedLeaderboardRefresh(10000);
         })
         .finally(() => { leaderboardRuntime.refreshPromise = null; });
       return leaderboardRuntime.refreshPromise;
@@ -40986,8 +40998,14 @@
           let rows;
           try {
             rows = await request("rest/v1", `profiles?select=public_id,username,country_flag,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
-          } catch {
-            rows = await request("rest/v1", `profiles?select=public_id,username,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+          } catch (profileError) {
+            try {
+              rows = await request("rest/v1", `profiles?select=public_id,username,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+            } catch (legacyProfileError) {
+              const error = new Error(`Shared leaderboard and profile recovery failed: ${legacyProfileError?.message || profileError?.message || leaderboardError?.message || "unknown error"}`);
+              error.code = legacyProfileError?.code || profileError?.code || leaderboardError?.code || "LEADERBOARD_REQUEST_FAILED";
+              throw error;
+            }
           }
           return { entries: (Array.isArray(rows) ? rows : []).map(toLeaderboardEntry).filter((entry) => entry.publicId && entry.username) };
         }
@@ -41018,8 +41036,7 @@
           try {
             return await baseProvider.getLeaderboard(options);
           } catch (error) {
-            leaderboardApiAvailable = false;
-            authDebug("Leaderboard API unavailable; switching to Supabase", { message: error?.message || "unknown" });
+            authDebug("Leaderboard API request failed; trying Supabase recovery for this refresh", { message: error?.message || "unknown" });
           }
         }
         return getSupabaseLeaderboard(options);
@@ -41030,8 +41047,7 @@
           try {
             return await baseProvider.upsertLeaderboardEntry(entry);
           } catch (error) {
-            leaderboardApiAvailable = false;
-            authDebug("Leaderboard API save unavailable; switching to Supabase", { message: error?.message || "unknown" });
+            authDebug("Leaderboard API save failed; trying Supabase recovery for this save", { message: error?.message || "unknown" });
           }
         }
         return saveSupabaseLeaderboard(entry);
