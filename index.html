@@ -19890,6 +19890,108 @@
       .hero-command-center .hero-dashboard { grid-template-columns: 1fr; }
     }
 
+    /* Chessboard presentation only: raised platform, ambient light, and board-safe decoration. */
+    .hero-stage::before {
+      content: "";
+      position: absolute;
+      z-index: -2;
+      width: min(88%, 700px);
+      aspect-ratio: 1;
+      bottom: 2%;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 28px;
+      background:
+        linear-gradient(145deg, rgba(71, 85, 105, 0.86), rgba(15, 23, 42, 0.98) 54%, rgba(2, 6, 23, 1)),
+        #0f172a;
+      box-shadow:
+        0 46px 58px rgba(2, 6, 23, 0.62),
+        0 10px 0 rgba(34, 197, 94, 0.44),
+        0 16px 0 rgba(15, 23, 42, 0.9),
+        0 0 74px rgba(34, 197, 94, 0.2);
+      clip-path: polygon(6% 9%, 94% 9%, 100% 82%, 51% 100%, 0 82%);
+      transform: perspective(1200px) rotateX(59deg) rotateZ(-2.8deg) translateY(29%);
+      transform-origin: center bottom;
+    }
+
+    .hero-stage::after {
+      content: "";
+      position: absolute;
+      z-index: -3;
+      inset: 6% -7% -7%;
+      background:
+        radial-gradient(ellipse at 50% 57%, rgba(34, 197, 94, 0.24), transparent 34%),
+        radial-gradient(ellipse at 44% 73%, rgba(250, 204, 21, 0.1), transparent 40%);
+      filter: blur(16px);
+      pointer-events: none;
+    }
+
+    .hero-stage-halo::before,
+    .hero-stage-halo::after {
+      position: absolute;
+      z-index: -1;
+      color: rgba(226, 232, 240, 0.1);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1;
+      text-shadow: 0 22px 32px rgba(2, 6, 23, 0.4);
+      pointer-events: none;
+    }
+
+    .hero-stage-halo::before {
+      content: "♛";
+      top: -7%;
+      left: -1%;
+      font-size: clamp(5rem, 9vw, 9rem);
+      transform: rotate(-15deg);
+    }
+
+    .hero-stage-halo::after {
+      content: "♞";
+      right: -2%;
+      bottom: -4%;
+      color: rgba(250, 204, 21, 0.12);
+      font-size: clamp(4rem, 8vw, 8rem);
+      transform: rotate(12deg);
+    }
+
+    .hero-command-center .hero-board.hero-board--center {
+      border-color: #334155;
+      box-shadow:
+        0 52px 84px rgba(2, 6, 23, 0.64),
+        0 10px 0 rgba(34, 197, 94, 0.64),
+        0 15px 0 rgba(12, 24, 37, 0.96),
+        0 0 0 1px rgba(250, 204, 21, 0.32),
+        0 0 86px rgba(34, 197, 94, 0.28),
+        inset 0 1px 0 rgba(248, 250, 252, 0.24);
+    }
+
+    .hero-command-center .hero-board.hero-board--center::before {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(125deg, rgba(255, 255, 255, 0.11), transparent 19% 76%, rgba(2, 6, 23, 0.16));
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .hero-player-card {
+      border-color: rgba(226, 232, 240, 0.28);
+      background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(8, 15, 28, 0.86));
+      box-shadow: 0 18px 34px rgba(2, 6, 23, 0.5), inset 0 1px 0 rgba(248, 250, 252, 0.12);
+    }
+
+    .hero-player-card--you {
+      border-color: rgba(34, 197, 94, 0.64);
+      box-shadow: 0 18px 34px rgba(2, 6, 23, 0.5), 0 0 24px rgba(34, 197, 94, 0.16), inset 0 1px 0 rgba(248, 250, 252, 0.12);
+    }
+
+    @media (max-width: 820px) {
+      .hero-stage::before { width: min(90%, 620px); }
+      .hero-stage-halo::before { left: 2%; }
+      .hero-stage-halo::after { right: 2%; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :where(.button, .mission-button, .tab-button) { transition: none; }
       :where(.button, .mission-button, .tab-button):hover,
