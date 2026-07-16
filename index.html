@@ -32,6 +32,8 @@
       --radius: 8px;
       --max: 1380px;
       --move-speed: 140ms;
+      --ui-fast: 160ms;
+      --ui-standard: 220ms;
       --last-move-light: rgba(231, 182, 93, 0.42);
       --last-move-dark: rgba(231, 182, 93, 0.35);
       --board-frame-bg: rgba(33, 26, 18, 0.78);
@@ -511,7 +513,7 @@
       font-size: 0.84rem;
       font-weight: 900;
       white-space: nowrap;
-      transition: background var(--move-speed) ease, color var(--move-speed) ease, box-shadow var(--move-speed) ease, transform var(--move-speed) ease;
+      transition: background var(--ui-fast) ease, color var(--ui-fast) ease, box-shadow var(--ui-fast) ease, transform var(--ui-fast) ease;
     }
 
     .nav-links a.is-quick-tab {
@@ -698,7 +700,7 @@
 
     body.site-tab-mode main > .site-panel.is-active-panel {
       min-height: calc(100svh - 68px);
-      animation: sitePanelIn 220ms ease both;
+      animation: sitePanelIn var(--ui-standard) ease both;
     }
 
     @keyframes sitePanelIn {
@@ -817,7 +819,7 @@
     .tutorial-square.is-last .piece-symbol,
     .tutorial-square.is-last .piece-svg {
       animation: pieceMoveArrive 240ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
-      will-change: transform, filter, opacity;
+      will-change: transform, opacity;
     }
 
     body.speed-fast .play-square.last-move .piece-symbol,
@@ -838,7 +840,6 @@
       0% {
         opacity: 0.68;
         transform: translate3d(0, -8%, 0) scale(0.9);
-        filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.28));
       }
       68% {
         opacity: 1;
@@ -847,7 +848,6 @@
       100% {
         opacity: 1;
         transform: translate3d(0, 0, 0) scale(1);
-        filter: none;
       }
     }
 
@@ -1000,7 +1000,8 @@
       user-select: none;
       overflow: visible;
       filter: var(--piece-svg-filter, none);
-      transform: translateZ(0);
+      transform: translate3d(0, 0, 0);
+      backface-visibility: hidden;
       contain: paint;
     }
 
@@ -2716,12 +2717,57 @@
 
     .auth-session-loading::before {
       content: "";
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 248, 237, 0.22);
-      border-top-color: var(--gold);
-      border-radius: 50%;
-      animation: auth-spin 0.8s linear infinite;
+      width: 42px;
+      height: 36px;
+      border-radius: 7px;
+      background: linear-gradient(105deg, rgba(255, 248, 237, 0.08) 22%, rgba(255, 248, 237, 0.3) 48%, rgba(255, 248, 237, 0.08) 74%);
+      background-size: 230% 100%;
+      animation: uiSkeletonShimmer 1.15s ease-in-out infinite;
+    }
+
+    .auth-session-loading::after,
+    .status-skeleton::after,
+    .coach-skeleton::after {
+      content: "";
+      display: block;
+      width: min(18rem, 68%);
+      height: 0.75rem;
+      border-radius: 999px;
+      background: linear-gradient(105deg, rgba(255, 248, 237, 0.08) 22%, rgba(255, 248, 237, 0.3) 48%, rgba(255, 248, 237, 0.08) 74%);
+      background-size: 230% 100%;
+      animation: uiSkeletonShimmer 1.15s ease-in-out infinite;
+    }
+
+    .status-skeleton,
+    .coach-skeleton {
+      color: transparent !important;
+      overflow: hidden;
+    }
+
+    .status-skeleton::after {
+      width: 5.5rem;
+      height: 0.7rem;
+    }
+
+    .coach-skeleton::after {
+      width: min(24rem, 78%);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @keyframes uiSkeletonShimmer {
+      from { background-position: 180% 0; }
+      to { background-position: -80% 0; }
     }
 
     .auth-account-avatar {
@@ -17791,7 +17837,7 @@
                 <button class="button" type="submit">Login</button>
               </form>
               <button class="button secondary" type="button" id="authGoogleLogin" data-auth-guest>Continue with Google</button>
-              <div class="auth-session-loading" id="authSessionLoading" aria-live="polite">Checking your secure session...</div>
+              <div class="auth-session-loading" id="authSessionLoading" aria-live="polite"><span class="sr-only">Checking your secure session.</span></div>
               <div class="auth-account-panel" id="authAccountPanel" hidden>
                 <span class="auth-account-avatar" id="authAccountAvatar" aria-hidden="true">♟</span>
                 <span class="auth-account-copy"><strong id="authAccountName">Player</strong><small id="authAccountTitle">Chess learner</small><small id="authAccountEmail">player@example.com</small></span>
@@ -19950,7 +19996,7 @@
               </div>
               <div class="puzzle-meta">
                 <span class="badge" id="gameTurnBadge">White to move</span>
-                <span class="badge" id="gameStatusBadge">Loading rules</span>
+                <span class="badge status-skeleton" id="gameStatusBadge" aria-label="Loading chess rules"><span class="sr-only">Loading chess rules.</span></span>
                 <span class="badge" id="gameDifficultyBadge">Easy coach</span>
                 <span class="badge" id="gameBossBadge" hidden>Boss battle</span>
               </div>
@@ -20034,7 +20080,7 @@
                 </div>
               </div>
             </details>
-            <p class="simple-coach" id="gameCoach">Loading chess.js so every move follows official chess rules.</p>
+            <p class="simple-coach coach-skeleton" id="gameCoach" aria-label="Preparing the chessboard"><span class="sr-only">Preparing the chessboard.</span></p>
             <div class="opening-compass" id="openingCompass" aria-live="polite">
               <div class="opening-compass-head">
                 <div>
@@ -29337,7 +29383,7 @@
       if (leaderboardRuntime.refreshPromise) return leaderboardRuntime.refreshPromise;
       if (!force && Date.now() - leaderboardRuntime.lastRefresh < 5000) return;
       leaderboardRuntime.status = "syncing";
-      leaderboardRuntime.refreshPromise = Promise.resolve(fetchRows.call(provider, { limit: 500, cursor: null, include: ["puzzles", "ai", "tournaments"] }))
+      leaderboardRuntime.refreshPromise = Promise.resolve(fetchRows.call(provider, { limit: 100, cursor: null, include: ["puzzles", "ai", "tournaments"] }))
         .then((payload) => {
           leaderboardRuntime.accounts = normalizeGlobalLeaderboardAccounts(payload);
           leaderboardRuntime.status = "global";
@@ -31728,8 +31774,13 @@
     let friendNetworkUnsubscribe = null;
     let friendNetworkSubscribing = false;
     let friendNetworkSubscriptionGeneration = 0;
+    let friendNetworkRefreshTimer = 0;
+    let friendNetworkRefreshQueued = false;
+    let friendRealtimeReconnectTimer = 0;
+    let friendRealtimeReconnectAttempts = 0;
     let friendChallengeSyncEpoch = 0;
     let friendChallengeSyncQueue = Promise.resolve();
+    let friendChallengeLastPositionSignature = "";
     let networkVisibilityHandler = null;
     let realtimeMatchHeartbeatTimer = 0;
     let realtimeMatchHeartbeatInFlight = false;
@@ -34465,6 +34516,9 @@
       const friendOutcome = friendChallengeState?.remote ? getFriendGameOutcome(friendChallengeState) : null;
       const friendFinished = Boolean(friendOutcome) || friendChallengeState?.status === "completed";
 
+      statusBadge.classList.remove("status-skeleton");
+      coach.classList.remove("coach-skeleton");
+
       if (!friendChallengeState?.remote && (coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor)) {
         recordCoachGameResult(isMate && coachGame.turn() === getCoachBotColor());
       }
@@ -34691,6 +34745,24 @@
       });
     }
 
+    function ensureCoachBoardSquares(board, squareNames) {
+      const order = squareNames.join(",");
+      if (board._coachSquareOrder === order && board._coachSquares) return board._coachSquares;
+      const squares = new Map();
+      const fragment = document.createDocumentFragment();
+      squareNames.forEach((squareNameValue) => {
+        const square = document.createElement("button");
+        square.type = "button";
+        square.dataset.square = squareNameValue;
+        squares.set(squareNameValue, square);
+        fragment.appendChild(square);
+      });
+      board.replaceChildren(fragment);
+      board._coachSquareOrder = order;
+      board._coachSquares = squares;
+      return squares;
+    }
+
     function renderCoachBoard() {
       coachRenderFrame = 0;
       const board = document.getElementById("coachBoard");
@@ -34721,13 +34793,13 @@
         else delete boardWrap.dataset.reviewTactic;
       }
 
-      const fragment = document.createDocumentFragment();
-      getCoachSquares().forEach((squareNameValue) => {
+      const squareNames = getCoachSquares();
+      const boardSquares = ensureCoachBoardSquares(board, squareNames);
+      squareNames.forEach((squareNameValue) => {
         const piece = coachGame.get(squareNameValue);
         const legalMove = legalByTarget.get(squareNameValue);
-        const square = document.createElement("button");
-        square.type = "button";
-        square.dataset.square = squareNameValue;
+        const square = boardSquares.get(squareNameValue);
+        if (!square) return;
         square.className = `puzzle-square play-square ${isLightCoachSquare(squareNameValue) ? "light" : "dark"}`;
         if (piece) square.classList.add(piece.color === "w" ? "white-piece" : "black-piece");
         if (squareNameValue === coachSelected) square.classList.add("selected");
@@ -34746,11 +34818,13 @@
         if (threatSquares.has(squareNameValue)) square.classList.add("threat");
         if (coachThinking) square.classList.add("is-ai-thinking");
         square.draggable = Boolean(piece && isCoachPlayablePiece(piece) && !coachThinking && !isCoachGameOver());
-        renderPieceOnSquare(square, piece);
+        const pieceKey = piece ? `${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}` : "empty";
+        if (square.dataset.pieceKey !== pieceKey) {
+          renderPieceOnSquare(square, piece);
+          square.dataset.pieceKey = pieceKey;
+        }
         square.setAttribute("aria-label", `${squareNameValue}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${piece.type}` : " empty"}`);
-        fragment.appendChild(square);
       });
-      board.replaceChildren(fragment);
       renderReviewArrow();
 
       syncCoachBoardOutcome();
@@ -35150,9 +35224,16 @@
         termination: remote.termination,
         messages: remote.messages,
         remoteMessageStamp: remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|"),
+        remoteRevision: getFriendChallengeRevision(remote),
         clockState: remote.clockState,
         remoteUpdatedAt: remote.updatedAt
       };
+    }
+
+    function getFriendChallengeRevision(remote) {
+      const moves = Array.isArray(remote?.moves) ? remote.moves : [];
+      const lastMove = moves.length ? JSON.stringify(moves[moves.length - 1]) : "";
+      return [remote?.id || "", remote?.updatedAt || "", remote?.status || "", remote?.fen || "", moves.length, lastMove].join("\u001f");
     }
 
     function applyRemoteFriendChallenge(raw, restoreBoard = false) {
@@ -35162,7 +35243,8 @@
       if (previous?.remoteId && previous.remoteId !== remote.id) invalidateFriendChallengeSync();
       const boardNeedsRestore = Boolean(restoreBoard && ["active", "completed"].includes(remote.status) && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen));
       const messageStamp = remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|");
-      const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteUpdatedAt === remote.updatedAt && previous.remoteMessageStamp === messageStamp && previous.status === remote.status;
+      const revision = getFriendChallengeRevision(remote);
+      const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteRevision === revision && previous.remoteMessageStamp === messageStamp;
       if (unchanged && !boardNeedsRestore) return true;
       const next = toFriendChallengeState(remote);
       friendChallengeState = next;
@@ -35337,13 +35419,55 @@
       }
     }
 
+    function queueFriendNetworkRefresh() {
+      friendNetworkRefreshQueued = true;
+      if (friendNetworkRefreshTimer) return;
+      friendNetworkRefreshTimer = window.setTimeout(async () => {
+        friendNetworkRefreshTimer = 0;
+        if (friendNetworkRefreshPromise) {
+          try { await friendNetworkRefreshPromise; } catch {}
+        }
+        if (!friendNetworkRefreshQueued) return;
+        friendNetworkRefreshQueued = false;
+        await refreshFriendNetwork(true);
+        if (friendNetworkRefreshQueued) queueFriendNetworkRefresh();
+      }, 90);
+    }
+
+    function scheduleFriendRealtimeReconnect(generation) {
+      if (generation !== friendNetworkSubscriptionGeneration || friendRealtimeReconnectTimer || friendRealtimeReconnectAttempts >= 4) return;
+      const delay = Math.min(500 * (2 ** friendRealtimeReconnectAttempts), 5000);
+      friendRealtimeReconnectAttempts += 1;
+      friendRealtimeReconnectTimer = window.setTimeout(() => {
+        friendRealtimeReconnectTimer = 0;
+        if (generation !== friendNetworkSubscriptionGeneration) return;
+        try { friendNetworkUnsubscribe?.(); } catch {}
+        friendNetworkUnsubscribe = null;
+        friendNetworkSubscribing = false;
+        ensureFriendRealtime();
+        queueFriendNetworkRefresh();
+      }, delay);
+    }
+
+    function handleFriendRealtimeEvent(event, generation) {
+      if (generation !== friendNetworkSubscriptionGeneration) return;
+      if (event?.type === "status") {
+        if (event.status === "SUBSCRIBED") {
+          friendRealtimeReconnectAttempts = 0;
+          queueFriendNetworkRefresh();
+        } else if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(event.status)) {
+          scheduleFriendRealtimeReconnect(generation);
+        }
+        return;
+      }
+      queueFriendNetworkRefresh();
+    }
+
     function ensureFriendRealtime(provider = getFriendProvider()) {
       if (friendNetworkUnsubscribe || friendNetworkSubscribing || !provider?.subscribeFriendChallenges) return;
       const generation = friendNetworkSubscriptionGeneration;
       friendNetworkSubscribing = true;
-      Promise.resolve(provider.subscribeFriendChallenges(() => {
-        if (generation === friendNetworkSubscriptionGeneration) void refreshFriendNetwork(true);
-      }))
+      Promise.resolve(provider.subscribeFriendChallenges((event) => handleFriendRealtimeEvent(event, generation)))
         .then((unsubscribe) => {
           if (generation !== friendNetworkSubscriptionGeneration) {
             try { unsubscribe?.(); } catch {}
@@ -35702,6 +35826,7 @@
     function invalidateFriendChallengeSync() {
       friendChallengeSyncEpoch += 1;
       friendChallengeSyncQueue = Promise.resolve();
+      friendChallengeLastPositionSignature = "";
     }
 
     function queueFriendChallengeSync(task) {
@@ -35718,9 +35843,14 @@
         if (epoch !== friendChallengeSyncEpoch || !state?.remote || !state.active || !coachGame || !provider) return false;
         const code = state.code;
         const moves = getSyncedFriendMoves();
+        const signature = `${state.remoteId || code}\u001f${coachGame.fen()}\u001f${JSON.stringify(moves)}`;
+        if (signature === friendChallengeLastPositionSignature) return true;
         try {
           const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active", moveApplied });
-          if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) applyRemoteFriendChallenge(remote, false);
+          if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) {
+            friendChallengeLastPositionSignature = signature;
+            applyRemoteFriendChallenge(remote, false);
+          }
           return true;
         } catch (error) {
           if (epoch === friendChallengeSyncEpoch) {
@@ -36407,7 +36537,13 @@
 
     function stopFriendNetworkSync() {
       window.clearInterval(friendNetworkTimer);
+      window.clearTimeout(friendNetworkRefreshTimer);
+      window.clearTimeout(friendRealtimeReconnectTimer);
       friendNetworkTimer = 0;
+      friendNetworkRefreshTimer = 0;
+      friendNetworkRefreshQueued = false;
+      friendRealtimeReconnectTimer = 0;
+      friendRealtimeReconnectAttempts = 0;
       friendNetworkRequest += 1;
       friendNetworkSubscriptionGeneration += 1;
       friendNetworkRefreshPromise = null;
@@ -37002,11 +37138,11 @@
         return true;
       };
       const configuredUrl = String(document.documentElement.dataset.puzzleCollectionUrl || window.CHECKMATE_PUZZLE_PACK_URL || "").trim();
-      const collectionUrl = configuredUrl || new URL("data/puzzles.json?v=lichess-500-v1", window.location.href).href;
+      const collectionUrl = configuredUrl || new URL(`data/puzzles.json?v=${encodeURIComponent(puzzleBankVersion)}`, window.location.href).href;
       const cached = readJsonStorage(realPuzzleCollectionCacheKey, null);
       let installed = cached?.version === puzzleBankVersion && install(cached.puzzles, "Cached Lichess puzzles");
       try {
-        const response = await fetch(collectionUrl, { cache: "no-cache" });
+        const response = await fetch(collectionUrl, { cache: "force-cache" });
         if (!response.ok) return installed;
         const payload = await response.json();
         const items = Array.isArray(payload) ? payload : payload.puzzles;
@@ -37654,9 +37790,12 @@
       try {
         await loadRealPuzzleCollection();
         realPuzzleValidationErrors = validateRealPuzzleBank();
-        await verifyActivePuzzleBankWithStockfish();
-        const engineErrors = await verifyRealPuzzleBankWithStockfish();
-        if (engineErrors.length) realPuzzleValidationErrors.push(...engineErrors);
+        const deepAudit = new URLSearchParams(window.location.search).get("verifyPuzzles") === "1";
+        if (deepAudit) {
+          await verifyActivePuzzleBankWithStockfish();
+          const engineErrors = await verifyRealPuzzleBankWithStockfish();
+          if (engineErrors.length) realPuzzleValidationErrors.push(...engineErrors);
+        }
       } catch {
         // Runtime validation is best-effort; the JSON collection remains playable when it loaded.
       } finally {
@@ -37718,7 +37857,7 @@
       });
       document.getElementById("realPuzzleNextUnsolved")?.addEventListener("click", () => realPuzzleManager.nextUnsolved());
       renderRealPuzzle();
-      void verifyPuzzleBanksInBackground();
+      scheduleBackgroundTask(verifyPuzzleBanksInBackground, 2600);
     }
 
     async function setupPlayableChess() {
@@ -38226,6 +38365,7 @@
         document.body.classList.toggle("friend-challenge-mode", config.tab === "friendChallenge");
         document.body.classList.toggle("tournament-mode", config.tab === "tournaments");
         if (config.panel === "play") preloadStockfishWhenIdle();
+        if (config.panel === "puzzles") void setupRealPuzzles();
         panels.forEach((item) => {
           const isActive = item === panel;
           item.classList.toggle("is-active-panel", isActive);
@@ -38555,8 +38695,10 @@
     function createVercelLeaderboardProvider() {
       const host = String(location.hostname || "").toLowerCase();
       if (location.protocol !== "https:" || host.endsWith(".github.io")) return null;
-      const request = async (method, entry) => {
-        const response = await fetch("/api/leaderboard", {
+      const request = async (method, entry, options = {}) => {
+        const query = method === "GET" ? new URLSearchParams({ limit: String(Math.max(1, Math.min(100, Number(options.limit) || 50))) }) : null;
+        if (query && options.cursor) query.set("cursor", String(options.cursor));
+        const response = await fetch(`/api/leaderboard${query ? `?${query}` : ""}`, {
           method,
           headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
           body: method === "POST" ? JSON.stringify({ entry }) : undefined,
@@ -38571,7 +38713,7 @@
         return payload;
       };
       return {
-        getLeaderboard: async () => request("GET"),
+        getLeaderboard: async (options) => request("GET", null, options),
         upsertLeaderboardEntry: async (entry) => request("POST", entry)
       };
     }
@@ -38837,11 +38979,11 @@
         sendFriendMessage: (code, body) => callFriendRpc("send_game_challenge_message", { p_code: String(code || ""), p_body: String(body || "") }),
         subscribeFriendChallenges: async (callback) => {
           const supabase = await getSupabaseClient();
-          const refresh = () => { if (typeof callback === "function") callback(); };
+          const notify = (event) => { if (typeof callback === "function") callback(event); };
           const channel = supabase.channel("checkmate-friend-games")
-            .on("postgres_changes", { event: "*", schema: "public", table: "game_challenges" }, refresh)
-            .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_messages" }, refresh)
-            .subscribe();
+            .on("postgres_changes", { event: "*", schema: "public", table: "game_challenges" }, (payload) => notify({ type: "change", table: "game_challenges", payload }))
+            .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_messages" }, (payload) => notify({ type: "change", table: "game_challenge_messages", payload }))
+            .subscribe((status) => notify({ type: "status", status }));
           return () => { try { supabase.removeChannel(channel); } catch {} };
         },
         createTournament: (event) => callFriendRpc("create_tournament", {
@@ -42890,6 +43032,15 @@
       });
     }
 
+    function scheduleBackgroundTask(task, timeout = 1500) {
+      const run = () => Promise.resolve().then(task).catch(() => {});
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(run, { timeout });
+      } else {
+        window.setTimeout(run, Math.min(timeout, 500));
+      }
+    }
+
     function setupPerformanceOptimizations() {
       const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4;
@@ -42904,6 +43055,10 @@
         iframe.loading = iframe.loading || "lazy";
         iframe.fetchPriority = iframe.closest(".short-slide.is-active, .video-modal") ? "high" : "low";
       });
+
+      if (!perfLite && navigator.onLine !== false) {
+        scheduleBackgroundTask(() => fetch(new URL(`data/puzzles.json?v=${encodeURIComponent(puzzleBankVersion)}`, window.location.href), { cache: "force-cache" }).catch(() => {}), 1800);
+      }
 
       if ("IntersectionObserver" in window) {
         const sectionObserver = new IntersectionObserver((entries) => {
@@ -43079,7 +43234,7 @@
     renderMiniBoards();
     setupOpeningFavorites();
     renderCoordinates();
-    setupRealPuzzles();
+    scheduleBackgroundTask(setupRealPuzzles, 1200);
     wireTabs();
     setupBeginnerTutorial();
     setupAcademy();
@@ -43098,4 +43253,3 @@
   </script>
 </body>
 </html>
-

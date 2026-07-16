@@ -10,6 +10,9 @@ create table if not exists public.leaderboard_entries (
   updated_at timestamptz not null default now()
 );
 
+create index if not exists leaderboard_entries_updated_public_idx
+  on public.leaderboard_entries (updated_at desc, public_id asc);
+
 alter table public.leaderboard_entries enable row level security;
 grant usage on schema public to anon;
 grant select, insert, update on public.leaderboard_entries to anon;
