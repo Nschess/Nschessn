@@ -30109,6 +30109,9 @@
     let coachReviewMoments = [];
     let coachCurrentHanging = 0;
     let coachRenderFrame = 0;
+    let coachPanelFrame = 0;
+    let coachPanelTimer = 0;
+    let coachLearnerMoveScores = { fen: "", scored: [], pending: false };
     let matchStartedAt = Date.now();
     let matchEndedElapsedMs = null;
     let matchTimerInterval = 0;
@@ -32833,12 +32836,6 @@
       renderHomeDashboard();
     }
 
-    function getScoredLearnerMoves(moves) {
-      return moves
-        .map((move) => ({ move, score: scoreCoachMove(move, true) }))
-        .sort((a, b) => b.score - a.score);
-    }
-
     function renderCoachCaptured() {
       const whiteCaptured = [];
       const blackCaptured = [];
@@ -33015,6 +33012,49 @@
       });
     }
 
+    function scheduleCoachPanelUpdate() {
+      if (coachPanelFrame || coachPanelTimer) return;
+      coachPanelFrame = window.requestAnimationFrame(() => {
+        coachPanelFrame = 0;
+        // Let the board paint before the side panels do their wider DOM update.
+        coachPanelTimer = window.setTimeout(() => {
+          coachPanelTimer = 0;
+          updateCoachPanel();
+        }, 0);
+      });
+    }
+
+    function warmCoachLearnerMoveScores() {
+      if (!coachGame || coachThinking || coachDrawAgreed || isCoachGameOver()) return;
+      const game = coachGame;
+      const fen = game.fen();
+      if (coachLearnerMoveScores.fen === fen && (coachLearnerMoveScores.pending || coachLearnerMoveScores.scored.length)) return;
+      const moves = game.moves({ verbose: true });
+      const cache = { fen, scored: [], pending: true, index: 0, moves, game };
+      coachLearnerMoveScores = cache;
+      const scoreNextBatch = () => {
+        if (coachLearnerMoveScores !== cache || coachGame !== game || game.fen() !== fen) return;
+        const deadline = performance.now() + 8;
+        while (cache.index < cache.moves.length && performance.now() < deadline) {
+          const move = cache.moves[cache.index++];
+          cache.scored.push({ move, score: scoreCoachMove(move, true) });
+        }
+        if (cache.index < cache.moves.length) {
+          scheduleBackgroundTask(scoreNextBatch, 0);
+          return;
+        }
+        cache.scored.sort((a, b) => b.score - a.score);
+        cache.pending = false;
+      };
+      scheduleBackgroundTask(scoreNextBatch, 0);
+    }
+
+    function getWarmCoachLearnerMoveScores(fen) {
+      return coachLearnerMoveScores.fen === fen && !coachLearnerMoveScores.pending
+        ? coachLearnerMoveScores.scored
+        : [];
+    }
+
     function powerOnCoachBoard() {
       const wrap = document.querySelector("#coachBoard")?.closest(".puzzle-board-wrap");
       if (!wrap || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -33141,6 +33181,7 @@
         if (!from) return event.preventDefault();
         coachSelected = from;
         coachLegalMoves = coachGame.moves({ square: from, verbose: true });
+        warmCoachLearnerMoveScores();
         event.dataTransfer?.setData("text/plain", from);
         square.classList.add("dragging");
       });
@@ -33258,13 +33299,14 @@
       }
 
       const promotion = choosePromotion(legalMoves);
-      const scoredMoves = getScoredLearnerMoves(coachGame.moves({ verbose: true }));
+      const beforeFen = coachGame.fen();
+      const scoredMoves = getWarmCoachLearnerMoveScores(beforeFen);
+      const hasScoredMoves = scoredMoves.length > 0;
       const bestMove = scoredMoves[0]?.move || null;
       const pickedScore = scoredMoves.find(({ move }) => (
         move.from === from && move.to === to && (!move.promotion || move.promotion === (promotion || "q"))
       ))?.score || 0;
       const betterGap = (scoredMoves[0]?.score || 0) - pickedScore;
-      const beforeFen = coachGame.fen();
       let move = null;
       try {
         move = coachGame.move({ from, to, ...(promotion ? { promotion } : {}) });
@@ -33285,28 +33327,39 @@
       coachPremove = null;
       coachLastMove = move;
       advanceMatchClock(move.color);
+      coachLearnerMoveScores = { fen: "", scored: [], pending: false };
+      scheduleCoachBoardRender();
+      scheduleCoachPanelUpdate();
       if (friendChallengeState?.active) {
-        saveFriendChallengeState({ ...friendChallengeState, active: true });
-        const outcome = getFriendGameOutcome(friendChallengeState);
-        void (outcome ? syncFriendSignal(friendOutcomeSignal(outcome), "completed") : syncFriendChallengePosition(true));
+        const gameAtMove = coachGame;
+        window.setTimeout(() => {
+          if (coachGame !== gameAtMove || !friendChallengeState?.active) return;
+          saveFriendChallengeState({ ...friendChallengeState, active: true });
+          const outcome = getFriendGameOutcome(friendChallengeState);
+          void (outcome ? syncFriendSignal(friendOutcomeSignal(outcome), "completed") : syncFriendChallengePosition(true));
+        }, 0);
       }
     playCoachMoveSound(move, "player");
-      gameStats.moveQualityTotal += Math.max(0, Math.min(100, 100 - Math.round(betterGap / 8)));
-      gameStats.moveQualityMoves += 1;
-      if (betterGap > 220) {
+      if (hasScoredMoves) {
+        gameStats.moveQualityTotal += Math.max(0, Math.min(100, 100 - Math.round(betterGap / 8)));
+        gameStats.moveQualityMoves += 1;
+      }
+      if (hasScoredMoves && betterGap > 220) {
         coachCurrentHanging += 1;
         coachReplayFen = beforeFen;
         coachMistakeNote = buildCoachMistakeNote(move, bestMove);
         addGuidedReviewMoment(move, bestMove);
         rememberCoachMistake(move, bestMove, coachMistakeNote);
       }
-      coachMessage = explainLearnerMove(move, bestMove, betterGap);
+      coachMessage = hasScoredMoves
+        ? explainLearnerMove(move, bestMove, betterGap)
+        : `You played ${move.san}. Nice work - now look for the coach's threat.`;
+      if (!hasScoredMoves) coachWhyText = `${move.san} was legal and updated immediately. Check the coach's next threat before choosing again.`;
       if (!coachBotPaused && !isCoachGameOver() && coachGame.turn() === getCoachBotColor()) {
         queueCoachReply();
       } else {
-        scheduleCoachBoardRender();
+        scheduleCoachPanelUpdate();
       }
-      updateCoachPanel();
       return true;
     }
 
@@ -33347,6 +33400,7 @@
       if (piece && isCoachPlayablePiece(piece)) {
         coachSelected = square;
         coachLegalMoves = coachGame.moves({ square, verbose: true });
+        warmCoachLearnerMoveScores();
         coachMessage = `${coachLegalMoves.length} legal move${coachLegalMoves.length === 1 ? "" : "s"} highlighted. Pick one that keeps your pieces safe.`;
         scheduleCoachBoardRender();
         return;
@@ -33371,7 +33425,7 @@
         : `${engineLabel} is thinking. Look for the coach's threat next.`;
       scheduleCoachBoardRender();
       scheduleEnginePanelUpdate();
-      updateCoachPanel();
+      scheduleCoachPanelUpdate();
 
       window.requestAnimationFrame(async () => {
         if (token !== coachMoveToken || !coachGame || coachGame.turn() !== botColor || isCoachGameOver()) return;
@@ -33403,7 +33457,7 @@
         coachThinking = false;
         scheduleCoachBoardRender();
         scheduleEnginePanelUpdate();
-        updateCoachPanel();
+        scheduleCoachPanelUpdate();
       });
     }
 
@@ -33424,6 +33478,7 @@
       if (reviewRail) reviewRail.hidden = true;
       coachGame = new CoachChess();
       stockfishGamePrepared = false;
+      coachLearnerMoveScores = { fen: "", scored: [], pending: false };
       coachSelected = "";
       coachLegalMoves = [];
       coachPremove = null;
