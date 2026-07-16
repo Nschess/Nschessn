@@ -17474,6 +17474,8 @@
       --radius: 16px;
       --section-space: clamp(3rem, 6vw, 5.5rem);
       --shadow: 0 18px 42px rgba(2, 6, 23, 0.28);
+      --surface-shell: linear-gradient(145deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.94));
+      --surface-card: linear-gradient(145deg, rgba(30, 41, 59, 0.94), rgba(22, 31, 49, 0.94));
       --site-bg-image:
         radial-gradient(circle at 12% -8%, rgba(34, 197, 94, 0.12), transparent 31%),
         radial-gradient(circle at 88% 8%, rgba(250, 204, 21, 0.06), transparent 24%);
@@ -17574,39 +17576,44 @@
     }
 
     .site-header {
-      background: rgba(16, 23, 20, 0.92);
-      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
+      background: rgba(15, 23, 42, 0.88);
+      border-bottom: 1px solid rgba(51, 65, 85, 0.82);
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.2);
       -webkit-backdrop-filter: blur(14px);
       backdrop-filter: blur(14px);
     }
 
     .nav-links,
     .nav-menu {
-      border-color: rgba(238, 245, 237, 0.1);
-      background: rgba(23, 34, 29, 0.92);
+      border-color: var(--line);
+      background: rgba(30, 41, 59, 0.9);
     }
 
     .nav-links > a,
     .nav-group-label {
-      border-color: rgba(238, 245, 237, 0.09);
-      background: rgba(7, 12, 9, 0.2);
+      border-color: rgba(51, 65, 85, 0.86);
+      background: rgba(15, 23, 42, 0.52);
     }
 
     :where(.play-shell, .puzzle-shell, .settings-shell, .store-shell, .preference-panel) {
-      border-color: rgba(238, 245, 237, 0.11);
-      background:
-        linear-gradient(145deg, rgba(29, 43, 35, 0.9), rgba(17, 25, 21, 0.88));
+      border-color: var(--line);
+      background: var(--surface-shell);
       box-shadow: var(--shadow);
     }
 
     :where(.lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card, .notation-card, .book-card, .video-card, .store-card, .leaderboard-card) {
-      border-color: rgba(238, 245, 237, 0.1);
-      background: linear-gradient(145deg, rgba(35, 48, 41, 0.95), rgba(24, 34, 29, 0.95));
+      border-color: var(--line);
+      background: var(--surface-card);
     }
 
     :where(button, a, input, select, textarea):focus-visible {
-      outline: 2px solid rgba(180, 222, 118, 0.94);
+      outline: 2px solid var(--gold);
       outline-offset: 3px;
+    }
+
+    .footer {
+      background: rgba(15, 23, 42, 0.9);
+      border-color: var(--line);
     }
 
     @media (min-width: 1181px) {
@@ -17676,17 +17683,17 @@
       width: min(100%, 720px);
       margin-inline: auto;
       padding: clamp(7px, 1vw, 10px);
-      border: 1px solid rgba(214, 187, 121, 0.42);
+      border: 1px solid rgba(250, 204, 21, 0.42);
       border-radius: 14px;
-      background: linear-gradient(135deg, rgba(214, 187, 121, 0.28), rgba(95, 136, 70, 0.34));
-      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.3);
+      background: linear-gradient(135deg, rgba(250, 204, 21, 0.18), rgba(34, 197, 94, 0.16));
+      box-shadow: 0 22px 48px rgba(2, 6, 23, 0.42);
       transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
     }
 
     .home-main-board-link:hover,
     .home-main-board-link:focus-visible {
-      border-color: rgba(180, 222, 118, 0.85);
-      box-shadow: 0 26px 58px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(180, 222, 118, 0.2);
+      border-color: rgba(34, 197, 94, 0.9);
+      box-shadow: 0 26px 58px rgba(2, 6, 23, 0.5), 0 0 0 1px rgba(34, 197, 94, 0.2);
       transform: translateY(-2px);
     }
 
@@ -42384,6 +42391,8 @@
     }
 
     function setupPerformanceOptimizations() {
+      if (window.__checkmateQuestPerformanceBound) return;
+      window.__checkmateQuestPerformanceBound = true;
       const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4;
       const lowCpu = typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 4;
@@ -42396,6 +42405,10 @@
       document.querySelectorAll("iframe").forEach((iframe) => {
         iframe.loading = iframe.loading || "lazy";
         iframe.fetchPriority = iframe.closest(".short-slide.is-active, .video-modal") ? "high" : "low";
+      });
+      document.querySelectorAll("img").forEach((image) => {
+        if (image.decoding === "auto") image.decoding = "async";
+        if (!image.hasAttribute("loading") && !image.closest(".hero, .site-header")) image.loading = "lazy";
       });
 
       const prefetchController = new AbortController();
@@ -42634,6 +42647,7 @@
     setupSiteTabs();
     window.requestAnimationFrame(() => {
       setupVisualEntrances();
+      setupPerformanceOptimizations();
       void initializeDeferredFeature("hero");
     });
   </script>
