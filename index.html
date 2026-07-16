@@ -15801,6 +15801,28 @@
       max-width: 100%;
     }
 
+    @media (hover: none) and (pointer: coarse) {
+      :where(button, a, input, select, textarea, summary, .play-square) {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      :where(.nav-links, .puzzle-actions, .play-actions, .mission-selector, .coach-levels, .settings-tabs, .store-category-tabs, .friend-match-actions) {
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      :where(#play .coach-panel, #puzzles .puzzle-info) {
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-gutter: stable;
+      }
+
+      :where(.play-board-wrap, .puzzle-board-wrap) {
+        touch-action: manipulation;
+      }
+    }
+
     @media (max-width: 1024px) {
       :where(.wrap) {
         width: min(100% - 24px, 100%);
@@ -38235,10 +38257,12 @@
         .map((id) => document.getElementById(id))
         .filter(Boolean);
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let activePanel = panels.find((panel) => panel.classList.contains("is-active-panel")) || null;
 
       panels.forEach((panel) => {
         panel.classList.add("site-panel");
         panel.setAttribute("tabindex", "-1");
+        panel.setAttribute("aria-hidden", String(panel !== activePanel));
       });
 
       function getConfigFromHash(hashValue) {
@@ -38337,10 +38361,11 @@
         homeLink?.classList.add("is-active-tab");
         homeLink?.setAttribute("aria-current", "page");
         closeNavMenus();
-        panels.forEach((panel) => {
-          panel.classList.remove("is-active-panel");
-          panel.setAttribute("aria-hidden", "true");
-        });
+        if (activePanel) {
+          activePanel.classList.remove("is-active-panel");
+          activePanel.setAttribute("aria-hidden", "true");
+          activePanel = null;
+        }
 
         if (shouldScroll) {
           playAudioCue("page-home");
@@ -38366,11 +38391,15 @@
         document.body.classList.toggle("tournament-mode", config.tab === "tournaments");
         if (config.panel === "play") preloadStockfishWhenIdle();
         if (config.panel === "puzzles") void setupRealPuzzles();
-        panels.forEach((item) => {
-          const isActive = item === panel;
-          item.classList.toggle("is-active-panel", isActive);
-          item.setAttribute("aria-hidden", String(!isActive));
-        });
+        if (activePanel !== panel) {
+          if (activePanel) {
+            activePanel.classList.remove("is-active-panel");
+            activePanel.setAttribute("aria-hidden", "true");
+          }
+          panel.classList.add("is-active-panel");
+          panel.setAttribute("aria-hidden", "false");
+          activePanel = panel;
+        }
 
         clearActiveTabs();
         if (activeLink) {
@@ -43056,12 +43085,19 @@
         iframe.fetchPriority = iframe.closest(".short-slide.is-active, .video-modal") ? "high" : "low";
       });
 
+      const prefetchController = new AbortController();
       if (!perfLite && navigator.onLine !== false) {
-        scheduleBackgroundTask(() => fetch(new URL(`data/puzzles.json?v=${encodeURIComponent(puzzleBankVersion)}`, window.location.href), { cache: "force-cache" }).catch(() => {}), 1800);
+        scheduleBackgroundTask(() => fetch(new URL(`data/puzzles.json?v=${encodeURIComponent(puzzleBankVersion)}`, window.location.href), {
+          cache: "force-cache",
+          signal: prefetchController.signal
+        }).catch((error) => {
+          if (error?.name !== "AbortError") throw error;
+        }), 1800);
       }
 
+      let sectionObserver = null;
       if ("IntersectionObserver" in window) {
-        const sectionObserver = new IntersectionObserver((entries) => {
+        sectionObserver = new IntersectionObserver((entries) => {
           entries.forEach((entry) => {
             entry.target.classList.toggle("is-near-viewport", entry.isIntersecting);
           });
@@ -43090,12 +43126,29 @@
       });
 
       window.addEventListener("pagehide", () => {
+        prefetchController.abort();
+        sectionObserver?.disconnect();
+        if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
         flushReviewAnalysisCache();
         window.clearInterval(reviewReplayTimer);
         stopReviewBestLineReplay();
         window.clearInterval(matchTimerInterval);
         window.clearInterval(puzzleTimerId);
         window.clearInterval(realPuzzleTimerId);
+      }, { once: true });
+    }
+
+    function setupRuntimeSafety() {
+      if (window.__checkmateQuestRuntimeSafetyBound) return;
+      window.__checkmateQuestRuntimeSafetyBound = true;
+      window.addEventListener("unhandledrejection", (event) => {
+        if (event.reason?.name === "AbortError") event.preventDefault();
+      });
+      window.addEventListener("pagehide", (event) => {
+        if (event.persisted) return;
+        stopRealtimeMatchLifecycle();
+        stopFriendNetworkSync();
+        stopTournamentNetworkSync();
       }, { once: true });
     }
 
@@ -43247,6 +43300,7 @@
     setupBooks();
     renderShortFeed();
     setupVideoTheater();
+    setupRuntimeSafety();
     setupPerformanceOptimizations();
     claimDailyLoginReward();
     saveProgressSnapshot("page load");
