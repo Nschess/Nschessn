@@ -17595,6 +17595,40 @@
       background: rgba(15, 23, 42, 0.52);
     }
 
+    .nav {
+      gap: clamp(10px, 1.8vw, 22px);
+      padding-block: 8px;
+    }
+
+    .nav-links {
+      gap: 6px;
+      padding: 5px;
+      border-radius: 14px;
+    }
+
+    .nav-links > a,
+    .nav-group-label {
+      gap: 7px;
+      padding-inline: 12px;
+      border-radius: 10px;
+    }
+
+    .nav-icon {
+      display: inline-grid;
+      width: 1em;
+      place-items: center;
+      color: var(--gold);
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.95rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .nav-links a.is-active-tab .nav-icon,
+    .nav-group.is-active-group .nav-icon {
+      color: #052e16;
+    }
+
     :where(.play-shell, .puzzle-shell, .settings-shell, .store-shell, .preference-panel) {
       border-color: var(--line);
       background: var(--surface-shell);
@@ -17782,6 +17816,111 @@
     .home-summary-card a { color: var(--green); font-size: 0.88rem; font-weight: 800; }
     .home-summary-card a:hover { color: var(--soft); }
 
+    .hero {
+      min-height: clamp(650px, 82svh, 860px);
+      background: linear-gradient(120deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.74));
+    }
+
+    .hero::before {
+      background:
+        linear-gradient(90deg, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 0.88) 34%, rgba(15, 23, 42, 0.3) 78%),
+        linear-gradient(135deg, rgba(34, 197, 94, 0.12), transparent 48%);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.18;
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+      background-size: 56px 56px;
+      -webkit-mask-image: linear-gradient(90deg, transparent 6%, #000 52%, transparent 100%);
+      mask-image: linear-gradient(90deg, transparent 6%, #000 52%, transparent 100%);
+    }
+
+    .hero-board {
+      right: clamp(-180px, -7vw, -52px);
+      width: min(880px, 70vw);
+      border: 10px solid #1E293B;
+      border-radius: 18px;
+      background: #1E293B;
+      box-shadow: 0 30px 90px rgba(2, 6, 23, 0.58);
+    }
+
+    .hero-inner { padding-block: clamp(80px, 9vw, 128px); }
+
+    .hero-layout {
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+      gap: clamp(28px, 4vw, 64px);
+    }
+
+    .hero-copy { max-width: 560px; }
+    .hero-copy > :where(.home-start-flow, .guided-path-strip, .trust-strip) { display: none; }
+    .hero-actions { gap: 14px; margin-top: 30px; }
+    .hero-actions .button { min-height: 50px; padding-inline: 22px; }
+
+    .home-dashboard {
+      gap: 16px;
+      padding: 22px;
+      border-color: var(--line);
+      border-radius: 18px;
+      background: rgba(30, 41, 59, 0.84);
+      box-shadow: 0 24px 56px rgba(2, 6, 23, 0.34);
+    }
+
+    .home-dashboard::before { background: linear-gradient(var(--green), var(--gold)); }
+
+    .home-sidebar-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .home-sidebar-tile {
+      display: grid;
+      gap: 4px;
+      min-height: 76px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.62);
+      transition: transform 220ms ease, border-color 220ms ease, background 220ms ease;
+    }
+
+    .home-sidebar-tile strong { color: var(--soft); }
+    .home-sidebar-tile span { color: var(--muted); font-size: 0.84rem; }
+    .home-sidebar-tile.is-primary { border-color: rgba(34, 197, 94, 0.52); background: rgba(34, 197, 94, 0.1); }
+    .home-sidebar-tile:hover, .home-sidebar-tile:focus-visible { transform: translateY(-2px); border-color: var(--green); }
+
+    .home-dashboard .home-stat-grid { grid-template-columns: 1fr; }
+    .home-dashboard .home-stat-grid .home-stat:not(:last-child),
+    .home-dashboard :where(.daily-goals-card, .quick-practice, #homeInsight, .achievement-roadmap, .recommendation-list) { display: none; }
+    .home-dashboard-link { color: var(--gold); font-size: 0.88rem; font-weight: 800; }
+
+    .home-main-section { padding-top: clamp(34px, 5vw, 72px); }
+    .home-main-grid { grid-template-columns: minmax(0, 1fr); }
+    .home-board-panel { width: min(100%, 880px); margin-inline: auto; }
+    .home-quick-column { display: none; }
+    .home-main-board-link { width: min(100%, 860px); }
+
+    @media (max-width: 1050px) {
+      .hero { min-height: auto; }
+      .hero-layout { grid-template-columns: 1fr; }
+      .hero-board { right: -22vw; width: min(840px, 96vw); opacity: 0.38; }
+      .home-dashboard { width: min(100%, 560px); }
+    }
+
+    @media (max-width: 680px) {
+      .hero-inner { padding-block: 72px 56px; }
+      .hero-board { right: -46vw; width: 112vw; opacity: 0.24; }
+      .hero::after { background-size: 38px 38px; }
+      .hero-actions .button { width: 100%; }
+      .home-dashboard { padding: 18px; }
+    }
+
     @media (max-width: 900px) {
       .home-main-grid { grid-template-columns: 1fr; }
       .home-main-board-link { max-width: 640px; }
@@ -17794,22 +17933,521 @@
       .home-board-heading { align-items: start; flex-direction: column; gap: 4px; }
       .home-board-followups { grid-template-columns: 1fr; }
     }
+
+    /* Storefront: presentation only. Inventory, currency, and equip logic stay shared. */
+    #store.store-page {
+      position: relative;
+      isolation: isolate;
+      overflow: clip;
+      background:
+        radial-gradient(circle at 8% 4%, rgba(34, 197, 94, 0.12), transparent 27rem),
+        radial-gradient(circle at 88% 9%, rgba(250, 204, 21, 0.1), transparent 25rem),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.42), rgba(15, 23, 42, 0.08));
+    }
+
+    #store.store-page::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.34;
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+      background-size: 42px 42px;
+      -webkit-mask-image: linear-gradient(180deg, #000, transparent 84%);
+      mask-image: linear-gradient(180deg, #000, transparent 84%);
+    }
+
+    #store .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 0.62fr);
+      gap: clamp(18px, 4vw, 72px);
+      align-items: end;
+      margin-bottom: clamp(22px, 3vw, 34px);
+    }
+
+    #store .section-head h2 {
+      max-width: 11ch;
+      margin-top: 8px;
+      font-size: clamp(2.1rem, 5vw, 4.7rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    #store .section-intro {
+      max-width: 39rem;
+      padding: 14px 0 14px 20px;
+      border-left: 2px solid rgba(34, 197, 94, 0.72);
+      color: var(--soft);
+      font-size: clamp(0.98rem, 1.25vw, 1.12rem);
+    }
+
+    #store .store-premium-shell {
+      position: relative;
+      gap: clamp(16px, 2.1vw, 26px);
+      padding: clamp(14px, 2.4vw, 30px);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 24px;
+      background:
+        linear-gradient(145deg, rgba(30, 41, 59, 0.78), rgba(15, 23, 42, 0.86) 44%, rgba(30, 41, 59, 0.7)),
+        rgba(15, 23, 42, 0.72);
+      box-shadow: 0 32px 90px rgba(2, 6, 23, 0.38), inset 0 1px 0 rgba(248, 250, 252, 0.08);
+      backdrop-filter: blur(18px);
+      animation: storePanelEnter 360ms ease both;
+    }
+
+    #store .store-premium-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      background: linear-gradient(115deg, rgba(255, 255, 255, 0.1), transparent 23%, transparent 72%, rgba(34, 197, 94, 0.08));
+      mask-image: linear-gradient(#000, transparent 30%);
+    }
+
+    #store .store-wallet {
+      position: relative;
+      min-height: 154px;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
+      gap: clamp(16px, 3vw, 34px);
+      padding: clamp(20px, 2.5vw, 30px);
+      overflow: hidden;
+      border-color: rgba(250, 204, 21, 0.36);
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 92% 14%, rgba(250, 204, 21, 0.28), transparent 22%),
+        radial-gradient(circle at 70% 100%, rgba(34, 197, 94, 0.16), transparent 34%),
+        linear-gradient(125deg, rgba(250, 204, 21, 0.12), rgba(30, 41, 59, 0.84) 38%, rgba(15, 23, 42, 0.9));
+      box-shadow: 0 22px 48px rgba(2, 6, 23, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    #store .store-wallet::after {
+      content: "";
+      position: absolute;
+      width: 220px;
+      aspect-ratio: 1;
+      right: 13%;
+      top: -72%;
+      border: 1px solid rgba(250, 204, 21, 0.2);
+      border-radius: 50%;
+      box-shadow: 0 0 0 22px rgba(250, 204, 21, 0.035), 0 0 0 46px rgba(34, 197, 94, 0.025);
+      pointer-events: none;
+    }
+
+    #store .store-wallet h3 {
+      font-size: clamp(1.25rem, 2vw, 1.7rem);
+      color: var(--text);
+    }
+
+    #store .store-wallet p:not(.store-status) {
+      max-width: 55rem;
+      margin-top: 7px;
+      color: var(--muted);
+      line-height: 1.58;
+    }
+
+    #store .store-status {
+      margin-top: 14px;
+      color: #dce8d4;
+      font-size: 0.9rem;
+      font-weight: 800;
+    }
+
+    #store .store-balance {
+      position: relative;
+      z-index: 1;
+      min-width: 0;
+      min-height: 104px;
+      align-content: center;
+      padding: 18px;
+      border-color: rgba(250, 204, 21, 0.58);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(250, 204, 21, 0.22), rgba(15, 23, 42, 0.48));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 16px 32px rgba(2, 6, 23, 0.24);
+    }
+
+    #store .store-balance::before {
+      content: "";
+      width: 25px;
+      aspect-ratio: 1;
+      margin-inline: auto;
+      border: 3px solid #facc15;
+      border-radius: 50%;
+      background: radial-gradient(circle at 34% 30%, #fff7be 0 10%, #facc15 11% 54%, #a16207 55% 100%);
+      box-shadow: 0 0 18px rgba(250, 204, 21, 0.42);
+    }
+
+    #store .store-balance strong {
+      margin-top: 5px;
+      font-size: clamp(1.55rem, 3vw, 2rem);
+      letter-spacing: 0.02em;
+    }
+
+    #store #storeInventory {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 4px 2px;
+    }
+
+    #store #storeInventory .game-unlock {
+      border-color: rgba(148, 163, 184, 0.2);
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.64);
+      color: #cbd5e1;
+      font-size: 0.76rem;
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.05);
+    }
+
+    #store .store-showcase {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: clamp(10px, 1.2vw, 16px);
+    }
+
+    #store .store-showcase-card {
+      min-height: 146px;
+      padding: 18px;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--rarity-color, var(--gold)) 30%, transparent), transparent 31%),
+        linear-gradient(145deg, rgba(248, 250, 252, 0.11), rgba(15, 23, 42, 0.26) 38%, rgba(2, 6, 23, 0.4)),
+        var(--surface);
+      box-shadow: 0 18px 34px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(248, 250, 252, 0.1);
+    }
+
+    #store .store-showcase-card::after {
+      content: "";
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 28px;
+      aspect-ratio: 1;
+      border: 1px solid color-mix(in srgb, var(--rarity-color, var(--gold)) 58%, transparent);
+      border-radius: 10px;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--rarity-color, var(--gold)) 60%, white), transparent);
+      box-shadow: 0 0 22px color-mix(in srgb, var(--rarity-color, var(--gold)) 24%, transparent);
+      transform: rotate(45deg);
+    }
+
+    #store .store-showcase-card strong {
+      color: color-mix(in srgb, var(--rarity-color, var(--gold)) 78%, white);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+    }
+
+    #store .store-showcase-card span {
+      max-width: 11ch;
+      color: var(--text);
+      font-size: clamp(0.92rem, 1.15vw, 1.05rem);
+    }
+
+    #store .store-category-tabs {
+      gap: 10px;
+      padding: 10px;
+      overflow-x: auto;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.58);
+      box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.05);
+      scrollbar-width: thin;
+    }
+
+    #store .store-category-tab {
+      min-height: 44px;
+      padding-inline: 15px;
+      border-color: transparent;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    #store .store-category-tab:hover,
+    #store .store-category-tab:focus-visible {
+      border-color: rgba(148, 163, 184, 0.3);
+      background: rgba(30, 41, 59, 0.8);
+      transform: none;
+    }
+
+    #store .store-category-tab[aria-pressed="true"] {
+      border-color: rgba(34, 197, 94, 0.48);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.24), rgba(15, 23, 42, 0.42));
+      color: #ecfdf5;
+      box-shadow: 0 8px 20px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    #store .store-category-tab small {
+      background: rgba(148, 163, 184, 0.14);
+      color: #cbd5e1;
+    }
+
+    #store .store-grid {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 276px), 1fr));
+      gap: clamp(14px, 1.7vw, 22px);
+    }
+
+    #store .store-category-header {
+      min-height: 94px;
+      align-items: center;
+      padding: 19px 22px;
+      border-color: rgba(34, 197, 94, 0.28);
+      border-radius: 18px;
+      background:
+        linear-gradient(100deg, rgba(34, 197, 94, 0.13), rgba(30, 41, 59, 0.68) 42%, rgba(250, 204, 21, 0.08)),
+        rgba(15, 23, 42, 0.68);
+    }
+
+    #store .store-category-header h3 {
+      color: var(--text);
+      font-size: clamp(1.1rem, 1.8vw, 1.45rem);
+    }
+
+    #store .store-category-header p {
+      max-width: 52rem;
+      color: #cbd5e1;
+    }
+
+    #store .store-card {
+      min-height: 100%;
+      gap: 13px;
+      padding: 17px;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--rarity-color, var(--green)) 16%, transparent), transparent 34%),
+        linear-gradient(150deg, rgba(248, 250, 252, 0.08), rgba(30, 41, 59, 0.84) 42%, rgba(15, 23, 42, 0.94));
+      box-shadow: 0 18px 42px rgba(2, 6, 23, 0.25), inset 0 1px 0 rgba(248, 250, 252, 0.08);
+    }
+
+    #store .store-card:hover,
+    #store .store-card:focus-within {
+      transform: translateY(-5px);
+      box-shadow: 0 26px 58px rgba(2, 6, 23, 0.36), 0 0 0 1px color-mix(in srgb, var(--rarity-color, var(--green)) 18%, transparent);
+    }
+
+    #store .store-card h3 {
+      color: var(--text);
+      font-size: 1.05rem;
+    }
+
+    #store .store-card p { color: var(--muted); }
+
+    #store .store-preview {
+      min-height: 132px;
+      border-radius: 14px;
+      border-color: rgba(148, 163, 184, 0.2);
+      background-color: rgba(15, 23, 42, 0.56);
+    }
+
+    #store .store-card-actions {
+      gap: 8px;
+    }
+
+    #store .store-card-actions .button,
+    #store .store-card > .button {
+      min-height: 42px;
+      border-radius: 11px;
+    }
+
+    #store .store-card .button.secondary {
+      border-color: rgba(148, 163, 184, 0.28);
+      background: rgba(30, 41, 59, 0.72);
+    }
+
+    #store .store-card .button:not(.secondary) {
+      background: linear-gradient(135deg, #22c55e, #65a30d);
+      box-shadow: 0 10px 20px rgba(34, 197, 94, 0.16);
+    }
+
+    #store .store-card.is-equipped {
+      border-color: rgba(250, 204, 21, 0.64);
+      box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.2), 0 20px 46px rgba(2, 6, 23, 0.3), 0 0 30px rgba(250, 204, 21, 0.13);
+    }
+
+    #store .store-card.is-owned:not(.is-equipped) {
+      border-color: rgba(34, 197, 94, 0.42);
+    }
+
+    #store .store-skeleton-card {
+      display: grid;
+      gap: 13px;
+      min-height: 320px;
+      padding: 17px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 18px;
+      background: rgba(30, 41, 59, 0.62);
+    }
+
+    #store .store-skeleton-card :is(span, i, b) {
+      display: block;
+      border-radius: 9px;
+      background: linear-gradient(100deg, rgba(148, 163, 184, 0.1) 20%, rgba(248, 250, 252, 0.16) 40%, rgba(148, 163, 184, 0.1) 60%);
+      background-size: 220% 100%;
+      animation: storeSkeletonShimmer 1.35s linear infinite;
+    }
+
+    #store .store-skeleton-card span { min-height: 142px; }
+    #store .store-skeleton-card i { width: 62%; min-height: 15px; }
+    #store .store-skeleton-card i + i { width: 86%; }
+    #store .store-skeleton-card b { min-height: 42px; margin-top: auto; }
+
+    @keyframes storePanelEnter {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes storeSkeletonShimmer {
+      from { background-position: 120% 0; }
+      to { background-position: -120% 0; }
+    }
+
+    @media (max-width: 1060px) {
+      #store .section-head { grid-template-columns: 1fr; gap: 14px; }
+      #store .section-intro { max-width: 52rem; padding-block: 0; }
+      #store .store-showcase { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 720px) {
+      #store .store-premium-shell { padding: 13px; border-radius: 18px; }
+      #store .store-wallet { grid-template-columns: 1fr; min-height: 0; padding: 19px; }
+      #store .store-balance { width: min(100%, 190px); min-height: 92px; justify-self: start; }
+      #store .store-showcase { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #store .store-showcase-card { min-height: 124px; padding: 14px; }
+      #store .store-category-tabs { margin-inline: -1px; }
+      #store .store-category-header { display: grid; padding: 16px; }
+      #store .store-card { padding: 15px; }
+    }
+
+    @media (max-width: 460px) {
+      #store .section-head h2 { font-size: clamp(2.25rem, 14vw, 3.4rem); }
+      #store .store-showcase { grid-template-columns: 1fr; }
+      #store .store-showcase-card { min-height: 108px; }
+      #store .store-showcase-card span { max-width: none; }
+      #store .store-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #store .store-premium-shell,
+      #store .store-skeleton-card :is(span, i, b) { animation: none; }
+      #store .store-card:hover,
+      #store .store-card:focus-within { transform: none; }
+    }
+
+    /* Keep older learning surfaces inside the same dark, layered product system. */
+    body:not(.theme-light) main > .section-warm {
+      position: relative;
+      isolation: isolate;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 88% 4%, rgba(34, 197, 94, 0.09), transparent 28rem),
+        radial-gradient(circle at 8% 0%, rgba(250, 204, 21, 0.08), transparent 24rem),
+        linear-gradient(180deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.84));
+    }
+
+    body:not(.theme-light) main > .section-warm::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background: linear-gradient(115deg, rgba(248, 250, 252, 0.035), transparent 28%, transparent 72%, rgba(34, 197, 94, 0.05));
+    }
+
+    body:not(.theme-light) .section-warm :is(.section-kicker, .section-intro, .muted) {
+      color: var(--muted);
+    }
+
+    body:not(.theme-light) .section-warm :is(
+      .lesson-card,
+      .adventure-card,
+      .mission-card,
+      .adventure-play,
+      .rule-item,
+      .opening-card,
+      .notation-card,
+      .book-card,
+      .book-detail,
+      .video-card,
+      .puzzle-shell
+    ) {
+      border-color: rgba(148, 163, 184, 0.22);
+      background:
+        linear-gradient(145deg, rgba(248, 250, 252, 0.06), rgba(30, 41, 59, 0.82) 42%, rgba(15, 23, 42, 0.92));
+      color: var(--text);
+      box-shadow: 0 18px 40px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(248, 250, 252, 0.06);
+    }
+
+    body:not(.theme-light) .section-warm :is(
+      .lesson-card,
+      .adventure-card,
+      .mission-card,
+      .adventure-play,
+      .rule-item,
+      .opening-card,
+      .notation-card,
+      .book-card,
+      .book-detail,
+      .video-card,
+      .puzzle-info
+    ) p {
+      color: var(--muted);
+    }
+
+    body:not(.theme-light) .section-warm :is(.topic-list li, .notation-list li) {
+      border-color: rgba(148, 163, 184, 0.18);
+      background: rgba(15, 23, 42, 0.42);
+      color: var(--soft);
+    }
+
+    body:not(.theme-light) .section-warm :is(.lesson-card, .adventure-card, .mission-card, .rule-item, .notation-card, .book-card) {
+      transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+    }
+
+    body:not(.theme-light) .section-warm :is(.lesson-card, .adventure-card, .mission-card, .rule-item, .notation-card, .book-card):hover {
+      transform: translateY(-3px);
+      border-color: rgba(34, 197, 94, 0.46);
+      box-shadow: 0 24px 50px rgba(2, 6, 23, 0.32), 0 0 0 1px rgba(34, 197, 94, 0.1);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body:not(.theme-light) .section-warm :is(.lesson-card, .adventure-card, .mission-card, .rule-item, .notation-card, .book-card):hover {
+        transform: none;
+      }
+    }
   </style>
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
   <header class="site-header">
     <nav class="nav" aria-label="Main navigation">
-      <a class="brand" href="#top" aria-label="Checkmate Quest home">
+      <a class="brand" href="#top" data-home-link aria-label="Checkmate Quest home">
         <span class="brand-mark" aria-hidden="true">CQ</span>
         <span>Checkmate Quest</span>
       </a>
       <div class="nav-links" aria-label="Primary navigation">
-        <a href="#play" data-site-tab="play" data-site-panel="play">Play</a>
-        <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">Puzzles</a>
-        <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">Learn</a>
-        <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Tournaments</a>
-        <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">Leaderboard</a>
+        <a href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" aria-hidden="true">&#9822;</span><span>Play</span></a>
+        <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-icon" aria-hidden="true">&#9671;</span><span>Puzzles</span></a>
+        <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-icon" aria-hidden="true">&#8961;</span><span>Learn</span></a>
+        <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-icon" aria-hidden="true">&#9819;</span><span>Tournaments</span></a>
+        <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-icon" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
+        <a href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-icon" aria-hidden="true">&#10022;</span><span>Store</span></a>
+        <details class="nav-group">
+          <summary class="nav-group-label"><span class="nav-icon" aria-hidden="true">&middot;&middot;&middot;</span><span>More</span></summary>
+          <div class="nav-menu" aria-label="More chess features">
+            <a href="#academy" data-site-tab="academy" data-site-panel="academy">Academy</a>
+            <a href="#paths" data-site-tab="paths" data-site-panel="paths">Learning Path</a>
+            <a href="#adventures" data-site-tab="adventures" data-site-panel="adventures">Adventures</a>
+            <a href="#rules" data-site-tab="rules" data-site-panel="rules">Rules</a>
+            <a href="#openings" data-site-tab="openings" data-site-panel="openings">Openings</a>
+            <a href="#videos" data-site-tab="videos" data-site-panel="videos">Videos &amp; Shorts</a>
+            <a href="#books" data-site-tab="books" data-site-panel="books">Chess Books</a>
+            <a href="#notation" data-site-tab="notation" data-site-panel="notation">Notation</a>
+            <a href="#plan" data-site-tab="plan" data-site-panel="plan">Study Plan</a>
+            <a href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Friend Challenge</a>
+            <a href="#settings" data-site-tab="settings" data-site-panel="settings">Settings</a>
+          </div>
+        </details>
       </div>
       <a class="player-flex-chip" href="#login" data-site-tab="login" data-site-panel="login" aria-label="Open Profile or Login">
         <span class="player-profile-avatar" aria-hidden="true">&#10022;</span>
@@ -17865,11 +18503,22 @@
           </div>
           <div class="home-dashboard" aria-label="Personal chess dashboard">
             <h3 id="homeWelcome">Welcome back!</h3>
+            <p class="welcome-delta" id="homeWelcomeDelta">Your next tiny win is ready.</p>
+            <div class="home-sidebar-actions" aria-label="Quick chess actions">
+              <a class="home-sidebar-tile is-primary" href="#play" data-site-tab="play" data-site-panel="play">
+                <strong>Quick Play</strong><span>Start a focused game with the coach.</span>
+              </a>
+              <a class="home-sidebar-tile" href="#puzzles" data-home-action="daily-puzzle">
+                <strong>Daily Puzzle</strong><span>One practical tactic and a small reward.</span>
+              </a>
+              <a class="home-sidebar-tile" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">
+                <strong>Online Players</strong><span>Challenge a friend when you are ready.</span>
+              </a>
+            </div>
             <div class="home-progress-title">
-              <strong>Progress Dashboard</strong>
+              <strong>Progress</strong>
               <span>Small wins, real growth</span>
             </div>
-            <p class="welcome-delta" id="homeWelcomeDelta">Your next tiny win is ready.</p>
             <div class="home-stat-grid" aria-label="Progress dashboard">
               <span class="home-stat"><strong id="homeGamesPlayed">0</strong><small>Games played</small></span>
               <span class="home-stat"><strong id="homeThemesMastered">0</strong><small>Tactical themes mastered</small></span>
@@ -17903,6 +18552,7 @@
             <p id="homeInsight">One puzzle today is better than none.</p>
             <div class="achievement-roadmap" id="homeUnlocks" aria-label="Achievement roadmap"></div>
             <div class="recommendation-list" id="homeRecommendations" aria-label="Recommended practice"></div>
+            <a class="home-dashboard-link" href="#login" data-site-tab="login" data-site-panel="login">Open full dashboard</a>
           </div>
         </div>
       </div>
@@ -18572,7 +19222,7 @@
       </div>
     </section>
 
-    <section id="store" class="section-dark" aria-labelledby="store-title">
+    <section id="store" class="section-dark store-page" aria-labelledby="store-title">
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -18581,7 +19231,7 @@
           </div>
           <p class="section-intro">Unlock boards, pieces, backgrounds, avatars, pets, frames, and name styles. Everything is cosmetic, readable, and built for fast play.</p>
         </div>
-        <div class="store-shell">
+        <div class="store-shell store-premium-shell">
           <div class="store-wallet" aria-live="polite">
             <div>
               <h3>Adventure wallet</h3>
@@ -18723,7 +19373,11 @@
             </div>
             <div class="game-reward-row" id="lastMoveFavorites" aria-label="Favorite highlight colors"></div>
           </div>
-          <div class="store-grid" id="storeGrid" aria-label="Reward store items"></div>
+          <div class="store-grid is-loading" id="storeGrid" aria-label="Reward store items" aria-busy="true">
+            <article class="store-skeleton-card" aria-hidden="true"><span></span><i></i><i></i><b></b></article>
+            <article class="store-skeleton-card" aria-hidden="true"><span></span><i></i><i></i><b></b></article>
+            <article class="store-skeleton-card" aria-hidden="true"><span></span><i></i><i></i><b></b></article>
+          </div>
           <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Earn more coins</a>
         </div>
       </div>
@@ -21149,7 +21803,7 @@
         <span>Learn the board, spot the pattern, make the plan.</span>
       </div>
       <nav class="footer-links" aria-label="Footer navigation">
-        <a href="#home" data-site-tab="home" data-site-panel="home">About</a>
+        <a href="#top" data-home-link>Home</a>
         <a href="mailto:hello@checkmatequest.app">Contact</a>
         <a href="#settings" data-site-tab="settings" data-site-panel="settings">Privacy Policy</a>
         <a href="#settings" data-site-tab="settings" data-site-panel="settings">Terms</a>
@@ -26809,6 +27463,8 @@
       const inventory = document.getElementById("storeInventory");
       const tabs = document.getElementById("storeCategoryTabs");
       if (!grid || !balance || !inventory) return;
+      grid.setAttribute("aria-busy", "false");
+      grid.classList.remove("is-loading");
       const owned = new Set(storeState.owned);
       balance.textContent = formatProfileNumber(puzzleCoins);
       syncPreferenceLocks();
