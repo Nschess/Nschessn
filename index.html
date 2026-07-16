@@ -14597,11 +14597,32 @@
       background: #181512;
     }
 
-    .footer .wrap {
+    .footer-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto auto;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .footer-brand,
+    .footer-links,
+    .footer-social {
       display: flex;
-      justify-content: space-between;
-      gap: 18px;
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .footer-brand { flex-direction: column; align-items: flex-start; }
+    .footer-brand strong { color: var(--soft); }
+    .footer-brand span { font-size: 0.9rem; }
+    .footer-links { flex-wrap: wrap; }
+    .footer-social { justify-content: flex-end; }
+    .footer a { color: var(--muted); font-size: 0.9rem; }
+    .footer a:hover, .footer a:focus-visible { color: var(--green); }
+
+    @media (max-width: 760px) {
+      .footer-grid { grid-template-columns: 1fr; gap: 16px; }
+      .footer-social { justify-content: flex-start; }
     }
 
     .settings-shell {
@@ -15694,6 +15715,13 @@
 
       .site-header {
         position: sticky;
+      }
+
+      .nav-links > a,
+      .nav-group-label {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
       }
 
       .nav {
@@ -17429,57 +17457,354 @@
     #puzzles .puzzle-shell[hidden] {
       display: none !important;
     }
+    /* Visual refinement: board-first, calm dark surfaces, and accessible contrast. */
+    :root {
+      --bg: #0F172A;
+      --surface: #1E293B;
+      --panel: #1E293B;
+      --panel-2: #263449;
+      --text: #F8FAFC;
+      --muted: #94A3B8;
+      --soft: #E2E8F0;
+      --green: #22C55E;
+      --green-dark: #16A34A;
+      --gold: #FACC15;
+      --accent: #FACC15;
+      --line: #334155;
+      --radius: 16px;
+      --section-space: clamp(3rem, 6vw, 5.5rem);
+      --shadow: 0 18px 42px rgba(2, 6, 23, 0.28);
+      --site-bg-image:
+        radial-gradient(circle at 12% -8%, rgba(34, 197, 94, 0.12), transparent 31%),
+        radial-gradient(circle at 88% 8%, rgba(250, 204, 21, 0.06), transparent 24%);
+    }
+
+    :where(h1, h2, h3, .section-kicker) {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: var(--green);
+      color: #052e16;
+      font-weight: 800;
+      transform: translateY(-160%);
+      transition: transform 200ms ease;
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .button:focus-visible,
+    .nav-links a:focus-visible,
+    .nav-group-label:focus-visible,
+    .footer a:focus-visible {
+      outline: 3px solid var(--gold);
+      outline-offset: 3px;
+    }
+
+    :where(.section-dark, .section-warm) {
+      padding-block: var(--section-space);
+    }
+
+    :where(.home-quick-card, .home-summary-card) {
+      border-radius: var(--radius);
+      box-shadow: 0 12px 28px rgba(2, 6, 23, 0.2);
+    }
+
+    .button {
+      border-radius: 12px;
+      transition: transform 220ms ease, background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+    }
+
+    :where(.home-quick-card, .home-summary-card, .store-card, .video-card, .book-card, .leaderboard-card) {
+      transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+    }
+
+    @media (hover: hover) {
+      :where(.home-quick-card, .home-summary-card, .store-card, .video-card, .book-card, .leaderboard-card):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 16px 34px rgba(2, 6, 23, 0.26);
+      }
+    }
+
+    main > section.section-reveal {
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 280ms ease, transform 280ms ease;
+    }
+
+    main > section.section-reveal.is-revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    :where(#heroBoard, #homeMainBoard).board-intro {
+      opacity: 0;
+      transform: translateY(14px) scale(0.985);
+      transition: opacity 300ms ease, transform 300ms ease;
+    }
+
+    :where(#heroBoard, #homeMainBoard).board-intro.is-board-ready {
+      opacity: 1;
+      transform: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      main > section.section-reveal,
+      :where(#heroBoard, #homeMainBoard).board-intro {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+
+      html { scroll-behavior: auto; }
+
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    .site-header {
+      background: rgba(16, 23, 20, 0.92);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+
+    .nav-links,
+    .nav-menu {
+      border-color: rgba(238, 245, 237, 0.1);
+      background: rgba(23, 34, 29, 0.92);
+    }
+
+    .nav-links > a,
+    .nav-group-label {
+      border-color: rgba(238, 245, 237, 0.09);
+      background: rgba(7, 12, 9, 0.2);
+    }
+
+    :where(.play-shell, .puzzle-shell, .settings-shell, .store-shell, .preference-panel) {
+      border-color: rgba(238, 245, 237, 0.11);
+      background:
+        linear-gradient(145deg, rgba(29, 43, 35, 0.9), rgba(17, 25, 21, 0.88));
+      box-shadow: var(--shadow);
+    }
+
+    :where(.lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card, .notation-card, .book-card, .video-card, .store-card, .leaderboard-card) {
+      border-color: rgba(238, 245, 237, 0.1);
+      background: linear-gradient(145deg, rgba(35, 48, 41, 0.95), rgba(24, 34, 29, 0.95));
+    }
+
+    :where(button, a, input, select, textarea):focus-visible {
+      outline: 2px solid rgba(180, 222, 118, 0.94);
+      outline-offset: 3px;
+    }
+
+    @media (min-width: 1181px) {
+      #play .play-shell {
+        grid-template-columns: minmax(480px, 660px) minmax(340px, 1fr);
+        gap: clamp(22px, 3vw, 42px);
+      }
+
+      #puzzles .puzzle-shell {
+        grid-template-columns: minmax(480px, 660px) minmax(340px, 1fr);
+      }
+
+      #play .play-board-wrap,
+      #puzzles .puzzle-board-wrap {
+        width: min(100%, 640px);
+        max-width: 640px;
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      :where(.nav-links > a, .nav-group-label, .button, .mission-button, .store-card, .lesson-card, .adventure-card, .puzzle-board-wrap) {
+        transition-duration: 180ms;
+        transition-timing-function: ease;
+      }
+    }
+
+    .home-main-section {
+      padding: 0 0 clamp(52px, 7vw, 96px);
+    }
+
+    .home-main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 13fr) minmax(270px, 7fr);
+      gap: clamp(18px, 3vw, 38px);
+      align-items: stretch;
+    }
+
+    .home-board-panel {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .home-board-heading,
+    .home-quick-card-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .home-board-heading h2,
+    .home-quick-card h3 {
+      margin: 0;
+      font-size: clamp(1.1rem, 2vw, 1.45rem);
+    }
+
+    .home-board-heading p,
+    .home-quick-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .home-main-board-link {
+      display: block;
+      width: min(100%, 720px);
+      margin-inline: auto;
+      padding: clamp(7px, 1vw, 10px);
+      border: 1px solid rgba(214, 187, 121, 0.42);
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(214, 187, 121, 0.28), rgba(95, 136, 70, 0.34));
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.3);
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    }
+
+    .home-main-board-link:hover,
+    .home-main-board-link:focus-visible {
+      border-color: rgba(180, 222, 118, 0.85);
+      box-shadow: 0 26px 58px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(180, 222, 118, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .home-main-board {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      width: 100%;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border-radius: 8px;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
+    }
+
+    .home-main-square {
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      aspect-ratio: 1;
+    }
+
+    .home-main-square.light { background: var(--board-light); }
+    .home-main-square.dark { background: var(--board-dark); }
+
+    .home-quick-column {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-content: start;
+    }
+
+    .home-quick-card {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      min-height: 164px;
+      padding: 18px;
+      border: 1px solid rgba(238, 245, 237, 0.11);
+      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(35, 48, 41, 0.96), rgba(24, 34, 29, 0.96));
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    .home-quick-card.is-featured {
+      grid-column: 1 / -1;
+      min-height: 148px;
+      border-color: rgba(143, 186, 98, 0.48);
+      background: linear-gradient(140deg, rgba(95, 136, 70, 0.24), rgba(25, 37, 30, 0.94));
+    }
+
+    .home-quick-value {
+      font-size: clamp(1.55rem, 3vw, 2.25rem);
+      font-weight: 900;
+      line-height: 1;
+      color: var(--soft);
+    }
+
+    .home-quick-card .button {
+      width: fit-content;
+      min-height: 38px;
+      padding-inline: 14px;
+    }
+
+    .home-board-followups {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .home-summary-card {
+      display: grid;
+      align-content: start;
+      gap: 9px;
+      min-width: 0;
+      min-height: 148px;
+      padding: 16px;
+      border: 1px solid rgba(238, 245, 237, 0.1);
+      border-radius: 12px;
+      background: rgba(23, 34, 29, 0.74);
+    }
+
+    .home-summary-card h3,
+    .home-summary-card p { margin: 0; }
+    .home-summary-card h3 { font-size: 1rem; }
+    .home-summary-card p { color: var(--muted); font-size: 0.9rem; }
+    .home-summary-card a { color: var(--green); font-size: 0.88rem; font-weight: 800; }
+    .home-summary-card a:hover { color: var(--soft); }
+
+    @media (max-width: 900px) {
+      .home-main-grid { grid-template-columns: 1fr; }
+      .home-main-board-link { max-width: 640px; }
+      .home-board-followups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 520px) {
+      .home-quick-column { grid-template-columns: 1fr; }
+      .home-quick-card.is-featured { grid-column: auto; }
+      .home-board-heading { align-items: start; flex-direction: column; gap: 4px; }
+      .home-board-followups { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#top">Skip to main content</a>
   <header class="site-header">
     <nav class="nav" aria-label="Main navigation">
       <a class="brand" href="#top" aria-label="Checkmate Quest home">
         <span class="brand-mark" aria-hidden="true">CQ</span>
         <span>Checkmate Quest</span>
       </a>
-      <div class="nav-links" aria-label="Course section tabs">
-        <a class="is-quick-tab" href="#top" data-home-link>Home</a>
-        <details class="nav-group" aria-label="Learn">
-          <summary class="nav-group-label">Learn</summary>
-          <div class="nav-menu">
-          <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">Tutorial</a>
-          <a href="#academy" data-site-tab="academy" data-site-panel="academy">Academy</a>
-          <a href="#paths" data-site-tab="paths" data-site-panel="paths">Lessons</a>
-          <a href="#adventures" data-site-tab="adventures" data-site-panel="adventures">Adventures</a>
-          <a href="#rules" data-site-tab="rules" data-site-panel="rules">Rules</a>
-          <a href="#openings" data-site-tab="openings" data-site-panel="openings">Openings</a>
-          </div>
-        </details>
-        <details class="nav-group" aria-label="Play">
-          <summary class="nav-group-label">Play</summary>
-          <div class="nav-menu">
-          <a class="is-quick-tab" href="#play" data-site-tab="play" data-site-panel="play">Play AI</a>
-          <a class="is-quick-tab" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Friend Challenge</a>
-          <a class="is-quick-tab" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Tournaments</a>
-          </div>
-        </details>
-        <details class="nav-group" aria-label="Practice">
-          <summary class="nav-group-label">Practice</summary>
-          <div class="nav-menu">
-          <a class="is-quick-tab" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">Puzzles</a>
-          <a href="#shorts" data-site-tab="shorts" data-site-panel="videos" data-site-focus="shorts">Shorts</a>
-          <a class="is-quick-tab" href="#plan" data-site-tab="plan" data-site-panel="plan">Study Plan</a>
-          </div>
-        </details>
-        <details class="nav-group" aria-label="Review">
-          <summary class="nav-group-label">Review</summary>
-          <div class="nav-menu">
-          <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">Leaderboards</a>
-          <a href="#videos" data-site-tab="videos" data-site-panel="videos">Videos</a>
-          <a href="#books" data-site-tab="books" data-site-panel="books">Books</a>
-          <a href="#notation" data-site-tab="notation" data-site-panel="notation">Notation</a>
-          <a href="#settings" data-site-tab="settings" data-site-panel="settings">Settings</a>
-          </div>
-        </details>
-        <a class="is-quick-tab" href="#store" data-site-tab="store" data-site-panel="store">Store</a>
+      <div class="nav-links" aria-label="Primary navigation">
+        <a href="#play" data-site-tab="play" data-site-panel="play">Play</a>
+        <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">Puzzles</a>
+        <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">Learn</a>
+        <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Tournaments</a>
+        <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">Leaderboard</a>
       </div>
-      <a class="player-flex-chip" href="#login" data-site-tab="login" data-site-panel="login" aria-label="Open Profile">
+      <a class="player-flex-chip" href="#login" data-site-tab="login" data-site-panel="login" aria-label="Open Profile or Login">
         <span class="player-profile-avatar" aria-hidden="true">&#10022;</span>
         <span class="player-flex-main">
           <span class="player-flex-name">
@@ -17506,12 +17831,11 @@
         <div class="hero-layout">
           <div class="hero-copy">
             <p class="eyebrow">Beginner chess that feels like a game</p>
-            <h1 id="hero-title">Checkmate Quest</h1>
-            <p>Start with tiny missions, 60-second tricks, friendly puzzles, and a coach that rewards progress instead of pressure.</p>
+            <h1 id="hero-title">Play Chess. Improve Every Move.</h1>
+            <p>Play focused games, solve practical puzzles, and build confidence one clear idea at a time.</p>
             <div class="hero-actions">
-              <a class="button" href="#puzzles" id="heroContinueLearning" data-home-action="daily-puzzle">Continue Learning</a>
+              <a class="button" href="#play" id="heroContinueLearning" data-site-tab="play" data-site-panel="play">Play Now</a>
               <a class="button" href="#tutorial" id="newToChessButton" data-site-tab="tutorial" data-site-panel="tutorial">Learn Chess</a>
-              <a class="button secondary" href="#puzzles" data-home-action="daily-puzzle">Try a Puzzle</a>
             </div>
             <div class="home-start-flow" aria-label="Start here">
               <a class="home-step" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><strong>1. Learn</strong><span>One tiny rule.</span></a>
@@ -17573,6 +17897,66 @@
             <div class="achievement-roadmap" id="homeUnlocks" aria-label="Achievement roadmap"></div>
             <div class="recommendation-list" id="homeRecommendations" aria-label="Recommended practice"></div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-main-section" aria-labelledby="home-board-title">
+      <div class="wrap home-main-grid">
+        <article class="home-board-panel">
+          <div class="home-board-heading">
+            <h2 id="home-board-title">Your board</h2>
+            <p>Tap the board to begin a focused game.</p>
+          </div>
+          <a class="home-main-board-link" href="#play" data-site-tab="play" data-site-panel="play" aria-label="Open the interactive chessboard">
+            <div class="home-main-board" id="homeMainBoard" aria-hidden="true"></div>
+          </a>
+        </article>
+
+        <aside class="home-quick-column" aria-label="Quick chess actions">
+          <article class="home-quick-card is-featured">
+            <div class="home-quick-card-head"><h3>Quick Play</h3><span class="badge">Ready</span></div>
+            <p>Start a calm game against the coach whenever you have a few minutes.</p>
+            <a class="button" href="#play" data-site-tab="play" data-site-panel="play">Play Now</a>
+          </article>
+          <article class="home-quick-card">
+            <div class="home-quick-card-head"><h3>Player Rating</h3></div>
+            <strong class="home-quick-value" id="homeMainRating">400</strong>
+            <p id="homeMainRatingMeta">Play a game to establish your rating.</p>
+          </article>
+          <article class="home-quick-card">
+            <div class="home-quick-card-head"><h3>Daily Puzzle</h3></div>
+            <p>One focused tactic, a helpful hint, and a small reward.</p>
+            <a class="button secondary" href="#puzzles" data-home-action="daily-puzzle">Solve Puzzle</a>
+          </article>
+          <article class="home-quick-card">
+            <div class="home-quick-card-head"><h3>Online Players</h3></div>
+            <p>Find a friend or create a private challenge when you are ready.</p>
+            <a class="button secondary" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Challenge Friend</a>
+          </article>
+        </aside>
+
+        <div class="home-board-followups" aria-label="Chess activity">
+          <article class="home-summary-card">
+            <h3>Recent Games</h3>
+            <p id="homeRecentGames">Play a game and it will appear here.</p>
+            <a href="#play" data-site-tab="play" data-site-panel="play">Open Play</a>
+          </article>
+          <article class="home-summary-card">
+            <h3>Active Tournaments</h3>
+            <p>Join an event or create a friendly competition.</p>
+            <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">View Tournaments</a>
+          </article>
+          <article class="home-summary-card">
+            <h3>Leaderboard</h3>
+            <p>See puzzle, AI, and tournament progress from registered players.</p>
+            <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">View Rankings</a>
+          </article>
+          <article class="home-summary-card">
+            <h3>Chess News</h3>
+            <p>Fresh lessons, daily tactics, and practical coach updates.</p>
+            <a href="#videos" data-site-tab="videos" data-site-panel="videos">Explore Lessons</a>
+          </article>
         </div>
       </div>
     </section>
@@ -20752,9 +21136,21 @@
   </div>
 
   <footer class="footer">
-    <div class="wrap">
-      <span>Checkmate Quest</span>
-      <span>Learn the board, spot the pattern, make the plan.</span>
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <strong>Checkmate Quest</strong>
+        <span>Learn the board, spot the pattern, make the plan.</span>
+      </div>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="#home" data-site-tab="home" data-site-panel="home">About</a>
+        <a href="mailto:hello@checkmatequest.app">Contact</a>
+        <a href="#settings" data-site-tab="settings" data-site-panel="settings">Privacy Policy</a>
+        <a href="#settings" data-site-tab="settings" data-site-panel="settings">Terms</a>
+      </nav>
+      <nav class="footer-social" aria-label="Social links">
+        <a href="#videos" data-site-tab="videos" data-site-panel="videos">YouTube</a>
+        <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">Community</a>
+      </nav>
     </div>
   </footer>
 
@@ -23498,18 +23894,20 @@
     let readerFontScale = 1.08;
 
     function buildHeroBoard() {
-      const board = document.getElementById("heroBoard");
-      if (!board) return;
-      board.replaceChildren();
-      heroPieces.forEach((piece, index) => {
-        const square = document.createElement("span");
-        const row = Math.floor(index / 8);
-        const col = index % 8;
-        square.className = `hero-square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
-        const colorClass = piece?.color ? (piece.color === "w" ? "white-piece" : "black-piece") : pieceColorClass(piece);
-        if (colorClass) square.classList.add(colorClass);
-        renderPieceOnSquare(square, piece);
-        board.appendChild(square);
+      [["heroBoard", "hero-square"], ["homeMainBoard", "home-main-square"]].forEach(([id, squareClass]) => {
+        const board = document.getElementById(id);
+        if (!board) return;
+        board.replaceChildren();
+        heroPieces.forEach((piece, index) => {
+          const square = document.createElement("span");
+          const row = Math.floor(index / 8);
+          const col = index % 8;
+          square.className = `${squareClass} ${(row + col) % 2 === 0 ? "light" : "dark"}`;
+          const colorClass = piece?.color ? (piece.color === "w" ? "white-piece" : "black-piece") : pieceColorClass(piece);
+          if (colorClass) square.classList.add(colorClass);
+          renderPieceOnSquare(square, piece);
+          board.appendChild(square);
+        });
       });
     }
 
@@ -28819,6 +29217,16 @@
       setHomeStat("homeLearningTime", formatLearningTime(learningMinutes), "Estimated from completed lessons, puzzles, attempts, and games.");
       setHomeStat("homeSkillsUnlocked", formatProfileNumber(unlockedSkills.length), unlockedSkills.length ? unlockedSkills.join(", ") : "First unlock: solve one puzzle.");
       setHomeStat("homeXp", `${formatProfileNumber(profileSnapshot?.xp ?? puzzleXp)} XP`, `${lessonCount} lessons done`);
+      const mainRating = document.getElementById("homeMainRating");
+      const mainRatingMeta = document.getElementById("homeMainRatingMeta");
+      if (mainRating) mainRating.textContent = String(getLearnerGameRating());
+      if (mainRatingMeta) mainRatingMeta.textContent = gameStats.played
+        ? `${gameStats.wins || 0} wins from ${gameStats.played} game${gameStats.played === 1 ? "" : "s"}.`
+        : "Play a game to establish your rating.";
+      const recentGames = document.getElementById("homeRecentGames");
+      if (recentGames) recentGames.textContent = gameStats.played
+        ? `${gameStats.played} game${gameStats.played === 1 ? "" : "s"} played, ${gameStats.wins || 0} win${gameStats.wins === 1 ? "" : "s"} recorded.`
+        : "Play a game and it will appear here.";
       renderDailyGoals();
       document.getElementById("homeInsight").textContent = needsTactics
         ? "You struggled with tactics recently. Try one quick pattern."
@@ -42063,6 +42471,30 @@
       }, { once: true });
     }
 
+    function setupVisualEntrances() {
+      if (window.__checkmateQuestVisualEntrancesBound) return;
+      window.__checkmateQuestVisualEntrancesBound = true;
+      const sections = [...document.querySelectorAll("main > section")];
+      const boards = [...document.querySelectorAll("#heroBoard, #homeMainBoard")];
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      sections.forEach((section) => section.classList.add("section-reveal"));
+      boards.forEach((board) => board.classList.add("board-intro"));
+      if (reducedMotion || !("IntersectionObserver" in window)) {
+        sections.forEach((section) => section.classList.add("is-revealed"));
+      } else {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("is-revealed");
+            observer.unobserve(entry.target);
+          });
+        }, { rootMargin: "0px 0px -8%", threshold: 0.03 });
+        sections.forEach((section) => observer.observe(section));
+      }
+      window.requestAnimationFrame(() => boards.forEach((board) => board.classList.add("is-board-ready")));
+    }
+
     document.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : event.target?.parentElement;
       const trigger = target?.closest("[data-home-action]");
@@ -42201,6 +42633,7 @@
     setupRuntimeSafety();
     setupSiteTabs();
     window.requestAnimationFrame(() => {
+      setupVisualEntrances();
       void initializeDeferredFeature("hero");
     });
   </script>
