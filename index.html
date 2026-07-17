@@ -22800,6 +22800,94 @@
         gap: var(--cq-space-2);
       }
     }
+
+    /* Board-first stage: the board gets the largest uninterrupted surface in every layout. */
+    body:not(.theme-light) #play:not(.is-review-mode) {
+      --cq-board-stage-max: 760px;
+      --cq-board-stage-min: 560px;
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column {
+      width: 100%;
+      justify-items: center;
+      gap: clamp(var(--cq-space-2), 1.25vw, var(--cq-space-3));
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+      width: min(100%, clamp(var(--cq-board-stage-min), 46vw, var(--cq-board-stage-max)));
+      max-width: var(--cq-board-stage-max);
+      margin-block: var(--cq-space-2);
+      border-color: var(--cq-board-frame-border);
+      background: var(--cq-board-frame);
+      box-shadow:
+        0 0 0 1px var(--cq-border),
+        0 0 0 7px var(--cq-accent-secondary-soft),
+        0 0 48px var(--cq-board-frame-glow),
+        var(--cq-shadow-lg);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap::after {
+      border-color: rgba(255, 255, 255, 0.18);
+      box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.04);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+      width: min(100%, var(--cq-board-stage-max));
+      max-width: var(--cq-board-stage-max);
+      min-height: 66px;
+      padding: var(--cq-space-2) var(--cq-space-3);
+      border-color: var(--cq-border);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > .ai-player-card {
+      background: linear-gradient(105deg, var(--cq-surface-elevated), var(--cq-surface-glass-strong));
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > .match-player-card {
+      border-color: var(--cq-accent-tertiary);
+      background: linear-gradient(105deg, var(--cq-accent-primary-soft), var(--cq-surface-glass-strong));
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-bottom-actionbar,
+    body:not(.theme-light) #play:not(.is-review-mode) .game-options-panel {
+      width: min(100%, var(--cq-board-stage-max));
+    }
+
+    @media (min-width: 1181px) {
+      body:not(.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-columns: minmax(226px, var(--cq-rail-width)) minmax(620px, 1fr) minmax(288px, var(--cq-insight-width));
+        max-width: 1680px;
+      }
+    }
+
+    @media (min-width: 700px) and (max-width: 1180px) {
+      body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+        width: min(100%, 680px);
+      }
+    }
+
+    @media (max-width: 699px) {
+      body:not(.theme-light) #play:not(.is-review-mode) {
+        --cq-board-stage-min: 0px;
+        --cq-board-stage-max: 640px;
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+        width: 100%;
+        margin-block: var(--cq-space-1);
+        box-shadow:
+          0 0 0 1px var(--cq-border),
+          0 0 0 4px var(--cq-accent-secondary-soft),
+          0 0 28px var(--cq-board-frame-glow),
+          var(--cq-shadow-md);
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+        min-height: 58px;
+        padding: var(--cq-space-2);
+      }
+    }
   </style>
 </head>
 <body>
