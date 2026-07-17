@@ -1,0 +1,22 @@
+name: Verify site
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/verify-site.js
+      - run: node --check api/_supabase.js && node --check api/auth-config.js && node --check api/health.js && node --check api/leaderboard.js
+      - run: node scripts/build-pages.js
+      - run: node scripts/check-deploy-assets.js dist
