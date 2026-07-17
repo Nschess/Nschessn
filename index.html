@@ -20969,6 +20969,24 @@
       border-bottom: 1px solid rgba(255, 248, 237, 0.09);
     }
 
+    /* Player frames use their own five-row grid. This keeps legacy compact-card
+       placement from collapsing identity fields into the avatar row. */
+    #play:not(.is-review-mode) .match-board-column > .player-frame > :is(
+      .player-frame-topline,
+      .match-player-main,
+      .ai-player-main,
+      .match-player-timer,
+      .ai-player-timer,
+      .match-player-meta,
+      .player-frame-stats,
+      .player-frame-description,
+      .player-frame-footer
+    ) {
+      min-width: 0;
+      visibility: visible;
+      opacity: 1;
+    }
+
     #play .player-frame-kicker {
       color: var(--gold);
       font-size: 0.68rem;
@@ -21081,9 +21099,6 @@
       margin: 0;
       overflow: visible;
     }
-
-    #play .player-frame .match-player-meta [data-match-side],
-    #play .player-frame .match-player-meta [data-match-rating] { display: none; }
 
     #play .player-frame-footer :is(.ai-player-move, .ai-player-last),
     #play .player-frame-record,
