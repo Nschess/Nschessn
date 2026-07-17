@@ -3,6 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Learn chess with guided lessons, practical puzzles, coach games, and progress tracking for every level." />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="color-scheme" content="dark light" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Checkmate Quest" />
+  <meta property="og:title" content="Checkmate Quest — Learn Chess One Clear Idea at a Time" />
+  <meta property="og:description" content="Guided chess lessons, practical puzzles, coach games, and progress tracking for every level." />
+  <meta name="twitter:card" content="summary" />
+  <link rel="canonical" href="./" />
+  <link rel="manifest" href="site.webmanifest" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
   <title>Checkmate Quest - Learn Chess From First Move to Strategy</title>
   <style>
@@ -22250,7 +22261,7 @@
     </nav>
   </header>
 
-  <main id="top">
+  <main id="top" tabindex="-1">
     <section class="hero hero-command-center" aria-labelledby="hero-title">
       <div class="hero-ambient" aria-hidden="true">
         <span class="hero-float hero-float-knight">&#9816;</span>
@@ -47243,11 +47254,16 @@
       const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4;
       const lowCpu = typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 4;
-      const saveData = Boolean(connection?.saveData);
-      const slowNetwork = /(^|-)2g$/.test(connection?.effectiveType || "");
-      const perfLite = lowMemory || lowCpu || saveData || slowNetwork || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      document.body.classList.toggle("perf-lite", perfLite);
-      document.documentElement.style.setProperty("--perf-mode", perfLite ? "lite" : "full");
+      const applyPerformanceMode = () => {
+        const saveData = Boolean(connection?.saveData);
+        const slowNetwork = /(^|-)2g$/.test(connection?.effectiveType || "");
+        const enabled = lowMemory || lowCpu || saveData || slowNetwork || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        document.body.classList.toggle("perf-lite", enabled);
+        document.documentElement.style.setProperty("--perf-mode", enabled ? "lite" : "full");
+        return enabled;
+      };
+      const perfLite = applyPerformanceMode();
+      connection?.addEventListener?.("change", applyPerformanceMode);
 
       document.querySelectorAll("iframe").forEach((iframe) => {
         iframe.loading = iframe.loading || "lazy";
@@ -47279,11 +47295,15 @@
       }
 
       let resizeFrame = 0;
+      const updateViewportMode = () => {
+        document.body.classList.toggle("is-compact-viewport", window.innerWidth < 700);
+      };
+      updateViewportMode();
       window.addEventListener("resize", () => {
         if (resizeFrame) return;
         resizeFrame = window.requestAnimationFrame(() => {
           resizeFrame = 0;
-          document.body.classList.toggle("is-compact-viewport", window.innerWidth < 700);
+          updateViewportMode();
         });
       }, { passive: true });
 
@@ -47301,6 +47321,7 @@
       window.addEventListener("pagehide", () => {
         prefetchController.abort();
         sectionObserver?.disconnect();
+        connection?.removeEventListener?.("change", applyPerformanceMode);
         if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
         flushReviewAnalysisCache();
         window.clearInterval(reviewReplayTimer);
