@@ -30942,9 +30942,10 @@
     }
 
     function normalizeGlobalLeaderboardAccounts(payload) {
-      const records = Array.isArray(payload) ? payload : (payload?.accounts || payload?.players || payload?.entries || []);
+      const candidate = Array.isArray(payload) ? payload : (payload?.entries || payload?.accounts || payload?.players);
+      const records = Array.isArray(candidate) ? candidate : [];
       const seen = new Set();
-      return records.map((account) => {
+      return records.filter((account) => account && typeof account === "object").map((account) => {
         const id = getLeaderboardAccountId(account);
         if (!id || seen.has(id)) return null;
         seen.add(id);
@@ -31121,7 +31122,8 @@
     }
 
     function filterLeaderboardAccounts(accounts = []) {
-      return accounts.filter((account) => isRealLeaderboardAccount(account) && isInLeaderboardScope(account) && isWithinLeaderboardPeriod(account));
+      const rows = Array.isArray(accounts) ? accounts : [];
+      return rows.filter((account) => isRealLeaderboardAccount(account) && isInLeaderboardScope(account) && isWithinLeaderboardPeriod(account));
     }
 
     function getLeaderboardScopeLabel() {
@@ -31238,9 +31240,9 @@
       const currentName = normalizeAuthUsername(readLearnerProfile().name).toLowerCase();
       const seen = new Set();
       const useSharedAccounts = leaderboardRuntime.status !== "local" && Array.isArray(leaderboardRuntime.accounts);
-      const accounts = useSharedAccounts ? (leaderboardRuntime.accounts || []) : readAuthRegistry().accounts;
+      const sourceAccounts = useSharedAccounts ? leaderboardRuntime.accounts : readAuthRegistry().accounts;
+      const accounts = filterLeaderboardAccounts(sourceAccounts);
       return accounts
-        .filter(filterLeaderboardAccounts)
         .map((account) => {
           const id = getLeaderboardAccountId(account);
           if (seen.has(id)) return null;
@@ -31290,11 +31292,12 @@
     function renderLeaderboardList(targetId, entries) {
       const list = document.getElementById(targetId);
       if (!list) return;
-      if (!entries.length) {
+      const rows = Array.isArray(entries) ? entries : [];
+      if (!rows.length) {
         list.replaceChildren(createBookText("p", "trainer-note", getLeaderboardEmptyMessage()));
         return;
       }
-      list.replaceChildren(...entries.map((entry, index) => {
+      list.replaceChildren(...rows.map((entry, index) => {
         const row = document.createElement("div");
         row.className = `leaderboard-row${entry.isPlayer ? " is-player" : ""}`;
         const rank = createBookText("span", "leaderboard-rank", `#${index + 1}`);
