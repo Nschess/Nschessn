@@ -25,10 +25,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node scripts/check-deploy-assets.js
+      - run: node scripts/build-pages.js
+      - run: node scripts/check-deploy-assets.js dist
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: outputs
+          path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
