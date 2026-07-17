@@ -20466,6 +20466,1136 @@
       .home-feature-card:last-child { grid-column: 1 / -1; }
       .home-lower-grid { grid-template-columns: 1fr; overflow: visible; }
     }
+
+    /* Play workspace: persistent side rails around a board-first center stage. */
+    @media (min-width: 1181px) {
+      #play:not(.is-review-mode) {
+        --play-chrome-space: 340px;
+      }
+
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas: "left center right";
+        grid-template-columns: 280px minmax(0, 1fr) 360px;
+        max-width: 1760px;
+        gap: 16px 20px;
+        align-items: start;
+      }
+
+      #play:not(.is-review-mode) .play-left-sidebar {
+        grid-area: left;
+        position: sticky;
+        top: 82px;
+        align-self: start;
+        max-height: calc(100dvh - 110px);
+        overflow: auto;
+        overscroll-behavior: contain;
+      }
+
+      #play:not(.is-review-mode) .match-board-column {
+        grid-area: center;
+        min-width: 0;
+      }
+
+      #play:not(.is-review-mode) .play-right-sidebar {
+        grid-area: right;
+        max-height: calc(100dvh - 110px);
+        overflow: auto;
+        overscroll-behavior: contain;
+        padding-right: 2px;
+      }
+
+      #play:not(.is-review-mode) .match-board-column > .play-bottom-actionbar {
+        grid-area: actions;
+        position: static;
+        z-index: 8;
+        padding: 9px;
+        border: 1px solid rgba(255, 248, 237, 0.12);
+        border-radius: 14px;
+        background: rgba(23, 24, 20, 0.88);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+        backdrop-filter: blur(12px);
+      }
+
+      #play:not(.is-review-mode) .play-actions {
+        grid-template-columns: minmax(154px, 1.65fr) repeat(4, minmax(0, 1fr)) auto;
+      }
+
+      #play:not(.is-review-mode) .preference-panel {
+        margin: 0;
+        padding: 12px;
+      }
+
+      #play:not(.is-review-mode) .play-left-sidebar .preference-grid {
+        grid-template-columns: 1fr;
+        gap: 7px;
+      }
+
+      #play:not(.is-review-mode) .play-left-sidebar .preference-grid > label {
+        display: grid;
+        grid-template-columns: 78px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+        font-size: 0.76rem;
+      }
+
+      #play:not(.is-review-mode) .play-left-sidebar .preference-grid :is(select, input) {
+        min-width: 0;
+        min-height: 34px;
+      }
+    }
+
+    @media (min-width: 700px) and (max-width: 1180px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center right"
+          "left right";
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 340px) !important;
+      }
+
+      #play:not(.is-review-mode) .play-left-sidebar { grid-area: left; }
+      #play:not(.is-review-mode) .match-board-column { grid-area: center; }
+      #play:not(.is-review-mode) .play-right-sidebar { grid-area: right; }
+    }
+
+    @media (max-width: 699px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas: "center" "right" "left";
+      }
+
+      #play:not(.is-review-mode) .play-left-sidebar,
+      #play:not(.is-review-mode) .match-board-column,
+      #play:not(.is-review-mode) .play-right-sidebar,
+      #play:not(.is-review-mode) .play-bottom-actionbar { grid-column: 1; }
+
+      #play:not(.is-review-mode) .play-left-sidebar { grid-area: left; }
+      #play:not(.is-review-mode) .match-board-column { grid-area: center; }
+      #play:not(.is-review-mode) .play-right-sidebar { grid-area: right; }
+    }
+
+    #play .play-mode-nav {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 10px;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(32, 38, 31, 0.82), rgba(11, 14, 17, 0.7));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 30px rgba(0, 0, 0, 0.16);
+    }
+
+    #play .play-mode-head {
+      display: grid;
+      gap: 2px;
+      padding: 2px 3px 5px;
+    }
+
+    #play .play-mode-head strong {
+      color: var(--soft);
+      font-size: 0.88rem;
+    }
+
+    #play .play-mode-head small,
+    #play .play-mode-card small {
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 750;
+    }
+
+    #play .play-mode-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      min-height: 58px;
+      padding: 8px 9px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 12px;
+      color: var(--text);
+      text-decoration: none;
+      background: rgba(255, 255, 255, 0.035);
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+
+    #play .play-mode-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      background: linear-gradient(110deg, transparent 22%, rgba(224, 255, 191, 0.12) 50%, transparent 78%);
+      transform: translateX(-120%);
+      transition: opacity 180ms ease, transform 360ms ease;
+    }
+
+    #play .play-mode-card:hover,
+    #play .play-mode-card:focus-visible {
+      z-index: 1;
+      transform: translateX(2px);
+      border-color: rgba(127, 166, 80, 0.72);
+      background: linear-gradient(120deg, rgba(127, 166, 80, 0.18), rgba(255, 255, 255, 0.055));
+      box-shadow: 0 0 0 1px rgba(127, 166, 80, 0.16), 0 0 22px rgba(127, 166, 80, 0.16);
+      outline: none;
+    }
+
+    #play .play-mode-card:hover::before,
+    #play .play-mode-card:focus-visible::before {
+      opacity: 1;
+      transform: translateX(120%);
+    }
+
+    #play .play-mode-card > span:nth-child(2) {
+      display: grid;
+      min-width: 0;
+      gap: 2px;
+    }
+
+    #play .play-mode-card strong {
+      overflow: hidden;
+      color: var(--soft);
+      font-size: 0.78rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #play .play-mode-icon {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 1px solid rgba(127, 166, 80, 0.28);
+      border-radius: 10px;
+      color: #d9ffc8;
+      background: linear-gradient(135deg, rgba(127, 166, 80, 0.28), rgba(111, 168, 220, 0.14));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      font-size: 1rem;
+      font-weight: 900;
+    }
+
+    #play .play-mode-card > b {
+      color: var(--gold);
+      font-size: 1.18rem;
+      line-height: 1;
+      transition: transform 180ms ease;
+    }
+
+    #play .play-mode-card:hover > b,
+    #play .play-mode-card:focus-visible > b { transform: translateX(2px); }
+
+    body:not(.friend-challenge-mode):not(.tournament-mode) #play:not(.is-review-mode) .play-mode-card[data-play-mode="ai"],
+    body.friend-challenge-mode #play .play-mode-card[data-play-mode="friend"],
+    body.tournament-mode #play .play-mode-card[data-play-mode="tournament"] {
+      border-color: rgba(231, 182, 93, 0.72);
+      background: linear-gradient(120deg, rgba(231, 182, 93, 0.18), rgba(127, 166, 80, 0.12));
+      box-shadow: inset 3px 0 0 var(--gold), 0 0 18px rgba(231, 182, 93, 0.12);
+    }
+
+    /* Board-first center rail: compact live setup without competing with the board. */
+    #play:not(.is-review-mode) .match-board-column,
+    #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+      grid-template-areas:
+        "setup"
+        "board"
+        "actions"
+        "opponent"
+        "player"
+        "options";
+    }
+
+    #play:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: opponent; }
+    #play:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: player; }
+    #play:not(.is-review-mode) .match-board-column > .play-board-wrap { grid-area: board; }
+
+    #play:not(.is-review-mode) .match-board-column > .coach-setup {
+      grid-area: setup;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      min-height: 44px;
+      padding: 6px 8px;
+      overflow-x: auto;
+      border: 1px solid rgba(224, 255, 191, 0.2);
+      border-radius: 14px;
+      background:
+        linear-gradient(115deg, rgba(127, 166, 80, 0.16), transparent 38%),
+        rgba(19, 25, 22, 0.86);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 22px rgba(0, 0, 0, 0.2);
+      scrollbar-width: thin;
+      white-space: nowrap;
+    }
+
+    #play .coach-setup-heading {
+      flex: 0 0 auto;
+      padding: 0 3px;
+    }
+
+    #play .coach-setup-heading strong {
+      color: var(--soft);
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    #play .coach-setup .coach-side-picker {
+      display: inline-grid;
+      flex: 0 0 auto;
+      width: auto;
+      grid-template-columns: repeat(2, auto);
+      gap: 3px;
+      padding: 2px;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 9px;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    #play .coach-setup .coach-side-picker .mission-button {
+      min-height: 28px;
+      padding: 4px 8px;
+      border: 0;
+      border-radius: 6px;
+      font-size: 0.7rem;
+    }
+
+    #play .play-setup-chip,
+    #play .coach-setup > .badge {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 8px;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.045);
+      font-size: 0.7rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    #play .coach-setup > #gameDifficultyBadge {
+      color: #e1ffd1;
+      border-color: rgba(127, 166, 80, 0.38);
+      background: rgba(127, 166, 80, 0.16);
+    }
+
+    #play .coach-setup > #gameTurnBadge {
+      color: #ffe5a6;
+      border-color: rgba(231, 182, 93, 0.25);
+    }
+
+    #play .coach-difficulty-menu {
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    #play .coach-difficulty-menu summary {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 8px;
+      cursor: pointer;
+      border: 1px solid rgba(255, 248, 237, 0.14);
+      border-radius: 8px;
+      color: var(--soft);
+      background: rgba(255, 255, 255, 0.055);
+      font-size: 0.7rem;
+      font-weight: 850;
+      list-style: none;
+    }
+
+    #play .coach-difficulty-menu summary::-webkit-details-marker { display: none; }
+
+    #play .coach-difficulty-menu[open] .coach-levels {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 7px);
+      right: 0;
+      display: grid;
+      width: min(360px, calc(100vw - 28px));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid rgba(255, 248, 237, 0.14);
+      border-radius: 12px;
+      background: rgba(20, 24, 22, 0.98);
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.32);
+    }
+
+    #play .coach-difficulty-menu:not([open]) .coach-levels { display: none; }
+
+    #play:not(.is-review-mode) .play-board-wrap {
+      border-radius: 20px;
+      box-shadow: 0 0 0 1px rgba(127, 166, 80, 0.26), 0 18px 38px rgba(0, 0, 0, 0.36), 0 0 28px rgba(102, 183, 89, 0.1);
+    }
+
+    /* Compact controls live below the player frames, not in the board's primary space. */
+    #play:not(.is-review-mode) .game-options-panel {
+      grid-area: options;
+      display: grid;
+      gap: 12px;
+      width: 100%;
+      padding: 14px;
+      border: 1px solid rgba(255, 248, 237, 0.14);
+      border-radius: 18px;
+      background:
+        linear-gradient(120deg, rgba(127, 166, 80, 0.1), transparent 42%),
+        rgba(18, 23, 21, 0.84);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 14px 28px rgba(0, 0, 0, 0.2);
+    }
+
+    #play .game-options-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #play .game-options-heading .section-kicker {
+      margin: 0;
+      color: var(--gold);
+      font-size: 0.66rem;
+      font-weight: 950;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    #play .game-options-heading h3 {
+      margin: 0 0 0 auto;
+      color: var(--soft);
+      font-size: 0.92rem;
+      line-height: 1;
+    }
+
+    #play .game-options-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    #play .game-options-grid label {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 0.66rem;
+      font-weight: 900;
+      letter-spacing: 0.035em;
+      text-transform: uppercase;
+    }
+
+    #play .game-options-grid select {
+      width: 100%;
+      min-height: 36px;
+      padding: 0 28px 0 9px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 248, 237, 0.12);
+      border-radius: 10px;
+      color: var(--soft);
+      background-color: rgba(0, 0, 0, 0.2);
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    #play .game-options-grid select:hover,
+    #play .game-options-grid select:focus-visible {
+      border-color: rgba(127, 166, 80, 0.6);
+      outline: none;
+      background-color: rgba(127, 166, 80, 0.1);
+      box-shadow: 0 0 0 3px rgba(127, 166, 80, 0.1);
+    }
+
+    #play .game-options-panel.is-emphasized {
+      border-color: rgba(231, 182, 93, 0.68);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 0 3px rgba(231, 182, 93, 0.12), 0 14px 28px rgba(0, 0, 0, 0.2);
+    }
+
+    @media (max-width: 699px) {
+      #play:not(.is-review-mode) .match-board-column > .coach-setup {
+        flex-wrap: wrap;
+        overflow-x: visible;
+        white-space: normal;
+      }
+
+      #play .game-options-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+      #play .coach-difficulty-menu[open] .coach-levels { right: auto; left: 0; }
+    }
+
+    /* Dedicated player frames keep identity, stats, and live match state readable. */
+    #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr) auto;
+      grid-template-areas:
+        "top top top"
+        "avatar identity clock"
+        "stats stats stats"
+        "description description description"
+        "footer footer footer";
+      gap: 10px 12px;
+      width: 100%;
+      min-height: 216px;
+      padding: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 248, 237, 0.14);
+      border-radius: 18px;
+      background:
+        linear-gradient(125deg, rgba(255, 248, 237, 0.065), transparent 38%),
+        linear-gradient(145deg, rgba(127, 166, 80, 0.1), rgba(13, 17, 15, 0.86));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 34px rgba(0, 0, 0, 0.24);
+    }
+
+    #play:not(.is-review-mode) .match-board-column > .player-frame--opponent {
+      border-color: color-mix(in srgb, var(--ai-rarity) 38%, rgba(255, 248, 237, 0.12));
+      background:
+        linear-gradient(125deg, color-mix(in srgb, var(--ai-rarity) 10%, transparent), transparent 42%),
+        linear-gradient(145deg, rgba(127, 166, 80, 0.08), rgba(13, 17, 15, 0.88));
+    }
+
+    #play .player-frame-topline {
+      grid-area: top;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 21px;
+      gap: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 248, 237, 0.09);
+    }
+
+    #play .player-frame-kicker {
+      color: var(--gold);
+      font-size: 0.68rem;
+      font-weight: 950;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    #play .player-frame-side,
+    #play .player-frame-topline .ai-player-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border: 1px solid rgba(127, 166, 80, 0.26);
+      border-radius: 999px;
+      color: var(--green);
+      background: rgba(127, 166, 80, 0.12);
+      font-size: 0.68rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    #play .player-frame--opponent.is-thinking .player-frame-topline .ai-player-status {
+      color: var(--gold);
+      border-color: rgba(231, 182, 93, 0.36);
+      background: rgba(231, 182, 93, 0.13);
+    }
+
+    #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
+      grid-area: avatar;
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      font-size: 1.38rem;
+    }
+
+    #play .player-frame > :is(.match-player-main, .ai-player-main) {
+      grid-area: identity;
+      align-self: center;
+      gap: 5px;
+    }
+
+    #play .player-frame > :is(.match-player-main, .ai-player-main) strong {
+      font-size: 1rem;
+    }
+
+    #play .player-frame > :is(.match-player-timer, .ai-player-timer) {
+      grid-area: clock;
+      min-width: 68px;
+      min-height: 36px;
+      font-size: 0.82rem;
+    }
+
+    #play .player-frame-stats {
+      grid-area: stats;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+      margin: 0;
+    }
+
+    #play .player-frame-stats > div {
+      min-width: 0;
+      min-height: 47px;
+      padding: 7px 8px;
+      border: 1px solid rgba(255, 248, 237, 0.075);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.16);
+    }
+
+    #play .player-frame-stats dt {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.62rem;
+      font-weight: 800;
+      line-height: 1.1;
+      text-transform: uppercase;
+    }
+
+    #play .player-frame-stats dd {
+      margin: 4px 0 0;
+      overflow: hidden;
+      color: var(--soft);
+      font-size: 0.75rem;
+      font-weight: 950;
+      line-height: 1.15;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #play .player-frame-description {
+      grid-area: description;
+      min-height: 32px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    #play .player-frame-footer,
+    #play .player-frame .match-player-meta {
+      grid-area: footer;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 27px;
+      margin: 0;
+      overflow: visible;
+    }
+
+    #play .player-frame .match-player-meta [data-match-side],
+    #play .player-frame .match-player-meta [data-match-rating] { display: none; }
+
+    #play .player-frame-footer :is(.ai-player-move, .ai-player-last),
+    #play .player-frame-record,
+    #play .player-frame .match-player-meta .match-player-pill {
+      position: static;
+      display: inline-flex;
+      align-items: center;
+      min-height: 25px;
+      max-width: none;
+      padding: 4px 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 248, 237, 0.1);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.16);
+      font-size: 0.66rem;
+      font-weight: 850;
+      line-height: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #play .player-frame .match-player-meta .is-premium[hidden] { display: none !important; }
+
+    #play .player-frame-footer .ai-player-move,
+    #play .player-frame .match-player-online { color: var(--green); }
+
+    /* Centered quick actions: primary play control first, utility controls close by. */
+    #play:not(.is-review-mode) .play-bottom-actionbar {
+      justify-self: stretch;
+      align-self: start;
+      min-width: 0;
+      overflow: visible;
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions {
+      position: static;
+      display: grid;
+      grid-template-columns: minmax(154px, 1.65fr) repeat(4, minmax(0, 1fr)) auto;
+      gap: 8px;
+      padding: 0;
+      overflow: visible;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions > .button,
+    #play:not(.is-review-mode) .play-extra-actions summary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      min-height: 42px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 0.72rem;
+      font-weight: 900;
+      line-height: 1.1;
+      text-align: center;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions .play-start-button {
+      gap: 7px;
+      border-color: rgba(174, 228, 104, 0.7);
+      color: #14210e;
+      background: linear-gradient(135deg, #a9d65e, #70a33d);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 7px 16px rgba(82, 143, 49, 0.24);
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions .play-start-button:hover,
+    #play:not(.is-review-mode) .play-primary-actions .play-start-button:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 10px 20px rgba(82, 143, 49, 0.34);
+    }
+
+    #play:not(.is-review-mode) .play-extra-actions {
+      position: relative;
+      align-self: stretch;
+    }
+
+    #play:not(.is-review-mode) .play-extra-actions summary {
+      height: 100%;
+      cursor: pointer;
+      border: 1px solid rgba(255, 248, 237, 0.16);
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.045);
+      list-style: none;
+    }
+
+    #play:not(.is-review-mode) .play-extra-actions summary::-webkit-details-marker { display: none; }
+
+    #play:not(.is-review-mode) .play-extra-actions-menu {
+      position: absolute;
+      z-index: 26;
+      right: 0;
+      bottom: calc(100% + 9px);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(118px, 1fr));
+      gap: 7px;
+      width: min(320px, calc(100vw - 28px));
+      padding: 9px;
+      border: 1px solid rgba(255, 248, 237, 0.15);
+      border-radius: 14px;
+      background: rgba(20, 24, 22, 0.98);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+    }
+
+    #play:not(.is-review-mode) .play-extra-actions:not([open]) .play-extra-actions-menu { display: none; }
+
+    #play:not(.is-review-mode) .play-extra-actions-menu .button {
+      min-height: 36px;
+      padding: 7px 8px;
+      font-size: 0.7rem;
+    }
+
+    @media (max-width: 1180px) {
+      #play:not(.is-review-mode) .play-primary-actions {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      #play:not(.is-review-mode) .play-primary-actions .play-start-button { grid-column: span 2; }
+    }
+
+    @media (max-width: 760px) {
+      #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
+        min-height: 0;
+        grid-template-columns: 50px minmax(0, 1fr) auto;
+        padding: 11px;
+      }
+
+      #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+      }
+
+      #play .player-frame-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+      #play:not(.is-review-mode) .play-primary-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      #play:not(.is-review-mode) .play-primary-actions .play-start-button { grid-column: span 2; }
+
+      #play:not(.is-review-mode) .play-extra-actions-menu {
+        right: 0;
+        grid-template-columns: 1fr;
+        width: min(260px, calc(100vw - 28px));
+      }
+    }
+
+    @media (max-width: 420px) {
+      #play .player-frame-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #play .game-options-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Final Play-only finish: quiet glass, navy depth, and restrained green-gold energy. */
+    #play:not(.is-review-mode) {
+      position: relative;
+      isolation: isolate;
+      background:
+        radial-gradient(900px 440px at 50% 24%, rgba(47, 115, 91, 0.13), transparent 66%),
+        radial-gradient(620px 360px at 83% 18%, rgba(207, 166, 81, 0.07), transparent 70%),
+        linear-gradient(180deg, #0c1522 0%, #0a111c 62%, #080e17 100%);
+    }
+
+    #play:not(.is-review-mode)::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(176, 210, 197, 0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(176, 210, 197, 0.022) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), transparent 76%);
+    }
+
+    #play:not(.is-review-mode) .section-head {
+      margin-bottom: 18px;
+      padding: 4px 2px;
+    }
+
+    #play:not(.is-review-mode) .section-head h2 {
+      color: #f5f7f2;
+      letter-spacing: 0;
+    }
+
+    #play:not(.is-review-mode) .section-intro { color: #9aa8b8; }
+
+    #play:not(.is-review-mode) .play-shell {
+      padding: clamp(16px, 1.7vw, 24px);
+      border: 1px solid rgba(199, 220, 212, 0.11);
+      border-radius: 18px;
+      background:
+        linear-gradient(135deg, rgba(42, 69, 80, 0.28), rgba(12, 21, 33, 0.72) 48%, rgba(10, 17, 27, 0.88)),
+        rgba(8, 15, 24, 0.82);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 22px 54px rgba(0, 0, 0, 0.26);
+      backdrop-filter: blur(16px) saturate(112%);
+    }
+
+    #play:not(.is-review-mode) :is(.play-mode-nav, .player-frame, .game-options-panel, .coach-panel, .play-bottom-actionbar) {
+      border-color: rgba(199, 220, 212, 0.12);
+      background-color: rgba(12, 23, 33, 0.72);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 14px 30px rgba(0, 0, 0, 0.18);
+      backdrop-filter: blur(14px) saturate(108%);
+    }
+
+    #play:not(.is-review-mode) .play-mode-nav,
+    #play:not(.is-review-mode) .game-options-panel,
+    #play:not(.is-review-mode) .play-bottom-actionbar { border-radius: 16px; }
+
+    #play:not(.is-review-mode) .play-right-sidebar .coach-panel {
+      border-radius: 18px;
+      background:
+        linear-gradient(160deg, rgba(31, 61, 67, 0.24), transparent 48%),
+        rgba(10, 20, 29, 0.76);
+    }
+
+    #play:not(.is-review-mode) .play-mode-card {
+      border-color: rgba(199, 220, 212, 0.1);
+      background: linear-gradient(135deg, rgba(36, 58, 67, 0.44), rgba(12, 22, 31, 0.66));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+      transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    #play:not(.is-review-mode) .play-mode-card:hover,
+    #play:not(.is-review-mode) .play-mode-card:focus-visible {
+      transform: translateY(-2px);
+      border-color: rgba(126, 190, 127, 0.42);
+      background: linear-gradient(135deg, rgba(56, 92, 78, 0.52), rgba(12, 23, 33, 0.76));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 12px 22px rgba(0, 0, 0, 0.18);
+    }
+
+    #play:not(.is-review-mode) .play-board-wrap {
+      border: 1px solid rgba(213, 184, 112, 0.26);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(255, 232, 172, 0.08), rgba(48, 121, 91, 0.12));
+      box-shadow: 0 0 0 5px rgba(10, 22, 30, 0.54), 0 22px 46px rgba(0, 0, 0, 0.38), 0 0 24px rgba(87, 168, 111, 0.1);
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions .button:not(.play-start-button),
+    #play:not(.is-review-mode) .play-extra-actions summary {
+      border-color: rgba(199, 220, 212, 0.13);
+      color: #d9e2e5;
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions .button:not(.play-start-button):hover,
+    #play:not(.is-review-mode) .play-primary-actions .button:not(.play-start-button):focus-visible,
+    #play:not(.is-review-mode) .play-extra-actions summary:hover {
+      border-color: rgba(126, 190, 127, 0.46);
+      color: #f7faf6;
+      background: rgba(126, 190, 127, 0.12);
+      transform: translateY(-1px);
+    }
+
+    #play:not(.is-review-mode) .button:focus-visible,
+    #play:not(.is-review-mode) select:focus-visible,
+    #play:not(.is-review-mode) summary:focus-visible {
+      outline: 2px solid rgba(214, 181, 100, 0.86);
+      outline-offset: 2px;
+    }
+
+    /* Board-first hierarchy: supporting controls deliberately recede. */
+    #play:not(.is-review-mode) .match-board-column {
+      z-index: 3;
+    }
+
+    #play:not(.is-review-mode) .play-board-wrap {
+      position: relative;
+      z-index: 4;
+    }
+
+    #play:not(.is-review-mode) .player-frame {
+      position: relative;
+      z-index: 3;
+    }
+
+    #play:not(.is-review-mode) .match-board-column > .coach-setup {
+      position: relative;
+      z-index: 2;
+      background: rgba(12, 23, 33, 0.7);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    }
+
+    #play:not(.is-review-mode) .game-options-panel {
+      position: relative;
+      z-index: 1;
+      background:
+        linear-gradient(120deg, rgba(88, 133, 103, 0.06), transparent 48%),
+        rgba(10, 20, 29, 0.58);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 22px rgba(0, 0, 0, 0.13);
+    }
+
+    #play:not(.is-review-mode) .play-left-sidebar {
+      z-index: 1;
+    }
+
+    #play:not(.is-review-mode) .play-mode-nav {
+      gap: 6px;
+      padding: 8px;
+      background: rgba(9, 18, 27, 0.54);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+    }
+
+    #play:not(.is-review-mode) .play-mode-card {
+      min-height: 52px;
+      background: rgba(20, 34, 43, 0.48);
+      box-shadow: none;
+    }
+
+    #play:not(.is-review-mode) .play-mode-card .play-mode-icon {
+      opacity: 0.82;
+      filter: saturate(0.84);
+    }
+
+    #play:not(.is-review-mode) .play-mode-card small,
+    #play:not(.is-review-mode) .play-mode-card > b { color: #8190a0; }
+
+    #play:not(.is-review-mode) .play-mode-card:hover .play-mode-icon,
+    #play:not(.is-review-mode) .play-mode-card:focus-visible .play-mode-icon {
+      opacity: 1;
+      filter: saturate(1);
+    }
+
+    /* Responsive reading order keeps the playable board ahead of supporting panels. */
+    @media (min-width: 700px) and (max-width: 1180px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center"
+          "right"
+          "left"
+          "actions";
+        grid-template-columns: minmax(0, 1fr) !important;
+        justify-items: stretch;
+      }
+
+      #play:not(.is-review-mode) .match-board-column,
+      #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+        grid-template-areas:
+          "board"
+          "opponent"
+          "player"
+          "setup"
+          "options";
+      }
+
+      #play:not(.is-review-mode) .play-board-wrap {
+        width: min(100%, var(--user-board-size));
+      }
+
+      #play:not(.is-review-mode) .match-board-column { max-height: none; }
+
+      #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar, .play-bottom-actionbar) {
+        width: min(100%, var(--user-board-size));
+        justify-self: center;
+      }
+    }
+
+    @media (max-width: 699px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center"
+          "left"
+          "actions"
+          "right";
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 12px;
+        padding: 10px;
+      }
+
+      #play:not(.is-review-mode) .match-board-column,
+      #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+        grid-template-areas:
+          "board"
+          "player"
+          "opponent"
+          "setup"
+          "options";
+        gap: 10px;
+      }
+
+      #play:not(.is-review-mode) .play-board-wrap {
+        width: min(100%, var(--user-board-size));
+        max-width: none;
+      }
+
+      #play:not(.is-review-mode) .match-board-column { max-height: none; }
+
+      #play:not(.is-review-mode) :is(.match-player-card, .ai-player-card, .game-options-panel, .play-left-sidebar, .play-right-sidebar, .play-bottom-actionbar) {
+        width: 100%;
+        max-width: none;
+      }
+    }
+
+    @keyframes playSurfaceEnter {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Short, quiet motion cues for the Play workspace. */
+    #play:not(.is-review-mode) .play-shell > :is(.play-left-sidebar, .match-board-column, .play-right-sidebar, .play-bottom-actionbar) {
+      animation: playSurfaceEnter 200ms ease-out both;
+    }
+
+    #play:not(.is-review-mode) .match-board-column { animation-delay: 20ms; }
+    #play:not(.is-review-mode) .play-right-sidebar { animation-delay: 45ms; }
+    #play:not(.is-review-mode) .play-bottom-actionbar { animation-delay: 70ms; }
+
+    #play:not(.is-review-mode) :is(.play-mode-card, .player-frame, .game-options-panel, .featured-coach-card, .play-bottom-actionbar) {
+      transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+    }
+
+    #play:not(.is-review-mode) :is(.player-frame, .game-options-panel, .featured-coach-card):hover {
+      border-color: rgba(126, 190, 127, 0.3);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 16px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    #play:not(.is-review-mode) :is(.button, .play-extra-actions summary) {
+      transition: transform 150ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    #play:not(.is-review-mode) :is(.button, .play-extra-actions summary):active {
+      transform: translateY(1px) scale(0.985);
+    }
+
+    #play:not(.is-review-mode) .play-mode-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      background: linear-gradient(115deg, transparent 18%, rgba(212, 239, 204, 0.07) 50%, transparent 82%);
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+
+    #play:not(.is-review-mode) .play-mode-card:hover::after,
+    #play:not(.is-review-mode) .play-mode-card:focus-visible::after { opacity: 1; }
+
+    /* Keep interaction motion on the compositor without adding new UI work. */
+    #play:not(.is-review-mode) :is(.play-board-wrap, .player-frame, .play-mode-card, .play-primary-actions .button) {
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+
+    body.low-performance #play:not(.is-review-mode) :is(.play-shell, .player-frame, .game-options-panel, .coach-panel, .play-bottom-actionbar) {
+      backdrop-filter: none;
+    }
+
+    @media (max-width: 699px) {
+      #play:not(.is-review-mode) :is(.play-shell, .player-frame, .game-options-panel, .coach-panel, .play-bottom-actionbar) {
+        backdrop-filter: none;
+      }
+    }
+
+    /* Accessibility safeguards stay scoped to the redesigned Play workspace. */
+    #play:not(.is-review-mode) :is(button, a, select, summary) { touch-action: manipulation; }
+
+    #play:not(.is-review-mode) :is(.play-mode-card, .play-primary-actions .button, .play-extra-actions summary, .game-options-grid select):focus-visible {
+      outline: 3px solid var(--gold);
+      outline-offset: 3px;
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions .button,
+    #play:not(.is-review-mode) .play-extra-actions summary {
+      font-size: clamp(0.72rem, 1.6vw, 0.82rem);
+    }
+
+    body.high-contrast #play:not(.is-review-mode) :is(.play-shell, .player-frame, .game-options-panel, .coach-panel, .play-bottom-actionbar, .play-mode-nav, .play-mode-card) {
+      border-color: rgba(255, 255, 255, 0.72);
+      background: #101a24;
+      box-shadow: none;
+    }
+
+    body.high-contrast #play:not(.is-review-mode) :is(.play-board-wrap, .play-start-button) {
+      border-color: #ffe95a;
+      box-shadow: 0 0 0 3px rgba(255, 233, 90, 0.28);
+    }
+
+    body.high-contrast #play:not(.is-review-mode) :is(.player-frame-kicker, .game-options-heading .section-kicker) { color: #ffe95a; }
+
+    @media (forced-colors: active) {
+      #play:not(.is-review-mode) :is(.play-shell, .player-frame, .game-options-panel, .coach-panel, .play-bottom-actionbar, .play-mode-nav, .play-mode-card, .play-primary-actions .button, .play-extra-actions summary) {
+        color: CanvasText;
+        border-color: CanvasText;
+        background: Canvas;
+        box-shadow: none;
+        forced-color-adjust: auto;
+      }
+
+      #play:not(.is-review-mode) .play-start-button {
+        color: HighlightText;
+        border-color: Highlight;
+        background: Highlight;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #play:not(.is-review-mode) .play-mode-card,
+      #play:not(.is-review-mode) .play-primary-actions .button { transition: none; }
+      #play:not(.is-review-mode) .play-shell > :is(.play-left-sidebar, .match-board-column, .play-right-sidebar, .play-bottom-actionbar) { animation: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #play .play-mode-card,
+      #play .play-mode-card::before,
+      #play .play-mode-card > b { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -22929,89 +24059,6 @@
           <p class="section-intro">Practice one friendly game at a time. Legal moves, checks, checkmate, castling, en passant, promotion, and draws are handled by chess.js.</p>
         </div>
 
-        <div class="preference-panel" id="learnerPreferences">
-          <h3>Board style</h3>
-          <div class="preference-grid">
-            <label>Mode
-              <select id="prefTheme">
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-              </select>
-            </label>
-            <label>Board
-              <select id="prefBoard">
-                <option value="wood">Wooden</option>
-                <option value="marble">Marble</option>
-                <option value="neon">Neon</option>
-                <option value="forest">Forest Quest</option>
-                <option value="sky">Sky Kingdom</option>
-                <option value="dragon">Dragon Realm</option>
-                <option value="ocean">Ocean Tactics</option>
-                <option value="midnight">Midnight Gold</option>
-                <option value="candy">Candy Quest</option>
-                <option value="slate">Slate Arena</option>
-                <option value="sunrise">Sunrise Puzzle</option>
-                <option value="tournamentPro">Tournament Board</option>
-                <option value="royalCourt">Royal Board Theme</option>
-              </select>
-            </label>
-            <label>Pieces
-              <select id="prefPieces">
-                <option value="classic">Classic</option>
-                <option value="letter">Letters</option>
-              </select>
-            </label>
-            <label>Coordinates
-              <select id="prefCoords">
-                <option value="on">On</option>
-                <option value="off">Off</option>
-              </select>
-            </label>
-            <label>Board Size
-              <select id="prefBoardSize">
-                <option value="small">Small</option>
-                <option value="medium">Medium</option>
-                <option value="large">Large</option>
-                <option value="xl">Extra Large</option>
-              </select>
-            </label>
-            <label class="board-size-slider">Fine resize
-              <input id="prefBoardScale" type="range" min="82" max="122" step="2" value="100" aria-label="Fine board size" />
-            </label>
-            <label>Border
-              <select id="prefBoardBorder">
-                <option value="classic">Classic Wood</option>
-              </select>
-            </label>
-            <label>Animation
-              <select id="prefSpeed">
-                <option value="normal">Normal</option>
-                <option value="slow">Slow</option>
-                <option value="fast">Fast</option>
-              </select>
-            </label>
-            <label>Motion
-              <select id="prefMotion">
-                <option value="system">Use device setting</option>
-                <option value="reduced">Reduced motion</option>
-              </select>
-            </label>
-            <label>Contrast
-              <select id="prefContrast">
-                <option value="normal">Normal</option>
-                <option value="high">High contrast</option>
-              </select>
-            </label>
-            <label>No pressure
-              <select id="prefPressure">
-                <option value="on">On</option>
-                <option value="off">Off</option>
-              </select>
-            </label>
-          </div>
-          <p class="preference-note" id="motivationMessage">Every master was once a beginner.</p>
-        </div>
-
         <div class="friend-lobby" id="friendChallenge" aria-labelledby="friendChallengeTitle">
           <div class="friend-lobby-head">
             <div>
@@ -23141,19 +24188,115 @@
         </section>
 
         <div class="puzzle-shell play-shell">
+          <aside class="play-left-sidebar" aria-label="Board preferences">
+            <nav class="play-mode-nav" aria-label="Game modes">
+              <div class="play-mode-head"><strong>Game modes</strong><small>Choose how you want to play</small></div>
+              <a class="play-mode-card" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="ai">
+                <span class="play-mode-icon" aria-hidden="true">♞</span><span><strong>Play AI</strong><small>Train with a coach</small></span><b aria-hidden="true">›</b>
+              </a>
+              <a class="play-mode-card" href="#play?mode=quick" data-site-tab="play" data-site-panel="play" data-play-mode="quick">
+                <span class="play-mode-icon" aria-hidden="true">⚡</span><span><strong>Quick Match</strong><small>Start a focused game</small></span><b aria-hidden="true">›</b>
+              </a>
+              <a class="play-mode-card" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge" data-play-mode="friend">
+                <span class="play-mode-icon" aria-hidden="true">♟</span><span><strong>Friendly Challenge</strong><small>Invite a chess friend</small></span><b aria-hidden="true">›</b>
+              </a>
+              <a class="play-mode-card" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby" data-play-mode="tournament">
+                <span class="play-mode-icon" aria-hidden="true">♛</span><span><strong>Tournaments</strong><small>Join a live event</small></span><b aria-hidden="true">›</b>
+              </a>
+              <a class="play-mode-card" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge" data-play-mode="custom">
+                <span class="play-mode-icon" aria-hidden="true">+</span><span><strong>Custom Match</strong><small>Choose color and clock</small></span><b aria-hidden="true">›</b>
+              </a>
+            </nav>
+            <div class="preference-panel" id="learnerPreferences">
+              <h3>Board style</h3>
+              <div class="preference-grid">
+                <label>Mode
+                  <select id="prefTheme"><option value="dark">Dark</option><option value="light">Light</option></select>
+                </label>
+                <label>Coordinates
+                  <select id="prefCoords"><option value="on">On</option><option value="off">Off</option></select>
+                </label>
+                <label class="board-size-slider">Fine resize
+                  <input id="prefBoardScale" type="range" min="82" max="122" step="2" value="100" aria-label="Fine board size" />
+                </label>
+                <label>Border
+                  <select id="prefBoardBorder"><option value="classic">Classic Wood</option></select>
+                </label>
+                <label>Animation
+                  <select id="prefSpeed"><option value="normal">Normal</option><option value="slow">Slow</option><option value="fast">Fast</option></select>
+                </label>
+                <label>Motion
+                  <select id="prefMotion"><option value="system">Use device setting</option><option value="reduced">Reduced motion</option></select>
+                </label>
+                <label>Contrast
+                  <select id="prefContrast"><option value="normal">Normal</option><option value="high">High contrast</option></select>
+                </label>
+                <label>No pressure
+                  <select id="prefPressure"><option value="on">On</option><option value="off">Off</option></select>
+                </label>
+              </div>
+              <p class="preference-note" id="motivationMessage">Every master was once a beginner.</p>
+            </div>
+          </aside>
           <div class="match-board-column" data-board-orientation="white">
-            <aside class="ai-player-card" id="aiPlayerCard" data-ai-rarity="Common" aria-label="AI player header">
+            <div class="coach-setup" aria-label="Game setup">
+              <div class="coach-setup-heading"><strong>Game setup</strong></div>
+              <div class="mission-selector puzzle-plan-selector coach-levels coach-side-picker" role="group" aria-label="Choose your pieces">
+                <button class="mission-button" type="button" data-coach-side="w" aria-pressed="true">White</button>
+                <button class="mission-button" type="button" data-coach-side="b" aria-pressed="false">Black</button>
+              </div>
+              <span class="play-setup-chip">Casual</span>
+              <span class="play-setup-chip">Stockfish WASM</span>
+              <span class="badge" id="gameDifficultyBadge">Easy coach</span>
+              <span class="play-setup-chip" id="gameEloBadge">1050 Elo</span>
+              <span class="badge status-skeleton" id="gameStatusBadge" aria-label="Loading chess rules"><span class="sr-only">Loading chess rules.</span></span>
+              <span class="badge" id="gameTurnBadge">White to move</span>
+              <span class="badge" id="gameBossBadge" hidden>Boss battle</span>
+              <details class="coach-difficulty-menu">
+                <summary>Difficulty</summary>
+                <div class="mission-selector puzzle-plan-selector coach-levels" role="group" aria-label="AI difficulty">
+                  <button class="mission-button" type="button" data-game-difficulty="beginner" aria-pressed="false">Beginner</button>
+                  <button class="mission-button" type="button" data-game-difficulty="easy" aria-pressed="true">Easy</button>
+                  <button class="mission-button" type="button" data-game-difficulty="medium" aria-pressed="false">Medium</button>
+                  <button class="mission-button" type="button" data-game-difficulty="hard" aria-pressed="false">Hard</button>
+                  <button class="mission-button" type="button" data-game-difficulty="expert" aria-pressed="false">Expert</button>
+                  <button class="mission-button" type="button" data-game-difficulty="master" aria-pressed="false">Master</button>
+                  <button class="mission-button" type="button" data-game-difficulty="strong" aria-pressed="false">2000 Bot</button>
+                </div>
+              </details>
+            </div>
+            <aside class="ai-player-card player-frame player-frame--opponent" id="aiPlayerCard" data-ai-rarity="Common" aria-label="Opponent player frame">
+              <div class="player-frame-topline">
+                <span class="player-frame-kicker">Opponent</span>
+                <span class="ai-player-status" id="aiPlayerStatus">Online</span>
+              </div>
               <span class="ai-player-avatar" id="aiPlayerAvatar" aria-hidden="true">♟</span>
               <span class="ai-player-main">
                 <strong><span id="aiPlayerFlag" class="player-country-flag" data-country-code="GB">🇬🇧</span><span id="aiPlayerName">Club Tutor</span></strong>
                 <small><span id="aiPlayerTitle">Novice Student</span> • <span id="aiPlayerRating">1050 Elo</span></small>
               </span>
               <span class="ai-player-timer" id="aiPlayerTimer" aria-label="Opponent game clock">00:00</span>
-              <span class="ai-player-move" id="aiMoveIndicator">Black</span>
-              <span class="ai-player-status" id="aiPlayerStatus">Online</span>
-              <span class="ai-player-last" id="aiLastMove">Last: --</span>
+              <dl class="player-frame-stats player-frame-stats--opponent" aria-label="Opponent details">
+                <div><dt>Engine</dt><dd data-ai-stat="engine">Stockfish 16</dd></div>
+                <div><dt>Difficulty</dt><dd data-ai-stat="difficulty">Easy engine</dd></div>
+                <div><dt>Elo</dt><dd data-ai-stat="rating">1050 Elo</dd></div>
+                <div><dt>Style</dt><dd data-ai-stat="style">Balanced</dd></div>
+                <div><dt>Strength</dt><dd data-ai-stat="strength">Skill 3/20</dd></div>
+                <div><dt>Level</dt><dd data-ai-stat="level">Novice</dd></div>
+              </dl>
+              <p class="player-frame-description" data-ai-description>A calm opponent that develops safely and looks for practical tactics.</p>
+              <div class="player-frame-footer">
+                <span class="ai-player-move" id="aiMoveIndicator">Black</span>
+                <span class="ai-player-last" id="aiLastMove">Last: --</span>
+                <span class="player-frame-record" data-ai-games>0 games</span>
+                <span class="player-frame-record" data-ai-win-rate>-- win rate</span>
+              </div>
             </aside>
-            <aside class="match-player-card" id="matchPlayerCard" aria-label="In-game player card">
+            <aside class="match-player-card player-frame player-frame--you" id="matchPlayerCard" aria-label="Your player frame">
+              <div class="player-frame-topline">
+                <span class="player-frame-kicker">You</span>
+                <span class="player-frame-side" data-match-frame-side>White</span>
+              </div>
               <span class="match-player-avatar" data-match-avatar aria-hidden="true">?</span>
               <span class="match-player-main">
                 <strong class="match-player-name-line"><span data-match-name>Player</span></strong>
@@ -23165,7 +24308,18 @@
                 <span class="match-player-pill" data-match-rating>450 Elo</span>
                 <span class="match-player-pill is-premium" data-match-premium hidden>Premium</span>
                 <span class="match-player-pill match-player-online" data-match-online>Online</span>
+                <span class="player-frame-record" data-match-frame-status>Ready</span>
               </span>
+              <dl class="player-frame-stats" aria-label="Your game statistics">
+                <div><dt>Elo</dt><dd data-match-frame-stat="rating">450</dd></div>
+                <div><dt>Games</dt><dd data-match-frame-stat="games">0</dd></div>
+                <div><dt>Wins</dt><dd data-match-frame-stat="wins">0</dd></div>
+                <div><dt>Losses</dt><dd data-match-frame-stat="losses">0</dd></div>
+                <div><dt>Draws</dt><dd data-match-frame-stat="draws">0</dd></div>
+                <div><dt>Win rate</dt><dd data-match-frame-stat="win-rate">0%</dd></div>
+                <div><dt>Best rating</dt><dd data-match-frame-stat="best-rating">450</dd></div>
+              </dl>
+              <p class="player-frame-description" data-match-description>Ready for a focused game.</p>
             </aside>
             <div class="puzzle-board-wrap play-board-wrap" aria-label="Playable chess board">
               <div class="review-eval-rail" id="reviewEvalRail" aria-label="Review evaluation bar" hidden>
@@ -23177,33 +24331,70 @@
               </div>
               <div class="puzzle-board play-board" id="coachBoard" role="grid" aria-label="Player versus AI chess board"></div>
             </div>
-          </div>
-          <div class="puzzle-info coach-panel">
-            <div class="coach-setup" aria-label="Game setup">
-              <div class="coach-setup-heading">
-                <strong>Game setup</strong>
-                <small>Choose a coach and your side.</small>
-              </div>
-              <div class="puzzle-meta">
-                <span class="badge" id="gameTurnBadge">White to move</span>
-                <span class="badge status-skeleton" id="gameStatusBadge" aria-label="Loading chess rules"><span class="sr-only">Loading chess rules.</span></span>
-                <span class="badge" id="gameDifficultyBadge">Easy coach</span>
-                <span class="badge" id="gameBossBadge" hidden>Boss battle</span>
-              </div>
-              <div class="mission-selector puzzle-plan-selector coach-levels" role="group" aria-label="AI difficulty">
-                <button class="mission-button" type="button" data-game-difficulty="beginner" aria-pressed="false">Beginner</button>
-                <button class="mission-button" type="button" data-game-difficulty="easy" aria-pressed="true">Easy</button>
-                <button class="mission-button" type="button" data-game-difficulty="medium" aria-pressed="false">Medium</button>
-                <button class="mission-button" type="button" data-game-difficulty="hard" aria-pressed="false">Hard</button>
-                <button class="mission-button" type="button" data-game-difficulty="expert" aria-pressed="false">Expert</button>
-                <button class="mission-button" type="button" data-game-difficulty="master" aria-pressed="false">Master</button>
-                <button class="mission-button" type="button" data-game-difficulty="strong" aria-pressed="false">2000 Bot</button>
-              </div>
-              <div class="mission-selector puzzle-plan-selector coach-levels coach-side-picker" role="group" aria-label="Choose your pieces">
-                <button class="mission-button" type="button" data-coach-side="w" aria-pressed="true">Play White</button>
-                <button class="mission-button" type="button" data-coach-side="b" aria-pressed="false">Play Black</button>
+            <div class="play-bottom-actionbar" aria-label="Game controls">
+              <div class="puzzle-actions play-actions play-primary-actions">
+                <button class="button play-start-button" type="button" id="restartGame"><span aria-hidden="true">&#9654;</span> Start Game</button>
+                <button class="button secondary" type="button" id="flipGame">Flip Board</button>
+                <button class="button secondary" type="button" id="openBoardEditor">Board Editor</button>
+                <a class="button secondary" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Invite Friend</a>
+                <a class="button secondary" href="#settings" data-site-tab="settings" data-site-panel="settings">Settings</a>
+                <details class="play-extra-actions">
+                  <summary aria-label="More game controls">More</summary>
+                  <div class="play-extra-actions-menu">
+                    <button class="button secondary" type="button" id="undoGame">Undo</button>
+                    <button class="button secondary" type="button" id="toggleBot">Bot On</button>
+                    <button class="button secondary" type="button" id="whyGame">Why?</button>
+                    <button class="button secondary" type="button" id="replayMistake">Replay Mistake</button>
+                    <button class="button secondary" type="button" id="showThreats">Threats</button>
+                    <button class="button secondary" type="button" id="offerDraw">Offer Draw</button>
+                    <button class="button secondary" type="button" id="acceptDraw" hidden>Accept Draw</button>
+                    <button class="button secondary" type="button" id="declineDraw" hidden>Decline</button>
+                    <button class="button secondary" type="button" id="abortGame">Abort</button>
+                    <button class="button secondary" type="button" id="resignGame">Resign</button>
+                    <button class="button secondary" type="button" id="returnLobby">Lobby</button>
+                    <button class="button" type="button" id="exportPgn">Copy PGN</button>
+                    <button class="button secondary" type="button" id="importPgn">Import PGN</button>
+                  </div>
+                </details>
               </div>
             </div>
+            <section class="game-options-panel" aria-labelledby="gameOptionsTitle">
+              <div class="game-options-heading">
+                <span class="section-kicker">Match settings</span>
+                <h3 id="gameOptionsTitle">Game options</h3>
+              </div>
+              <div class="game-options-grid">
+                <label>Time control
+                  <select id="playTimeControl" aria-label="Time control">
+                    <option value="3">3 minutes</option><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="15">15 minutes</option>
+                  </select>
+                </label>
+                <label>Increment
+                  <select id="playIncrement" aria-label="Increment">
+                    <option value="0" selected>0 seconds</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="5">5 seconds</option><option value="10">10 seconds</option>
+                  </select>
+                </label>
+                <label>Rated
+                  <select id="playMatchType" aria-label="Game type"><option value="casual" selected>Casual</option><option value="rated">Rated</option></select>
+                </label>
+                <label>Engine
+                  <select id="playEngine" aria-label="Chess engine"><option value="stockfish16" selected>Stockfish 16 Lite</option></select>
+                </label>
+                <label>Board theme
+                  <select id="prefBoard">
+                    <option value="wood">Wooden</option><option value="marble">Marble</option><option value="neon">Neon</option><option value="forest">Forest Quest</option><option value="sky">Sky Kingdom</option><option value="dragon">Dragon Realm</option><option value="ocean">Ocean Tactics</option><option value="midnight">Midnight Gold</option><option value="candy">Candy Quest</option><option value="slate">Slate Arena</option><option value="sunrise">Sunrise Puzzle</option><option value="tournamentPro">Tournament Board</option><option value="royalCourt">Royal Board Theme</option>
+                  </select>
+                </label>
+                <label>Piece set
+                  <select id="prefPieces"><option value="classic">Classic</option><option value="letter">Letters</option></select>
+                </label>
+                <label>Board size
+                  <select id="prefBoardSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="xl">Extra Large</option></select>
+                </label>
+              </div>
+            </section>
+          </div>
+          <aside class="puzzle-info coach-panel play-right-sidebar">
             <article class="featured-coach-card" aria-label="KingNorbert Coach Bot profile">
               <span class="featured-coach-avatar" data-coach-avatar="assets/kingnorbert-coach.png" data-coach-fallback="KN" role="img" aria-label="KingNorbert Coach Bot"></span>
               <div class="featured-coach-copy">
@@ -23227,23 +24418,6 @@
                 <span>Eval <strong id="engineEvalText">0.00</strong></span>
                 <span>Best <strong id="engineBestMove">--</strong></span>
               </div>
-            </div>
-            <div class="puzzle-actions play-actions">
-              <button class="button secondary" type="button" id="undoGame">Undo</button>
-              <button class="button secondary" type="button" id="toggleBot">Bot On</button>
-              <button class="button secondary" type="button" id="restartGame">Restart</button>
-              <button class="button secondary" type="button" id="flipGame">Flip Board</button>
-              <button class="button secondary" type="button" id="whyGame">Why?</button>
-              <button class="button secondary" type="button" id="replayMistake">Replay Mistake</button>
-              <button class="button secondary" type="button" id="showThreats">Threats</button>
-              <button class="button secondary" type="button" id="offerDraw">Offer Draw</button>
-              <button class="button secondary" type="button" id="acceptDraw" hidden>Accept Draw</button>
-              <button class="button secondary" type="button" id="declineDraw" hidden>Decline</button>
-              <button class="button secondary" type="button" id="abortGame">Abort</button>
-              <button class="button secondary" type="button" id="resignGame">Resign</button>
-              <button class="button secondary" type="button" id="returnLobby">Lobby</button>
-              <button class="button" type="button" id="exportPgn">Copy PGN</button>
-              <button class="button secondary" type="button" id="importPgn">Import PGN</button>
             </div>
             <details class="coach-library">
               <summary><span>More opponents</span><small>Friendly bots and story battles</small></summary>
@@ -23372,7 +24546,7 @@
                 <button class="button secondary" type="submit">Send</button>
               </form>
             </section>
-          </div>
+          </aside>
         </div>
       </div>
     </section>
@@ -26508,6 +27682,9 @@
     let realPuzzlePrefetchQueued = false;
     let realPuzzleCollectionLoaded = false;
     let realPuzzleAutoNextTimer = 0;
+    let realPuzzleReplyTimer = 0;
+    let realPuzzleReplyResolver = null;
+    let realPuzzleCompletionTransitionId = -1;
     let streak = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.streak) || 0) : 0;
     let puzzleXp = Math.max(0, Number(savedPuzzleState.xp) || 0);
     let puzzleCoins = Math.max(0, Number(savedPuzzleState.coins) || 0);
@@ -33607,7 +34784,9 @@
       });
       const labels = { beginner: "Beginner engine", easy: "Easy engine", medium: "Medium engine", hard: "Hard engine", expert: "Expert engine", master: "Master engine", strong: "2000 Elo bot" };
       const config = getCoachConfig();
-      document.getElementById("gameDifficultyBadge").textContent = `${labels[coachDifficulty] || config.label} - ${config.elo} Elo`;
+      document.getElementById("gameDifficultyBadge").textContent = labels[coachDifficulty] || config.label;
+      const gameEloBadge = document.getElementById("gameEloBadge");
+      if (gameEloBadge) gameEloBadge.textContent = `${config.elo} Elo`;
       stockfishInfo.depth = config.depth || stockfishInfo.depth;
       updateAiPlayerHeader();
       updateEnginePanel();
@@ -33827,12 +35006,11 @@
         aiCard.dataset.seat = "top";
         aiCard.style.gridArea = "opponent";
       }
-      const side = document.querySelector("[data-match-side]");
-      if (side) {
-        const label = getCoachColorName(coachPlayerColor);
+      const label = getCoachColorName(coachPlayerColor);
+      document.querySelectorAll("[data-match-side], [data-match-frame-side]").forEach((side) => {
         side.textContent = label;
         side.title = `${label} is your side.`;
-      }
+      });
     }
 
     function renderCoachAvatar(container, { imageUrl = "", fallback = "KN", label = "Coach avatar" } = {}) {
@@ -33897,6 +35075,29 @@
       document.getElementById("aiPlayerName").textContent = ai.name;
       document.getElementById("aiPlayerTitle").textContent = ai.title;
       document.getElementById("aiPlayerRating").textContent = `${displayRating} Elo`;
+      const selectedBot = getBeginnerBot();
+      const botGames = selectedBot
+        ? Math.max(0, Number(beginnerBotState.wins[selectedBot.id]) || 0) + Math.max(0, Number(beginnerBotState.losses[selectedBot.id]) || 0)
+        : 0;
+      const botWins = selectedBot ? Math.max(0, Number(beginnerBotState.losses[selectedBot.id]) || 0) : 0;
+      const setFrameStat = (key, value) => {
+        const field = card.querySelector(`[data-ai-stat="${key}"]`);
+        if (field) field.textContent = value;
+      };
+      setFrameStat("engine", ai.isFriend ? "Realtime match" : "Stockfish 16");
+      setFrameStat("difficulty", ai.isFriend ? (friendChallengeState?.gameType || "Casual") : config.label);
+      setFrameStat("rating", `${displayRating} Elo`);
+      setFrameStat("style", ai.isFriend ? "Live player" : selectedBot?.opening || "Balanced engine");
+      setFrameStat("strength", ai.isFriend ? "Player" : `Skill ${config.skill}/20`);
+      setFrameStat("level", ai.title || "Opponent");
+      const description = card.querySelector("[data-ai-description]");
+      if (description) description.textContent = ai.isFriend
+        ? `${ai.name} is connected for a live game.`
+        : selectedBot?.bio || `${ai.name} uses ${config.label.toLowerCase()} calculation and practical tactics.`;
+      const games = card.querySelector("[data-ai-games]");
+      if (games) games.textContent = `${botGames} game${botGames === 1 ? "" : "s"}`;
+      const winRate = card.querySelector("[data-ai-win-rate]");
+      if (winRate) winRate.textContent = botGames ? `${Math.round((botWins / botGames) * 100)}% win rate` : "-- win rate";
       const flag = document.getElementById("aiPlayerFlag");
       if (flag) {
         flag.textContent = formatCountryFlag(ai.flag);
@@ -34083,6 +35284,7 @@
       const timer = document.querySelector("[data-match-timer]");
       const aiTimer = document.getElementById("aiPlayerTimer");
       const online = document.querySelector("[data-match-online]");
+      const frameStatus = document.querySelector("[data-match-frame-status]");
       const avatar = document.querySelector("[data-match-avatar]");
       const clock = getMatchClockSnapshot();
       const playerMs = coachPlayerColor === "b" ? clock.blackMs : clock.whiteMs;
@@ -34098,15 +35300,17 @@
         avatar.style.setProperty("--match-timer-angle", `${Math.round(progress * 360)}deg`);
         avatar.style.setProperty("--timer-ring-color", progress > 0.8 ? "#d86f62" : progress > 0.6 ? "#ffd36b" : "var(--rank-b)");
       }
+      const isOnline = navigator.onLine !== false;
+      const isGameOver = coachGame && isCoachGameOver();
+      const playerStatus = !isOnline ? "Offline"
+        : matchClockExpiredColor ? `${getCoachColorName(matchClockExpiredColor)} flagged`
+          : isGameOver ? "Review"
+            : coachGame?.turn() === coachPlayerColor && !coachThinking ? "Your move" : "Ready";
       if (online) {
-        const isOnline = navigator.onLine !== false;
-        const isGameOver = coachGame && isCoachGameOver();
-        online.textContent = !isOnline ? "Offline"
-          : matchClockExpiredColor ? `${getCoachColorName(matchClockExpiredColor)} flagged`
-            : isGameOver ? "Review"
-              : coachGame?.turn() === coachPlayerColor && !coachThinking ? "Your move" : "Ready";
+        online.textContent = playerStatus;
         online.classList.toggle("is-offline", !isOnline);
       }
+      if (frameStatus) frameStatus.textContent = playerStatus;
     }
 
     function startMatchPlayerTimer() {
@@ -34139,7 +35343,27 @@
       } else {
         renderPlayerIdentityExtras(profile);
       }
-      if (rating) rating.textContent = `${friendSelf?.rating || getLearnerGameRating()} Elo`;
+      const playerRating = Math.max(400, Number(friendSelf?.rating) || getLearnerGameRating());
+      if (rating) rating.textContent = `${playerRating} Elo`;
+      const gamesPlayed = Math.max(0, Number(gameStats.played) || 0);
+      const wins = Math.min(gamesPlayed, Math.max(0, Number(gameStats.wins) || 0));
+      const draws = Math.min(Math.max(0, gamesPlayed - wins), Math.max(0, Number(gameStats.draws) || 0));
+      const losses = Math.max(0, gamesPlayed - wins - draws);
+      const frameStats = {
+        rating: playerRating,
+        games: gamesPlayed,
+        wins,
+        losses,
+        draws,
+        "win-rate": `${gamesPlayed ? Math.round((wins / gamesPlayed) * 100) : 0}%`,
+        "best-rating": Math.max(playerRating, Number(gameStats.bestRating) || 0)
+      };
+      Object.entries(frameStats).forEach(([key, value]) => {
+        const field = card.querySelector(`[data-match-frame-stat="${key}"]`);
+        if (field) field.textContent = String(value);
+      });
+      const frameDescription = card.querySelector("[data-match-description]");
+      if (frameDescription) frameDescription.textContent = `${gamesPlayed ? `${wins} win${wins === 1 ? "" : "s"} from ${gamesPlayed} game${gamesPlayed === 1 ? "" : "s"}.` : "Ready for a focused game."} Keep your pieces safe and look for forcing moves.`;
       renderFlexBadgeTargets(prefs);
       if (premium) {
         premium.hidden = !premiumLabel;
@@ -39267,6 +40491,8 @@
     function resetRealPuzzleGame() {
       const puzzle = realPuzzleBank[realPuzzleIndex];
       realPuzzleTransitionId += 1;
+      cancelPendingRealPuzzleReply();
+      realPuzzleCompletionTransitionId = -1;
       setRealPuzzlePhase("Loading");
       realPuzzleSelected = "";
       realPuzzleLegalMoves = [];
@@ -39580,37 +40806,84 @@
       return applied;
     }
 
+    function cancelPendingRealPuzzleReply() {
+      window.clearTimeout(realPuzzleReplyTimer);
+      realPuzzleReplyTimer = 0;
+      const resolve = realPuzzleReplyResolver;
+      realPuzzleReplyResolver = null;
+      if (resolve) resolve(false);
+    }
+
+    function waitForRealPuzzleReply(delay, transitionId) {
+      cancelPendingRealPuzzleReply();
+      return new Promise((resolve) => {
+        realPuzzleReplyResolver = resolve;
+        realPuzzleReplyTimer = window.setTimeout(() => {
+          realPuzzleReplyTimer = 0;
+          realPuzzleReplyResolver = null;
+          resolve(transitionId === realPuzzleTransitionId);
+        }, delay);
+      });
+    }
+
     function completeRealPuzzle() {
       const puzzle = realPuzzleBank[realPuzzleIndex];
-      const seconds = Math.max(1, Math.floor((Date.now() - realPuzzleStartedAt) / 1000));
+      const completionId = realPuzzleTransitionId;
+      if (!puzzle || realPuzzleCompletionTransitionId === completionId || realPuzzlePhase === "Completed") return;
+      realPuzzleCompletionTransitionId = completionId;
+      cancelPendingRealPuzzleReply();
+      const startedAt = realPuzzleStartedAt || Date.now();
+      const seconds = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
       const firstSolve = !realPuzzleSolved.has(puzzle.id);
       stopRealPuzzleTimer();
-      realPuzzleAttempts += 1;
-      realPuzzleCorrect += 1;
-      realPuzzleStreak += 1;
-      realPuzzleBestStreak = Math.max(realPuzzleBestStreak, realPuzzleStreak);
-      updateRealPuzzleRating(Math.max(4, Math.round((puzzle.rating - realPuzzleRating) / 24) + (realPuzzleMistakes ? 3 : 10)));
-      if (firstSolve) {
-        realPuzzleSolved.add(puzzle.id);
-        const reward = getRealPuzzleReward(puzzle, seconds);
-        const xpResult = addPuzzleXp(reward.xp);
-        addPuzzleCoins(reward.coins);
-        addExtraRewards(reward);
-        realPuzzleCoinsEarned += reward.coins;
-        if (!realPuzzleBestSeconds || seconds < realPuzzleBestSeconds) realPuzzleBestSeconds = seconds;
-        savePuzzleState();
-        renderBeginnerProgress();
-        renderStore();
-        renderPlayerProfile();
-        playPuzzleTone("milestone");
-        showCelebration("Real puzzle solved!", formatRewardText(reward), xpResult.levelUp ? "New level!" : puzzle.theme);
+      realPuzzleSelected = "";
+      realPuzzleLegalMoves = [];
+      let completionMessage = "Puzzle complete.";
+      try {
+        realPuzzleAttempts += 1;
+        realPuzzleCorrect += 1;
+        realPuzzleStreak += 1;
+        realPuzzleBestStreak = Math.max(realPuzzleBestStreak, realPuzzleStreak);
+        updateRealPuzzleRating(Math.max(4, Math.round((puzzle.rating - realPuzzleRating) / 24) + (realPuzzleMistakes ? 3 : 10)));
+        if (firstSolve) {
+          realPuzzleSolved.add(puzzle.id);
+          const reward = getRealPuzzleReward(puzzle, seconds);
+          const xpResult = addPuzzleXp(reward.xp);
+          addPuzzleCoins(reward.coins);
+          addExtraRewards(reward);
+          realPuzzleCoinsEarned += reward.coins;
+          if (!realPuzzleBestSeconds || seconds < realPuzzleBestSeconds) realPuzzleBestSeconds = seconds;
+          renderBeginnerProgress();
+          renderStore();
+          renderPlayerProfile();
+          playPuzzleTone("milestone");
+          showCelebration("Real puzzle solved!", formatRewardText(reward), xpResult.levelUp ? "New level!" : puzzle.theme);
+        }
+        completionMessage = `Solved in ${formatPuzzleTime(seconds * 1000)}. Line: ${realPuzzleMoveSans.join(" ")}. ${puzzle.note}`;
+      } catch (error) {
+        console.warn("[Checkmate Quest Puzzles] Completion side effect failed.", error);
+        completionMessage = "Puzzle solved. Your progress has been saved; choose the next challenge when ready.";
+      } finally {
+        if (completionId !== realPuzzleTransitionId) return;
+        try {
+          savePuzzleState();
+          saveRealPuzzleState();
+        } catch (error) {
+          console.warn("[Checkmate Quest Puzzles] Completion save failed.", error);
+        }
+        setRealPuzzlePhase("Completed");
+        const feedback = document.getElementById("realPuzzleFeedback");
+        const moves = document.getElementById("realPuzzleMoves");
+        if (feedback) feedback.textContent = completionMessage;
+        if (moves) moves.textContent = realPuzzleMoveSans.join(" ");
+        try {
+          renderRealPuzzleAchievements();
+          renderRealPuzzleBoard();
+        } catch (error) {
+          console.warn("[Checkmate Quest Puzzles] Completion render failed.", error);
+        }
+        autoAdvanceRealPuzzleIfNeeded();
       }
-      document.getElementById("realPuzzleFeedback").textContent = `Solved in ${formatPuzzleTime(seconds * 1000)}. Line: ${realPuzzleMoveSans.join(" ")}. ${puzzle.note}`;
-      document.getElementById("realPuzzleMoves").textContent = realPuzzleMoveSans.join(" ");
-      renderRealPuzzleAchievements();
-      saveRealPuzzleState();
-      setRealPuzzlePhase("Completed");
-      autoAdvanceRealPuzzleIfNeeded();
     }
 
     async function finishRealPuzzleMove(move) {
@@ -39652,15 +40925,14 @@
       if (realPuzzleStep >= realPuzzleLine.length) {
         setRealPuzzlePhase("Success");
         completeRealPuzzle();
-        renderRealPuzzleBoard();
         return;
       }
 
       setRealPuzzlePhase("OpponentMove");
       document.getElementById("realPuzzleFeedback").textContent = `Great move: ${played.san}. Watch the reply.`;
       renderRealPuzzleBoard();
-      await wait(220);
-      if (transitionId !== realPuzzleTransitionId || realPuzzlePhase !== "OpponentMove" || !realPuzzleGame) return;
+      const replyReady = await waitForRealPuzzleReply(220, transitionId);
+      if (!replyReady || transitionId !== realPuzzleTransitionId || realPuzzlePhase !== "OpponentMove" || !realPuzzleGame) return;
       if (!applyRealPuzzleAutoReplies(1)) {
         setRealPuzzlePhase("Failed");
         document.getElementById("realPuzzleFeedback").textContent = "This puzzle line could not continue. Try another verified puzzle.";
@@ -39671,10 +40943,10 @@
       if (realPuzzleStep >= realPuzzleLine.length) {
         setRealPuzzlePhase("Success");
         completeRealPuzzle();
-      } else {
-        setRealPuzzlePhase("PlayerTurn");
-        document.getElementById("realPuzzleFeedback").textContent = "Your turn. Keep the pressure on.";
+        return;
       }
+      setRealPuzzlePhase("PlayerTurn");
+      document.getElementById("realPuzzleFeedback").textContent = "Your turn. Keep the pressure on.";
       renderRealPuzzleBoard();
     }
 
@@ -39893,6 +41165,16 @@
       document.getElementById("flipGame").addEventListener("click", () => {
         coachFlipped = !coachFlipped;
         renderCoachBoard();
+      });
+      document.getElementById("openBoardEditor")?.addEventListener("click", () => {
+        const options = document.querySelector("#play .game-options-panel");
+        if (!options) return;
+        options.classList.remove("is-emphasized");
+        void options.offsetWidth;
+        options.classList.add("is-emphasized");
+        options.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        document.getElementById("prefBoard")?.focus({ preventScroll: true });
+        window.setTimeout(() => options.classList.remove("is-emphasized"), 900);
       });
       document.getElementById("whyGame").addEventListener("click", askCoachWhy);
       document.getElementById("replayMistake").addEventListener("click", replayCoachMistake);
