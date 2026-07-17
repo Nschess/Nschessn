@@ -38672,7 +38672,9 @@
     }
 
     function findRealUciMove(game, uci) {
-      return game.moves({ verbose: true }).find((move) => moveToUci(move) === uci) || null;
+      const expected = String(uci || "").trim().toLowerCase();
+      if (!game || !expected) return null;
+      return game.moves({ verbose: true }).find((move) => moveToUci(move).toLowerCase() === expected) || null;
     }
 
     function getDeclaredPuzzleSide(side) {
@@ -38699,7 +38701,9 @@
 
     function prepareRealPuzzle(puzzle = realPuzzleBank[realPuzzleIndex]) {
       const game = new CoachChess(puzzle.fen);
-      const line = Array.isArray(puzzle.moves) ? [...puzzle.moves] : [];
+      const line = Array.isArray(puzzle.moves)
+        ? puzzle.moves.map((move) => String(move || "").trim().toLowerCase()).filter(Boolean)
+        : [];
       if (puzzle.primer) {
         const primer = line.shift();
         const primerMove = findRealUciMove(game, primer);
@@ -38724,8 +38728,37 @@
       const engine = realPuzzleEngine;
       const move = getRealPuzzleEngineMove();
       if (!engine || !move) return null;
-      const played = engine.game.move(toCoachMoveInput(move));
+      let played = null;
+      try {
+        played = engine.game.move(toCoachMoveInput(move));
+      } catch {
+        return null;
+      }
       if (!played) return null;
+      realPuzzleGame = engine.game;
+      engine.step += 1;
+      realPuzzleStep = engine.step;
+      return played;
+    }
+
+    function commitRealPuzzlePlayerMove(move) {
+      const engine = realPuzzleEngine;
+      const expected = String(engine?.line?.[engine?.step] || "").trim().toLowerCase();
+      const playedUci = moveToUci(move).toLowerCase();
+      if (!engine?.game || !expected || playedUci !== expected) return null;
+
+      // Re-resolve the move from the current engine position before applying it.
+      // This keeps the board, move line, and chess rules in one authoritative state.
+      const legalMove = findRealUciMove(engine.game, expected);
+      if (!legalMove || moveToUci(legalMove).toLowerCase() !== playedUci) return null;
+      let played = null;
+      try {
+        played = engine.game.move(toCoachMoveInput(move));
+      } catch {
+        return null;
+      }
+      if (!played) return null;
+      realPuzzleGame = engine.game;
       engine.step += 1;
       realPuzzleStep = engine.step;
       return played;
@@ -39581,8 +39614,8 @@
       if (!realPuzzleGame || realPuzzlePhase !== "PlayerTurn") return;
       const transitionId = realPuzzleTransitionId;
       setRealPuzzlePhase("Validate");
-      const playedUci = moveToUci(move);
-      const expected = realPuzzleLine[realPuzzleStep];
+      const playedUci = moveToUci(move).toLowerCase();
+      const expected = String(realPuzzleEngine?.line?.[realPuzzleEngine?.step] || "").trim().toLowerCase();
       const expectedMove = getRealPuzzleEngineMove();
       if (playedUci !== expected || !expectedMove) {
         realPuzzleMistakes += 1;
@@ -39600,10 +39633,12 @@
         return;
       }
 
-      const played = commitRealPuzzleEngineMove();
+      const played = commitRealPuzzlePlayerMove(move);
       if (!played) {
-        setRealPuzzlePhase("Failed");
-        document.getElementById("realPuzzleFeedback").textContent = "This puzzle line could not continue. Try another verified puzzle.";
+        realPuzzleSelected = "";
+        realPuzzleLegalMoves = [];
+        setRealPuzzlePhase("PlayerTurn");
+        document.getElementById("realPuzzleFeedback").textContent = "The position is ready. Try the move again.";
         renderRealPuzzleBoard();
         return;
       }
@@ -39647,9 +39682,11 @@
       if (realPuzzleSelected && square !== realPuzzleSelected) {
         const legalMoves = realPuzzleGame.moves({ square: realPuzzleSelected, verbose: true }).filter((move) => move.to === square);
         if (legalMoves.length) {
-          const promotion = legalMoves.find((move) => move.promotion === "q")?.promotion || legalMoves[0].promotion;
-          const move = legalMoves.find((candidate) => !promotion || candidate.promotion === promotion) || legalMoves[0];
-          if (move) void finishRealPuzzleMove(move);
+          const expected = String(realPuzzleEngine?.line?.[realPuzzleEngine?.step] || "").trim().toLowerCase();
+          const selectedMove = legalMoves.find((candidate) => moveToUci(candidate).toLowerCase() === expected)
+            || legalMoves.find((move) => move.promotion === "q")
+            || legalMoves[0];
+          if (selectedMove) void finishRealPuzzleMove(selectedMove);
           return;
         }
       }
