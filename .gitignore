@@ -2,6 +2,7 @@
 .env.*.local
 .env
 .tmp-*/
+dist/
 .agents/
 .codex/
 data/lichess_db_puzzle.csv

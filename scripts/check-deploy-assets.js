@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const siteDir = path.resolve(__dirname, "..", "outputs");
+const siteDir = path.resolve(process.argv[2] || path.resolve(__dirname, ".."));
 const indexPath = path.join(siteDir, "index.html");
 const html = fs.readFileSync(indexPath, "utf8");
 const required = [
@@ -23,6 +23,7 @@ for (const match of styles.matchAll(/url\(["']?([^"')]+)["']?\)/gi)) addRef(matc
 
 const missing = [...refs]
   .filter((ref) => !ref.includes("*"))
+  .filter((ref) => !ref.includes("${"))
   .map((ref) => ({ ref, file: path.join(siteDir, ref) }))
   .filter(({ file }) => !fs.existsSync(file));
 
