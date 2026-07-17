@@ -39566,8 +39566,11 @@
     }
 
     function applyRealPuzzleAutoReplies(limit = Infinity) {
+      const engine = realPuzzleEngine;
+      if (!engine?.game) return 0;
+      realPuzzleGame = engine.game;
       let applied = 0;
-      while (applied < limit && realPuzzleStep < realPuzzleLine.length && realPuzzleGame.turn() !== realPuzzleSide) {
+      while (applied < limit && engine.step < engine.line.length && engine.game.turn() !== engine.playerSide) {
         const played = commitRealPuzzleEngineMove();
         if (!played) break;
         realPuzzleLastMove = played;
