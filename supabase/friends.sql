@@ -210,6 +210,7 @@ create table if not exists public.game_challenges (
   termination text not null default '' check (length(termination) <= 48),
   fen text not null default 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' check (length(fen) <= 256),
   moves jsonb not null default '[]'::jsonb,
+  revision bigint not null default 0 check (revision >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   expires_at timestamptz not null default now() + interval '24 hours'
@@ -228,6 +229,7 @@ alter table public.game_challenges add column if not exists abandon_grace_second
 alter table public.game_challenges add column if not exists both_inactive_result text not null default 'draw' check (both_inactive_result in ('draw', 'aborted'));
 alter table public.game_challenges add column if not exists result text not null default 'pending' check (result in ('pending', 'white', 'black', 'draw', 'aborted'));
 alter table public.game_challenges add column if not exists termination text not null default '' check (length(termination) <= 48);
+alter table public.game_challenges add column if not exists revision bigint not null default 0 check (revision >= 0);
 
 create table if not exists public.game_challenge_messages (
   id uuid primary key default gen_random_uuid(),
@@ -333,6 +335,7 @@ begin
   set status = 'completed',
       result = p_result,
       termination = left(coalesce(nullif(trim(p_termination), ''), 'game end'), 48),
+      revision = revision + 1,
       updated_at = now()
   where id = found.id
   returning * into found;
@@ -396,7 +399,7 @@ declare
   cutoff timestamptz;
 begin
   update public.game_challenges
-  set status = 'expired', updated_at = now()
+  set status = 'expired', revision = revision + 1, updated_at = now()
   where status in ('pending', 'accepted') and expires_at < now();
 
   for found in
@@ -498,6 +501,7 @@ as $$
     'termination', challenge.termination,
     'fen', challenge.fen,
     'moves', challenge.moves,
+    'revision', challenge.revision,
     'messages', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', note.id,
@@ -623,15 +627,16 @@ begin
   select * into found from public.game_challenges where code = upper(trim(p_code)) for update;
   if found.id is null or found.expires_at < now() then raise exception 'Challenge not found or expired'; end if;
   if p_response = 'cancel' and found.creator_id = current_user_id and found.status in ('pending', 'accepted') then
-    update public.game_challenges set status = 'cancelled', updated_at = now() where id = found.id returning * into found;
+    update public.game_challenges set status = 'cancelled', revision = revision + 1, updated_at = now() where id = found.id returning * into found;
   elsif p_response = 'decline' and found.opponent_id = current_user_id and found.status = 'pending' then
-    update public.game_challenges set status = 'declined', updated_at = now() where id = found.id returning * into found;
+    update public.game_challenges set status = 'declined', revision = revision + 1, updated_at = now() where id = found.id returning * into found;
   elsif p_response = 'accept' and found.creator_id <> current_user_id and found.status = 'pending' and (found.opponent_id is null or found.opponent_id = current_user_id) then
     update public.game_challenges
     set opponent_id = current_user_id,
         status = 'active',
         active_color = 'w',
         turn_started_at = case when clock = 'none' then null else now() end,
+        revision = revision + 1,
         updated_at = now()
     where id = found.id
     returning * into found;
@@ -643,12 +648,15 @@ end;
 $$;
 
 drop function if exists public.save_game_challenge_position(text, text, jsonb, text);
+drop function if exists public.save_game_challenge_position(text, text, jsonb, text, boolean);
+drop function if exists public.save_game_challenge_position(text, text, jsonb, text, boolean, bigint);
 create or replace function public.save_game_challenge_position(
   p_code text,
   p_fen text,
   p_moves jsonb,
   p_status text default 'active',
-  p_move_applied boolean default false
+  p_move_applied boolean default false,
+  p_expected_revision bigint default null
 )
 returns jsonb
 language plpgsql
@@ -658,9 +666,15 @@ declare
   current_user_id uuid := auth.uid();
   found public.game_challenges;
   active_user_id uuid;
+  actor_color text;
   elapsed_ms bigint;
   remaining_ms bigint;
-  result_signal text;
+  existing_count integer;
+  submitted_count integer;
+  board_move_count integer;
+  move_index integer;
+  new_item text;
+  active_draw_offer text := '';
   completion_result text := 'aborted';
   completion_termination text := 'ended';
 begin
@@ -671,8 +685,47 @@ begin
   if current_user_id <> found.creator_id and current_user_id <> found.opponent_id then raise exception 'You are not in this game'; end if;
   if found.status <> 'active' then raise exception 'This challenge is not ready to play'; end if;
   if length(coalesce(p_fen, '')) < 8 or length(p_fen) > 256 or jsonb_typeof(coalesce(p_moves, '[]'::jsonb)) <> 'array' then raise exception 'Game state is invalid'; end if;
+  if p_expected_revision is not null and p_expected_revision <> found.revision then
+    raise exception 'This game changed on another device. Reconnecting…' using errcode = '40001';
+  end if;
 
-  if p_move_applied then
+  existing_count := jsonb_array_length(found.moves);
+  submitted_count := jsonb_array_length(p_moves);
+  if submitted_count < existing_count or submitted_count > existing_count + 1 then
+    raise exception 'Game history must advance one action at a time';
+  end if;
+  if existing_count > 0 then
+    for move_index in 0..existing_count - 1 loop
+      if found.moves -> move_index is distinct from p_moves -> move_index then
+        raise exception 'Game history changed on another device. Reconnecting…' using errcode = '40001';
+      end if;
+      new_item := found.moves ->> move_index;
+      if new_item ~ '^__draw_offer:[wb]$' then
+        active_draw_offer := new_item;
+      elsif new_item in ('__draw_decline', '__draw_accept') then
+        active_draw_offer := '';
+      end if;
+    end loop;
+  end if;
+  if submitted_count = existing_count then
+    if p_fen <> found.fen or p_status <> 'active' or p_move_applied then
+      raise exception 'Game update did not contain a new action';
+    end if;
+    return public.challenge_payload(found);
+  end if;
+
+  new_item := p_moves ->> existing_count;
+  actor_color := case
+    when current_user_id = found.creator_id then found.creator_color
+    else case when found.creator_color = 'w' then 'b' else 'w' end
+  end;
+
+  select count(*) into board_move_count
+  from jsonb_array_elements_text(found.moves) as item(value)
+  where item.value ~ '^[a-h][1-8][a-h][1-8][qrbn]?$';
+
+  if new_item ~ '^[a-h][1-8][a-h][1-8][qrbn]?$' then
+    if not p_move_applied or p_status <> 'active' then raise exception 'A board move must be submitted as an active turn'; end if;
     active_user_id := case
       when found.active_color = 'w' and found.creator_color = 'w' then found.creator_id
       when found.active_color = 'w' then found.opponent_id
@@ -691,6 +744,7 @@ begin
         update public.game_challenges
         set white_ms = case when found.active_color = 'w' then 0 else white_ms end,
             black_ms = case when found.active_color = 'b' then 0 else black_ms end,
+            revision = revision + 1,
             updated_at = now()
         where id = found.id
         returning * into found;
@@ -699,47 +753,55 @@ begin
       end if;
       if found.active_color = 'w' then
         update public.game_challenges
-        set white_ms = remaining_ms + increment_ms, active_color = 'b', turn_started_at = now(), updated_at = now()
+        set white_ms = remaining_ms + increment_ms, active_color = 'b', turn_started_at = now(), revision = revision + 1, updated_at = now()
         where id = found.id
         returning * into found;
       else
         update public.game_challenges
-        set black_ms = remaining_ms + increment_ms, active_color = 'w', turn_started_at = now(), updated_at = now()
+        set black_ms = remaining_ms + increment_ms, active_color = 'w', turn_started_at = now(), revision = revision + 1, updated_at = now()
         where id = found.id
         returning * into found;
       end if;
     else
       update public.game_challenges
-      set active_color = case when found.active_color = 'w' then 'b' else 'w' end, updated_at = now()
+      set active_color = case when found.active_color = 'w' then 'b' else 'w' end, revision = revision + 1, updated_at = now()
       where id = found.id
       returning * into found;
     end if;
+    update public.game_challenges
+    set fen = p_fen,
+        moves = p_moves,
+        updated_at = now()
+    where id = found.id
+    returning * into found;
+    return public.challenge_payload(found);
   end if;
 
-  select item.value into result_signal
-  from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) with ordinality as item(value, ordinal)
-  where item.value like '__result:%'
-  order by item.ordinal desc
-  limit 1;
-
-  if p_status = 'completed' then
-    if exists (select 1 from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) as item(value) where item.value = '__abort') then
-      completion_result := 'aborted'; completion_termination := 'aborted';
-    elsif exists (select 1 from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) as item(value) where item.value = '__draw_accept') then
-      completion_result := 'draw'; completion_termination := 'draw agreement';
-    elsif exists (select 1 from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) as item(value) where item.value = '__resign:w') then
-      completion_result := 'black'; completion_termination := 'resignation';
-    elsif exists (select 1 from jsonb_array_elements_text(coalesce(p_moves, '[]'::jsonb)) as item(value) where item.value = '__resign:b') then
-      completion_result := 'white'; completion_termination := 'resignation';
-    elsif result_signal ~ '^__result:(white|black|draw|aborted):[a-z_]+$' then
-      completion_result := split_part(result_signal, ':', 2);
-      completion_termination := replace(split_part(result_signal, ':', 3), '_', ' ');
-    end if;
+  if p_move_applied or p_fen <> found.fen then raise exception 'Only a legal board move may change the position'; end if;
+  if new_item ~ '^__draw_offer:[wb]$' then
+    if p_status <> 'active' or split_part(new_item, ':', 2) <> actor_color then raise exception 'Draw offer is invalid'; end if;
+  elsif new_item = '__draw_decline' then
+    if p_status <> 'active' or active_draw_offer = '' or split_part(active_draw_offer, ':', 2) = actor_color then raise exception 'There is no draw offer to decline'; end if;
+  elsif new_item = '__draw_accept' then
+    if p_status <> 'completed' or active_draw_offer = '' or split_part(active_draw_offer, ':', 2) = actor_color then raise exception 'There is no draw offer to accept'; end if;
+    completion_result := 'draw'; completion_termination := 'draw agreement';
+  elsif new_item ~ '^__resign:[wb]$' then
+    if p_status <> 'completed' or split_part(new_item, ':', 2) <> actor_color then raise exception 'Resignation is invalid'; end if;
+    completion_result := case when actor_color = 'w' then 'black' else 'white' end; completion_termination := 'resignation';
+  elsif new_item = '__abort' then
+    if p_status <> 'completed' or board_move_count >= 2 then raise exception 'Abort is only available before move 2'; end if;
+    completion_result := 'aborted'; completion_termination := 'aborted';
+  elsif new_item ~ '^__result:(white|black|draw|aborted):[a-z_]+$' then
+    if p_status <> 'completed' then raise exception 'Game result is invalid'; end if;
+    completion_result := split_part(new_item, ':', 2);
+    completion_termination := replace(split_part(new_item, ':', 3), '_', ' ');
+  else
+    raise exception 'Game action is invalid';
   end if;
 
   update public.game_challenges
-  set fen = p_fen,
-      moves = coalesce(p_moves, '[]'::jsonb),
+  set moves = p_moves,
+      revision = revision + 1,
       updated_at = now()
   where id = found.id
   returning * into found;
@@ -800,7 +862,7 @@ revoke all on function public.search_registered_players(text) from public;
 revoke all on function public.create_game_challenge(uuid, text, text, text, text, text) from public;
 revoke all on function public.get_game_challenge(text) from public;
 revoke all on function public.respond_game_challenge(text, text) from public;
-revoke all on function public.save_game_challenge_position(text, text, jsonb, text, boolean) from public;
+revoke all on function public.save_game_challenge_position(text, text, jsonb, text, boolean, bigint) from public;
 revoke all on function public.list_game_challenges() from public;
 revoke all on function public.send_game_challenge_message(text, text) from public;
 grant execute on function public.search_registered_players(text) to authenticated;
@@ -808,6 +870,6 @@ grant execute on function public.create_game_challenge(uuid, text, text, text, t
 grant execute on function public.get_game_challenge(text) to authenticated;
 grant execute on function public.touch_game_challenge_presence(text, boolean) to authenticated;
 grant execute on function public.respond_game_challenge(text, text) to authenticated;
-grant execute on function public.save_game_challenge_position(text, text, jsonb, text, boolean) to authenticated;
+grant execute on function public.save_game_challenge_position(text, text, jsonb, text, boolean, bigint) to authenticated;
 grant execute on function public.list_game_challenges() to authenticated;
 grant execute on function public.send_game_challenge_message(text, text) to authenticated;

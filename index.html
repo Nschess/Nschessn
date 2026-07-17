@@ -21611,6 +21611,384 @@
       #play .play-mode-card::before,
       #play .play-mode-card > b { transition: none; }
     }
+
+    /* Play workspace visual refresh. Structure, controls, and game state remain unchanged. */
+    #play:not(.is-review-mode) {
+      background:
+        radial-gradient(760px 440px at 51% 22%, rgba(63, 128, 96, 0.16), transparent 68%),
+        radial-gradient(420px 300px at 76% 8%, rgba(214, 175, 76, 0.09), transparent 72%),
+        linear-gradient(180deg, #0a1320 0%, #08111b 68%, #070d15 100%);
+    }
+
+    #play:not(.is-review-mode) .play-shell {
+      width: min(100% - clamp(18px, 3vw, 48px), 1600px);
+      max-width: 1600px;
+      margin-inline: auto;
+      padding: clamp(12px, 1.45vw, 20px);
+      gap: 14px;
+      border-color: rgba(197, 221, 209, 0.13);
+      border-radius: 22px;
+      background:
+        linear-gradient(132deg, rgba(40, 70, 77, 0.24), rgba(9, 18, 28, 0.88) 38%, rgba(6, 13, 22, 0.95)),
+        rgba(8, 15, 24, 0.9);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 26px 70px rgba(0, 0, 0, 0.3);
+    }
+
+    @media (min-width: 1181px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-columns: clamp(222px, 17.2vw, 262px) minmax(520px, 760px) clamp(286px, 20vw, 336px);
+        justify-content: center;
+        align-items: start;
+      }
+
+      #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: sticky;
+        top: 76px;
+        max-height: calc(100dvh - 94px);
+        overflow: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+      }
+    }
+
+    #play:not(.is-review-mode) .play-left-sidebar,
+    #play:not(.is-review-mode) .play-right-sidebar {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid rgba(195, 220, 208, 0.12);
+      border-radius: 18px;
+      background: linear-gradient(155deg, rgba(31, 57, 63, 0.45), rgba(7, 15, 24, 0.74));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 14px 30px rgba(0, 0, 0, 0.16);
+    }
+
+    #play:not(.is-review-mode) .play-mode-nav {
+      gap: 7px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    #play:not(.is-review-mode) .play-mode-head {
+      padding: 3px 4px 7px;
+    }
+
+    #play:not(.is-review-mode) .play-mode-head strong {
+      color: #f6f8f3;
+      font-size: 0.84rem;
+      letter-spacing: 0.035em;
+      text-transform: uppercase;
+    }
+
+    #play:not(.is-review-mode) .play-mode-card {
+      min-height: 55px;
+      grid-template-columns: 32px minmax(0, 1fr) 12px;
+      gap: 9px;
+      padding: 8px;
+      border-color: rgba(199, 220, 212, 0.1);
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(37, 60, 68, 0.45), rgba(13, 24, 34, 0.75));
+    }
+
+    #play:not(.is-review-mode) .play-mode-card:hover,
+    #play:not(.is-review-mode) .play-mode-card:focus-visible {
+      transform: translateX(3px);
+      border-color: rgba(124, 207, 129, 0.48);
+      background: linear-gradient(135deg, rgba(55, 99, 78, 0.58), rgba(13, 30, 37, 0.82));
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(103, 197, 117, 0.09);
+    }
+
+    #play:not(.is-review-mode) .play-mode-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      color: #e2ffd3;
+      background: linear-gradient(145deg, rgba(104, 187, 115, 0.32), rgba(63, 114, 151, 0.16));
+    }
+
+    #play:not(.is-review-mode) .play-left-sidebar .preference-panel {
+      margin: 0;
+      padding: 11px;
+      border-color: rgba(198, 219, 209, 0.1);
+      border-radius: 13px;
+      background: rgba(4, 12, 20, 0.28);
+      box-shadow: none;
+    }
+
+    #play:not(.is-review-mode) .match-board-column {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "setup"
+        "opponent"
+        "board"
+        "player"
+        "actions"
+        "options";
+      gap: 11px;
+      justify-items: center;
+      min-width: 0;
+    }
+
+    #play:not(.is-review-mode) .match-board-column > .coach-setup {
+      min-height: 42px;
+      padding: 6px 9px;
+      border-color: rgba(115, 203, 126, 0.22);
+      border-radius: 12px;
+      background:
+        linear-gradient(100deg, rgba(72, 167, 95, 0.18), transparent 42%),
+        rgba(9, 20, 29, 0.84);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 10px 20px rgba(0, 0, 0, 0.16);
+    }
+
+    #play:not(.is-review-mode) .play-board-wrap {
+      isolation: isolate;
+      width: min(100%, var(--user-board-size));
+      padding: clamp(7px, 0.75vw, 10px);
+      overflow: visible;
+      border: 1px solid rgba(222, 189, 112, 0.48);
+      border-radius: 20px;
+      background:
+        linear-gradient(145deg, rgba(249, 219, 158, 0.15), rgba(36, 117, 81, 0.18) 48%, rgba(8, 21, 29, 0.82)),
+        #10211f;
+      box-shadow: 0 0 0 5px rgba(5, 13, 21, 0.7), 0 28px 52px rgba(0, 0, 0, 0.42), 0 0 38px rgba(81, 188, 109, 0.14);
+    }
+
+    #play:not(.is-review-mode) .play-board-wrap::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 14% -10% -14%;
+      border-radius: 50%;
+      pointer-events: none;
+      background: radial-gradient(ellipse, rgba(53, 168, 99, 0.24), transparent 68%);
+      filter: blur(18px);
+      opacity: 0.72;
+    }
+
+    #play:not(.is-review-mode) .play-board {
+      overflow: hidden;
+      border-radius: 12px;
+      box-shadow: inset 0 0 0 1px rgba(22, 8, 2, 0.38);
+    }
+
+    #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
+      width: min(100%, var(--user-board-size));
+      min-height: 0;
+      grid-template-columns: 54px minmax(0, 1fr) auto;
+      grid-template-areas:
+        "top top top"
+        "avatar identity clock"
+        "stats stats stats"
+        "description description description"
+        "footer footer footer";
+      gap: 7px 10px;
+      padding: 10px 12px;
+      border-color: rgba(197, 220, 211, 0.15);
+      border-radius: 15px;
+      background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.055), transparent 36%),
+        linear-gradient(145deg, rgba(33, 67, 67, 0.7), rgba(8, 17, 25, 0.86));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 12px 28px rgba(0, 0, 0, 0.2);
+    }
+
+    #play:not(.is-review-mode) .match-board-column > .player-frame--opponent {
+      border-color: color-mix(in srgb, var(--ai-rarity) 46%, rgba(198, 220, 209, 0.14));
+      background:
+        linear-gradient(120deg, color-mix(in srgb, var(--ai-rarity) 16%, transparent), transparent 40%),
+        linear-gradient(145deg, rgba(25, 48, 61, 0.78), rgba(8, 17, 25, 0.88));
+    }
+
+    #play:not(.is-review-mode) .player-frame-topline {
+      min-height: 18px;
+      padding-bottom: 6px;
+    }
+
+    #play:not(.is-review-mode) .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      box-shadow: 0 7px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    #play:not(.is-review-mode) .player-frame > :is(.match-player-main, .ai-player-main) strong {
+      color: #f8faf5;
+      font-size: 0.96rem;
+    }
+
+    #play:not(.is-review-mode) .player-frame > :is(.match-player-timer, .ai-player-timer) {
+      min-width: 74px;
+      min-height: 34px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+    }
+
+    #play:not(.is-review-mode) .player-frame-stats {
+      grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+      gap: 5px;
+    }
+
+    #play:not(.is-review-mode) .player-frame-stats > div {
+      min-height: 40px;
+      padding: 5px 6px;
+      border-radius: 8px;
+      background: rgba(1, 8, 13, 0.22);
+    }
+
+    #play:not(.is-review-mode) .player-frame-stats dt { font-size: 0.54rem; }
+    #play:not(.is-review-mode) .player-frame-stats dd { margin-top: 3px; font-size: 0.69rem; }
+
+    #play:not(.is-review-mode) .player-frame-description {
+      display: -webkit-box;
+      min-height: 0;
+      overflow: hidden;
+      color: #a8b7c0;
+      font-size: 0.68rem;
+      line-height: 1.35;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 1;
+    }
+
+    #play:not(.is-review-mode) .player-frame-footer,
+    #play:not(.is-review-mode) .player-frame .match-player-meta { gap: 5px; }
+
+    #play:not(.is-review-mode) .player-frame-footer :is(.ai-player-move, .ai-player-last),
+    #play:not(.is-review-mode) .player-frame-record,
+    #play:not(.is-review-mode) .player-frame .match-player-meta .match-player-pill {
+      min-height: 23px;
+      padding: 3px 7px;
+      font-size: 0.61rem;
+    }
+
+    #play:not(.is-review-mode) .play-bottom-actionbar {
+      width: min(100%, var(--user-board-size));
+      padding: 8px;
+      border-color: rgba(196, 220, 208, 0.14);
+      border-radius: 14px;
+      background: rgba(8, 18, 27, 0.88);
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions {
+      grid-template-columns: minmax(160px, 1.7fr) repeat(4, minmax(0, 1fr)) auto;
+      gap: 7px;
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions > .button,
+    #play:not(.is-review-mode) .play-extra-actions summary {
+      min-height: 40px;
+      border-radius: 9px;
+    }
+
+    #play:not(.is-review-mode) .play-primary-actions .play-start-button {
+      border-color: rgba(141, 220, 103, 0.72);
+      background: linear-gradient(135deg, #aee262, #66a640);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 9px 18px rgba(82, 159, 58, 0.25);
+    }
+
+    #play:not(.is-review-mode) .game-options-panel {
+      width: min(100%, var(--user-board-size));
+      gap: 9px;
+      padding: 11px;
+      border-radius: 14px;
+      background: linear-gradient(120deg, rgba(70, 148, 100, 0.1), transparent 42%), rgba(8, 18, 27, 0.76);
+    }
+
+    #play:not(.is-review-mode) .game-options-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    #play:not(.is-review-mode) .game-options-grid label { font-size: 0.59rem; }
+    #play:not(.is-review-mode) .game-options-grid select { min-height: 34px; border-radius: 8px; font-size: 0.66rem; }
+
+    #play:not(.is-review-mode) .play-right-sidebar {
+      padding: 0;
+      overflow: hidden;
+      background: linear-gradient(155deg, rgba(23, 45, 58, 0.64), rgba(6, 14, 23, 0.88));
+    }
+
+    #play:not(.is-review-mode) .play-right-sidebar > :not([hidden]) {
+      margin: 0 10px;
+    }
+
+    #play:not(.is-review-mode) .play-right-sidebar > :first-child { margin-top: 10px; }
+    #play:not(.is-review-mode) .play-right-sidebar > :last-child { margin-bottom: 10px; }
+
+    #play:not(.is-review-mode) .featured-coach-card {
+      grid-template-columns: 56px minmax(0, 1fr);
+      gap: 9px 10px;
+      padding: 11px;
+      border-color: rgba(220, 185, 89, 0.28);
+      border-radius: 13px;
+      background:
+        linear-gradient(130deg, rgba(210, 163, 64, 0.14), transparent 42%),
+        rgba(8, 16, 25, 0.62);
+    }
+
+    #play:not(.is-review-mode) .featured-coach-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+    }
+
+    #play:not(.is-review-mode) .featured-coach-copy h4 { font-size: 0.94rem; }
+    #play:not(.is-review-mode) .featured-coach-copy p { font-size: 0.69rem; line-height: 1.4; }
+    #play:not(.is-review-mode) .featured-coach-card .button { grid-column: 1 / -1; min-height: 36px; }
+
+    #play:not(.is-review-mode) :is(.engine-panel, .opening-compass, .captured-row, .move-history, .friend-game-chat, .simple-coach, .coach-library) {
+      border-color: rgba(196, 220, 209, 0.11);
+      border-radius: 12px;
+      background-color: rgba(4, 13, 21, 0.35);
+    }
+
+    #play:not(.is-review-mode) :is(.featured-coach-card, .engine-panel, .opening-compass, .captured-row, .move-history, .friend-game-chat, .coach-library) {
+      transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    }
+
+    #play:not(.is-review-mode) :is(.featured-coach-card, .engine-panel, .opening-compass, .coach-library):hover {
+      border-color: rgba(111, 197, 126, 0.3);
+      box-shadow: 0 12px 25px rgba(0, 0, 0, 0.16);
+    }
+
+    @media (max-width: 1180px) {
+      #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 24px, 930px);
+        grid-template-areas: "center" "right" "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+
+      #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+
+      #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #play:not(.is-review-mode) .play-mode-nav { grid-row: span 2; }
+      #play:not(.is-review-mode) .play-right-sidebar { padding: 10px; }
+      #play:not(.is-review-mode) .play-right-sidebar > :not([hidden]) { margin: 0; }
+    }
+
+    @media (max-width: 699px) {
+      #play:not(.is-review-mode) .play-shell { width: min(100% - 14px, 680px); padding: 8px; gap: 10px; }
+      #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) { grid-template-columns: 1fr; padding: 8px; }
+      #play:not(.is-review-mode) .match-board-column { gap: 9px; }
+      #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame { grid-template-columns: 48px minmax(0, 1fr) auto; padding: 9px; }
+      #play:not(.is-review-mode) .player-frame > :is(.match-player-avatar, .ai-player-avatar) { width: 48px; height: 48px; border-radius: 12px; }
+      #play:not(.is-review-mode) .player-frame-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      #play:not(.is-review-mode) .play-primary-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #play:not(.is-review-mode) .play-primary-actions .play-start-button { grid-column: span 2; }
+      #play:not(.is-review-mode) .game-options-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #play:not(.is-review-mode) :is(.play-mode-card, .featured-coach-card, .engine-panel, .opening-compass, .coach-library) { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -34610,6 +34988,7 @@
     let friendNetworkState = { directory: [], search: [], challenges: [] };
     let friendNetworkTimer = 0;
     let friendSearchTimer = 0;
+    let friendSearchRequest = 0;
     let friendNetworkRequest = 0;
     let friendNetworkRefreshPromise = null;
     let friendNetworkLastRefresh = 0;
@@ -34628,6 +35007,8 @@
     let realtimeMatchHeartbeatInFlight = false;
     let realtimeMatchVisibilityHandler = null;
     let friendIncomingNoticeCode = "";
+    let friendUiAbortController = null;
+    const friendActionLocks = new Map();
     let coachPremove = null;
     let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, subscriptionGeneration: 0, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0, renderSignature: "", lastPresencePulse: 0, lastPresenceConnected: null };
     let chessRulesPromise = null;
@@ -35243,17 +35624,30 @@
     }
 
     function getFriendDrawOfferBy(state = friendChallengeState || readFriendChallengeState()) {
-      const signal = getFriendControlSignals(state).reverse().find((move) => move.startsWith("__draw_offer:"));
-      return signal ? signal.split(":")[1] || "" : "";
+      let offeredBy = "";
+      getFriendControlSignals(state).forEach((signal) => {
+        if (signal.startsWith("__draw_offer:")) offeredBy = signal.split(":")[1] || "";
+        if (signal === "__draw_decline" || signal === "__draw_accept") offeredBy = "";
+      });
+      return offeredBy;
     }
 
     function getFriendBoardMoves() {
-      return coachGame?.history({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion || ""}`) || [];
+      const state = friendChallengeState || readFriendChallengeState();
+      const storedMoves = (Array.isArray(state?.moves) ? state.moves : []).map(String).filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move));
+      const localMoves = coachGame?.history({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion || ""}`) || [];
+      const historyBasePly = Math.max(0, Number(state?.historyBasePly) || 0);
+      if (historyBasePly > 0) return [...storedMoves.slice(0, historyBasePly), ...localMoves];
+      return localMoves.length ? localMoves : storedMoves;
     }
 
     function getSyncedFriendMoves(extraSignals = []) {
-      const signals = [...new Set([...getFriendControlSignals(), ...extraSignals].map(String))];
-      return [...getFriendBoardMoves(), ...signals];
+      const state = friendChallengeState || readFriendChallengeState();
+      const existing = Array.isArray(state?.moves) ? state.moves.map(String) : [];
+      const storedBoardCount = existing.filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)).length;
+      const newBoardMoves = getFriendBoardMoves().slice(storedBoardCount);
+      const additions = [...newBoardMoves, ...extraSignals.map(String).filter((signal) => signal && !existing.includes(signal))];
+      return [...existing, ...additions];
     }
 
     function isBeforeMoveTwo() {
@@ -37872,7 +38266,9 @@
           if (coachGame !== gameAtMove || !friendChallengeState?.active) return;
           saveFriendChallengeState({ ...friendChallengeState, active: true });
           const outcome = getFriendGameOutcome(friendChallengeState);
-          void (outcome ? syncFriendSignal(friendOutcomeSignal(outcome), "completed") : syncFriendChallengePosition(true));
+          void syncFriendChallengePosition(true).then((synced) => {
+            if (synced && outcome && friendChallengeState?.active) void syncFriendSignal(friendOutcomeSignal(outcome), "completed");
+          });
         }, 0);
       }
     playCoachMoveSound(move, "player");
@@ -38050,6 +38446,17 @@
       return Array.from({ length: 10 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
     }
 
+    function runFriendAction(key, task) {
+      const active = friendActionLocks.get(key);
+      if (active) return active;
+      const request = Promise.resolve().then(task);
+      friendActionLocks.set(key, request);
+      request.finally(() => {
+        if (friendActionLocks.get(key) === request) friendActionLocks.delete(key);
+      }).catch(() => {});
+      return request;
+    }
+
     function readFriendChallengeState() {
       const fallback = { code: createFriendChallengeCode(), inviteType: "private", gameType: "casual", color: "random", fen: "", moves: [], status: "draft", active: false, createdAt: Date.now() };
       const saved = readJsonStorage(friendChallengeStorageKey, fallback);
@@ -38088,13 +38495,18 @@
       }));
     }
 
-    async function sendFriendGameMessage(event) {
+    function sendFriendGameMessage(event) {
       event?.preventDefault();
       const input = document.getElementById("friendGameChatInput");
       const text = String(input?.value || "").trim();
       if (!text || !friendChallengeState?.remote) return;
+      const code = friendChallengeState.code;
+      return runFriendAction(`challenge:${code}:message:${text}`, () => sendFriendGameMessageRequest(code, text, input));
+    }
+
+    async function sendFriendGameMessageRequest(code, text, input) {
       try {
-        const remote = await getFriendProvider()?.sendFriendMessage(friendChallengeState.code, text);
+        const remote = await getFriendProvider()?.sendFriendMessage(code, text);
         if (remote) applyRemoteFriendChallenge(remote, false);
         if (input) input.value = "";
       } catch (error) {
@@ -38195,6 +38607,7 @@
         termination: String(raw.termination || ""),
         fen: String(raw.fen || ""),
         moves: Array.isArray(raw.moves) ? raw.moves.map(String) : [],
+        revision: Math.max(0, Number(raw.revision) || 0),
         messages: Array.isArray(raw.messages) ? raw.messages : [],
         clockState: normalizeMatchClockState(raw.clockState || raw.clock_state, raw.clock),
         updatedAt: String(raw.updatedAt || raw.updated_at || ""),
@@ -38233,6 +38646,7 @@
         messages: remote.messages,
         remoteMessageStamp: remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|"),
         remoteRevision: getFriendChallengeRevision(remote),
+        serverRevision: remote.revision,
         clockState: remote.clockState,
         remoteUpdatedAt: remote.updatedAt
       };
@@ -38241,7 +38655,9 @@
     function getFriendChallengeRevision(remote) {
       const moves = Array.isArray(remote?.moves) ? remote.moves : [];
       const lastMove = moves.length ? JSON.stringify(moves[moves.length - 1]) : "";
-      return [remote?.id || "", remote?.updatedAt || "", remote?.status || "", remote?.fen || "", moves.length, lastMove].join("\u001f");
+      const creatorOnline = remote?.creatorProfile?.online ? "online" : "offline";
+      const opponentOnline = remote?.opponentProfile?.online ? "online" : "offline";
+      return [remote?.id || "", remote?.revision || 0, remote?.updatedAt || "", remote?.status || "", remote?.fen || "", moves.length, lastMove, creatorOnline, opponentOnline].join("\u001f");
     }
 
     function applyRemoteFriendChallenge(raw, restoreBoard = false) {
@@ -38249,12 +38665,14 @@
       if (!remote) return false;
       const previous = friendChallengeState || readFriendChallengeState();
       if (previous?.remoteId && previous.remoteId !== remote.id) invalidateFriendChallengeSync();
+      if (previous?.remoteId === remote.id && Number(remote.revision) < Number(previous.serverRevision || 0)) return true;
       const boardNeedsRestore = Boolean(restoreBoard && ["active", "completed"].includes(remote.status) && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen));
       const messageStamp = remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|");
       const revision = getFriendChallengeRevision(remote);
       const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteRevision === revision && previous.remoteMessageStamp === messageStamp;
       if (unchanged && !boardNeedsRestore) return true;
       const next = toFriendChallengeState(remote);
+      if (boardNeedsRestore) next.historyBasePly = remote.moves.filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)).length;
       friendChallengeState = next;
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
       if (remote.status === "active") {
@@ -38492,14 +38910,18 @@
     async function searchFriendPlayers(query = document.getElementById("friendSearchInput")?.value || "") {
       const provider = getFriendProvider();
       const text = String(query || "").trim();
+      const requestId = ++friendSearchRequest;
       if (!provider || text.length < 2) {
         friendNetworkState.search = [];
         renderFriendDirectory();
         return;
       }
       try {
-        friendNetworkState.search = (await provider.searchRegisteredPlayers(text)).map(normalizeFriendRecord).filter((friend) => friend.id);
+        const rows = await provider.searchRegisteredPlayers(text);
+        if (requestId !== friendSearchRequest) return;
+        friendNetworkState.search = (Array.isArray(rows) ? rows : []).map(normalizeFriendRecord).filter((friend) => friend.id);
       } catch (error) {
+        if (requestId !== friendSearchRequest) return;
         friendNetworkState.search = [];
         setFriendChallengeStatus(error?.message || "Player search is unavailable.");
       }
@@ -38675,7 +39097,11 @@
       saveFriendChallengeState(friendChallengeState);
     }
 
-    async function sendFriendChallenge(target = null) {
+    function sendFriendChallenge(target = null) {
+      return runFriendAction(`challenge:create:${target?.id || "invite"}`, () => createFriendChallengeRequest(target));
+    }
+
+    async function createFriendChallengeRequest(target = null) {
       updateFriendChallengeFromControls();
       const provider = getFriendProvider();
       if (!provider) {
@@ -38704,8 +39130,12 @@
       if (linkInput) linkInput.value = link;
     }
 
-    async function acceptFriendChallenge() {
+    function acceptFriendChallenge() {
       const state = friendChallengeState || readFriendChallengeState();
+      return runFriendAction(`challenge:${state.code}:accept`, () => acceptFriendChallengeRequest(state));
+    }
+
+    async function acceptFriendChallengeRequest(state) {
       try {
         const remote = await getFriendProvider()?.respondFriendChallenge(state.code, "accept");
         if (!remote) throw new Error("Sign in to accept this challenge.");
@@ -38719,8 +39149,12 @@
       startFriendChallenge(false);
     }
 
-    async function declineFriendChallenge() {
+    function declineFriendChallenge() {
       const state = friendChallengeState || readFriendChallengeState();
+      return runFriendAction(`challenge:${state.code}:decline`, () => declineFriendChallengeRequest(state));
+    }
+
+    async function declineFriendChallengeRequest(state) {
       try {
         await getFriendProvider()?.respondFriendChallenge(state.code, "decline");
         saveFriendChallengeState({ ...state, pending: false, active: false, status: "declined" });
@@ -38775,7 +39209,7 @@
       coachGameRecorded = false;
       coachEndSoundPlayed = false;
       coachMessage = `${rematch ? "Rematch ready" : "Friend challenge ready"}. Pass the board or share the invite. White moves first.`;
-      friendChallengeState = { ...state, pending: false, active: true, status: "active", color, fen: coachGame.fen(), moves: [], startedAt: Date.now() };
+      friendChallengeState = { ...state, pending: false, active: true, status: "active", color, fen: coachGame.fen(), moves: state.moves || [], historyBasePly: 0, startedAt: Date.now() };
       saveFriendChallengeState(friendChallengeState);
       void syncFriendChallengePosition();
       startRealtimeMatchLifecycle();
@@ -38788,8 +39222,12 @@
       powerOnCoachBoard();
     }
 
-    async function reconnectFriendChallenge() {
+    function reconnectFriendChallenge() {
       const state = friendChallengeState || readFriendChallengeState();
+      return runFriendAction(`challenge:${state.code}:reconnect`, () => reconnectFriendChallengeRequest(state));
+    }
+
+    async function reconnectFriendChallengeRequest(state) {
       try {
         const remote = await getFriendProvider()?.getFriendChallenge(state.code);
         if (!remote) throw new Error("Sign in to reconnect this game.");
@@ -38800,8 +39238,12 @@
       }
     }
 
-    async function replaceFriendChallengeCode() {
+    function replaceFriendChallengeCode() {
       const state = friendChallengeState || readFriendChallengeState();
+      return runFriendAction(`challenge:${state.code}:replace`, () => replaceFriendChallengeCodeRequest(state));
+    }
+
+    async function replaceFriendChallengeCodeRequest(state) {
       try {
         if (state.remote && state.status === "pending" && state.creatorId === getFriendCurrentUserId()) {
           await getFriendProvider()?.respondFriendChallenge(state.code, "cancel");
@@ -38813,7 +39255,7 @@
       setFriendChallengeStatus("New code ready. Send Challenge to create the invite.");
     }
 
-    async function joinFriendChallengeCode() {
+    function joinFriendChallengeCode() {
       const input = document.getElementById("friendJoinCode");
       const code = String(input?.value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
       if (!code) {
@@ -38821,6 +39263,10 @@
         if (status) status.textContent = "Enter a challenge code first.";
         return;
       }
+      return runFriendAction(`challenge:${code}:join`, () => joinFriendChallengeCodeRequest(code));
+    }
+
+    async function joinFriendChallengeCodeRequest(code) {
       try {
         const remote = await getFriendProvider()?.getFriendChallenge(code);
         if (!remote) throw new Error("Sign in to join a friend challenge.");
@@ -38851,7 +39297,7 @@
         if (epoch !== friendChallengeSyncEpoch || !state?.remote || !state.active || !coachGame || !provider) return false;
         const code = state.code;
         const moves = getSyncedFriendMoves();
-        const signature = `${state.remoteId || code}\u001f${coachGame.fen()}\u001f${JSON.stringify(moves)}`;
+        const signature = `${state.remoteId || code}\u001f${state.serverRevision || 0}\u001f${coachGame.fen()}\u001f${JSON.stringify(moves)}`;
         if (signature === friendChallengeLastPositionSignature) return true;
         try {
           const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active", moveApplied });
@@ -38930,10 +39376,8 @@
     }
 
     function declineFriendDraw() {
-      const cleared = getFriendBoardMoves();
-      if (friendChallengeState) friendChallengeState = { ...friendChallengeState, moves: cleared };
       coachMessage = "Draw declined. Keep playing.";
-      void syncFriendChallengePosition(false);
+      void syncFriendSignal("__draw_decline");
       renderCoachBoard();
       updateCoachPanel();
     }
@@ -39547,11 +39991,16 @@
       window.clearInterval(friendNetworkTimer);
       window.clearTimeout(friendNetworkRefreshTimer);
       window.clearTimeout(friendRealtimeReconnectTimer);
+      window.clearTimeout(friendSearchTimer);
       friendNetworkTimer = 0;
       friendNetworkRefreshTimer = 0;
       friendNetworkRefreshQueued = false;
       friendRealtimeReconnectTimer = 0;
       friendRealtimeReconnectAttempts = 0;
+      friendSearchTimer = 0;
+      friendSearchRequest += 1;
+      friendNetworkState.search = [];
+      friendActionLocks.clear();
       friendNetworkRequest += 1;
       friendNetworkSubscriptionGeneration += 1;
       friendNetworkRefreshPromise = null;
@@ -39628,10 +40077,53 @@
     }
 
     function startFriendNetworkSync() {
-      stopFriendNetworkSync();
+      if (!getFriendProvider()) return;
       ensureFriendRealtime();
       void refreshFriendNetwork(true);
-      friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 5000);
+      if (!friendNetworkTimer) friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 5000);
+    }
+
+    function setupFriendlyChallengeControls() {
+      friendUiAbortController?.abort();
+      friendUiAbortController = new AbortController();
+      const options = { signal: friendUiAbortController.signal };
+      const listen = (id, event, handler) => document.getElementById(id)?.addEventListener(event, handler, options);
+
+      friendChallengeState = readFriendChallengeState();
+      void applyFriendInviteFromHash();
+      renderFriendChallengeLobby();
+      ["friendInviteType", "friendGameType", "friendColor", "friendClock"].forEach((id) => listen(id, "change", updateFriendChallengeFromControls));
+      listen("friendNewCode", "click", () => void replaceFriendChallengeCode());
+      listen("friendCopyLink", "click", () => copyFriendChallengeText(getFriendInviteLink(friendChallengeState || readFriendChallengeState()), "Invite link"));
+      listen("friendCopyCode", "click", () => copyFriendChallengeText((friendChallengeState || readFriendChallengeState()).code, "Challenge code"));
+      listen("friendSend", "click", () => void sendFriendChallenge());
+      listen("friendAccept", "click", () => void acceptFriendChallenge());
+      listen("friendDecline", "click", () => void declineFriendChallenge());
+      listen("friendSearchButton", "click", () => {
+        const state = readFriendDirectoryState();
+        const query = document.getElementById("friendSearchInput")?.value || "";
+        saveFriendDirectoryState({ ...state, lastSearch: query });
+        void searchFriendPlayers(query);
+      });
+      listen("friendSearchInput", "input", (event) => {
+        const state = readFriendDirectoryState();
+        const query = String(event.target?.value || "");
+        writeJsonStorage(friendDirectoryStorageKey, { ...state, lastSearch: query });
+        window.clearTimeout(friendSearchTimer);
+        friendSearchTimer = window.setTimeout(() => void searchFriendPlayers(query), 220);
+      });
+      listen("friendStart", "click", () => startFriendChallenge(false));
+      listen("friendJoin", "click", () => void joinFriendChallengeCode());
+      listen("friendReconnect", "click", () => void reconnectFriendChallenge());
+      listen("friendRematch", "click", () => startFriendChallenge(true));
+      listen("friendTakeback", "click", takebackFriendMove);
+      listen("friendGameChatForm", "submit", sendFriendGameMessage);
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("[data-profile-challenge]")) openFriendChallengeFromProfile();
+      }, options);
+      window.addEventListener("hashchange", () => {
+        if (location.hash.includes("challenge=")) void applyFriendInviteFromHash();
+      }, options);
     }
 
     function takebackFriendMove() {
@@ -41216,43 +41708,10 @@
       document.getElementById("reviewShowYour")?.addEventListener("click", () => setReviewCompareMode("your"));
       document.getElementById("reviewShowBest")?.addEventListener("click", () => setReviewCompareMode("best"));
       document.getElementById("reviewReplayBest")?.addEventListener("click", replayReviewBestLine);
-      friendChallengeState = readFriendChallengeState();
-      void applyFriendInviteFromHash();
-      renderFriendChallengeLobby();
-      ["friendInviteType", "friendGameType", "friendColor", "friendClock"].forEach((id) => {
-        document.getElementById(id)?.addEventListener("change", updateFriendChallengeFromControls);
-      });
-      document.getElementById("friendNewCode")?.addEventListener("click", () => void replaceFriendChallengeCode());
-      document.getElementById("friendCopyLink")?.addEventListener("click", () => copyFriendChallengeText(getFriendInviteLink(friendChallengeState || readFriendChallengeState()), "Invite link"));
-      document.getElementById("friendCopyCode")?.addEventListener("click", () => copyFriendChallengeText((friendChallengeState || readFriendChallengeState()).code, "Challenge code"));
-      document.getElementById("friendSend")?.addEventListener("click", () => void sendFriendChallenge());
-      document.getElementById("friendAccept")?.addEventListener("click", () => void acceptFriendChallenge());
-      document.getElementById("friendDecline")?.addEventListener("click", () => void declineFriendChallenge());
-      document.getElementById("friendSearchButton")?.addEventListener("click", () => {
-        const state = readFriendDirectoryState();
-        const query = document.getElementById("friendSearchInput")?.value || "";
-        saveFriendDirectoryState({ ...state, lastSearch: query });
-        void searchFriendPlayers(query);
-      });
-      document.getElementById("friendSearchInput")?.addEventListener("input", (event) => {
-        const state = readFriendDirectoryState();
-        writeJsonStorage(friendDirectoryStorageKey, { ...state, lastSearch: event.target.value || "" });
-        window.clearTimeout(friendSearchTimer);
-        friendSearchTimer = window.setTimeout(() => void searchFriendPlayers(event.target.value || ""), 220);
-      });
-      document.getElementById("friendStart")?.addEventListener("click", () => startFriendChallenge(false));
-      document.getElementById("friendJoin")?.addEventListener("click", () => void joinFriendChallengeCode());
-      document.getElementById("friendReconnect")?.addEventListener("click", () => void reconnectFriendChallenge());
-      document.getElementById("friendRematch")?.addEventListener("click", () => startFriendChallenge(true));
-      document.getElementById("friendTakeback")?.addEventListener("click", takebackFriendMove);
-      document.getElementById("friendGameChatForm")?.addEventListener("submit", sendFriendGameMessage);
+      setupFriendlyChallengeControls();
       document.getElementById("tournamentCreateForm")?.addEventListener("submit", createTournamentFromForm);
       document.getElementById("tournamentRefresh")?.addEventListener("click", () => void refreshTournamentNetwork(true));
-      document.addEventListener("click", (event) => {
-        if (event.target.closest("[data-profile-challenge]")) openFriendChallengeFromProfile();
-      });
       window.addEventListener("hashchange", () => {
-        if (location.hash.includes("challenge=")) void applyFriendInviteFromHash();
         if (location.hash.includes("tournament=")) void refreshTournamentNetwork(true);
       });
       startFriendNetworkSync();
@@ -42443,14 +42902,10 @@
             p_code: String(challenge?.code || ""),
             p_fen: String(challenge?.fen || ""),
             p_moves: Array.isArray(challenge?.moves) ? challenge.moves : [],
-            p_status: String(challenge?.status || "active")
+            p_status: String(challenge?.status || "active"),
+            p_expected_revision: Number.isFinite(Number(challenge?.serverRevision)) ? Number(challenge.serverRevision) : null
           };
-          try {
-            return await callFriendRpc("save_game_challenge_position", { ...payload, p_move_applied: Boolean(challenge?.moveApplied) });
-          } catch (error) {
-            if (!/p_move_applied|function .*save_game_challenge_position/i.test(String(error?.message || ""))) throw error;
-            return callFriendRpc("save_game_challenge_position", payload);
-          }
+          return callFriendRpc("save_game_challenge_position", { ...payload, p_move_applied: Boolean(challenge?.moveApplied) });
         },
         listFriendChallenges: () => callFriendRpc("list_game_challenges"),
         sendFriendMessage: (code, body) => callFriendRpc("send_game_challenge_message", { p_code: String(code || ""), p_body: String(body || "") }),
@@ -42460,6 +42915,7 @@
           const channel = supabase.channel("checkmate-friend-games")
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenges" }, (payload) => notify({ type: "change", table: "game_challenges", payload }))
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_messages" }, (payload) => notify({ type: "change", table: "game_challenge_messages", payload }))
+            .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_presence" }, (payload) => notify({ type: "change", table: "game_challenge_presence", payload }))
             .subscribe((status) => notify({ type: "status", status }));
           return () => { try { supabase.removeChannel(channel); } catch {} };
         },
