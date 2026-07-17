@@ -22522,6 +22522,125 @@
         transform: none;
       }
     }
+
+    /* Design language foundations: three surface levels, one accent family, and a measured spacing scale. */
+    :root {
+      --cq-radius-control: 10px;
+      --cq-radius-card: 16px;
+      --cq-radius-stage: 24px;
+      --cq-space-1: 6px;
+      --cq-space-2: 10px;
+      --cq-space-3: 16px;
+      --cq-space-4: 24px;
+      --cq-space-5: 36px;
+    }
+
+    body:not(.theme-light)::before {
+      background-size: 46px 46px;
+      opacity: 0.42;
+    }
+
+    body:not(.theme-light) :is(.section-dark, .section-warm) {
+      background: transparent;
+    }
+
+    body:not(.theme-light) :where(
+      .home-quick-card,
+      .home-summary-card,
+      .lesson-card,
+      .academy-card,
+      .mission-card,
+      .adventure-card,
+      .rule-item,
+      .opening-card,
+      .notation-card,
+      .book-card,
+      .video-card,
+      .store-card,
+      .leaderboard-card,
+      .plan-panel,
+      .friend-lobby,
+      .tournament-lobby,
+      .real-puzzles-panel,
+      .puzzle-shell,
+      .settings-panel,
+      .login-perks,
+      .player-profile
+    ) {
+      border-color: var(--cq-line);
+      border-radius: var(--cq-radius-card);
+      background: linear-gradient(145deg, rgba(20, 26, 63, 0.78), rgba(10, 14, 36, 0.82));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 14px 34px rgba(0, 0, 0, 0.15);
+    }
+
+    body:not(.theme-light) :where(
+      .home-quick-card,
+      .home-summary-card,
+      .lesson-card,
+      .academy-card,
+      .mission-card,
+      .adventure-card,
+      .rule-item,
+      .opening-card,
+      .notation-card,
+      .book-card,
+      .video-card,
+      .store-card,
+      .leaderboard-card
+    ):hover {
+      border-color: rgba(137, 112, 255, 0.34);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 38px rgba(0, 0, 0, 0.2);
+    }
+
+    body:not(.theme-light) :is(.badge, .xp-pill, .match-player-pill, .player-frame-record) {
+      border-color: rgba(150, 163, 255, 0.2);
+      border-radius: 999px;
+      color: #d6ddff;
+      background: rgba(90, 105, 191, 0.13);
+    }
+
+    body:not(.theme-light) :is(.section-head, .real-puzzles-head, .tournament-head, .friend-lobby-head) h2,
+    body:not(.theme-light) :is(.section-head, .real-puzzles-head, .tournament-head, .friend-lobby-head) h3 {
+      letter-spacing: -0.025em;
+    }
+
+    body:not(.theme-light) .section-intro,
+    body:not(.theme-light) :is(.lesson-card, .academy-card, .mission-card, .adventure-card, .book-card, .video-card, .store-card, .leaderboard-card) p {
+      color: #aeb9df;
+    }
+
+    body:not(.theme-light) .footer {
+      border-top-color: var(--cq-line);
+      background: rgba(7, 9, 26, 0.74);
+    }
+
+    @media (max-width: 699px) {
+      body:not(.theme-light) :where(
+        .home-quick-card,
+        .home-summary-card,
+        .lesson-card,
+        .academy-card,
+        .mission-card,
+        .adventure-card,
+        .rule-item,
+        .opening-card,
+        .notation-card,
+        .book-card,
+        .video-card,
+        .store-card,
+        .leaderboard-card,
+        .plan-panel,
+        .friend-lobby,
+        .tournament-lobby,
+        .real-puzzles-panel,
+        .puzzle-shell,
+        .settings-panel,
+        .login-perks,
+        .player-profile
+      ) {
+        border-radius: 14px;
+      }
+    }
   </style>
 </head>
 <body>
