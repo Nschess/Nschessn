@@ -30896,8 +30896,45 @@
       return provider && (typeof provider.getLeaderboard === "function" || typeof provider.listLeaderboard === "function") ? provider : null;
     }
 
+    function canUseSharedLeaderboardApi() {
+      const host = String(location.hostname || "").toLowerCase();
+      return location.protocol === "https:" && !host.endsWith(".github.io");
+    }
+
+    async function requestSharedLeaderboard(method = "GET", entry = null, options = {}) {
+      if (!canUseSharedLeaderboardApi()) {
+        const error = new Error("The shared leaderboard API is unavailable in this preview.");
+        error.code = "LEADERBOARD_API_UNAVAILABLE";
+        throw error;
+      }
+      const query = method === "GET"
+        ? new URLSearchParams({ limit: String(Math.max(1, Math.min(100, Number(options.limit) || 50))) })
+        : null;
+      if (query && options.cursor) query.set("cursor", String(options.cursor));
+      const endpoint = new URL(`/api/leaderboard${query ? `?${query}` : ""}`, window.location.origin);
+      const response = await fetch(endpoint, {
+        method,
+        headers: method === "POST" ? { "Content-Type": "application/json", Accept: "application/json" } : { Accept: "application/json" },
+        body: method === "POST" ? JSON.stringify({ entry }) : undefined,
+        cache: "no-store"
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const error = new Error(payload?.error || `Shared leaderboard request failed (${response.status}).`);
+        error.code = payload?.code || "LEADERBOARD_REQUEST_FAILED";
+        error.status = response.status;
+        throw error;
+      }
+      if (method === "GET" && !Array.isArray(payload?.entries)) {
+        const error = new Error("The shared leaderboard returned an invalid response.");
+        error.code = "LEADERBOARD_INVALID_RESPONSE";
+        throw error;
+      }
+      return payload;
+    }
+
     function scheduleSharedLeaderboardRefresh(delay = 30000) {
-      if (leaderboardRuntime.refreshTimer || !getLeaderboardProvider()) return;
+      if (leaderboardRuntime.refreshTimer || (!canUseSharedLeaderboardApi() && !getLeaderboardProvider())) return;
       leaderboardRuntime.refreshTimer = window.setTimeout(() => {
         leaderboardRuntime.refreshTimer = 0;
         if (document.visibilityState === "visible") void refreshSharedLeaderboards(true);
@@ -30966,8 +31003,10 @@
 
     async function refreshSharedLeaderboards(force = false) {
       const provider = getLeaderboardProvider();
-      const fetchRows = provider?.getLeaderboard || provider?.listLeaderboard;
-      if (!provider || typeof fetchRows !== "function") {
+      const fetchRows = canUseSharedLeaderboardApi()
+        ? (options) => requestSharedLeaderboard("GET", null, options)
+        : (provider?.getLeaderboard || provider?.listLeaderboard);
+      if (typeof fetchRows !== "function") {
         leaderboardRuntime.status = "local";
         leaderboardRuntime.accounts = null;
         return;
@@ -31198,7 +31237,7 @@
     function buildLeaderboardEntries(type = "puzzles") {
       const currentName = normalizeAuthUsername(readLearnerProfile().name).toLowerCase();
       const seen = new Set();
-      const useSharedAccounts = getLeaderboardProvider() && leaderboardRuntime.status !== "local";
+      const useSharedAccounts = leaderboardRuntime.status !== "local" && Array.isArray(leaderboardRuntime.accounts);
       const accounts = useSharedAccounts ? (leaderboardRuntime.accounts || []) : readAuthRegistry().accounts;
       return accounts
         .filter(filterLeaderboardAccounts)
@@ -40691,28 +40730,10 @@
     }
 
     function createVercelLeaderboardProvider() {
-      const host = String(location.hostname || "").toLowerCase();
-      if (location.protocol !== "https:" || host.endsWith(".github.io")) return null;
-      const request = async (method, entry, options = {}) => {
-        const query = method === "GET" ? new URLSearchParams({ limit: String(Math.max(1, Math.min(100, Number(options.limit) || 50))) }) : null;
-        if (query && options.cursor) query.set("cursor", String(options.cursor));
-        const response = await fetch(`/api/leaderboard${query ? `?${query}` : ""}`, {
-          method,
-          headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
-          body: method === "POST" ? JSON.stringify({ entry }) : undefined,
-          cache: "no-store"
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const error = new Error(payload.error || "Shared leaderboard is unavailable.");
-          error.code = payload.code || "LEADERBOARD_REQUEST_FAILED";
-          throw error;
-        }
-        return payload;
-      };
+      if (!canUseSharedLeaderboardApi()) return null;
       return {
-        getLeaderboard: async (options) => request("GET", null, options),
-        upsertLeaderboardEntry: async (entry) => request("POST", entry)
+        getLeaderboard: async (options) => requestSharedLeaderboard("GET", null, options),
+        upsertLeaderboardEntry: async (entry) => requestSharedLeaderboard("POST", entry)
       };
     }
 
