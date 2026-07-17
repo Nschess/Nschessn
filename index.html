@@ -42709,8 +42709,7 @@
     function createVercelLeaderboardProvider() {
       if (!canUseSharedLeaderboardApi()) return null;
       return {
-        getLeaderboard: async (options) => requestSharedLeaderboard("GET", null, options),
-        upsertLeaderboardEntry: async (entry) => requestSharedLeaderboard("POST", entry)
+        getLeaderboard: async (options) => requestSharedLeaderboard("GET", null, options)
       };
     }
 
@@ -43021,10 +43020,19 @@
           statistics: entry.statistics && typeof entry.statistics === "object" ? entry.statistics : {},
           updated_at: entry.updatedAt || new Date().toISOString()
         };
+        const supabase = await getSupabaseClient();
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const accessToken = sessionData.session?.access_token;
+        if (!accessToken) throw new Error("Sign in to sync your shared leaderboard progress.");
         return request("rest/v1", "leaderboard_entries?on_conflict=public_id", {
           method: "POST",
           cache: "no-store",
-          headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=representation",
+            Authorization: `Bearer ${accessToken}`
+          },
           body: JSON.stringify(row)
         });
       };
