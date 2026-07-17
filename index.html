@@ -22220,6 +22220,11 @@
       --cq-featured-aura: rgba(145, 85, 255, 0.45);
       --cq-focus-ring: 0 0 0 3px var(--cq-accent-tertiary-soft);
       --cq-inset-highlight: inset 0 1px 0 var(--cq-highlight);
+      --cq-card-surface: linear-gradient(145deg, rgba(24, 34, 53, 0.92), rgba(10, 14, 36, 0.88));
+      --cq-card-highlight: linear-gradient(125deg, rgba(255, 255, 255, 0.065), transparent 32%);
+      --cq-card-padding: var(--cq-space-3);
+      --cq-card-padding-compact: var(--cq-space-2);
+      --cq-card-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
 
       /* Shape, elevation, motion, and rhythm */
       --cq-radius-control: 10px;
@@ -23083,6 +23088,139 @@
 
       body:not(.theme-light) .site-header .nav-links > a::after {
         transform: none;
+      }
+    }
+
+    /* Shared card system: content groups use one soft, layered surface without flattening special controls. */
+    body:not(.theme-light) :where(
+      .academy-hero-card,
+      .admin-card,
+      .adventure-card,
+      .daily-goals-card,
+      .featured-coach-card,
+      .first-tour-card,
+      .friend-code-card,
+      .friend-request-card,
+      .hero-player-card,
+      .hero-progress-card,
+      .home-lower-card,
+      .home-quick-card,
+      .leaderboard-card,
+      .lesson-card,
+      .login-card,
+      .mission-card,
+      .next-step-card,
+      .notation-card,
+      .opening-card,
+      .real-puzzle-card,
+      .review-focus-card,
+      .settings-card,
+      .story-mode-card,
+      .video-card,
+      .book-card,
+      .store-card,
+      .plan-panel,
+      .tournament-detail,
+      .friend-search-panel
+    ) {
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-card-highlight), var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-card-shadow);
+    }
+
+    body:not(.theme-light) :where(
+      .academy-hero-card,
+      .admin-card,
+      .adventure-card,
+      .daily-goals-card,
+      .featured-coach-card,
+      .first-tour-card,
+      .friend-code-card,
+      .friend-request-card,
+      .home-lower-card,
+      .home-quick-card,
+      .leaderboard-card,
+      .lesson-card,
+      .login-card,
+      .mission-card,
+      .next-step-card,
+      .notation-card,
+      .opening-card,
+      .real-puzzle-card,
+      .review-focus-card,
+      .settings-card,
+      .story-mode-card,
+      .video-card,
+      .book-card,
+      .store-card,
+      .plan-panel,
+      .tournament-detail,
+      .friend-search-panel
+    ) {
+      padding: var(--cq-card-padding);
+    }
+
+    body:not(.theme-light) :where(.hero-player-card, .hero-progress-card) {
+      padding: var(--cq-card-padding-compact);
+    }
+
+    body:not(.theme-light) :where(.store-skeleton-card, .home-quick-card-head, .home-lower-card-head, .login-card-actions) {
+      border-radius: var(--cq-radius-card);
+    }
+
+    @media (hover: hover) {
+      body:not(.theme-light) :where(
+        .adventure-card,
+        .home-quick-card,
+        .leaderboard-card,
+        .lesson-card,
+        .mission-card,
+        .notation-card,
+        .opening-card,
+        .video-card,
+        .book-card,
+        .store-card
+      ):hover {
+        border-color: var(--cq-border-strong);
+        box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+      }
+    }
+
+    @media (max-width: 699px) {
+      body:not(.theme-light) :where(
+        .academy-hero-card,
+        .admin-card,
+        .adventure-card,
+        .daily-goals-card,
+        .featured-coach-card,
+        .first-tour-card,
+        .friend-code-card,
+        .friend-request-card,
+        .hero-player-card,
+        .hero-progress-card,
+        .home-lower-card,
+        .home-quick-card,
+        .leaderboard-card,
+        .lesson-card,
+        .login-card,
+        .mission-card,
+        .next-step-card,
+        .notation-card,
+        .opening-card,
+        .real-puzzle-card,
+        .review-focus-card,
+        .settings-card,
+        .story-mode-card,
+        .video-card,
+        .book-card,
+        .store-card,
+        .plan-panel,
+        .tournament-detail,
+        .friend-search-panel
+      ) {
+        padding: var(--cq-card-padding-compact);
+        border-radius: 14px;
       }
     }
   </style>
