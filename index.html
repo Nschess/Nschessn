@@ -21989,6 +21989,184 @@
     @media (prefers-reduced-motion: reduce) {
       #play:not(.is-review-mode) :is(.play-mode-card, .featured-coach-card, .engine-panel, .opening-compass, .coach-library) { transition: none; }
     }
+
+    /* Premium component pass: keep live controls legible without changing their behavior. */
+    #play:not(.is-review-mode) .player-frame {
+      transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    }
+
+    #play:not(.is-review-mode) .player-frame:hover,
+    #play:not(.is-review-mode) .player-frame:focus-within {
+      border-color: rgba(127, 166, 80, 0.42);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 36px rgba(0, 0, 0, 0.28), 0 0 24px rgba(127, 166, 80, 0.08);
+    }
+
+    #play:not(.is-review-mode) .player-frame--opponent:hover,
+    #play:not(.is-review-mode) .player-frame--opponent:focus-within {
+      border-color: color-mix(in srgb, var(--ai-rarity) 64%, rgba(255, 248, 237, 0.18));
+    }
+
+    #play:not(.is-review-mode) :is(.match-player-timer, .ai-player-timer) {
+      justify-self: end;
+      align-self: center;
+      padding: 7px 10px;
+      border: 1px solid rgba(231, 182, 93, 0.24);
+      color: #fff0bd;
+      background: linear-gradient(145deg, rgba(231, 182, 93, 0.16), rgba(0, 0, 0, 0.22));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 5px 14px rgba(0, 0, 0, 0.18);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
+    }
+
+    #play:not(.is-review-mode) :is(.match-player-timer.is-active, .ai-player-timer.is-active) {
+      border-color: rgba(143, 220, 112, 0.7);
+      color: #e8ffd8;
+      background: linear-gradient(145deg, rgba(91, 167, 77, 0.26), rgba(0, 0, 0, 0.2));
+      box-shadow: 0 0 0 3px rgba(112, 195, 86, 0.09), 0 5px 16px rgba(0, 0, 0, 0.18);
+    }
+
+    #play:not(.is-review-mode) .play-right-sidebar {
+      gap: 8px;
+    }
+
+    #play:not(.is-review-mode) .play-right-sidebar > :is(.engine-panel, .coach-library, .simple-coach, .opening-compass, .guided-review, .post-game-flow, .premium-review, .captured-row, .move-history, .trainer-note, .friend-game-chat) {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 10px 22px rgba(0, 0, 0, 0.13);
+    }
+
+    #play:not(.is-review-mode) .engine-panel {
+      padding: 10px;
+      background: linear-gradient(135deg, rgba(67, 126, 91, 0.13), rgba(5, 12, 19, 0.52));
+    }
+
+    #play:not(.is-review-mode) .engine-panel .engine-row {
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 0.66rem;
+    }
+
+    #play:not(.is-review-mode) .engine-panel .engine-row strong {
+      color: var(--soft);
+      font-variant-numeric: tabular-nums;
+    }
+
+    #play:not(.is-review-mode) .engine-panel .engine-eval {
+      height: 7px;
+      margin: 8px 0;
+      overflow: hidden;
+      border: 1px solid rgba(255, 248, 237, 0.12);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.34);
+    }
+
+    #play:not(.is-review-mode) .engine-panel .engine-eval span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #b0dd7b, #e8c76a);
+      transition: width 220ms ease;
+    }
+
+    #play:not(.is-review-mode) .play-right-sidebar > .coach-library > summary,
+    #play:not(.is-review-mode) .play-right-sidebar > .opening-compass .opening-compass-head,
+    #play:not(.is-review-mode) .play-right-sidebar > .friend-game-chat .friend-game-chat-head {
+      min-height: 38px;
+      padding: 8px 10px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    #play:not(.is-review-mode) .coach-library[open] > summary {
+      color: #ecffd9;
+      border-color: rgba(127, 166, 80, 0.34);
+      background: rgba(127, 166, 80, 0.1);
+    }
+
+    #play:not(.is-review-mode) .coach-library-body,
+    #play:not(.is-review-mode) .opening-compass-list,
+    #play:not(.is-review-mode) .move-history,
+    #play:not(.is-review-mode) .friend-game-chat-messages {
+      scrollbar-width: thin;
+    }
+
+    #play:not(.is-review-mode) :is(.captured-row, .move-history) {
+      padding: 10px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.15));
+    }
+
+    #play:not(.is-review-mode) .captured-row > div {
+      min-width: 0;
+      padding: 7px;
+      border: 1px solid rgba(255, 248, 237, 0.07);
+      border-radius: 9px;
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    #play:not(.is-review-mode) .captured-row strong {
+      color: var(--muted);
+      font-size: 0.64rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    #play:not(.is-review-mode) .move-history > * {
+      border-radius: 7px;
+      transition: background-color 160ms ease, color 160ms ease;
+    }
+
+    #play:not(.is-review-mode) .move-history > *:hover {
+      color: var(--soft);
+      background: rgba(127, 166, 80, 0.1);
+    }
+
+    #play:not(.is-review-mode) :is(.review-controls, .post-game-actions) {
+      gap: 7px;
+    }
+
+    #play:not(.is-review-mode) :is(.review-controls, .post-game-actions) .button {
+      min-height: 34px;
+      border-radius: 9px;
+      font-size: 0.68rem;
+    }
+
+    #play:not(.is-review-mode) .premium-review {
+      padding: 10px;
+      border-color: rgba(231, 182, 93, 0.24);
+      background: linear-gradient(145deg, rgba(84, 65, 35, 0.18), rgba(4, 12, 19, 0.55));
+    }
+
+    #play:not(.is-review-mode) .friend-game-chat-form {
+      gap: 7px;
+      padding: 8px;
+      border-top: 1px solid rgba(255, 248, 237, 0.08);
+    }
+
+    #play:not(.is-review-mode) .friend-game-chat-form input {
+      min-height: 34px;
+      border-radius: 9px;
+    }
+
+    @media (max-width: 1180px) {
+      #play:not(.is-review-mode) .play-right-sidebar > :is(.engine-panel, .coach-library, .simple-coach, .opening-compass, .guided-review, .post-game-flow, .premium-review, .captured-row, .move-history, .trainer-note, .friend-game-chat) {
+        min-width: 0;
+      }
+
+      #play:not(.is-review-mode) .play-right-sidebar .premium-review,
+      #play:not(.is-review-mode) .play-right-sidebar .post-game-flow {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 699px) {
+      #play:not(.is-review-mode) .player-frame-topline { padding-bottom: 6px; }
+      #play:not(.is-review-mode) :is(.match-player-timer, .ai-player-timer) { min-width: 66px; padding-inline: 8px; }
+      #play:not(.is-review-mode) .play-right-sidebar > :is(.engine-panel, .coach-library, .simple-coach, .opening-compass, .guided-review, .post-game-flow, .premium-review, .captured-row, .move-history, .trainer-note, .friend-game-chat) { grid-column: 1; }
+      #play:not(.is-review-mode) :is(.review-controls, .post-game-actions) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #play:not(.is-review-mode) :is(.player-frame, .move-history > *, .engine-panel .engine-eval span) { transition: none; }
+    }
   </style>
 </head>
 <body>
