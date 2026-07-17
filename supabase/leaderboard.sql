@@ -14,12 +14,16 @@ create index if not exists leaderboard_entries_updated_public_idx
   on public.leaderboard_entries (updated_at desc, public_id asc);
 
 alter table public.leaderboard_entries enable row level security;
-grant usage on schema public to anon;
-grant select, insert, update on public.leaderboard_entries to anon;
+grant usage on schema public to anon, authenticated;
+grant select on public.leaderboard_entries to anon, authenticated;
+grant insert, update on public.leaderboard_entries to authenticated;
+revoke insert, update on public.leaderboard_entries from anon;
 
 drop policy if exists "public leaderboard read" on public.leaderboard_entries;
 drop policy if exists "leaderboard insert" on public.leaderboard_entries;
 drop policy if exists "leaderboard update" on public.leaderboard_entries;
 create policy "public leaderboard read" on public.leaderboard_entries for select using (true);
-create policy "leaderboard insert" on public.leaderboard_entries for insert with check (true);
-create policy "leaderboard update" on public.leaderboard_entries for update using (true) with check (true);
+create policy "leaderboard insert" on public.leaderboard_entries for insert to authenticated
+  with check (public_id = auth.uid()::text);
+create policy "leaderboard update" on public.leaderboard_entries for update to authenticated
+  using (public_id = auth.uid()::text) with check (public_id = auth.uid()::text);

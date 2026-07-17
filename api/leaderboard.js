@@ -112,28 +112,8 @@ module.exports = async (request, response) => {
       const payload = await readEntries({ limit: getQueryValue(request, "limit"), cursor: getQueryValue(request, "cursor") });
       return send(response, 200, payload, "public, max-age=5, s-maxage=5, stale-while-revalidate=25");
     }
-    if (request.method !== "POST") return send(response, 405, { error: "Method not allowed." });
-    const body = typeof request.body === "string" ? JSON.parse(request.body) : request.body;
-    const entry = normalizeEntry(body?.entry || body);
-    if (!entry) return send(response, 400, { error: "A valid registered player entry is required." });
-    const row = {
-      public_id: entry.publicId,
-      username: entry.username,
-      country_flag: entry.countryFlag,
-      title: entry.title,
-      puzzle_rating: entry.puzzleRating,
-      game_rating: entry.gameRating,
-      achievements: entry.achievements,
-      statistics: entry.statistics,
-      updated_at: entry.updatedAt
-    };
-    await supabaseRequest("leaderboard_entries?on_conflict=public_id", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(row)
-    });
-    readCache.clear();
-    return send(response, 200, { entry });
+    response.setHeader("Allow", "GET");
+    return send(response, 405, { error: "Method not allowed." });
   } catch (error) {
     const status = error?.code === "SUPABASE_NOT_CONFIGURED" ? 503 : (error?.status || 500);
     return send(response, status, { error: error?.message || "Leaderboard storage failed.", code: error?.code || "LEADERBOARD_STORAGE_ERROR" });
