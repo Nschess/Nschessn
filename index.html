@@ -22670,6 +22670,136 @@
         border-radius: 14px;
       }
     }
+
+    /* Three-rail game workspace: utilities, match stage, and live insight remain visually independent. */
+    body:not(.theme-light) #play:not(.is-review-mode) {
+      --cq-workspace-gap: clamp(16px, 1.6vw, 26px);
+      --cq-rail-width: 250px;
+      --cq-insight-width: 320px;
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-shell {
+      align-items: start;
+      gap: var(--cq-workspace-gap);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar,
+    body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar,
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column {
+      align-content: start;
+      gap: var(--cq-space-3);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar > *,
+    body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar > *,
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > * {
+      margin: 0;
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar > :is(.play-mode-nav, .preference-panel),
+    body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar > :not([hidden]),
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.coach-setup, .ai-player-card, .match-player-card, .play-bottom-actionbar, .game-options-panel) {
+      border-radius: var(--cq-radius-card);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar > :not([hidden]) {
+      min-width: 0;
+      padding: var(--cq-space-3);
+      border: 1px solid var(--cq-border);
+      background: var(--cq-surface-panel);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar > .featured-coach-card {
+      padding: var(--cq-space-3);
+      background:
+        radial-gradient(circle at 92% 6%, var(--cq-featured-aura), transparent 28%),
+        var(--cq-featured-surface);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-bottom-actionbar {
+      padding: var(--cq-space-2);
+      border: 1px solid var(--cq-border);
+      background: var(--cq-surface-glass);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .game-options-panel {
+      padding: var(--cq-space-3);
+      border: 1px solid var(--cq-border);
+      background: var(--cq-surface-panel);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column {
+      grid-template-areas:
+        "setup"
+        "opponent"
+        "board"
+        "player"
+        "actions"
+        "options";
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > .coach-setup { grid-area: setup; }
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: opponent; }
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap { grid-area: board; }
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: player; }
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > .play-bottom-actionbar { grid-area: actions; }
+    body:not(.theme-light) #play:not(.is-review-mode) .match-board-column > .game-options-panel { grid-area: options; }
+
+    @media (min-width: 1181px) {
+      body:not(.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-areas: "left center right";
+        grid-template-columns: minmax(226px, var(--cq-rail-width)) minmax(520px, 1fr) minmax(288px, var(--cq-insight-width));
+        max-width: 1540px;
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar {
+        grid-area: left;
+        top: 84px;
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .match-board-column { grid-area: center; }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar {
+        grid-area: right;
+        padding-right: var(--cq-space-1);
+      }
+    }
+
+    @media (min-width: 700px) and (max-width: 1180px) {
+      body:not(.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center right"
+          "left right";
+        grid-template-columns: minmax(0, 1fr) minmax(286px, 340px) !important;
+        gap: var(--cq-space-3);
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar {
+        grid-area: right;
+        padding: 0;
+      }
+    }
+
+    @media (max-width: 699px) {
+      body:not(.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-areas: "center" "right" "left";
+        gap: var(--cq-space-3);
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar,
+      body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar {
+        padding: 0;
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .match-board-column,
+      body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar,
+      body:not(.theme-light) #play:not(.is-review-mode) .play-right-sidebar {
+        gap: var(--cq-space-2);
+      }
+    }
   </style>
 </head>
 <body>
