@@ -23570,6 +23570,73 @@
         opacity: 0;
       }
     }
+
+    /* Responsive resilience: contain wide content and keep the board first as space contracts. */
+    html,
+    body {
+      max-width: 100%;
+      overflow-x: clip;
+    }
+
+    :where(
+      main,
+      main > section,
+      .wrap,
+      .section-head,
+      .puzzle-shell,
+      .play-shell,
+      .match-board-column,
+      .play-left-sidebar,
+      .play-right-sidebar
+    ) {
+      min-inline-size: 0;
+    }
+
+    :where(img, picture, video, iframe, canvas, svg) {
+      max-inline-size: 100%;
+    }
+
+    :where(input, select, textarea, button) {
+      max-inline-size: 100%;
+    }
+
+    :where(pre, .audit-log, .notation-card code) {
+      max-inline-size: 100%;
+      overflow-wrap: anywhere;
+    }
+
+    @media (min-width: 700px) and (max-width: 940px) {
+      body:not(.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .match-board-column {
+        width: min(100%, 720px);
+        justify-self: center;
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+        width: min(100%, 680px);
+      }
+    }
+
+    @media (max-width: 699px) {
+      body:not(.theme-light) :is(.section-head, .home-quick-card-head, .player-frame-topline) {
+        min-width: 0;
+      }
+
+      body:not(.theme-light) .section-head {
+        align-items: flex-start;
+      }
+
+      body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+        max-inline-size: calc(100vw - 30px);
+      }
+    }
   </style>
 </head>
 <body>
