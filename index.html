@@ -15,6 +15,9 @@
   <link rel="canonical" href="./" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <title>Checkmate Quest - Learn Chess From First Move to Strategy</title>
   <style>
     :root {
@@ -250,8 +253,8 @@
       background-position: center;
       background-size: cover;
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.55;
+      font-family: var(--cq-font-sans, "Manrope", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      line-height: var(--cq-leading-body, 1.58);
       transition: background 260ms ease, color 160ms ease;
     }
 
@@ -22233,6 +22236,13 @@
       --cq-button-disabled: rgba(116, 129, 165, 0.14);
       --cq-button-shadow: 0 8px 18px rgba(4, 8, 24, 0.32);
       --cq-button-shadow-hover: 0 14px 26px rgba(4, 8, 24, 0.42);
+      --cq-font-sans: "Manrope", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --cq-font-display: "Space Grotesk", var(--cq-font-sans);
+      --cq-font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      --cq-leading-body: 1.62;
+      --cq-leading-heading: 1.12;
+      --cq-tracking-heading: -0.03em;
+      --cq-tracking-label: 0.075em;
 
       /* Shape, elevation, motion, and rhythm */
       --cq-radius-control: 10px;
@@ -23363,6 +23373,67 @@
       body:not(.theme-light) .button::before {
         transition: none;
         animation: none;
+      }
+    }
+
+    /* Typography system: a calm reading face with a precise display hierarchy. */
+    body {
+      font-family: var(--cq-font-sans);
+      font-size: 1rem;
+      font-kerning: normal;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body :where(h1, h2, h3, h4, h5, h6) {
+      font-family: var(--cq-font-display);
+      font-weight: 650;
+      line-height: var(--cq-leading-heading);
+      letter-spacing: var(--cq-tracking-heading);
+      text-wrap: balance;
+    }
+
+    body :where(h1, h2) {
+      font-weight: 700;
+    }
+
+    body :where(h3, h4) {
+      font-weight: 650;
+    }
+
+    body :where(p, li, dd) {
+      line-height: var(--cq-leading-body);
+    }
+
+    body :where(.section-kicker, .eyebrow, .player-profile-kicker, .store-wallet-kicker) {
+      font-family: var(--cq-font-display);
+      font-weight: 700;
+      letter-spacing: var(--cq-tracking-label);
+      line-height: 1.25;
+    }
+
+    body:not(.theme-light) :where(
+      .hero-description,
+      .section-intro,
+      .settings-page-head p,
+      .auth-note,
+      .home-quick-card > p,
+      .home-lower-card > p,
+      .login-pass-card > p
+    ) {
+      color: var(--cq-text-muted);
+      line-height: var(--cq-leading-body);
+    }
+
+    body :where(code, kbd, pre, .book-lines, .audit-log) {
+      font-family: var(--cq-font-mono);
+    }
+
+    @media (max-width: 699px) {
+      body :where(h1, h2, h3, h4, h5, h6) {
+        letter-spacing: -0.022em;
+        text-wrap: pretty;
       }
     }
   </style>
