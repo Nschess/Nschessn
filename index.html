@@ -18,6 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
+  <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Checkmate Quest - Learn Chess From First Move to Strategy</title>
   <style>
     :root {
@@ -23436,6 +23437,24 @@
         text-wrap: pretty;
       }
     }
+
+    /* Lucide keeps the shared navigation chrome on one coherent icon language. */
+    body:not(.theme-light) :is(svg.nav-icon, svg.nav-utility-icon, svg.nav-mobile-icon) {
+      display: block;
+      width: 1em;
+      height: 1em;
+      flex: 0 0 auto;
+      stroke-width: 1.9;
+    }
+
+    body:not(.theme-light) svg.nav-icon {
+      color: var(--cq-accent-tertiary);
+    }
+
+    body:not(.theme-light) svg.nav-utility-icon,
+    body:not(.theme-light) svg.nav-mobile-icon {
+      color: var(--cq-accent-tertiary);
+    }
   </style>
 </head>
 <body>
@@ -23447,14 +23466,14 @@
         <span class="brand-copy"><strong>Checkmate</strong><small>Quest</small></span>
       </a>
       <div class="nav-links" aria-label="Primary navigation">
-        <a href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" aria-hidden="true">&#9822;</span><span>Play</span></a>
-        <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-icon" aria-hidden="true">&#9671;</span><span>Puzzles</span></a>
-        <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-icon" aria-hidden="true">&#8961;</span><span>Learn</span></a>
-        <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-icon" aria-hidden="true">&#9819;</span><span>Tournaments</span></a>
-        <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-icon" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
-        <a href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-icon" aria-hidden="true">&#10022;</span><span>Store</span></a>
+        <a href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" data-lucide="swords" aria-hidden="true">&#9822;</span><span>Play</span></a>
+        <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-icon" data-lucide="puzzle" aria-hidden="true">&#9671;</span><span>Puzzles</span></a>
+        <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-icon" data-lucide="graduation-cap" aria-hidden="true">&#8961;</span><span>Learn</span></a>
+        <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span><span>Tournaments</span></a>
+        <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
+        <a href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span><span>Store</span></a>
         <details class="nav-group">
-          <summary class="nav-group-label"><span class="nav-icon" aria-hidden="true">&#9673;</span><span>Community</span></summary>
+          <summary class="nav-group-label"><span class="nav-icon" data-lucide="users" aria-hidden="true">&#9673;</span><span>Community</span></summary>
           <div class="nav-menu" aria-label="Community and more chess features">
             <a href="#academy" data-site-tab="academy" data-site-panel="academy">Academy</a>
             <a href="#paths" data-site-tab="paths" data-site-panel="paths">Learning Path</a>
@@ -23472,11 +23491,11 @@
       </div>
       <div class="nav-utilities" aria-label="Account actions">
         <a class="nav-coin-chip" href="#store" data-site-tab="store" data-site-panel="store" aria-label="Open Store and view coins">
-          <span class="nav-utility-icon" aria-hidden="true">&#9670;</span>
+          <span class="nav-utility-icon" data-lucide="coins" aria-hidden="true">&#9670;</span>
           <span data-profile-field="tokens">0</span>
         </a>
         <a class="nav-icon-button" href="#settings" data-site-tab="settings" data-site-panel="settings" aria-label="Open notification settings" title="Notifications">
-          <span aria-hidden="true">&#9673;</span><i aria-hidden="true"></i>
+          <span class="nav-utility-icon" data-lucide="bell" aria-hidden="true">&#9673;</span><i aria-hidden="true"></i>
         </a>
         <a class="player-flex-chip" href="#login" data-site-tab="login" data-site-panel="login" aria-label="Open Profile or Login">
           <span class="player-profile-avatar" aria-hidden="true">&#10022;</span>
@@ -23490,7 +23509,7 @@
         </a>
       </div>
       <details class="nav-mobile-menu">
-        <summary aria-label="Open navigation menu"><span aria-hidden="true">Menu</span><b>Menu</b></summary>
+        <summary aria-label="Open navigation menu"><span class="nav-mobile-icon" data-lucide="menu" aria-hidden="true">Menu</span><b>Menu</b></summary>
         <div class="nav-mobile-panel" aria-label="Mobile navigation">
           <a href="#play" data-site-tab="play" data-site-panel="play">Play</a>
           <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">Puzzles</a>
@@ -48776,6 +48795,10 @@
       setupPerformanceOptimizations();
       void initializeDeferredFeature("hero");
     });
+
+    window.addEventListener("load", () => {
+      window.lucide?.createIcons({ attrs: { "aria-hidden": "true" } });
+    }, { once: true });
   </script>
 </body>
 </html>
