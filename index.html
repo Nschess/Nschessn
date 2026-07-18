@@ -23756,6 +23756,103 @@
     body:not(.theme-light) .cq-navigation-list .cq-navigation-item:focus-visible {
       box-shadow: 0 0 0 3px var(--cq-focus-halo);
     }
+
+    /* Final interface polish: align control density, icon weight, and quiet states across the workspace. */
+    body:not(.theme-light) .site-header svg.nav-icon,
+    body:not(.theme-light) .site-header svg.nav-mobile-icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    body:not(.theme-light) .site-header svg.nav-utility-icon {
+      width: 16px;
+      height: 16px;
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) {
+      --cq-play-control-height: 42px;
+      --cq-play-field-height: 40px;
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-primary-actions {
+      gap: var(--cq-space-1);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) :is(
+      .play-primary-actions > .button,
+      .play-extra-actions summary
+    ) {
+      min-height: var(--cq-play-control-height);
+      justify-content: center;
+      padding-inline: var(--cq-space-2);
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-extra-actions-menu .button {
+      min-height: 38px;
+      border-radius: var(--cq-radius-control);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar .preference-grid {
+      gap: var(--cq-space-1);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar .preference-grid > label,
+    body:not(.theme-light) #play:not(.is-review-mode) .game-options-grid > label {
+      color: var(--cq-text-muted);
+      font-size: 0.68rem;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar .preference-grid :is(select, input:not([type="range"])),
+    body:not(.theme-light) #play:not(.is-review-mode) .game-options-grid select {
+      min-height: var(--cq-play-field-height);
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-primary);
+      font-size: 0.72rem;
+      font-weight: 650;
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .play-left-sidebar .preference-grid input[type="range"] {
+      min-height: var(--cq-play-field-height);
+    }
+
+    body:not(.theme-light) #play:not(.is-review-mode) .game-options-grid {
+      gap: var(--cq-space-1);
+    }
+
+    body:not(.theme-light) :is(.tournament-empty, .book-empty) {
+      display: block;
+      margin: 0;
+      padding: var(--cq-space-3);
+      border: 1px dashed var(--cq-border-strong);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-input);
+      line-height: var(--cq-leading-body);
+    }
+
+    body:not(.theme-light) .status-skeleton {
+      display: inline-flex;
+      min-height: 1.4rem;
+      align-items: center;
+      border-radius: 999px;
+    }
+
+    body:not(.theme-light) .coach-skeleton {
+      display: grid;
+      min-height: 3.5rem;
+      align-items: center;
+      border-radius: var(--cq-radius-control);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body:not(.theme-light) :is(.status-skeleton, .coach-skeleton)::after {
+        animation: none;
+      }
+    }
   </style>
 </head>
 <body>
