@@ -27522,7 +27522,7 @@
     function schedulePieceSvgPrewarm(style = activePieceSvgSet) {
       const task = () => prewarmPieceSvgSet(style);
       if (typeof scheduleBackgroundTask === "function") {
-        scheduleBackgroundTask(task, 600);
+        scheduleBackgroundTask(task, 600, `piece-svg-prewarm:${resolvePieceSvgSet(style)}`);
         return;
       }
       window.setTimeout(task, 0);
@@ -40052,30 +40052,35 @@
         const legalMove = legalByTarget.get(squareNameValue);
         const square = boardSquares.get(squareNameValue);
         if (!square) return;
-        square.className = `puzzle-square play-square ${isLightCoachSquare(squareNameValue) ? "light" : "dark"}`;
-        if (piece) square.classList.add(piece.color === "w" ? "white-piece" : "black-piece");
-        if (squareNameValue === coachSelected) square.classList.add("selected");
-        if (coachPremove?.from === squareNameValue) square.classList.add("selected");
-        if (coachPremove?.to === squareNameValue) square.classList.add("legal");
-        if (legalMove) square.classList.add(legalMove.captured || legalMove.flags.includes("e") ? "capture" : "legal");
-        if (lastSquares.includes(squareNameValue)) square.classList.add("last-move");
-        if (animateEffect && squareNameValue === coachLastMove?.to && captureEffect) square.classList.add("capture-impact");
-        if (animateEffect && squareNameValue === coachLastMove?.to && promotionEffect) square.classList.add("promotion-bloom");
-        if (reviewVisual?.from === squareNameValue) square.classList.add("review-from");
-        if (reviewVisual?.to === squareNameValue) square.classList.add("review-to");
-        if (reviewVisual?.best && (reviewVisual.from === squareNameValue || reviewVisual.to === squareNameValue)) square.classList.add("review-best");
-        if (reviewOverlay.attacks.has(squareNameValue)) square.classList.add("review-attack");
-        if (reviewOverlay.engineSquares.has(squareNameValue)) square.classList.add(squareNameValue === reviewOverlay.best?.from ? "review-engine-from" : "review-engine-to");
-        if (squareNameValue === checkedKing) square.classList.add("in-check");
-        if (threatSquares.has(squareNameValue)) square.classList.add("threat");
-        if (coachThinking) square.classList.add("is-ai-thinking");
-        square.draggable = Boolean(piece && isCoachPlayablePiece(piece) && !coachThinking && !isCoachGameOver());
+        let className = `puzzle-square play-square ${isLightCoachSquare(squareNameValue) ? "light" : "dark"}`;
+        if (piece) className += ` ${piece.color === "w" ? "white-piece" : "black-piece"}`;
+        if (squareNameValue === coachSelected || coachPremove?.from === squareNameValue) className += " selected";
+        if (coachPremove?.to === squareNameValue) className += " legal";
+        if (legalMove) className += legalMove.captured || legalMove.flags.includes("e") ? " capture" : " legal";
+        if (lastSquares.includes(squareNameValue)) className += " last-move";
+        if (animateEffect && squareNameValue === coachLastMove?.to && captureEffect) className += " capture-impact";
+        if (animateEffect && squareNameValue === coachLastMove?.to && promotionEffect) className += " promotion-bloom";
+        if (reviewVisual?.from === squareNameValue) className += " review-from";
+        if (reviewVisual?.to === squareNameValue) className += " review-to";
+        if (reviewVisual?.best && (reviewVisual.from === squareNameValue || reviewVisual.to === squareNameValue)) className += " review-best";
+        if (reviewOverlay.attacks.has(squareNameValue)) className += " review-attack";
+        if (reviewOverlay.engineSquares.has(squareNameValue)) className += squareNameValue === reviewOverlay.best?.from ? " review-engine-from" : " review-engine-to";
+        if (squareNameValue === checkedKing) className += " in-check";
+        if (threatSquares.has(squareNameValue)) className += " threat";
+        if (coachThinking) className += " is-ai-thinking";
+        if (square.className !== className) square.className = className;
+        const draggable = Boolean(piece && isCoachPlayablePiece(piece) && !coachThinking && !isCoachGameOver());
+        if (square.draggable !== draggable) square.draggable = draggable;
         const pieceKey = piece ? `${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}` : "empty";
         if (square.dataset.pieceKey !== pieceKey) {
           renderPieceOnSquare(square, piece);
           square.dataset.pieceKey = pieceKey;
         }
-        square.setAttribute("aria-label", `${squareNameValue}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${piece.type}` : " empty"}`);
+        const ariaLabel = `${squareNameValue}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${piece.type}` : " empty"}`;
+        if (square.dataset.ariaLabel !== ariaLabel) {
+          square.setAttribute("aria-label", ariaLabel);
+          square.dataset.ariaLabel = ariaLabel;
+        }
       });
       renderReviewArrow();
 
@@ -45876,6 +45881,14 @@
       return keys.some((key) => key === "pieces" || key === "pieceSkin");
     }
 
+    function applyPlayBoardScale(prefs) {
+      const boardSizeMap = { small: 620, medium: 720, large: 820, xl: 920 };
+      const scaledBoardSize = Math.round((boardSizeMap[prefs.boardSize] || boardSizeMap.large) * clampNumber(Number(prefs.boardScale) || 100, 82, 122) / 100);
+      const playSection = document.getElementById("play");
+      playSection?.style.setProperty("--user-board-size", `${scaledBoardSize}px`);
+      playSection?.style.setProperty("--match-card-width", `${clampNumber(Math.round(scaledBoardSize * 0.58), 320, 540)}px`);
+    }
+
     function applyLearnerPrefs(prefs) {
       document.body.classList.toggle("theme-light", prefs.theme === "light");
       applyBackgroundTheme(prefs.backgroundTheme);
@@ -45901,11 +45914,7 @@
       ["small", "medium", "large", "xl"].forEach((size) => {
         document.body.classList.toggle(`board-size-${size}`, prefs.boardSize === size);
       });
-      const boardSizeMap = { small: 620, medium: 720, large: 820, xl: 920 };
-      const scaledBoardSize = Math.round((boardSizeMap[prefs.boardSize] || boardSizeMap.large) * clampNumber(Number(prefs.boardScale) || 100, 82, 122) / 100);
-      const playSection = document.getElementById("play");
-      playSection?.style.setProperty("--user-board-size", `${scaledBoardSize}px`);
-      playSection?.style.setProperty("--match-card-width", `${clampNumber(Math.round(scaledBoardSize * 0.58), 320, 540)}px`);
+      applyPlayBoardScale(prefs);
       applyBoardTheme(prefs.board);
       document.body.classList.toggle("piece-letter", prefs.pieces === "letter");
       [...supportedPieceSvgSets].forEach((skin) => {
@@ -45973,6 +45982,8 @@
         pressure: document.getElementById("prefPressure")
       };
       const note = document.getElementById("motivationMessage");
+      let boardScalePreviewFrame = 0;
+      let pendingBoardScale = null;
 
       applyLearnerPrefs(prefs);
       syncPreferenceLocks();
@@ -45980,6 +45991,11 @@
         if (!field) return;
         field.value = prefs[key];
         field.addEventListener("change", () => {
+          if (key === "boardScale" && boardScalePreviewFrame) {
+            window.cancelAnimationFrame(boardScalePreviewFrame);
+            boardScalePreviewFrame = 0;
+            pendingBoardScale = null;
+          }
           const value = key === "boardScale" ? clampNumber(Number(field.value) || 100, 82, 122) : field.value;
           const next = { ...readLearnerPrefs(), [key]: value };
           writeJsonStorage(learnerPrefsStorageKey, next);
@@ -45993,9 +46009,13 @@
         });
         if (key === "boardScale") {
           field.addEventListener("input", () => {
-            const next = { ...readLearnerPrefs(), boardScale: clampNumber(Number(field.value) || 100, 82, 122) };
-            writeJsonStorage(learnerPrefsStorageKey, next);
-            applyLearnerPrefs(next);
+            pendingBoardScale = clampNumber(Number(field.value) || 100, 82, 122);
+            if (boardScalePreviewFrame) return;
+            boardScalePreviewFrame = window.requestAnimationFrame(() => {
+              boardScalePreviewFrame = 0;
+              applyPlayBoardScale({ ...readLearnerPrefs(), boardScale: pendingBoardScale });
+              pendingBoardScale = null;
+            });
           });
         }
       });
@@ -48864,6 +48884,7 @@
     }
 
     const backgroundTaskQueue = [];
+    const queuedBackgroundTaskKeys = new Set();
     let backgroundTaskTimer = 0;
     let backgroundTaskIdleId = 0;
     let backgroundTaskScheduledFor = 0;
@@ -48871,6 +48892,7 @@
     function flushNextBackgroundTask(deadline) {
       backgroundTaskIdleId = 0;
       backgroundTaskScheduledFor = 0;
+      if (document.hidden) return;
       if (deadline && !deadline.didTimeout && deadline.timeRemaining() < 4) {
         window.setTimeout(scheduleNextBackgroundTask, 0);
         return;
@@ -48883,6 +48905,7 @@
       }
 
       const [job] = backgroundTaskQueue.splice(index, 1);
+      if (job.key) queuedBackgroundTaskKeys.delete(job.key);
       try {
         const result = job.task();
         if (result && typeof result.catch === "function") result.catch(() => {});
@@ -48919,14 +48942,18 @@
       }, wait);
     }
 
-    function scheduleBackgroundTask(task, timeout = 1500) {
+    function scheduleBackgroundTask(task, timeout = 1500, key = "") {
       if (typeof task !== "function") return;
-      backgroundTaskQueue.push({ task, dueAt: performance.now() + Math.max(0, Number(timeout) || 0) });
+      const taskKey = String(key || "");
+      if (taskKey && queuedBackgroundTaskKeys.has(taskKey)) return;
+      if (taskKey) queuedBackgroundTaskKeys.add(taskKey);
+      backgroundTaskQueue.push({ task, dueAt: performance.now() + Math.max(0, Number(timeout) || 0), key: taskKey });
       scheduleNextBackgroundTask();
     }
 
     function cancelBackgroundTasks() {
       backgroundTaskQueue.length = 0;
+      queuedBackgroundTaskKeys.clear();
       if (backgroundTaskTimer) window.clearTimeout(backgroundTaskTimer);
       if (backgroundTaskIdleId && "cancelIdleCallback" in window) window.cancelIdleCallback(backgroundTaskIdleId);
       backgroundTaskTimer = 0;
@@ -48967,7 +48994,7 @@
           signal: prefetchController.signal
         }).catch((error) => {
           if (error?.name !== "AbortError") throw error;
-        }), 1800);
+        }), 1800, "puzzle-bank-prefetch");
       }
 
       let sectionObserver = null;
@@ -48995,6 +49022,7 @@
 
       document.addEventListener("visibilitychange", () => {
         document.body.classList.toggle("is-background-tab", document.hidden);
+        if (!document.hidden) scheduleNextBackgroundTask();
         if (document.hidden) {
           window.clearInterval(reviewReplayTimer);
           reviewReplayTimer = 0;
