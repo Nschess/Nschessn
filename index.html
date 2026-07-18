@@ -22223,6 +22223,9 @@
       --cq-featured-surface: linear-gradient(145deg, rgba(37, 22, 98, 0.98), rgba(14, 18, 57, 0.98));
       --cq-featured-aura: rgba(145, 85, 255, 0.45);
       --cq-focus-ring: 0 0 0 3px var(--cq-accent-tertiary-soft);
+      --cq-focus-outline: var(--cq-accent-tertiary);
+      --cq-focus-halo: var(--cq-accent-tertiary-soft);
+      --cq-focus-offset: 3px;
       --cq-inset-highlight: inset 0 1px 0 var(--cq-highlight);
       --cq-card-surface: linear-gradient(145deg, rgba(24, 34, 53, 0.92), rgba(10, 14, 36, 0.88));
       --cq-card-highlight: linear-gradient(125deg, rgba(255, 255, 255, 0.065), transparent 32%);
@@ -23635,6 +23638,60 @@
 
       body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap {
         max-inline-size: calc(100vw - 30px);
+      }
+    }
+
+    /* Accessible interaction states: predictable keyboard focus, stronger contrast, and system color support. */
+    body.theme-light {
+      --cq-focus-outline: #1d4ed8;
+      --cq-focus-halo: rgba(29, 78, 216, 0.18);
+    }
+
+    body :is(a, button, summary, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+      outline: 3px solid var(--cq-focus-outline) !important;
+      outline-offset: var(--cq-focus-offset);
+      scroll-margin-block: var(--cq-space-5);
+    }
+
+    body:not(.theme-light) :is(.button, .audio-control, .nav-icon-button, .nav-coin-chip, .player-flex-chip):focus-visible {
+      box-shadow: var(--cq-focus-ring), 0 0 0 6px var(--cq-focus-halo), var(--cq-shadow-md);
+    }
+
+    body:not(.theme-light) #coachBoard .play-square:focus-visible {
+      z-index: 3;
+      outline-offset: -4px;
+    }
+
+    @media (prefers-contrast: more) {
+      body:not(.theme-light) {
+        --cq-text-muted: #d8e0ff;
+        --cq-text-subtle: #c0c9ea;
+        --cq-border: rgba(204, 214, 255, 0.46);
+        --cq-border-strong: rgba(165, 193, 255, 0.76);
+        --cq-accent-tertiary-soft: rgba(103, 232, 249, 0.2);
+      }
+
+      body:not(.theme-light) :is(
+        .button.secondary,
+        .nav-links > a,
+        .nav-group-label,
+        .nav-icon-button,
+        .nav-coin-chip,
+        .player-flex-chip
+      ) {
+        border-color: var(--cq-border);
+      }
+    }
+
+    @media (forced-colors: active) {
+      .skip-link {
+        border: 1px solid CanvasText;
+        color: CanvasText;
+        background: Canvas;
+      }
+
+      body :is(a, button, summary, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+        outline-color: Highlight !important;
       }
     }
   </style>
@@ -26290,7 +26347,7 @@
               <span class="play-setup-chip">Stockfish WASM</span>
               <span class="badge" id="gameDifficultyBadge">Easy coach</span>
               <span class="play-setup-chip" id="gameEloBadge">1050 Elo</span>
-              <span class="badge status-skeleton" id="gameStatusBadge" aria-label="Loading chess rules"><span class="sr-only">Loading chess rules.</span></span>
+              <span class="badge status-skeleton" id="gameStatusBadge" role="status" aria-live="polite" aria-atomic="true"><span class="sr-only">Loading chess rules.</span></span>
               <span class="badge" id="gameTurnBadge">White to move</span>
               <span class="badge" id="gameBossBadge" hidden>Boss battle</span>
               <details class="coach-difficulty-menu">
@@ -26485,7 +26542,7 @@
                 </div>
               </div>
             </details>
-            <p class="simple-coach coach-skeleton" id="gameCoach" aria-label="Preparing the chessboard"><span class="sr-only">Preparing the chessboard.</span></p>
+            <p class="simple-coach coach-skeleton" id="gameCoach" role="status" aria-live="polite" aria-atomic="true"><span class="sr-only">Preparing the chessboard.</span></p>
             <div class="opening-compass" id="openingCompass" aria-live="polite">
               <div class="opening-compass-head">
                 <div>
