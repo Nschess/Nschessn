@@ -23830,7 +23830,162 @@
       border-radius: var(--cq-radius-control);
     }
 
+    /* Phase 3 design-system foundation. These primitives bridge the existing
+       component classes so future visual work can reuse one contract without
+       changing routes, DOM order, or interaction bindings. */
+    :root {
+      --cq-radius-pill: 999px;
+      --cq-control-height: 42px;
+      --cq-control-height-compact: 36px;
+      --cq-control-padding-inline: var(--cq-space-3);
+      --cq-control-radius: var(--cq-radius-control);
+      --cq-control-border: var(--cq-border);
+      --cq-control-surface: var(--cq-surface-input);
+      --cq-text-on-success: #07140f;
+      --cq-control-transition: border-color var(--cq-transition-fast) ease, background-color var(--cq-transition-fast) ease, box-shadow var(--cq-transition-fast) ease, transform var(--cq-transition-fast) ease;
+      --cq-component-border: var(--cq-border);
+      --cq-component-surface: var(--cq-surface-panel);
+      --cq-component-shadow: var(--cq-shadow-sm);
+      --cq-component-padding: var(--cq-card-padding);
+      --cq-status-gap: var(--cq-space-1);
+      --cq-status-padding-inline: var(--cq-space-2);
+      --cq-empty-state-padding: var(--cq-space-3);
+    }
+
+    :where(.cq-surface, .cq-card, .cq-control, .cq-button, .cq-field, .cq-status, .cq-empty-state, .cq-stack, .cq-cluster) {
+      box-sizing: border-box;
+      min-inline-size: 0;
+    }
+
+    .cq-surface,
+    .cq-card {
+      border: 1px solid var(--cq-component-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-component-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-component-shadow);
+    }
+
+    .cq-surface--elevated,
+    .cq-card--elevated {
+      --cq-component-surface: var(--cq-surface-panel-strong);
+      --cq-component-shadow: var(--cq-shadow-md);
+    }
+
+    .cq-surface--quiet,
+    .cq-card--quiet {
+      --cq-component-surface: var(--cq-surface-input);
+      --cq-component-shadow: none;
+    }
+
+    .cq-stack {
+      display: grid;
+      gap: var(--cq-component-gap, var(--cq-space-3));
+    }
+
+    .cq-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--cq-component-gap, var(--cq-space-2));
+    }
+
+    .cq-control,
+    .cq-button,
+    .cq-field {
+      border-radius: var(--cq-control-radius);
+      transition: var(--cq-control-transition);
+    }
+
+    .cq-button {
+      display: inline-flex;
+      min-height: var(--cq-control-height);
+      align-items: center;
+      justify-content: center;
+      gap: var(--cq-space-1);
+      padding-inline: var(--cq-control-padding-inline);
+      border: 1px solid var(--cq-control-border);
+      font: inherit;
+      font-weight: 700;
+      line-height: 1.15;
+      text-decoration: none;
+    }
+
+    .cq-button--primary { background: var(--cq-button-primary); color: var(--cq-text-primary); }
+    .cq-button--secondary { background: var(--cq-button-secondary); color: var(--cq-text-primary); }
+    .cq-button--success { background: var(--cq-button-success); color: var(--cq-text-on-success); }
+    .cq-button--danger { background: var(--cq-button-danger); color: var(--cq-text-primary); }
+
+    .cq-field {
+      min-height: var(--cq-control-height);
+      padding-inline: var(--cq-space-2);
+      border: 1px solid var(--cq-control-border);
+      background: var(--cq-control-surface);
+      color: var(--cq-text-primary);
+      font: inherit;
+    }
+
+    .cq-status {
+      display: inline-flex;
+      min-inline-size: 0;
+      align-items: center;
+      gap: var(--cq-status-gap);
+      padding-inline: var(--cq-status-padding-inline);
+      border-radius: var(--cq-radius-pill);
+      font-variant-numeric: tabular-nums;
+      line-height: 1.25;
+    }
+
+    .cq-status--success { color: var(--cq-success); }
+    .cq-status--warning { color: var(--cq-warning); }
+    .cq-status--danger { color: var(--cq-danger); }
+
+    .cq-empty-state {
+      margin: 0;
+      padding: var(--cq-empty-state-padding);
+      border: 1px dashed var(--cq-border-strong);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-input);
+      line-height: var(--cq-leading-body);
+    }
+
+    /* Compatibility adapters standardize the established UI without forcing a
+       markup migration during the foundation phase. */
+    :where(.button, .mission-button, .tab-button) {
+      --cq-control-radius: var(--cq-radius-control);
+      --cq-control-transition: transform var(--cq-transition-fast) ease, border-color var(--cq-transition-fast) ease, box-shadow var(--cq-transition-standard) ease, background-color var(--cq-transition-fast) ease;
+      border-radius: var(--cq-control-radius);
+      transition: var(--cq-control-transition);
+    }
+
+    :where(input, select, textarea) {
+      border-radius: var(--cq-control-radius);
+      font: inherit;
+    }
+
+    :where(.badge, .play-setup-chip, .cq-stat-chip) {
+      border-radius: var(--cq-radius-pill);
+      font-variant-numeric: tabular-nums;
+    }
+
+    :where(.tournament-empty, .book-empty) {
+      --cq-empty-state-padding: var(--cq-space-3);
+    }
+
+    body.theme-light {
+      --cq-component-border: rgba(44, 63, 102, 0.2);
+      --cq-component-surface: rgba(255, 255, 255, 0.9);
+      --cq-component-shadow: 0 9px 20px rgba(23, 37, 64, 0.1);
+      --cq-control-border: rgba(44, 63, 102, 0.28);
+      --cq-control-surface: rgba(255, 255, 255, 0.96);
+      --cq-text-on-success: #062c1f;
+    }
+
     @media (prefers-reduced-motion: reduce) {
+      :where(.cq-control, .cq-button, .cq-field, .button, .mission-button, .tab-button) {
+        transition: none;
+      }
+
       body:not(.theme-light) :is(.status-skeleton, .coach-skeleton)::after {
         animation: none;
       }
