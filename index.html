@@ -27361,7 +27361,7 @@
       if (cached) return cached;
       const asset = licensedPieceAssetSets[resolvedStyle]?.[`${info.color}${info.type}`];
       if (!asset) return "";
-      const markup = `<img class="piece-svg ${colorClass}" src="${asset}" alt="" aria-hidden="true" draggable="false" decoding="async" fetchpriority="high" referrerpolicy="no-referrer" data-piece="${info.color}${info.type}" data-style="${resolvedStyle}" data-rarity="${theme.rarity}">`;
+      const markup = `<img class="piece-svg ${colorClass}" src="${asset}" alt="" aria-hidden="true" draggable="false" decoding="async" fetchpriority="auto" referrerpolicy="no-referrer" data-piece="${info.color}${info.type}" data-style="${resolvedStyle}" data-rarity="${theme.rarity}">`;
       pieceSvgMarkupCache.set(cacheKey, markup);
       return markup;
     }
@@ -27376,6 +27376,15 @@
         image.src = asset;
       });
       ["K", "Q", "R", "B", "N", "P", "k", "q", "r", "b", "n", "p"].forEach((piece) => createPieceSvgMarkup(piece, resolvedStyle));
+    }
+
+    function schedulePieceSvgPrewarm(style = activePieceSvgSet) {
+      const task = () => prewarmPieceSvgSet(style);
+      if (typeof scheduleBackgroundTask === "function") {
+        scheduleBackgroundTask(task, 600);
+        return;
+      }
+      window.setTimeout(task, 0);
     }
 
     function renderPieceOnSquare(square, piece, style = activePieceSvgSet, forceClassic = false) {
@@ -29954,6 +29963,8 @@
       [["heroBoard", "hero-square"], ["homeMainBoard", "home-main-square"]].forEach(([id, squareClass]) => {
         const board = document.getElementById(id);
         if (!board) return;
+        const renderKey = `${pieceSvgRenderVersion}:${activePieceSvgSet}`;
+        if (board.dataset.pieceRenderKey === renderKey && board.childElementCount === heroPieces.length) return;
         board.replaceChildren();
         heroPieces.forEach((piece, index) => {
           const square = document.createElement("span");
@@ -29965,6 +29976,7 @@
           renderPieceOnSquare(square, piece);
           board.appendChild(square);
         });
+        board.dataset.pieceRenderKey = renderKey;
       });
     }
 
@@ -30825,6 +30837,8 @@
 
     function renderMiniBoards() {
       document.querySelectorAll(".mini-board").forEach((board) => {
+        const renderKey = `${pieceSvgRenderVersion}:${activePieceSvgSet}:${board.dataset.fen || ""}`;
+        if (board.dataset.pieceRenderKey === renderKey && board.childElementCount === 64) return;
         const squares = fenToSquares(board.dataset.fen);
         board.innerHTML = "";
         squares.forEach((piece, index) => {
@@ -30837,6 +30851,7 @@
           renderPieceOnSquare(square, piece);
           board.appendChild(square);
         });
+        board.dataset.pieceRenderKey = renderKey;
       });
     }
 
@@ -31752,11 +31767,15 @@
     }
 
     function applyPieceSetTheme(value) {
-      activePieceSvgSet = resolvePieceSvgSet(value);
-      pieceSvgRenderVersion += 1;
+      const nextPieceSet = resolvePieceSvgSet(value);
+      const didChange = activePieceSvgSet !== nextPieceSet || document.body.dataset.pieceRenderer !== "svg";
+      activePieceSvgSet = nextPieceSet;
       document.body.dataset.pieceRenderer = "svg";
       applyStyleVars(document.body, getPieceSetTheme(activePieceSvgSet).vars);
-      prewarmPieceSvgSet(activePieceSvgSet);
+      if (!didChange) return false;
+      pieceSvgRenderVersion += 1;
+      schedulePieceSvgPrewarm(activePieceSvgSet);
+      return true;
     }
 
     function applyPieceSetPreview(element, value) {
@@ -45709,6 +45728,13 @@
       Object.assign(coachPieceSymbols.b, useLetters ? letterCoachPieceSymbols.b : classicCoachPieceSymbols.b);
     }
 
+    function preferencesRequireBoardRender(changedPreferences) {
+      const keys = Array.isArray(changedPreferences)
+        ? changedPreferences
+        : Object.keys(changedPreferences || {});
+      return keys.some((key) => key === "pieces" || key === "pieceSkin");
+    }
+
     function applyLearnerPrefs(prefs) {
       document.body.classList.toggle("theme-light", prefs.theme === "light");
       applyBackgroundTheme(prefs.backgroundTheme);
@@ -45817,9 +45843,11 @@
           const next = { ...readLearnerPrefs(), [key]: value };
           writeJsonStorage(learnerPrefsStorageKey, next);
           applyLearnerPrefs(next);
-          renderMiniBoards();
-          renderPuzzle();
-          renderCoachBoard();
+          if (preferencesRequireBoardRender([key])) {
+            renderMiniBoards();
+            renderPuzzle();
+            renderCoachBoard();
+          }
           saveProgressSnapshot("settings");
         });
         if (key === "boardScale") {
@@ -45827,7 +45855,6 @@
             const next = { ...readLearnerPrefs(), boardScale: clampNumber(Number(field.value) || 100, 82, 122) };
             writeJsonStorage(learnerPrefsStorageKey, next);
             applyLearnerPrefs(next);
-            renderCoachBoard();
           });
         }
       });
@@ -45949,13 +45976,15 @@
       writeJsonStorage(learnerPrefsStorageKey, next);
       applyLearnerPrefs(next);
       syncPreferenceLocks();
-      renderMiniBoards();
-      buildHeroBoard();
-      renderAdventureMission();
-      renderPuzzle();
-      renderCoachBoard();
-      if (document.getElementById("realPuzzleBoard") && typeof renderRealPuzzleBoard === "function") renderRealPuzzleBoard();
-      if (document.getElementById("tutorialBoard")) renderBeginnerTutorial(false);
+      if (preferencesRequireBoardRender(patch)) {
+        renderMiniBoards();
+        buildHeroBoard();
+        renderAdventureMission();
+        renderPuzzle();
+        renderCoachBoard();
+        if (document.getElementById("realPuzzleBoard") && typeof renderRealPuzzleBoard === "function") renderRealPuzzleBoard();
+        if (document.getElementById("tutorialBoard")) renderBeginnerTutorial(false);
+      }
       renderPlayerProfile();
       syncSettingsProfileFields();
       saveProgressSnapshot(label);
