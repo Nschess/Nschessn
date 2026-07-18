@@ -23455,6 +23455,16 @@
     body:not(.theme-light) svg.nav-mobile-icon {
       color: var(--cq-accent-tertiary);
     }
+
+    body:not(.theme-light) .site-header .nav-mobile-panel > a::before {
+      content: none;
+      display: none;
+    }
+
+    body:not(.theme-light) .site-header .nav-mobile-panel > a:hover .nav-mobile-icon,
+    body:not(.theme-light) .site-header .nav-mobile-panel > a:focus-visible .nav-mobile-icon {
+      color: var(--cq-text-primary);
+    }
   </style>
 </head>
 <body>
@@ -23511,12 +23521,12 @@
       <details class="nav-mobile-menu">
         <summary aria-label="Open navigation menu"><span class="nav-mobile-icon" data-lucide="menu" aria-hidden="true">Menu</span><b>Menu</b></summary>
         <div class="nav-mobile-panel" aria-label="Mobile navigation">
-          <a href="#play" data-site-tab="play" data-site-panel="play">Play</a>
-          <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">Puzzles</a>
-          <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">Learn</a>
-          <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Tournaments</a>
-          <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">Leaderboard</a>
-          <a href="#store" data-site-tab="store" data-site-panel="store">Store</a>
+          <a href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-mobile-icon" data-lucide="swords" aria-hidden="true">&#9822;</span>Play</a>
+          <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-mobile-icon" data-lucide="puzzle" aria-hidden="true">&#9671;</span>Puzzles</a>
+          <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-mobile-icon" data-lucide="graduation-cap" aria-hidden="true">&#8961;</span>Learn</a>
+          <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-mobile-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span>Tournaments</a>
+          <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-mobile-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span>Leaderboard</a>
+          <a href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-mobile-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span>Store</a>
           <details class="nav-mobile-community">
             <summary>Community</summary>
             <div class="nav-mobile-community-links">
