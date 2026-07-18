@@ -17554,7 +17554,7 @@
     main > section.section-reveal {
       opacity: 0;
       transform: translateY(18px);
-      transition: opacity 280ms ease, transform 280ms ease;
+      transition: opacity 220ms ease, transform 220ms ease;
     }
 
     main > section.section-reveal.is-revealed {
@@ -17565,7 +17565,7 @@
     :where(#heroBoard, #homeMainBoard).board-intro {
       opacity: 0;
       transform: translateY(14px) scale(0.985);
-      transition: opacity 300ms ease, transform 300ms ease;
+      transition: opacity 240ms ease, transform 240ms ease;
     }
 
     :where(#heroBoard, #homeMainBoard).board-intro.is-board-ready {
@@ -23464,6 +23464,111 @@
     body:not(.theme-light) .site-header .nav-mobile-panel > a:hover .nav-mobile-icon,
     body:not(.theme-light) .site-header .nav-mobile-panel > a:focus-visible .nav-mobile-icon {
       color: var(--cq-text-primary);
+    }
+
+    /* Motion system: concise tactile feedback that keeps the board and content in charge. */
+    body:not(.theme-light) .button:not(:disabled):not([aria-disabled="true"]):not(.is-loading):not([aria-busy="true"])::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: -85%;
+      border-radius: 50%;
+      pointer-events: none;
+      background: radial-gradient(circle, color-mix(in srgb, var(--cq-text-primary) 28%, transparent), transparent 64%);
+      opacity: 0;
+      transform: scale(0.3);
+      transition: transform var(--cq-transition-standard) ease-out, opacity var(--cq-transition-fast) ease-out;
+    }
+
+    body:not(.theme-light) .button:not(:disabled):not([aria-disabled="true"]):not(.is-loading):not([aria-busy="true"]):active::before {
+      opacity: 0.72;
+      transform: scale(1);
+    }
+
+    body:not(.theme-light) :is(
+      .settings-card,
+      .engine-panel,
+      .coach-library,
+      .opening-compass,
+      .friend-game-chat,
+      .move-history,
+      .captured-row,
+      .guided-review,
+      .post-game-flow,
+      .premium-review
+    ) {
+      transition:
+        transform var(--cq-transition-standard) ease,
+        border-color var(--cq-transition-fast) ease,
+        box-shadow var(--cq-transition-standard) ease;
+    }
+
+    body:not(.theme-light) .site-header :is(.nav-links > a, .nav-group-label, .nav-mobile-panel > a) {
+      transition:
+        transform var(--cq-transition-fast) ease,
+        color var(--cq-transition-fast) ease,
+        background-color var(--cq-transition-fast) ease,
+        border-color var(--cq-transition-fast) ease;
+    }
+
+    body:not(.theme-light) .site-header :is(.nav-icon, .nav-mobile-icon) {
+      transition: transform var(--cq-transition-fast) ease, color var(--cq-transition-fast) ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      body:not(.theme-light) :is(
+        .settings-card,
+        .engine-panel,
+        .coach-library,
+        .opening-compass,
+        .friend-game-chat,
+        .move-history,
+        .captured-row,
+        .guided-review,
+        .post-game-flow,
+        .premium-review
+      ):hover {
+        transform: translateY(-2px);
+        border-color: var(--cq-border-strong);
+        box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md), 0 0 24px var(--cq-accent-primary-soft);
+      }
+
+      body:not(.theme-light) .site-header :is(.nav-links > a, .nav-group-label, .nav-mobile-panel > a):hover {
+        transform: translateY(-1px);
+      }
+
+      body:not(.theme-light) .site-header :is(.nav-links > a, .nav-group-label, .nav-mobile-panel > a):hover :is(.nav-icon, .nav-mobile-icon) {
+        transform: scale(1.08);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body:not(.theme-light) :is(
+        .button,
+        .settings-card,
+        .engine-panel,
+        .coach-library,
+        .opening-compass,
+        .friend-game-chat,
+        .move-history,
+        .captured-row,
+        .guided-review,
+        .post-game-flow,
+        .premium-review,
+        .site-header .nav-links > a,
+        .site-header .nav-group-label,
+        .site-header .nav-mobile-panel > a,
+        .nav-icon,
+        .nav-mobile-icon
+      ),
+      body:not(.theme-light) .button::before {
+        transition: none;
+        animation: none;
+      }
+
+      body:not(.theme-light) .button::before {
+        opacity: 0;
+      }
     }
   </style>
 </head>
