@@ -22225,6 +22225,14 @@
       --cq-card-padding: var(--cq-space-3);
       --cq-card-padding-compact: var(--cq-space-2);
       --cq-card-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+      --cq-button-primary: linear-gradient(135deg, var(--cq-accent-primary), var(--cq-accent-secondary));
+      --cq-button-primary-hover: linear-gradient(135deg, #4b91ff, #9a7af0);
+      --cq-button-secondary: linear-gradient(145deg, rgba(31, 42, 67, 0.94), rgba(13, 19, 36, 0.92));
+      --cq-button-danger: linear-gradient(135deg, #d94b68, var(--cq-danger));
+      --cq-button-success: linear-gradient(135deg, #36ab7c, var(--cq-success));
+      --cq-button-disabled: rgba(116, 129, 165, 0.14);
+      --cq-button-shadow: 0 8px 18px rgba(4, 8, 24, 0.32);
+      --cq-button-shadow-hover: 0 14px 26px rgba(4, 8, 24, 0.42);
 
       /* Shape, elevation, motion, and rhythm */
       --cq-radius-control: 10px;
@@ -23223,6 +23231,140 @@
         border-radius: 14px;
       }
     }
+    /* Button system: clear hierarchy, tactile feedback, and accessible state styling. */
+    body:not(.theme-light) .button {
+      position: relative;
+      isolation: isolate;
+      min-height: 42px;
+      gap: var(--cq-space-1);
+      overflow: hidden;
+      border-color: var(--cq-border-strong);
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-primary);
+      background: var(--cq-button-primary);
+      box-shadow: inset 0 1px 0 var(--cq-highlight), var(--cq-button-shadow);
+      font-weight: 760;
+      letter-spacing: 0.01em;
+      transition:
+        transform var(--cq-transition-fast) ease,
+        box-shadow var(--cq-transition-standard) ease,
+        border-color var(--cq-transition-fast) ease,
+        background var(--cq-transition-standard) ease,
+        color var(--cq-transition-fast) ease,
+        opacity var(--cq-transition-fast) ease;
+    }
+
+    body:not(.theme-light) .button::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 1px;
+      border-radius: inherit;
+      pointer-events: none;
+      background: linear-gradient(125deg, var(--cq-highlight), transparent 44%);
+      opacity: 0.85;
+    }
+
+    body:not(.theme-light) .button:focus-visible {
+      outline: none;
+      border-color: var(--cq-accent-tertiary);
+      box-shadow: var(--cq-focus-ring), inset 0 1px 0 var(--cq-highlight), var(--cq-button-shadow-hover);
+    }
+
+    @media (hover: hover) {
+      body:not(.theme-light) .button:not(:disabled):not([aria-disabled="true"]):hover {
+        transform: translateY(-2px);
+        border-color: var(--cq-accent-tertiary);
+        background: var(--cq-button-primary-hover);
+        box-shadow: inset 0 1px 0 var(--cq-highlight), var(--cq-button-shadow-hover);
+      }
+    }
+
+    body:not(.theme-light) .button:not(:disabled):not([aria-disabled="true"]):active {
+      transform: translateY(1px) scale(0.985);
+      box-shadow: inset 0 2px 5px rgba(4, 8, 24, 0.3), 0 4px 10px rgba(4, 8, 24, 0.24);
+    }
+
+    body:not(.theme-light) .button.secondary {
+      border-color: var(--cq-line);
+      color: var(--cq-text-muted);
+      background: var(--cq-button-secondary);
+      box-shadow: inset 0 1px 0 var(--cq-highlight), var(--cq-shadow-sm);
+    }
+
+    @media (hover: hover) {
+      body:not(.theme-light) .button.secondary:not(:disabled):not([aria-disabled="true"]):hover {
+        color: var(--cq-text-primary);
+        background: var(--cq-surface-elevated);
+      }
+    }
+
+    body:not(.theme-light) .button:is(.danger, .is-danger) {
+      border-color: color-mix(in srgb, var(--cq-danger) 62%, transparent);
+      color: var(--cq-text-primary);
+      background: var(--cq-button-danger);
+    }
+
+    body:not(.theme-light) .button:is(.success, .is-success) {
+      border-color: color-mix(in srgb, var(--cq-success) 62%, transparent);
+      color: var(--cq-text-primary);
+      background: var(--cq-button-success);
+    }
+
+    @media (hover: hover) {
+      body:not(.theme-light) .button:is(.danger, .is-danger):not(:disabled):not([aria-disabled="true"]):hover {
+        border-color: var(--cq-danger);
+        background: var(--cq-button-danger);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--cq-danger) 18%, transparent), var(--cq-button-shadow-hover);
+      }
+
+      body:not(.theme-light) .button:is(.success, .is-success):not(:disabled):not([aria-disabled="true"]):hover {
+        border-color: var(--cq-success);
+        background: var(--cq-button-success);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--cq-success) 18%, transparent), var(--cq-button-shadow-hover);
+      }
+    }
+
+    body:not(.theme-light) .button:disabled,
+    body:not(.theme-light) .button[aria-disabled="true"] {
+      cursor: not-allowed;
+      pointer-events: none;
+      border-color: var(--cq-border);
+      color: var(--cq-text-subtle);
+      background: var(--cq-button-disabled);
+      box-shadow: none;
+      opacity: 0.62;
+      transform: none;
+    }
+
+    body:not(.theme-light) .button:is(.is-loading, [aria-busy="true"]) {
+      cursor: wait;
+      pointer-events: none;
+      color: transparent;
+    }
+
+    body:not(.theme-light) .button:is(.is-loading, [aria-busy="true"])::before {
+      content: "";
+      position: absolute;
+      width: 1em;
+      height: 1em;
+      border: 2px solid color-mix(in srgb, var(--cq-text-primary) 36%, transparent);
+      border-top-color: var(--cq-text-primary);
+      border-radius: 50%;
+      animation: cq-button-spin 700ms linear infinite;
+    }
+
+    @keyframes cq-button-spin {
+      to { transform: rotate(1turn); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body:not(.theme-light) .button,
+      body:not(.theme-light) .button::before {
+        transition: none;
+        animation: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -23957,7 +24099,7 @@
                   <label class="settings-field">Email <input type="email" data-profile-setting="email" placeholder="you@example.com" /></label>
                   <label class="settings-field">Password <input type="password" data-profile-setting="passwordNote" placeholder="Managed by secure account provider" disabled /></label>
                   <label class="settings-field">Blocked Users <textarea data-profile-setting="blockedUsers" placeholder="One username per line"></textarea></label>
-                  <button class="button secondary" type="button" id="settingsDeleteAccount">Delete Account</button>
+                  <button class="button secondary danger" type="button" id="settingsDeleteAccount">Delete Account</button>
                 </div>
               </div>
             </article>
@@ -25624,7 +25766,7 @@
               </div>
               <div class="book-actions">
                 <button class="button" type="submit">Add Local Book</button>
-                <button class="button secondary" id="clearLocalBooks" type="button">Clear Local Books</button>
+                <button class="button secondary danger" id="clearLocalBooks" type="button">Clear Local Books</button>
               </div>
             </form>
             <div class="admin-list" id="adminBookList" aria-live="polite"></div>
@@ -25754,7 +25896,7 @@
               <span id="friendRequestMeta">Choose time and color, then send.</span>
             </span>
             <span class="friend-request-actions">
-              <button class="button" type="button" id="friendAccept">Accept</button>
+              <button class="button success" type="button" id="friendAccept">Accept</button>
               <button class="button secondary" type="button" id="friendDecline">Decline</button>
             </span>
           </div>
@@ -25976,8 +26118,8 @@
                     <button class="button secondary" type="button" id="offerDraw">Offer Draw</button>
                     <button class="button secondary" type="button" id="acceptDraw" hidden>Accept Draw</button>
                     <button class="button secondary" type="button" id="declineDraw" hidden>Decline</button>
-                    <button class="button secondary" type="button" id="abortGame">Abort</button>
-                    <button class="button secondary" type="button" id="resignGame">Resign</button>
+                    <button class="button secondary danger" type="button" id="abortGame">Abort</button>
+                    <button class="button secondary danger" type="button" id="resignGame">Resign</button>
                     <button class="button secondary" type="button" id="returnLobby">Lobby</button>
                     <button class="button" type="button" id="exportPgn">Copy PGN</button>
                     <button class="button secondary" type="button" id="importPgn">Import PGN</button>
