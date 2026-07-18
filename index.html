@@ -23694,25 +23694,87 @@
         outline-color: Highlight !important;
       }
     }
+
+    /* Component composition layer: presentation-only primitives for the static application. */
+    :where(
+      .cq-navigation,
+      .cq-navigation-list,
+      .cq-workspace-shell,
+      .cq-sidebar,
+      .cq-board-stage,
+      .cq-panel,
+      .cq-player-card,
+      .cq-glass-container,
+      .cq-floating-toolbar
+    ) {
+      min-inline-size: 0;
+    }
+
+    .cq-section-header {
+      --cq-component-gap: var(--cq-space-3);
+      gap: var(--cq-component-gap);
+    }
+
+    .cq-navigation-list .cq-navigation-item {
+      position: relative;
+    }
+
+    .cq-panel,
+    .cq-player-card,
+    .cq-glass-container,
+    .cq-floating-toolbar {
+      background-clip: padding-box;
+    }
+
+    .cq-panel {
+      --cq-component-radius: var(--cq-radius-card);
+      border-radius: var(--cq-component-radius);
+    }
+
+    .cq-panel--compact {
+      --cq-component-padding: var(--cq-space-2);
+    }
+
+    .cq-panel--featured {
+      --cq-component-accent: var(--cq-accent-secondary);
+    }
+
+    .cq-player-card {
+      --cq-component-radius: var(--cq-radius-card);
+      border-radius: var(--cq-component-radius);
+    }
+
+    .cq-stat-chip {
+      min-inline-size: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cq-floating-toolbar {
+      --cq-component-padding: var(--cq-space-2);
+    }
+
+    body:not(.theme-light) .cq-navigation-list .cq-navigation-item:focus-visible {
+      box-shadow: 0 0 0 3px var(--cq-focus-halo);
+    }
   </style>
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
   <header class="site-header">
-    <nav class="nav" aria-label="Main navigation">
+    <nav class="nav cq-navigation" aria-label="Main navigation">
       <a class="brand" href="#top" data-home-link aria-label="Checkmate Quest home">
         <span class="brand-mark" aria-hidden="true">CQ</span>
         <span class="brand-copy"><strong>Checkmate</strong><small>Quest</small></span>
       </a>
-      <div class="nav-links" aria-label="Primary navigation">
-        <a href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" data-lucide="swords" aria-hidden="true">&#9822;</span><span>Play</span></a>
-        <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-icon" data-lucide="puzzle" aria-hidden="true">&#9671;</span><span>Puzzles</span></a>
-        <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-icon" data-lucide="graduation-cap" aria-hidden="true">&#8961;</span><span>Learn</span></a>
-        <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span><span>Tournaments</span></a>
-        <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
-        <a href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span><span>Store</span></a>
-        <details class="nav-group">
-          <summary class="nav-group-label"><span class="nav-icon" data-lucide="users" aria-hidden="true">&#9673;</span><span>Community</span></summary>
+      <div class="nav-links cq-navigation-list" aria-label="Primary navigation">
+        <a class="cq-navigation-item" href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" data-lucide="swords" aria-hidden="true">&#9822;</span><span>Play</span></a>
+        <a class="cq-navigation-item" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-icon" data-lucide="puzzle" aria-hidden="true">&#9671;</span><span>Puzzles</span></a>
+        <a class="cq-navigation-item" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-icon" data-lucide="graduation-cap" aria-hidden="true">&#8961;</span><span>Learn</span></a>
+        <a class="cq-navigation-item" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span><span>Tournaments</span></a>
+        <a class="cq-navigation-item" href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
+        <a class="cq-navigation-item" href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span><span>Store</span></a>
+        <details class="nav-group cq-navigation-group">
+          <summary class="nav-group-label cq-navigation-item"><span class="nav-icon" data-lucide="users" aria-hidden="true">&#9673;</span><span>Community</span></summary>
           <div class="nav-menu" aria-label="Community and more chess features">
             <a href="#academy" data-site-tab="academy" data-site-panel="academy">Academy</a>
             <a href="#paths" data-site-tab="paths" data-site-panel="paths">Learning Path</a>
@@ -23749,13 +23811,13 @@
       </div>
       <details class="nav-mobile-menu">
         <summary aria-label="Open navigation menu"><span class="nav-mobile-icon" data-lucide="menu" aria-hidden="true">Menu</span><b>Menu</b></summary>
-        <div class="nav-mobile-panel" aria-label="Mobile navigation">
-          <a href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-mobile-icon" data-lucide="swords" aria-hidden="true">&#9822;</span>Play</a>
-          <a href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-mobile-icon" data-lucide="puzzle" aria-hidden="true">&#9671;</span>Puzzles</a>
-          <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-mobile-icon" data-lucide="graduation-cap" aria-hidden="true">&#8961;</span>Learn</a>
-          <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-mobile-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span>Tournaments</a>
-          <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-mobile-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span>Leaderboard</a>
-          <a href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-mobile-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span>Store</a>
+        <div class="nav-mobile-panel cq-navigation-list" aria-label="Mobile navigation">
+          <a class="cq-navigation-item" href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-mobile-icon" data-lucide="swords" aria-hidden="true">&#9822;</span>Play</a>
+          <a class="cq-navigation-item" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-mobile-icon" data-lucide="puzzle" aria-hidden="true">&#9671;</span>Puzzles</a>
+          <a class="cq-navigation-item" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-mobile-icon" data-lucide="graduation-cap" aria-hidden="true">&#8961;</span>Learn</a>
+          <a class="cq-navigation-item" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-mobile-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span>Tournaments</a>
+          <a class="cq-navigation-item" href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-mobile-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span>Leaderboard</a>
+          <a class="cq-navigation-item" href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-mobile-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span>Store</a>
           <details class="nav-mobile-community">
             <summary>Community</summary>
             <div class="nav-mobile-community-links">
@@ -23796,9 +23858,9 @@
               <a class="button secondary" href="#tutorial" id="newToChessButton" data-site-tab="tutorial" data-site-panel="tutorial">Learn Chess</a>
             </div>
             <div class="hero-stat-row" aria-label="Your chess progress">
-              <span class="home-stat hero-stat"><strong id="homeGamesPlayed">0</strong><small>Games</small></span>
-              <span class="home-stat hero-stat"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
-              <span class="home-stat hero-stat is-highlight"><strong id="homeStreak">0 days</strong><small>Day streak</small></span>
+              <span class="home-stat hero-stat cq-stat-chip"><strong id="homeGamesPlayed">0</strong><small>Games</small></span>
+              <span class="home-stat hero-stat cq-stat-chip"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
+              <span class="home-stat hero-stat is-highlight cq-stat-chip"><strong id="homeStreak">0 days</strong><small>Day streak</small></span>
             </div>
           </div>
 
@@ -23968,7 +24030,7 @@
 
     <section id="tutorial" class="section-dark" aria-labelledby="tutorial-title">
       <div class="wrap">
-        <div class="section-head">
+        <div class="section-head cq-section-header">
           <div>
             <p class="section-kicker">Beginner tutorial</p>
             <h2 id="tutorial-title">Learn chess one move at a time</h2>
@@ -26149,7 +26211,7 @@
 
     <section id="play" class="section-dark" aria-labelledby="play-title">
       <div class="wrap">
-        <div class="section-head">
+        <div class="section-head cq-section-header">
           <div>
             <p class="section-kicker">Beginner game</p>
             <h2 id="play-title">Play the coach</h2>
@@ -26285,9 +26347,9 @@
           </div>
         </section>
 
-        <div class="puzzle-shell play-shell">
-          <aside class="play-left-sidebar" aria-label="Board preferences">
-            <nav class="play-mode-nav" aria-label="Game modes">
+        <div class="puzzle-shell play-shell cq-workspace-shell">
+          <aside class="play-left-sidebar cq-sidebar cq-sidebar--utility" aria-label="Board preferences">
+            <nav class="play-mode-nav cq-panel" aria-label="Game modes">
               <div class="play-mode-head"><strong>Game modes</strong><small>Choose how you want to play</small></div>
               <a class="play-mode-card" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="ai">
                 <span class="play-mode-icon" aria-hidden="true">♞</span><span><strong>Play AI</strong><small>Train with a coach</small></span><b aria-hidden="true">›</b>
@@ -26305,7 +26367,7 @@
                 <span class="play-mode-icon" aria-hidden="true">+</span><span><strong>Custom Match</strong><small>Choose color and clock</small></span><b aria-hidden="true">›</b>
               </a>
             </nav>
-            <div class="preference-panel" id="learnerPreferences">
+            <div class="preference-panel cq-panel" id="learnerPreferences">
               <h3>Board style</h3>
               <div class="preference-grid">
                 <label>Mode
@@ -26336,8 +26398,8 @@
               <p class="preference-note" id="motivationMessage">Every master was once a beginner.</p>
             </div>
           </aside>
-          <div class="match-board-column" data-board-orientation="white">
-            <div class="coach-setup" aria-label="Game setup">
+          <div class="match-board-column cq-board-stage" data-board-orientation="white">
+            <div class="coach-setup cq-panel cq-panel--compact" aria-label="Game setup">
               <div class="coach-setup-heading"><strong>Game setup</strong></div>
               <div class="mission-selector puzzle-plan-selector coach-levels coach-side-picker" role="group" aria-label="Choose your pieces">
                 <button class="mission-button" type="button" data-coach-side="w" aria-pressed="true">White</button>
@@ -26363,7 +26425,7 @@
                 </div>
               </details>
             </div>
-            <aside class="ai-player-card player-frame player-frame--opponent" id="aiPlayerCard" data-ai-rarity="Common" aria-label="Opponent player frame">
+            <aside class="ai-player-card player-frame player-frame--opponent cq-player-card" id="aiPlayerCard" data-ai-rarity="Common" aria-label="Opponent player frame">
               <div class="player-frame-topline">
                 <span class="player-frame-kicker">Opponent</span>
                 <span class="ai-player-status" id="aiPlayerStatus">Online</span>
@@ -26390,7 +26452,7 @@
                 <span class="player-frame-record" data-ai-win-rate>-- win rate</span>
               </div>
             </aside>
-            <aside class="match-player-card player-frame player-frame--you" id="matchPlayerCard" aria-label="Your player frame">
+            <aside class="match-player-card player-frame player-frame--you cq-player-card" id="matchPlayerCard" aria-label="Your player frame">
               <div class="player-frame-topline">
                 <span class="player-frame-kicker">You</span>
                 <span class="player-frame-side" data-match-frame-side>White</span>
@@ -26419,7 +26481,7 @@
               </dl>
               <p class="player-frame-description" data-match-description>Ready for a focused game.</p>
             </aside>
-            <div class="puzzle-board-wrap play-board-wrap" aria-label="Playable chess board">
+            <div class="puzzle-board-wrap play-board-wrap cq-glass-container" aria-label="Playable chess board">
               <div class="review-eval-rail" id="reviewEvalRail" aria-label="Review evaluation bar" hidden>
                 <span class="review-eval-side review-eval-black">Black</span>
                 <span class="review-eval-fill" id="reviewEvalFill"></span>
@@ -26429,7 +26491,7 @@
               </div>
               <div class="puzzle-board play-board" id="coachBoard" role="grid" aria-label="Player versus AI chess board"></div>
             </div>
-            <div class="play-bottom-actionbar" aria-label="Game controls">
+            <div class="play-bottom-actionbar cq-floating-toolbar" aria-label="Game controls">
               <div class="puzzle-actions play-actions play-primary-actions">
                 <button class="button play-start-button" type="button" id="restartGame"><span aria-hidden="true">&#9654;</span> Start Game</button>
                 <button class="button secondary" type="button" id="flipGame">Flip Board</button>
@@ -26456,7 +26518,7 @@
                 </details>
               </div>
             </div>
-            <section class="game-options-panel" aria-labelledby="gameOptionsTitle">
+            <section class="game-options-panel cq-panel" aria-labelledby="gameOptionsTitle">
               <div class="game-options-heading">
                 <span class="section-kicker">Match settings</span>
                 <h3 id="gameOptionsTitle">Game options</h3>
@@ -26492,8 +26554,8 @@
               </div>
             </section>
           </div>
-          <aside class="puzzle-info coach-panel play-right-sidebar">
-            <article class="featured-coach-card" aria-label="KingNorbert Coach Bot profile">
+          <aside class="puzzle-info coach-panel play-right-sidebar cq-sidebar cq-sidebar--insight">
+            <article class="featured-coach-card cq-panel cq-panel--featured" aria-label="KingNorbert Coach Bot profile">
               <span class="featured-coach-avatar" data-coach-avatar="assets/kingnorbert-coach.png" data-coach-fallback="KN" role="img" aria-label="KingNorbert Coach Bot"></span>
               <div class="featured-coach-copy">
                 <span>Featured coach bot</span>
@@ -26503,7 +26565,7 @@
               </div>
               <button class="button" type="button" id="playKingNorbert">Play Coach</button>
             </article>
-            <div class="engine-panel" id="enginePanel" aria-live="polite" hidden>
+            <div class="engine-panel cq-panel" id="enginePanel" aria-live="polite" hidden>
               <div class="engine-row">
                 <span>Rating <strong id="engineRating">1100</strong></span>
                 <span>Depth <strong id="engineDepth">4</strong></span>
@@ -26517,7 +26579,7 @@
                 <span>Best <strong id="engineBestMove">--</strong></span>
               </div>
             </div>
-            <details class="coach-library">
+            <details class="coach-library cq-panel">
               <summary><span>More opponents</span><small>Friendly bots and story battles</small></summary>
               <div class="coach-library-body">
                 <div class="beginner-bot-panel" aria-labelledby="beginnerBotsTitle">
@@ -26542,8 +26604,8 @@
                 </div>
               </div>
             </details>
-            <p class="simple-coach coach-skeleton" id="gameCoach" role="status" aria-live="polite" aria-atomic="true"><span class="sr-only">Preparing the chessboard.</span></p>
-            <div class="opening-compass" id="openingCompass" aria-live="polite">
+            <p class="simple-coach coach-skeleton cq-panel" id="gameCoach" role="status" aria-live="polite" aria-atomic="true"><span class="sr-only">Preparing the chessboard.</span></p>
+            <div class="opening-compass cq-panel" id="openingCompass" aria-live="polite">
               <div class="opening-compass-head">
                 <div>
                   <strong id="openingCompassTitle">Opening compass</strong>
