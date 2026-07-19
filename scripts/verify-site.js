@@ -49,6 +49,7 @@ const requiredRegressionContracts = [
   ["AI completed-game recording", /function recordCoachGameResult[\s\S]*?recordCompletedGame\(/],
   ["online completed-game recording", /remote\.status === "completed"[\s\S]*?recordCompletedGame\(/],
   ["header rating binding", /data-profile-field="gameRating"/],
+  ["visible desktop profile metadata", /\.player-flex-chip > \.player-flex-main:last-child\s*\{\s*display: grid;/],
   ["player-card coins binding", /data-match-coins/],
   ["compact player-frame grid", /"footer footer footer"\s*\n\s*"details details details"/],
   ["wide player side-seat grid", /Wide desktop gives each player[\s\S]*?"opponent board player"/],
