@@ -28465,7 +28465,7 @@
               <div class="tutorial-coordinate-frame" id="tutorialCoordinateFrame">
                 <div class="tutorial-coords tutorial-files tutorial-files-top" id="tutorialFilesTop" aria-hidden="true"></div>
                 <div class="tutorial-coords tutorial-ranks tutorial-ranks-left" id="tutorialRanksLeft" aria-hidden="true"></div>
-                <div class="tutorial-board" id="tutorialBoard" aria-label="Interactive beginner chess board"></div>
+                <div class="tutorial-board" id="tutorialBoard" role="group" aria-roledescription="chess board" aria-label="Interactive beginner chess board. Select a piece, then its highlighted destination."></div>
                 <div class="tutorial-coords tutorial-ranks tutorial-ranks-right" id="tutorialRanksRight" aria-hidden="true"></div>
                 <div class="tutorial-coords tutorial-files tutorial-files-bottom" id="tutorialFilesBottom" aria-hidden="true"></div>
               </div>
@@ -30982,7 +30982,7 @@
                 <span class="review-eval-score" id="reviewEvalScore">0.00</span>
                 <span class="review-eval-side review-eval-white">White</span>
               </div>
-              <div class="puzzle-board play-board" id="coachBoard" role="grid" aria-label="Player versus AI chess board"></div>
+              <div class="puzzle-board play-board" id="coachBoard" role="group" aria-roledescription="chess board" aria-label="Player versus AI chess board. Select a piece, then its legal destination."></div>
             </div>
             <div class="play-bottom-actionbar cq-floating-toolbar" aria-label="Game controls">
               <div class="puzzle-actions play-actions play-primary-actions">
@@ -31329,7 +31329,7 @@
             <button type="button" data-puzzle-plan="Puzzle Rush" aria-pressed="false">Puzzle Storm</button>
           </nav>
           <div class="puzzle-board-wrap" aria-label="Chess puzzle position">
-            <div class="puzzle-board" id="puzzleBoard"></div>
+            <div class="puzzle-board" id="puzzleBoard" role="group" aria-roledescription="chess board" aria-label="Puzzle board. Select a piece, then its highlighted destination."></div>
             <div class="coordinates" aria-hidden="true" id="coordinates"></div>
           </div>
           <div class="puzzle-info">
@@ -31465,7 +31465,7 @@
             </div>
             <p class="puzzle-hint hidden" id="puzzleHint">Hint text</p>
             <div class="answers" id="answers"></div>
-            <p class="feedback" id="feedback">Choose the strongest move.</p>
+            <p class="feedback" id="feedback" role="status" aria-live="polite" aria-atomic="true">Choose the strongest move.</p>
             <div class="puzzle-complete" id="puzzleComplete" hidden>
               <strong>Puzzle complete</strong>
               <p id="puzzleCompleteSummary">Accuracy, time, and themes appear here.</p>
@@ -31511,7 +31511,7 @@
           <div class="real-puzzle-shell">
             <div class="real-board-stack">
               <div class="puzzle-board-wrap real-puzzle-board-wrap" aria-label="Real chess puzzle board">
-                <div class="puzzle-board play-board" id="realPuzzleBoard" role="grid" aria-label="Real puzzle board"></div>
+                <div class="puzzle-board play-board" id="realPuzzleBoard" role="group" aria-roledescription="chess board" aria-label="Real puzzle board. Select a piece, then its highlighted destination."></div>
               </div>
               <div class="real-board-quick-actions" aria-label="Quick puzzle actions">
                 <button class="button secondary" type="button" id="realPuzzleBoardRestart">Restart</button>
@@ -31562,7 +31562,7 @@
               <h3 id="realPuzzleTitle">Puzzle ready</h3>
               <p id="realPuzzlePrompt">Find the strongest move and follow the idea.</p>
               <p class="real-puzzle-hint" id="realPuzzleHint">Hints appear here.</p>
-              <p class="real-puzzle-feedback" id="realPuzzleFeedback">Choose a piece to start.</p>
+              <p class="real-puzzle-feedback" id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose a piece to start.</p>
               <div class="real-puzzle-moves" id="realPuzzleMoves" aria-label="Played solution line"></div>
               <div class="real-puzzle-actions">
                 <button class="button secondary" type="button" id="realPuzzlePrev">Previous</button>
@@ -31923,6 +31923,7 @@
       k: { color: "b", type: "k" }, q: { color: "b", type: "q" }, r: { color: "b", type: "r" },
       b: { color: "b", type: "b" }, n: { color: "b", type: "n" }, p: { color: "b", type: "p" }
     });
+    const accessiblePieceNames = Object.freeze({ p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" });
 
     function getPieceCodeInfo(piece) {
       if (!piece) return null;
@@ -31930,6 +31931,26 @@
         return { color: piece.color, type: piece.type };
       }
       return pieceCodeLookup[String(piece)] || null;
+    }
+
+    function getAccessibleSquareLabel(squareName, piece, states = []) {
+      const info = getPieceCodeInfo(piece);
+      const content = info
+        ? `${info.color === "w" ? "white" : "black"} ${accessiblePieceNames[info.type] || "piece"}`
+        : "empty";
+      return [squareName, content, ...states.filter(Boolean)].join(", ");
+    }
+
+    function getFocusedBoardSquare(board) {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !board?.contains(active)) return "";
+      return active.dataset.square || "";
+    }
+
+    function restoreBoardFocus(board, squareName) {
+      if (!board || !squareName) return;
+      const square = board.querySelector(`[data-square="${squareName}"]`);
+      if (square instanceof HTMLElement) square.focus({ preventScroll: true });
     }
 
     function resolvePieceSvgSet(style) {
@@ -35202,6 +35223,7 @@
       if (tutorialGame) syncTutorialTurn(lesson);
       const move = getActiveTutorialMove(lesson);
       if (!board) return;
+      const focusedSquareName = getFocusedBoardSquare(board);
       board.innerHTML = "";
       renderTutorialCoordinates();
       const legalTargets = tutorialGame && move ? tutorialGame.moves({ square: move.from, verbose: true }).map((legal) => legal.to) : (move?.targets || []);
@@ -35213,6 +35235,7 @@
         const name = tutorialSquares[index];
         const square = document.createElement("button");
         square.type = "button";
+        square.dataset.square = name;
         square.className = `tutorial-square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
         const colorClass = pieceColorClass(piece);
         if (colorClass) square.classList.add(colorClass);
@@ -35221,10 +35244,16 @@
         if (legalTargets.includes(name)) square.classList.add("is-target");
         if (tutorialLastMove?.includes(name)) square.classList.add("is-last");
         renderPieceOnSquare(square, piece, activePieceSvgSet, false);
-        square.setAttribute("aria-label", `${name}${piece ? ` ${piece}` : ""}`);
+        square.setAttribute("aria-label", getAccessibleSquareLabel(name, piece, [
+          move && name === move.from ? "guided piece" : "",
+          name === selectedTutorialSquare ? "selected" : "",
+          legalTargets.includes(name) ? "legal destination" : "",
+          tutorialLastMove?.includes(name) ? "last move" : ""
+        ]));
         square.addEventListener("click", () => handleTutorialSquare(name));
         board.appendChild(square);
       });
+      restoreBoardFocus(board, focusedSquareName);
     }
 
     function setTutorialCoach(message, speak = false) {
@@ -41322,6 +41351,7 @@
     function renderPuzzleBoard() {
       const puzzle = puzzles[currentPuzzle];
       const board = document.getElementById("puzzleBoard");
+      const focusedSquareName = getFocusedBoardSquare(board);
       const legalByTarget = new Map(puzzleLegalMoves.map((move) => [move.to, move]));
       const lastSquares = puzzleLastMove ? [puzzleLastMove.from, puzzleLastMove.to] : [];
       const checkedKing = puzzleGame && callCoachRule(puzzleGame, "isCheck", "in_check") ? findPuzzleKing(puzzleGame.turn()) : "";
@@ -41353,6 +41383,7 @@
         const legalMove = legalByTarget.get(name);
         const square = document.createElement("button");
         square.type = "button";
+        square.dataset.square = name;
         square.className = `puzzle-square play-square ${isLightCoachSquare(name) ? "light" : "dark"}`;
         if (piece) square.classList.add(piece.color === "w" ? "white-piece" : "black-piece");
         if (name === selectedPuzzleSquare) square.classList.add("selected");
@@ -41364,7 +41395,13 @@
         if (puzzleHintDestination && name === puzzleHintDestination) square.classList.add("hint-destination");
         if (hintVisible && puzzle.targets.includes(name)) square.classList.add("target");
         renderPieceOnSquare(square, piece);
-        square.setAttribute("aria-label", `${name}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${piece.type}` : " empty"}`);
+        square.setAttribute("aria-label", getAccessibleSquareLabel(name, piece, [
+          name === selectedPuzzleSquare ? "selected" : "",
+          legalMove ? "legal destination" : "",
+          lastSquares.includes(name) ? "last move" : "",
+          name === checkedKing ? "in check" : "",
+          puzzleHintDestination === name ? "hint" : ""
+        ]));
         square.draggable = Boolean(piece && piece.color === puzzleGame.turn() && (puzzleStarted || puzzleAnalyzeMode) && (!activeAnswered || puzzleAnalyzeMode));
         square.addEventListener("dragstart", (event) => {
           if (!square.draggable) return event.preventDefault();
@@ -41384,6 +41421,7 @@
         square.addEventListener("click", () => handlePuzzleSquare(name));
         board.appendChild(square);
       });
+      restoreBoardFocus(board, focusedSquareName);
     }
 
     function lockAnswers(selectedButton, selectedWasCorrect) {
@@ -44942,7 +44980,13 @@
           renderPieceOnSquare(square, piece);
           square.dataset.pieceKey = pieceKey;
         }
-        const ariaLabel = `${squareNameValue}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${piece.type}` : " empty"}`;
+        const ariaLabel = getAccessibleSquareLabel(squareNameValue, piece, [
+          squareNameValue === coachSelected || coachPremove?.from === squareNameValue ? "selected" : "",
+          legalMove ? "legal destination" : "",
+          lastSquares.includes(squareNameValue) ? "last move" : "",
+          squareNameValue === checkedKing ? "in check" : "",
+          threatSquares.has(squareNameValue) ? "under attack" : ""
+        ]);
         if (square.dataset.ariaLabel !== ariaLabel) {
           square.setAttribute("aria-label", ariaLabel);
           square.dataset.ariaLabel = ariaLabel;
@@ -47999,7 +48043,12 @@
           renderPieceOnSquare(square, piece, activePieceSvgSet, false);
           square.dataset.pieceKey = pieceKey;
         }
-        square.setAttribute("aria-label", `${squareNameValue}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${piece.type}` : " empty"}`);
+        square.setAttribute("aria-label", getAccessibleSquareLabel(squareNameValue, piece, [
+          squareNameValue === realPuzzleSelected ? "selected" : "",
+          legalMove ? "legal destination" : "",
+          lastSquares.includes(squareNameValue) ? "last move" : "",
+          squareNameValue === checkedKing ? "in check" : ""
+        ]));
         square.disabled = realPuzzlePhase !== "PlayerTurn" || realPuzzleReplaying;
         square.draggable = Boolean(piece && piece.color === realPuzzleGame?.turn() && !square.disabled);
       });
