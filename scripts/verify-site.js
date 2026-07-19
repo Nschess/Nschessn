@@ -82,7 +82,11 @@ const requiredRegressionContracts = [
   ["active move emphasis", /#play \.move-pair:last-child \{\s*border-color:/],
   ["play preference controls", /id="prefTheme"[\s\S]*?id="prefPressure"/],
   ["play preference bindings", /function setupLearnerPreferences\([\s\S]*?field\.addEventListener\("change"/],
-  ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/]
+  ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/],
+  ["human-readable board labels", /const accessiblePieceNames[\s\S]*?function getAccessibleSquareLabel\(/],
+  ["board keyboard focus retention", /function getFocusedBoardSquare\([\s\S]*?function restoreBoardFocus\([\s\S]*?function renderTutorialBoard\([\s\S]*?restoreBoardFocus\(board, focusedSquareName\)[\s\S]*?function renderPuzzleBoard\([\s\S]*?restoreBoardFocus\(board, focusedSquareName\)/],
+  ["board group semantics", /id="tutorialBoard" role="group" aria-roledescription="chess board"[\s\S]*?id="coachBoard" role="group"[\s\S]*?id="puzzleBoard" role="group"[\s\S]*?id="realPuzzleBoard" role="group"/],
+  ["live puzzle feedback", /id="feedback" role="status" aria-live="polite" aria-atomic="true"[\s\S]*?id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true"/]
 ];
 
 for (const [label, pattern] of requiredRegressionContracts) {
