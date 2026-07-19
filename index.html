@@ -26200,6 +26200,520 @@
         transition: none;
       }
     }
+
+    /* Phase 4: Player Profile. The existing Player Pass remains the profile
+       destination; this layer turns its live data into a clearer dashboard. */
+    :is(body:not(.theme-light), body.theme-light) #login .login-player-profile {
+      gap: clamp(var(--cq-space-3), 2vw, var(--cq-space-4));
+      padding: clamp(14px, 2vw, 20px);
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .login-player-profile::before {
+      content: none;
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--cq-space-3);
+      align-items: start;
+      padding: clamp(14px, 2.2vw, 20px);
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background:
+        linear-gradient(135deg, var(--cq-accent-primary-soft), transparent 46%),
+        var(--cq-surface-panel-strong);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview .player-profile-row {
+      min-width: 0;
+      justify-content: flex-start;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview .player-profile-avatar {
+      width: clamp(60px, 7vw, 76px);
+      height: clamp(60px, 7vw, 76px);
+      min-height: clamp(60px, 7vw, 76px);
+      border-radius: calc(var(--cq-radius-card) - 4px);
+      border-color: var(--cq-border-strong);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), 0 10px 24px rgba(38, 64, 166, 0.18);
+      font-size: clamp(1.9rem, 3.4vw, 2.45rem);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview .player-profile-title {
+      display: flex;
+      flex: 1 1 auto;
+      flex-wrap: wrap;
+      align-items: center;
+      column-gap: 6px;
+      row-gap: 3px;
+      min-width: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview .player-profile-kicker,
+    :is(body:not(.theme-light), body.theme-light) #login .profile-section-kicker {
+      color: var(--cq-text-subtle);
+      font-size: 0.66rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview .player-profile-kicker,
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview .player-profile-level {
+      flex: 0 0 100%;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview .player-profile-name {
+      display: inline-block;
+      flex: 0 1 auto;
+      max-width: 100%;
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: clamp(1.22rem, 2.2vw, 1.65rem);
+      letter-spacing: var(--cq-tracking-heading);
+      overflow-wrap: anywhere;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview .player-profile-level {
+      color: var(--cq-text-muted);
+      font-size: 0.8rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-presence {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+      color: var(--cq-success);
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-presence i {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: currentColor;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--cq-success) 18%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--cq-space-2);
+      justify-content: flex-end;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview-actions :is(.player-profile-save, .profile-challenge-button) {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 40px;
+      margin: 0;
+      padding-inline: 12px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview-actions .profile-challenge-button:hover,
+    :is(body:not(.theme-light), body.theme-light) #login .profile-overview-actions .profile-challenge-button:focus-visible {
+      color: var(--cq-text-on-accent);
+      border-color: var(--cq-border-strong);
+      background: var(--cq-accent-gradient);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .login-player-profile :is(.profile-collection, .profile-performance, .profile-progress-section, .profile-activity, .profile-achievement-section, .profile-stat-section) {
+      display: grid;
+      gap: var(--cq-space-2);
+      min-width: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: var(--cq-space-3);
+      min-width: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-section-heading h4 {
+      margin: 3px 0 0;
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: 0.95rem;
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-section-heading p,
+    :is(body:not(.theme-light), body.theme-light) #login .profile-section-status {
+      margin: 0;
+      color: var(--cq-text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-section-status {
+      padding: 4px 8px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      background: var(--cq-surface-pill);
+      color: var(--cq-accent-tertiary);
+      white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .login-player-profile .player-avatar-strip {
+      gap: var(--cq-space-2);
+      margin: 0;
+      padding: 2px 1px 6px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--cq-border-strong) transparent;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .login-player-profile .avatar-choice {
+      min-width: 86px;
+      min-height: 68px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .login-player-profile .avatar-choice:hover:not(:disabled),
+    :is(body:not(.theme-light), body.theme-light) #login .login-player-profile .avatar-choice:focus-visible,
+    :is(body:not(.theme-light), body.theme-light) #login .login-player-profile .avatar-choice[aria-pressed="true"] {
+      border-color: var(--cq-border-strong);
+      background: var(--cq-accent-tertiary-soft);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-card {
+      display: grid;
+      align-content: start;
+      gap: 5px;
+      min-height: 100px;
+      padding: 13px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-card > span,
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-card small,
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-history-head {
+      color: var(--cq-text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-card strong {
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: clamp(1.22rem, 2vw, 1.52rem);
+      letter-spacing: var(--cq-tracking-heading);
+      line-height: 1;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-card small {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      line-height: 1.35;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-history {
+      display: grid;
+      gap: 8px;
+      padding: 12px 13px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-input);
+      box-shadow: inset 0 1px 0 var(--cq-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-history-head {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-history-head span {
+      color: var(--cq-text-primary);
+      font-weight: 800;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-history-head small {
+      color: var(--cq-text-subtle);
+      text-align: right;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-chart {
+      position: relative;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(8px, 1fr);
+      align-items: end;
+      gap: 5px;
+      height: 76px;
+      padding: 8px 2px 2px;
+      overflow: hidden;
+      border-radius: calc(var(--cq-radius-card) - 4px);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--cq-accent-secondary) 9%, transparent), transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-chart::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      bottom: 1px;
+      left: 0;
+      border-bottom: 1px solid var(--cq-border);
+      pointer-events: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-point {
+      z-index: 1;
+      min-height: 10px;
+      height: var(--profile-rating-height, 18%);
+      border-radius: 999px 999px 3px 3px;
+      background: linear-gradient(180deg, var(--cq-accent-tertiary), var(--cq-accent-primary));
+      box-shadow: 0 3px 10px color-mix(in srgb, var(--cq-accent-primary) 22%, transparent);
+      transition: height var(--cq-transition-normal) ease, opacity var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-point:not(.is-current) {
+      opacity: 0.64;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-point.is-current {
+      background: var(--cq-accent-gradient);
+      box-shadow: 0 3px 12px color-mix(in srgb, var(--cq-accent-secondary) 36%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-rating-empty {
+      align-self: center;
+      grid-column: 1 / -1;
+      color: var(--cq-text-subtle);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-stat-section .player-profile-stats {
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-stat-section .player-profile-stat {
+      min-height: 68px;
+      padding: 12px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-stat-section .player-profile-stat strong {
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: 1.2rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-stat-section .player-profile-stat span,
+    :is(body:not(.theme-light), body.theme-light) #login .profile-progress-section .player-profile-progress-labels,
+    :is(body:not(.theme-light), body.theme-light) #login .profile-progress-section .player-profile-progress-labels span {
+      color: var(--cq-text-muted);
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-progress-section {
+      gap: 8px;
+      padding: 12px 13px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-progress-section .player-profile-rank {
+      color: var(--cq-text-primary);
+      font-size: 0.95rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-progress-section .player-profile-progress-labels {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--cq-space-2);
+      margin: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-progress-section .player-profile-progress {
+      height: 9px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-progress-section .player-profile-progress span {
+      background: var(--cq-accent-gradient);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-activity .player-profile-missions {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-activity .player-profile-mission {
+      min-height: 58px;
+      display: grid;
+      align-content: center;
+      gap: 4px;
+      padding: 10px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+      font-size: 0.76rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-activity .player-profile-mission span:last-child {
+      color: var(--cq-accent-tertiary);
+      font-size: 0.68rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-achievement-section .player-profile-achievements {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-achievement-section .player-profile-achievement {
+      min-height: 78px;
+      align-content: center;
+      gap: 5px;
+      padding: 8px 5px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-accent-tertiary);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+      font-size: 1.06rem;
+      text-align: center;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-achievement-section .player-profile-achievement::after {
+      content: attr(data-profile-achievement-label);
+      color: var(--cq-text-muted);
+      font-family: var(--cq-font-body);
+      font-size: 0.58rem;
+      font-weight: 700;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .profile-achievement-section .player-profile-achievement.is-locked {
+      border-style: dashed;
+      color: var(--cq-text-subtle);
+      background: var(--cq-surface-input);
+      filter: none;
+      opacity: 0.68;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .account-vault {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .account-vault summary,
+    :is(body:not(.theme-light), body.theme-light) #login .account-vault-grid strong {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .account-vault summary span {
+      color: var(--cq-accent-tertiary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #login .account-vault-grid span {
+      border-color: var(--cq-border);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-input);
+    }
+
+    @media (max-width: 760px) {
+      :is(body:not(.theme-light), body.theme-light) #login .profile-overview {
+        grid-template-columns: 1fr;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #login .profile-overview-actions {
+        justify-content: stretch;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #login .profile-overview-actions :is(.player-profile-save, .profile-challenge-button) {
+        flex: 1 1 150px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      :is(body:not(.theme-light), body.theme-light) #login .profile-section-heading,
+      :is(body:not(.theme-light), body.theme-light) #login .profile-rating-history-head {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #login .profile-section-heading p,
+      :is(body:not(.theme-light), body.theme-light) #login .profile-rating-history-head small {
+        text-align: left;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #login .profile-rating-grid,
+      :is(body:not(.theme-light), body.theme-light) #login .profile-activity .player-profile-missions {
+        grid-template-columns: 1fr;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #login .profile-stat-section .player-profile-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #login .profile-stat-section .player-profile-stat:last-child {
+        grid-column: auto;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #login .profile-achievement-section .player-profile-achievements {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) #login :is(.profile-rating-point, .login-player-profile .avatar-choice) {
+        transition: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -26616,8 +27130,8 @@
             <div class="login-pass-grid">
               <div class="login-pass-panel">
                 <h4>Player Pass</h4>
-            <aside class="player-profile login-player-profile" aria-label="Player profile">
-              <div class="player-profile-top">
+            <aside class="player-profile login-player-profile cq-panel" aria-label="Player profile">
+              <header class="profile-overview">
                 <div class="player-profile-row">
                   <div class="player-profile-avatar" aria-hidden="true">&#10022;</div>
                   <div class="player-profile-title">
@@ -26625,46 +27139,120 @@
                     <strong class="player-profile-name" data-profile-field="name">Guest Explorer</strong>
                     <span class="player-profile-level" data-profile-field="level">Level 1 Explorer</span>
                   </div>
+                  <span class="profile-presence" title="Your player profile is ready"><i aria-hidden="true"></i>Ready</span>
                 </div>
-                <button class="player-profile-save" type="button" data-player-profile-save>
-                  <span aria-hidden="true">&#10003;</span>
-                  <span data-profile-save-state>Saved</span>
-                </button>
-                <button class="button secondary profile-challenge-button" type="button" data-profile-challenge>
-                  Challenge
-                </button>
-              </div>
-              <div class="player-avatar-strip" data-avatar-strip aria-label="Choose profile avatar"></div>
-              <div class="player-profile-stats" aria-label="Profile stats">
-                <div class="player-profile-stat">
-                  <strong data-profile-field="streak">0</strong>
-                  <span>Day Streak</span>
+                <div class="profile-overview-actions">
+                  <button class="player-profile-save" type="button" data-player-profile-save>
+                    <span aria-hidden="true">&#10003;</span>
+                    <span data-profile-save-state>Saved</span>
+                  </button>
+                  <button class="button secondary profile-challenge-button" type="button" data-profile-challenge>
+                    <span aria-hidden="true">&#9822;</span>
+                    <span>Challenge</span>
+                  </button>
                 </div>
-                <div class="player-profile-stat">
-                  <strong data-profile-field="xp">0</strong>
-                  <span>XP</span>
+              </header>
+
+              <section class="profile-collection" aria-labelledby="profileCollectionTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Appearance</span>
+                    <h4 id="profileCollectionTitle">Avatar collection</h4>
+                  </div>
+                  <p>Choose an unlocked look.</p>
                 </div>
-                <div class="player-profile-stat">
-                  <strong data-profile-field="tokens">0</strong>
-                  <span>Dragon Tokens</span>
+                <div class="player-avatar-strip" data-avatar-strip aria-label="Choose profile avatar"></div>
+              </section>
+
+              <section class="profile-performance" aria-labelledby="profilePerformanceTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Performance</span>
+                    <h4 id="profilePerformanceTitle">Ratings and activity</h4>
+                  </div>
+                  <span class="profile-section-status" data-profile-achievement-summary>0/5 unlocked</span>
                 </div>
-              </div>
-              <div data-auth-guest>
-                <div class="player-profile-progress-labels">
-                  <strong class="player-profile-rank" data-profile-field="rank">Rank: Explorer</strong>
+                <div class="profile-rating-grid">
+                  <article class="profile-rating-card">
+                    <span>Game rating</span>
+                    <strong data-profile-field="gameRating">450 Elo</strong>
+                    <small><span data-profile-field="gamesPlayed">0 games</span><span aria-hidden="true">&middot;</span><span data-profile-field="winRate">0% wins</span></small>
+                  </article>
+                  <article class="profile-rating-card">
+                    <span>Puzzle rating</span>
+                    <strong data-profile-field="puzzleRating">400</strong>
+                    <small data-profile-field="puzzleAccuracy">Solve a puzzle to begin</small>
+                  </article>
+                </div>
+                <div class="profile-rating-history">
+                  <div class="profile-rating-history-head">
+                    <span>Puzzle rating trend</span>
+                    <small data-profile-history-status>First puzzle starts your trend</small>
+                  </div>
+                  <div class="profile-rating-chart" data-profile-rating-history role="img" aria-label="Puzzle rating history">
+                    <span class="profile-rating-empty">Current rating</span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="profile-stat-section" aria-label="Profile stats">
+                <div class="player-profile-stats">
+                  <div class="player-profile-stat">
+                    <strong data-profile-field="streak">0</strong>
+                    <span>Day streak</span>
+                  </div>
+                  <div class="player-profile-stat">
+                    <strong data-profile-field="xp">0</strong>
+                    <span>Total XP</span>
+                  </div>
+                  <div class="player-profile-stat">
+                    <strong data-profile-field="tokens">0</strong>
+                    <span>Coins</span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="profile-progress-section" data-auth-guest aria-labelledby="profileProgressTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Progress</span>
+                    <h4 id="profileProgressTitle" class="player-profile-rank" data-profile-field="rank">Rank: Explorer</h4>
+                  </div>
                   <span data-profile-field="progress">0%</span>
+                </div>
+                <div class="player-profile-progress-labels">
+                  <span>Level progress</span>
+                  <span data-profile-field="next">Next Level: 80 XP</span>
                 </div>
                 <div class="player-profile-progress" aria-hidden="true">
                   <span data-profile-progress-fill></span>
                 </div>
-                <p class="player-profile-next" data-profile-field="next">Next Level: 80 XP</p>
-              </div>
-              <div class="player-profile-missions" data-profile-missions aria-label="Today's Mission"></div>
-              <div class="player-profile-achievements" data-profile-achievements aria-label="Achievements"></div>
+              </section>
+
+              <section class="profile-activity" aria-labelledby="profileActivityTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Today</span>
+                    <h4 id="profileActivityTitle">Focus queue</h4>
+                  </div>
+                </div>
+                <div class="player-profile-missions" data-profile-missions aria-label="Today's missions"></div>
+              </section>
+
+              <section class="profile-achievement-section" aria-labelledby="profileAchievementsTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Milestones</span>
+                    <h4 id="profileAchievementsTitle">Achievements</h4>
+                  </div>
+                  <span class="profile-section-status" data-profile-achievement-summary>0/5 unlocked</span>
+                </div>
+                <div class="player-profile-achievements" data-profile-achievements aria-label="Achievements"></div>
+              </section>
             </aside>
             <details class="account-vault" aria-labelledby="accountVaultTitle">
-              <summary id="accountVaultTitle">Saved progress snapshot <span>View</span></summary>
-              <p class="auth-note">This is the clean account snapshot your secure account can sync across devices.</p>
+              <summary id="accountVaultTitle">Account details <span>View</span></summary>
+              <p class="auth-note">Your saved profile details and preferences, ready to sync when you use a secure account.</p>
               <div class="account-vault-grid">
                 <span><strong data-account-field="username">Guest Explorer</strong>Username</span>
                 <span><strong data-account-field="avatar">Pawn Rookie</strong>Avatar</span>
@@ -37397,7 +37985,18 @@
       setProfileText('[data-profile-field="rank"]', `Rank: ${profile.rank}`);
       setProfileText('[data-profile-field="title"]', profile.rank || "Chess player");
       const gameRating = getLearnerGameRating();
+      const puzzleRating = getLearnerPuzzleRating();
+      const gamesPlayed = Math.max(0, Number(gameStats.played) || 0);
+      const wins = Math.max(0, Number(gameStats.wins) || 0);
+      const winRate = gamesPlayed ? Math.round((wins / gamesPlayed) * 100) : 0;
+      const puzzleAttemptsTotal = puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts);
+      const unlockedAchievements = profile.achievements.filter((achievement) => achievement.unlocked).length;
       setProfileText('[data-profile-field="gameRating"]', `${formatProfileNumber(gameRating)} Elo`);
+      setProfileText('[data-profile-field="puzzleRating"]', formatProfileNumber(puzzleRating));
+      setProfileText('[data-profile-field="gamesPlayed"]', `${formatProfileNumber(gamesPlayed)} ${gamesPlayed === 1 ? "game" : "games"}`);
+      setProfileText('[data-profile-field="winRate"]', gamesPlayed ? `${winRate}% wins` : "No games yet");
+      setProfileText('[data-profile-field="puzzleAccuracy"]', puzzleAttemptsTotal ? `${getPuzzleAccuracy(0)}% accuracy` : "Solve a puzzle to begin");
+      setProfileText('[data-profile-achievement-summary]', `${unlockedAchievements}/${profile.achievements.length} unlocked`);
       document.querySelectorAll(".player-flex-chip [data-profile-field='rank']").forEach((rank) => {
         const compact = getCompactPlayerTitle(profile.rank);
         rank.textContent = compact ? `Rank: ${compact.short}` : `Rank: ${String(profile.rank || "Explorer").replace(/\s+Avatar$/i, "").slice(0, 18)}`;
@@ -37436,15 +38035,65 @@
           const badge = createBookText("span", `player-profile-achievement${achievement.unlocked ? "" : " is-locked"}`, achievement.icon);
           badge.title = `${achievement.label}: ${achievement.unlocked ? "unlocked" : "locked"}`;
           badge.setAttribute("aria-label", badge.title);
+          badge.dataset.profileAchievementLabel = achievement.label;
           return badge;
         }));
       });
+      renderProfileRatingHistory();
       renderProfileAvatarChoices(profile);
       renderAccountVault(profile);
       renderStyledUsernames(profile.name);
       renderPlayerIdentityExtras(profile);
       renderLeaderboards();
       return profile;
+    }
+
+    function renderProfileRatingHistory() {
+      const currentRating = getLearnerPuzzleRating();
+      const recorded = Array.isArray(puzzleRatingHistory)
+        ? puzzleRatingHistory
+          .map((entry) => ({ rating: Number(entry?.rating), at: entry?.at || "" }))
+          .filter((entry) => Number.isFinite(entry.rating) && entry.rating > 0)
+          .slice(-11)
+        : [];
+      const latest = recorded.at(-1);
+      const points = latest?.rating === currentRating
+        ? recorded
+        : [...recorded, { rating: currentRating, at: "" }].slice(-12);
+      const ratings = points.map((point) => point.rating);
+      const low = Math.min(400, ...ratings);
+      const high = Math.max(...ratings, low + 40);
+      const spread = Math.max(40, high - low);
+      const chartFloor = low - (spread * 0.12);
+      const chartCeiling = high + (spread * 0.12);
+      const historyCount = recorded.length;
+      const historyLabel = historyCount
+        ? `${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"} tracked`
+        : "First puzzle starts your trend";
+      const historySignature = points.map((point) => `${point.rating}:${point.at || "current"}`).join("|");
+
+      document.querySelectorAll("[data-profile-history-status]").forEach((status) => {
+        status.textContent = historyLabel;
+      });
+      document.querySelectorAll("[data-profile-rating-history]").forEach((chart) => {
+        const label = historyCount
+          ? `Puzzle rating trend across ${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"}. Current rating ${formatProfileNumber(currentRating)}.`
+          : `Current puzzle rating ${formatProfileNumber(currentRating)}. Complete puzzles to build a rating trend.`;
+        chart.setAttribute("aria-label", label);
+        if (chart.dataset.profileRatingSignature === historySignature) return;
+        chart.dataset.profileRatingSignature = historySignature;
+        chart.replaceChildren(...points.map((point, index) => {
+          const marker = document.createElement("span");
+          const height = Math.round(Math.min(100, Math.max(16, ((point.rating - chartFloor) / (chartCeiling - chartFloor)) * 100)));
+          marker.className = `profile-rating-point${index === points.length - 1 ? " is-current" : ""}`;
+          marker.style.setProperty("--profile-rating-height", `${height}%`);
+          marker.title = point.at
+            ? `${formatProfileNumber(point.rating)} puzzle rating - ${new Date(point.at).toLocaleDateString()}`
+            : `Current puzzle rating: ${formatProfileNumber(point.rating)}`;
+          marker.setAttribute("aria-hidden", "true");
+          return marker;
+        }));
+      });
     }
 
     function getLearnerPuzzleRating() {
