@@ -86,7 +86,10 @@ const requiredRegressionContracts = [
   ["human-readable board labels", /const accessiblePieceNames[\s\S]*?function getAccessibleSquareLabel\(/],
   ["board keyboard focus retention", /function getFocusedBoardSquare\([\s\S]*?function restoreBoardFocus\([\s\S]*?function renderTutorialBoard\([\s\S]*?restoreBoardFocus\(board, focusedSquareName\)[\s\S]*?function renderPuzzleBoard\([\s\S]*?restoreBoardFocus\(board, focusedSquareName\)/],
   ["board group semantics", /id="tutorialBoard" role="group" aria-roledescription="chess board"[\s\S]*?id="coachBoard" role="group"[\s\S]*?id="puzzleBoard" role="group"[\s\S]*?id="realPuzzleBoard" role="group"/],
-  ["live puzzle feedback", /id="feedback" role="status" aria-live="polite" aria-atomic="true"[\s\S]*?id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true"/]
+  ["live puzzle feedback", /id="feedback" role="status" aria-live="polite" aria-atomic="true"[\s\S]*?id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true"/],
+  ["player pass dashboard layout", /Player Pass dashboard:[\s\S]*?#login \.login-shell \{[\s\S]*?grid-template-columns: minmax\(340px, 1\.2fr\) minmax\(318px, 0\.98fr\) minmax\(292px, 0\.9fr\);/],
+  ["player pass dashboard preservation", /#login \.login-pass \{[\s\S]*?display: contents;[\s\S]*?#login \.login-pass-grid \{ display: contents; \}/],
+  ["player pass compact breakpoint", /@media \(max-width: 760px\) \{[\s\S]*?#login \.login-shell \{ grid-template-columns: minmax\(0, 1fr\); grid-template-rows: none; \}/]
 ];
 
 for (const [label, pattern] of requiredRegressionContracts) {
