@@ -55,6 +55,8 @@ const requiredRegressionContracts = [
   ["viewport-balanced board sizing", /--cq-play-board-max: min\(760px, max\(420px, calc\(100svh - var\(--cq-play-stage-chrome\)\)\)\);/],
   ["compact player-strip grid", /"avatar identity clock details"\s*\n\s*"footer footer footer details"/],
   ["live move context priority", /#play \.move-history \{\s*order: 1;/],
+  ["play preference controls", /id="prefTheme"[\s\S]*?id="prefPressure"/],
+  ["play preference bindings", /function setupLearnerPreferences\([\s\S]*?field\.addEventListener\("change"/],
   ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/]
 ];
 

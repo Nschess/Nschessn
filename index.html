@@ -19777,12 +19777,72 @@
     }
 
     .site-header .nav-utilities .player-flex-chip {
-      min-width: 142px;
-      max-width: 172px;
-      min-height: 36px;
+      grid-template-columns: 32px minmax(0, 1fr);
+      min-width: 184px;
+      max-width: 184px;
+      min-height: 42px;
+      gap: 7px;
+      padding: 5px 7px 5px 5px;
       border-radius: 10px;
       border-color: rgba(250, 204, 21, 0.36);
       background: linear-gradient(135deg, rgba(250, 204, 21, 0.1), rgba(15, 23, 42, 0.76));
+    }
+
+    .site-header .nav-utilities .player-flex-main {
+      min-width: 0;
+      gap: 2px;
+    }
+
+    .site-header .nav-utilities .player-flex-name {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      font-size: 0.72rem;
+      line-height: 1.1;
+    }
+
+    .site-header .nav-utilities .player-flex-name .player-country-flag {
+      display: none;
+    }
+
+    .site-header .nav-utilities .player-flex-name [data-profile-field="name"],
+    .site-header .nav-utilities .player-flex-name [data-profile-field="name"].styled-username {
+      display: block;
+      min-width: 0;
+      max-width: 100%;
+      padding: 0;
+      overflow: hidden !important;
+      border: 0;
+      background: none;
+      box-shadow: none;
+      color: var(--cq-text-primary);
+      -webkit-text-fill-color: currentColor;
+      font: inherit;
+      text-overflow: ellipsis !important;
+      text-shadow: none;
+      white-space: nowrap;
+      animation: none;
+    }
+
+    .site-header .nav-utilities .player-flex-title {
+      overflow: hidden;
+      color: var(--cq-text-muted);
+      font-size: 0.54rem;
+      letter-spacing: 0.035em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .site-header .nav-utilities .player-flex-meta {
+      min-width: 0;
+      gap: 4px;
+      overflow: hidden;
+      font-size: 0.58rem;
+      text-overflow: ellipsis;
+    }
+
+    .site-header .nav-utilities .player-flex-meta > [aria-hidden="true"] {
+      display: none;
     }
 
     .site-header .nav-menu {
@@ -24154,6 +24214,22 @@
       line-height: 1.15;
     }
 
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-name-line {
+      display: block !important;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-name-line [data-match-name] {
+      display: block;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-main, .ai-player-main) small,
     :is(body:not(.theme-light), body.theme-light) #play .match-player-subline {
       overflow: hidden;
@@ -24162,6 +24238,10 @@
       line-height: 1.25;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-subline .match-flex-badge {
+      display: none;
     }
 
     :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
@@ -24182,12 +24262,13 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-side],
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-frame-status],
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer :is([data-ai-games], [data-ai-win-rate]) {
       display: none;
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer .ai-player-move::before {
-      content: "Side · ";
+      content: none;
       color: var(--cq-text-subtle);
       font-weight: 700;
     }
@@ -24550,14 +24631,6 @@
     }
 
     @media (min-width: 1181px) {
-      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .preference-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .preference-grid .board-size-slider {
-        grid-column: 1 / -1;
-      }
-
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
         position: sticky;
         top: 84px;
