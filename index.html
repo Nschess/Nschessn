@@ -28301,6 +28301,24 @@
       return markup;
     }
 
+    function createPieceFallbackElement(piece, style = activePieceSvgSet) {
+      const info = getPieceCodeInfo(piece);
+      if (!info) return null;
+      const symbols = {
+        wk: "♔", wq: "♕", wr: "♖", wb: "♗", wn: "♘", wp: "♙",
+        bk: "♚", bq: "♛", br: "♜", bb: "♝", bn: "♞", bp: "♟"
+      };
+      const symbol = symbols[`${info.color}${info.type}`];
+      if (!symbol) return null;
+      const fallback = document.createElement("span");
+      fallback.className = `piece-symbol ${info.color === "w" ? "white-piece" : "black-piece"}`;
+      fallback.dataset.symbol = symbol;
+      fallback.dataset.rarity = getPieceSvgTheme(resolvePieceSvgSet(style)).rarity;
+      fallback.textContent = symbol;
+      fallback.setAttribute("aria-hidden", "true");
+      return fallback;
+    }
+
     function prewarmPieceSvgSet(style = activePieceSvgSet) {
       const resolvedStyle = resolvePieceSvgSet(style);
       Object.values(licensedPieceAssetSets[resolvedStyle] || licensedPieceAssetSets.chessnut).forEach((asset) => {
@@ -28325,7 +28343,25 @@
     function renderPieceOnSquare(square, piece, style = activePieceSvgSet, forceClassic = false) {
       const markup = createPieceSvgMarkup(piece, style, forceClassic);
       square.textContent = "";
-      if (markup) square.innerHTML = markup;
+      if (!piece) return;
+      const showFallback = () => {
+        const fallback = createPieceFallbackElement(piece, forceClassic ? "chessnut" : style);
+        if (fallback) square.replaceChildren(fallback);
+      };
+      if (!markup) {
+        showFallback();
+        return;
+      }
+      square.innerHTML = markup;
+      const image = square.querySelector(".piece-svg");
+      if (!image) {
+        showFallback();
+        return;
+      }
+      image.addEventListener("error", () => {
+        if (image.parentElement === square) showFallback();
+      }, { once: true });
+      if (image.complete && !image.naturalWidth) showFallback();
     }
 
     const adventureMissions = [
@@ -38205,6 +38241,16 @@
       };
     }
 
+    function getSoloMatchClockControl() {
+      const minutes = Math.max(1, Math.min(60, Number(document.getElementById("playTimeControl")?.value) || 10));
+      const increment = Math.max(0, Math.min(120, Number(document.getElementById("playIncrement")?.value) || 0));
+      return `${minutes}+${increment}`;
+    }
+
+    function getActiveMatchClockControl() {
+      return friendChallengeState?.active ? (friendChallengeState.clock || "10+0") : getSoloMatchClockControl();
+    }
+
     function normalizeMatchClockState(raw, control = "10+0") {
       const preset = parseMatchClock(control);
       const source = raw && typeof raw === "object" ? raw : {};
@@ -38229,7 +38275,7 @@
     }
 
     function getMatchClockSnapshot(clock = matchClockState) {
-      const source = clock || normalizeMatchClockState(null, friendChallengeState?.clock || "10+0");
+      const source = clock || normalizeMatchClockState(null, getActiveMatchClockControl());
       const snapshot = { ...source };
       const running = Boolean(source.running && coachGame && !isCoachGameOver() && !coachDrawAgreed);
       if (!running) return snapshot;
@@ -38313,7 +38359,7 @@
       return (coachGame?.history()?.length || 0) < 2;
     }
 
-    function resetMatchPlayerTimer(control = friendChallengeState?.clock || "10+0", remoteClock = null) {
+    function resetMatchPlayerTimer(control = getActiveMatchClockControl(), remoteClock = null) {
       matchStartedAt = Date.now();
       matchEndedElapsedMs = null;
       matchClockExpiredColor = "";
@@ -38362,7 +38408,7 @@
       if (timer) timer.textContent = clock.running ? formatMatchClock(playerMs) : "--:--";
       if (aiTimer) aiTimer.textContent = clock.running ? formatMatchClock(opponentMs) : "--:--";
       if (avatar) {
-        const base = Math.max(1, parseMatchClock(friendChallengeState?.clock || "10+0").baseMs || 600000);
+        const base = Math.max(1, parseMatchClock(getActiveMatchClockControl()).baseMs || 600000);
         const progress = Math.min(1, Math.max(0, 1 - playerMs / base));
         avatar.dataset.timerRing = "on";
         avatar.style.setProperty("--match-timer-angle", `${Math.round(progress * 360)}deg`);
@@ -44293,6 +44339,14 @@
       });
       document.querySelectorAll("[data-coach-side]").forEach((button) => {
         button.addEventListener("click", () => setCoachPlayerColor(button.dataset.coachSide));
+      });
+      ["playTimeControl", "playIncrement"].forEach((id) => {
+        document.getElementById(id)?.addEventListener("change", () => {
+          if (friendChallengeState?.active) return;
+          resetMatchPlayerTimer(getSoloMatchClockControl());
+          coachMessage = `Clock set to ${getSoloMatchClockControl().replace("+", " + ")}.`;
+          updateCoachPanel();
+        });
       });
       document.getElementById("beginnerBotList")?.addEventListener("click", (event) => {
         const button = event.target.closest("[data-beginner-bot]");
