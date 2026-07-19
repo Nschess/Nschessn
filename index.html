@@ -39777,12 +39777,14 @@
       refreshPromise: null,
       refreshTimer: 0,
       lastSyncSignature: "",
+      cacheHydrated: false,
       subscribed: false,
       localListener: false,
       controlsBound: false,
       scope: "global",
       period: "all"
     };
+    const leaderboardSnapshotStorageKey = "checkmateQuest.leaderboardSnapshot.v1";
 
     function getLeaderboardAccountId(account = {}) {
       return String(account.publicId || account.id || account.userId || account.email || "").trim().toLowerCase();
@@ -39850,6 +39852,27 @@
       }).filter(Boolean);
     }
 
+    function hydrateSharedLeaderboardSnapshot() {
+      if (leaderboardRuntime.cacheHydrated) return Array.isArray(leaderboardRuntime.accounts);
+      leaderboardRuntime.cacheHydrated = true;
+      const snapshot = readJsonStorage(leaderboardSnapshotStorageKey, {});
+      const accounts = normalizeGlobalLeaderboardAccounts(snapshot?.entries || snapshot?.accounts || []);
+      if (!accounts.length) return false;
+      leaderboardRuntime.accounts = accounts;
+      leaderboardRuntime.status = "global";
+      // Leave this at zero so a current ranking request begins immediately.
+      leaderboardRuntime.lastRefresh = 0;
+      return true;
+    }
+
+    function cacheSharedLeaderboardSnapshot(accounts = leaderboardRuntime.accounts) {
+      if (!Array.isArray(accounts) || !accounts.length) return;
+      writeJsonStorage(leaderboardSnapshotStorageKey, {
+        cachedAt: Date.now(),
+        entries: accounts.map(({ __globalLeaderboard, ...account }) => account)
+      });
+    }
+
     function isRealLeaderboardAccount(account) {
       const name = normalizeAuthUsername(account?.username);
       const id = getLeaderboardAccountId(account);
@@ -39900,6 +39923,7 @@
     }
 
     async function refreshSharedLeaderboards(force = false) {
+      hydrateSharedLeaderboardSnapshot();
       const provider = getLeaderboardProvider();
       const fetchRows = canUseSharedLeaderboardApi()
         ? (options) => requestSharedLeaderboard("GET", null, options)
@@ -39917,6 +39941,7 @@
           leaderboardRuntime.accounts = normalizeGlobalLeaderboardAccounts(payload);
           leaderboardRuntime.status = "global";
           leaderboardRuntime.lastRefresh = Date.now();
+          cacheSharedLeaderboardSnapshot();
           renderLeaderboards();
           scheduleSharedLeaderboardRefresh();
         })
@@ -39932,6 +39957,7 @@
     }
 
     function ensureSharedLeaderboardSync() {
+      hydrateSharedLeaderboardSnapshot();
       if (!leaderboardRuntime.localListener) {
         leaderboardRuntime.localListener = true;
         window.addEventListener("storage", (event) => {
@@ -39946,6 +39972,7 @@
             leaderboardRuntime.accounts = normalizeGlobalLeaderboardAccounts(payload);
             leaderboardRuntime.status = "global";
             leaderboardRuntime.lastRefresh = Date.now();
+            cacheSharedLeaderboardSnapshot();
             renderLeaderboards();
           });
         } catch {
@@ -40269,6 +40296,12 @@
         row.append(rank, copy, createBookText("em", "home-rank-score", entry.primary));
         return row;
       }));
+    }
+
+    function primeHomeRankings() {
+      hydrateSharedLeaderboardSnapshot();
+      renderHomeTopPlayers();
+      ensureSharedLeaderboardSync();
     }
 
     function renderLeaderboardOverview({ puzzleEntries = [], aiEntries = [], tournamentEntries = [] } = {}) {
@@ -55071,6 +55104,8 @@
     applyStartupTheme();
     setupRuntimeSafety();
     setupSiteTabs();
+    primeHomeRankings();
+    void setupSupabaseAuthUi();
     window.requestAnimationFrame(() => {
       setupVisualEntrances();
       setupPerformanceOptimizations();
