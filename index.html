@@ -23990,6 +23990,639 @@
         animation: none;
       }
     }
+
+    /* Phase 4: the Play workspace is board-first, deliberately quiet, and
+       reuses the Phase 3 tokens rather than adding a second visual system. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+      --cq-play-rail-gap: var(--cq-space-2);
+      --cq-play-workspace-gap: clamp(var(--cq-space-2), 1.5vw, var(--cq-space-3));
+      --cq-play-board-max: 760px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .section-head {
+      align-items: center;
+      gap: var(--cq-space-3);
+      margin-bottom: var(--cq-space-3);
+      padding: var(--cq-space-3) var(--cq-space-4);
+      border-radius: var(--cq-radius-card);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .section-head .section-intro {
+      max-width: 58ch;
+      margin: 0;
+      color: var(--cq-text-muted);
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+      grid-template-areas: "left center right";
+      grid-template-columns: minmax(210px, 0.7fr) minmax(520px, 760px) minmax(258px, 0.84fr);
+      max-width: 1580px;
+      gap: var(--cq-play-workspace-gap);
+      padding: var(--cq-space-3);
+      border-radius: var(--cq-radius-stage);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+      align-content: start;
+      gap: var(--cq-play-rail-gap);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+      grid-template-areas:
+        "setup"
+        "opponent"
+        "board"
+        "player"
+        "actions"
+        "options";
+      width: 100%;
+      max-width: var(--cq-play-board-max);
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .coach-setup { grid-area: setup; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: opponent; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap { grid-area: board; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: player; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-bottom-actionbar { grid-area: actions; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .game-options-panel { grid-area: options; }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-shell, .play-left-sidebar, .play-right-sidebar, .player-frame, .play-bottom-actionbar, .game-options-panel) {
+      backdrop-filter: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+      width: min(100%, var(--cq-play-board-max));
+      padding: clamp(3px, 0.45vw, 5px);
+      border-color: var(--cq-board-frame-border);
+      border-radius: var(--cq-radius-stage);
+      box-shadow: 0 0 0 1px var(--cq-accent-secondary-soft), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap::after {
+      border-color: var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-setup {
+      min-height: var(--cq-control-height);
+      gap: var(--cq-space-1);
+      padding: var(--cq-space-1) var(--cq-space-2);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-glass-strong);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .coach-setup-heading {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .coach-side-picker {
+      gap: 2px;
+      padding: 2px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .coach-side-picker .mission-button,
+    :is(body:not(.theme-light), body.theme-light) #play .coach-difficulty-menu > summary {
+      min-height: 30px;
+      padding: 4px var(--cq-space-2);
+      border-radius: var(--cq-radius-pill);
+      font-size: 0.68rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .coach-setup > :is(.play-setup-chip, #gameDifficultyBadge, #gameEloBadge) {
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .coach-setup > :is(#gameStatusBadge, #gameTurnBadge, #gameBossBadge) {
+      min-height: 28px;
+      padding-inline: var(--cq-space-2);
+      border-radius: var(--cq-radius-pill);
+      font-size: 0.66rem;
+      line-height: 1;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .player-frame {
+      grid-template-columns: 46px minmax(0, 1fr) auto;
+      grid-template-areas:
+        "top top top"
+        "avatar identity clock"
+        "footer footer footer"
+        "details details details";
+      min-height: 0;
+      gap: var(--cq-space-1) var(--cq-space-2);
+      padding: var(--cq-space-2) var(--cq-space-3);
+      border-radius: var(--cq-radius-card);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-topline {
+      min-height: 20px;
+      padding-bottom: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
+      width: 46px;
+      height: 46px;
+      border-radius: var(--cq-radius-control);
+      font-size: 1.1rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-main, .ai-player-main) {
+      gap: 2px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-main, .ai-player-main) strong {
+      font-size: 0.92rem;
+      line-height: 1.15;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-main, .ai-player-main) small,
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-subline {
+      overflow: hidden;
+      color: var(--cq-text-muted);
+      font-size: 0.68rem;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
+      min-width: 72px;
+      min-height: 34px;
+      padding-inline: var(--cq-space-2);
+      border-radius: var(--cq-radius-control);
+      font-size: 0.76rem;
+      font-variant-numeric: tabular-nums;
+      box-shadow: var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer,
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta {
+      min-height: 26px;
+      gap: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-side],
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer :is([data-ai-games], [data-ai-win-rate]) {
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer .ai-player-move::before {
+      content: "Side · ";
+      color: var(--cq-text-subtle);
+      font-weight: 700;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-card.is-player-turn {
+      border-color: var(--cq-accent-tertiary);
+      box-shadow: inset 0 0 0 1px var(--cq-accent-tertiary-soft), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-card.is-player-turn .player-frame-topline::after {
+      content: "Your move";
+      margin-left: auto;
+      color: var(--cq-accent-tertiary);
+      font-size: 0.66rem;
+      font-weight: 800;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details {
+      grid-area: details;
+      min-width: 0;
+      margin: var(--cq-space-1) 0 0;
+      border-top: 1px solid var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary {
+      display: flex;
+      min-height: 30px;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--cq-text-muted);
+      cursor: pointer;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      list-style: none;
+      text-transform: uppercase;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary::after {
+      content: "+";
+      color: var(--cq-accent-tertiary);
+      font-size: 0.95rem;
+      line-height: 1;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details[open] > summary::after {
+      content: "−";
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details .player-frame-stats {
+      grid-area: auto;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--cq-space-1);
+      margin: 0;
+      padding: 0 0 var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details .player-frame-stats > div {
+      min-height: 42px;
+      padding: 6px var(--cq-space-1);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details .player-frame-stats dt {
+      color: var(--cq-text-subtle);
+      font-size: 0.58rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details .player-frame-stats dd {
+      color: var(--cq-text-primary);
+      font-size: 0.68rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details .player-frame-description {
+      grid-area: auto;
+      min-height: 0;
+      margin: 0;
+      padding: 0 0 var(--cq-space-2);
+      color: var(--cq-text-muted);
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-bottom-actionbar {
+      padding: var(--cq-space-2);
+      border-radius: var(--cq-radius-card);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions > .button,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-extra-actions {
+      flex: 1 1 90px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions .play-start-button {
+      flex-basis: 138px;
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions .play-start-button:hover,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions .play-start-button:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: var(--cq-focus-ring), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-extra-actions summary {
+      width: 100%;
+      min-height: var(--cq-control-height);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .game-options-panel {
+      padding: var(--cq-space-2) var(--cq-space-3);
+      border-radius: var(--cq-radius-card);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .game-options-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--cq-space-2);
+      margin-bottom: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .game-options-heading .section-kicker {
+      order: 2;
+      font-size: 0.6rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .game-options-heading h3 {
+      margin: 0;
+      font-size: 0.85rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .game-options-grid {
+      grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+      gap: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .game-options-grid label,
+    :is(body:not(.theme-light), body.theme-light) #play .preference-grid label {
+      gap: 4px;
+      color: var(--cq-text-muted);
+      font-size: 0.66rem;
+      font-weight: 750;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .game-options-grid select,
+    :is(body:not(.theme-light), body.theme-light) #play .preference-grid select {
+      min-height: 34px;
+      padding-inline: var(--cq-space-1);
+      font-size: 0.7rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-nav,
+    :is(body:not(.theme-light), body.theme-light) #play .preference-panel {
+      padding: var(--cq-space-2);
+      border-radius: var(--cq-radius-card);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-head {
+      margin-bottom: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-head small,
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card small,
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card > b,
+    :is(body:not(.theme-light), body.theme-light) #play .preference-note {
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card {
+      min-height: 42px;
+      gap: var(--cq-space-2);
+      padding: 6px var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: var(--cq-radius-control);
+      font-size: 0.9rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card strong {
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .preference-panel h3 {
+      margin-bottom: var(--cq-space-2);
+      font-size: 0.82rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .preference-grid {
+      gap: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > :not([hidden]) {
+      margin: 0;
+      border-radius: var(--cq-radius-card);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .featured-coach-card {
+      grid-template-columns: 48px minmax(0, 1fr);
+      grid-template-areas:
+        "avatar copy"
+        "action action";
+      gap: var(--cq-space-2);
+      padding: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .featured-coach-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--cq-radius-control);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .featured-coach-copy p,
+    :is(body:not(.theme-light), body.theme-light) #play .coach-library summary small {
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .featured-coach-copy h4 {
+      margin: 2px 0;
+      font-size: 0.88rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .featured-coach-meta {
+      gap: var(--cq-space-1);
+      font-size: 0.64rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .featured-coach-card .button {
+      min-height: 36px;
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .coach-library > summary {
+      min-height: 38px;
+      padding: 0 var(--cq-space-2);
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.simple-coach, .opening-compass, .captured-row, .move-history, .friend-game-chat) {
+      padding: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .simple-coach {
+      min-height: 0;
+      max-height: 5.3em;
+      overflow: auto;
+      color: var(--cq-text-muted);
+      font-size: 0.74rem;
+      line-height: 1.45;
+      scrollbar-width: thin;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .opening-compass-head {
+      gap: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .opening-compass-list {
+      gap: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .captured-row {
+      gap: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .captured-row > div {
+      min-height: 50px;
+      padding: var(--cq-space-1);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .captured-row strong {
+      margin-bottom: 3px;
+      color: var(--cq-text-subtle);
+      font-size: 0.6rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-history {
+      max-height: 190px;
+      overflow: auto;
+      scrollbar-width: thin;
+    }
+
+    @media (min-width: 1181px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: sticky;
+        top: 84px;
+        max-height: calc(100svh - 96px);
+        overflow: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+      }
+    }
+
+    @media (min-width: 900px) and (max-width: 1180px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center center"
+          "right left";
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        max-width: 980px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
+    @media (min-width: 700px) and (max-width: 899px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+        max-width: 760px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 699px) {
+      :is(body:not(.theme-light), body.theme-light) #play .section-head {
+        padding: var(--cq-space-2) var(--cq-space-3);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .section-head .section-intro {
+        display: none;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+        width: min(100% - 12px, 680px);
+        gap: var(--cq-space-2);
+        padding: var(--cq-space-2);
+        border-radius: var(--cq-radius-card);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+        grid-template-areas:
+          "board"
+          "opponent"
+          "player"
+          "actions"
+          "setup"
+          "options";
+        width: 100%;
+        gap: var(--cq-space-2);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+        width: min(100%, calc(100dvw - 28px));
+        border-radius: var(--cq-radius-card);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .player-frame {
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        padding: var(--cq-space-2);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
+        width: 42px;
+        height: 42px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
+        min-width: 64px;
+        min-height: 32px;
+        font-size: 0.7rem;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame-details .player-frame-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions > .button,
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-extra-actions {
+        flex-basis: calc(50% - var(--cq-space-1));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions .play-start-button {
+        flex-basis: 100%;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .game-options-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play :is(.play-left-sidebar, .play-right-sidebar) {
+        gap: var(--cq-space-2);
+        padding: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.player-frame, .play-mode-card, .play-primary-actions .button, .play-board-wrap) {
+        transition: none;
+        animation: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -26670,15 +27303,18 @@
                 <small><span id="aiPlayerTitle">Novice Student</span> • <span id="aiPlayerRating">1050 Elo</span></small>
               </span>
               <span class="ai-player-timer" id="aiPlayerTimer" aria-label="Opponent game clock">00:00</span>
-              <dl class="player-frame-stats player-frame-stats--opponent" aria-label="Opponent details">
-                <div><dt>Engine</dt><dd data-ai-stat="engine">Stockfish 16</dd></div>
-                <div><dt>Difficulty</dt><dd data-ai-stat="difficulty">Easy engine</dd></div>
-                <div><dt>Elo</dt><dd data-ai-stat="rating">1050 Elo</dd></div>
-                <div><dt>Style</dt><dd data-ai-stat="style">Balanced</dd></div>
-                <div><dt>Strength</dt><dd data-ai-stat="strength">Skill 3/20</dd></div>
-                <div><dt>Level</dt><dd data-ai-stat="level">Novice</dd></div>
-              </dl>
-              <p class="player-frame-description" data-ai-description>A calm opponent that develops safely and looks for practical tactics.</p>
+              <details class="player-frame-details">
+                <summary>Opponent details</summary>
+                <dl class="player-frame-stats player-frame-stats--opponent" aria-label="Opponent details">
+                  <div><dt>Engine</dt><dd data-ai-stat="engine">Stockfish 16</dd></div>
+                  <div><dt>Difficulty</dt><dd data-ai-stat="difficulty">Easy engine</dd></div>
+                  <div><dt>Elo</dt><dd data-ai-stat="rating">1050 Elo</dd></div>
+                  <div><dt>Style</dt><dd data-ai-stat="style">Balanced</dd></div>
+                  <div><dt>Strength</dt><dd data-ai-stat="strength">Skill 3/20</dd></div>
+                  <div><dt>Level</dt><dd data-ai-stat="level">Novice</dd></div>
+                </dl>
+                <p class="player-frame-description" data-ai-description>A calm opponent that develops safely and looks for practical tactics.</p>
+              </details>
               <div class="player-frame-footer">
                 <span class="ai-player-move" id="aiMoveIndicator">Black</span>
                 <span class="ai-player-last" id="aiLastMove">Last: --</span>
@@ -26704,16 +27340,19 @@
                 <span class="match-player-pill match-player-online" data-match-online>Online</span>
                 <span class="player-frame-record" data-match-frame-status>Ready</span>
               </span>
-              <dl class="player-frame-stats" aria-label="Your game statistics">
-                <div><dt>Elo</dt><dd data-match-frame-stat="rating">450</dd></div>
-                <div><dt>Games</dt><dd data-match-frame-stat="games">0</dd></div>
-                <div><dt>Wins</dt><dd data-match-frame-stat="wins">0</dd></div>
-                <div><dt>Losses</dt><dd data-match-frame-stat="losses">0</dd></div>
-                <div><dt>Draws</dt><dd data-match-frame-stat="draws">0</dd></div>
-                <div><dt>Win rate</dt><dd data-match-frame-stat="win-rate">0%</dd></div>
-                <div><dt>Best rating</dt><dd data-match-frame-stat="best-rating">450</dd></div>
-              </dl>
-              <p class="player-frame-description" data-match-description>Ready for a focused game.</p>
+              <details class="player-frame-details">
+                <summary>Match details</summary>
+                <dl class="player-frame-stats" aria-label="Your game statistics">
+                  <div><dt>Elo</dt><dd data-match-frame-stat="rating">450</dd></div>
+                  <div><dt>Games</dt><dd data-match-frame-stat="games">0</dd></div>
+                  <div><dt>Wins</dt><dd data-match-frame-stat="wins">0</dd></div>
+                  <div><dt>Losses</dt><dd data-match-frame-stat="losses">0</dd></div>
+                  <div><dt>Draws</dt><dd data-match-frame-stat="draws">0</dd></div>
+                  <div><dt>Win rate</dt><dd data-match-frame-stat="win-rate">0%</dd></div>
+                  <div><dt>Best rating</dt><dd data-match-frame-stat="best-rating">450</dd></div>
+                </dl>
+                <p class="player-frame-description" data-match-description>Ready for a focused game.</p>
+              </details>
             </aside>
             <div class="puzzle-board-wrap play-board-wrap cq-glass-container" aria-label="Playable chess board">
               <div class="review-eval-rail" id="reviewEvalRail" aria-label="Review evaluation bar" hidden>
