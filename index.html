@@ -26714,6 +26714,563 @@
         transition: none;
       }
     }
+
+    /* Phase 5: rankings, friends, and tournaments share the same calm,
+       data-first workspace treatment without changing their interactions. */
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview {
+      display: grid;
+      gap: var(--cq-space-3);
+      margin-bottom: var(--cq-space-3);
+      padding: clamp(16px, 2.4vw, 24px);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background:
+        linear-gradient(135deg, var(--cq-accent-primary-soft), transparent 46%),
+        var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-head,
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-grid,
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-player-summary {
+      display: flex;
+      align-items: center;
+      gap: var(--cq-space-3);
+      min-width: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-head {
+      justify-content: space-between;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-kicker {
+      display: block;
+      color: var(--cq-text-subtle);
+      font-size: 0.66rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview h3 {
+      margin: 3px 0 0;
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: clamp(1.05rem, 2vw, 1.3rem);
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-source {
+      flex: 0 0 auto;
+      padding: 5px 9px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      color: var(--cq-accent-tertiary);
+      background: var(--cq-surface-pill);
+      font-size: 0.7rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-grid {
+      display: grid;
+      grid-template-columns: minmax(210px, 0.9fr) minmax(240px, 1fr) minmax(250px, 1.1fr);
+      align-items: stretch;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-player-summary,
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-position-stats,
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-card {
+      min-width: 0;
+      padding: 13px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-summary-avatar {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border: 1px solid var(--cq-border-strong);
+      border-radius: calc(var(--cq-radius-card) - 4px);
+      color: var(--cq-text-on-accent);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), 0 8px 20px rgba(38, 64, 166, 0.18);
+      font-size: 1.55rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-summary-copy {
+      display: grid;
+      min-width: 0;
+      gap: 3px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-summary-copy strong {
+      overflow: hidden;
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: 0.98rem;
+      letter-spacing: var(--cq-tracking-heading);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-summary-copy small,
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-summary-rating small {
+      color: var(--cq-text-muted);
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-summary-rating {
+      display: grid;
+      min-width: max-content;
+      gap: 3px;
+      margin-left: auto;
+      text-align: right;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-summary-rating strong {
+      color: var(--cq-accent-tertiary);
+      font-family: var(--cq-font-display);
+      font-size: 0.9rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-position-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--cq-space-2);
+      margin: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-position-stats div {
+      display: grid;
+      align-content: center;
+      min-width: 0;
+      gap: 3px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-position-stats dt {
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: 1.05rem;
+      font-weight: 800;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-position-stats dd {
+      margin: 0;
+      color: var(--cq-text-muted);
+      font-size: 0.66rem;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-card {
+      display: grid;
+      align-content: center;
+      gap: 8px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-card > div:first-child {
+      display: grid;
+      gap: 3px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-card span,
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-card small {
+      color: var(--cq-text-muted);
+      font-size: 0.68rem;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-card strong {
+      color: var(--cq-text-primary);
+      font-size: 0.84rem;
+      line-height: 1.35;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-track {
+      height: 7px;
+      overflow: hidden;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-track span {
+      display: block;
+      width: 10%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--cq-accent-gradient);
+      transition: width var(--cq-transition-normal) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-toolbar {
+      gap: 7px;
+      padding: 8px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-glass);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-toolbar button {
+      min-height: 34px;
+      padding-inline: 10px;
+      border-color: transparent;
+      border-radius: var(--cq-radius-pill);
+      color: var(--cq-text-muted);
+      background: transparent;
+      box-shadow: none;
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-toolbar button:hover,
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-toolbar button:focus-visible {
+      color: var(--cq-text-primary);
+      border-color: var(--cq-border);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-focus-ring);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-toolbar button[aria-pressed="true"] {
+      color: var(--cq-text-on-accent);
+      border-color: var(--cq-border-strong);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-grid {
+      gap: var(--cq-space-3);
+      margin-top: var(--cq-space-3);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-card {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-head {
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      gap: var(--cq-space-2);
+      padding: 15px;
+      border-bottom-color: var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-head h3 {
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: 1rem;
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-head .trainer-note,
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-status {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-list > .trainer-note {
+      min-height: 112px;
+      display: grid;
+      place-items: center;
+      margin: 0;
+      padding: var(--cq-space-3);
+      color: var(--cq-text-subtle);
+      text-align: center;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-row {
+      min-height: 68px;
+      gap: var(--cq-space-2);
+      padding: 10px 15px;
+      border-bottom-color: var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-row:hover {
+      background: var(--cq-surface-elevated);
+      transform: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-row.is-player {
+      background: linear-gradient(90deg, var(--cq-accent-primary-soft), transparent 72%);
+      box-shadow: inset 3px 0 0 var(--cq-accent-tertiary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-row:nth-child(-n + 3) .leaderboard-rank {
+      color: var(--cq-text-on-accent);
+      border-color: var(--cq-border-strong);
+      background: var(--cq-accent-gradient);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-rank {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--cq-border);
+      border-radius: 9px;
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-input);
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-name {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-meta {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-score strong {
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-score small {
+      color: var(--cq-accent-tertiary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.friend-lobby, .tournament-lobby) {
+      gap: var(--cq-space-3);
+      margin-block: var(--cq-space-3);
+      padding: clamp(14px, 2vw, 22px);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.friend-lobby-head, .tournament-head) {
+      padding: 14px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.friend-lobby, .tournament-lobby) :is(h3, h4, strong, label) {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.friend-lobby, .tournament-lobby) :is(p, small, .tournament-meta, .tournament-empty) {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .friend-code-card {
+      min-width: 156px;
+      padding: 11px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .friend-code-card strong {
+      color: var(--cq-accent-tertiary);
+      font-family: var(--cq-font-display);
+      font-size: 1.08rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.friend-lobby-grid, .friend-search-panel, .friend-share-row, .friend-lobby-foot, .tournament-create-grid, .tournament-list, .tournament-detail) {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.friend-lobby, .tournament-lobby) :is(input, select) {
+      border-color: var(--cq-control-border);
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-input);
+      box-shadow: inset 0 1px 0 var(--cq-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.friend-result-card, .friend-chip, .friend-request-card, .tournament-card, .tournament-section, .tournament-stage) {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.friend-result-card, .friend-chip, .tournament-card):hover {
+      border-color: var(--cq-border-strong);
+      background: var(--cq-surface-panel-strong);
+      transform: translateY(-1px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-card.is-selected,
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-standing-row.is-self {
+      border-color: var(--cq-border-strong);
+      background: var(--cq-accent-primary-soft);
+      box-shadow: inset 3px 0 0 var(--cq-accent-tertiary), var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .friend-result-avatar,
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-avatar,
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-stage-icon {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-on-accent);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .friend-status-dot {
+      background: var(--cq-success);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--cq-success) 16%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .friend-status-dot.is-offline {
+      background: var(--cq-text-subtle);
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .friend-card-actions {
+      gap: 7px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .friend-qr {
+      border-color: var(--cq-border);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .friend-request-card {
+      border-color: color-mix(in srgb, var(--cq-success) 48%, var(--cq-border));
+      background: linear-gradient(135deg, color-mix(in srgb, var(--cq-success) 12%, transparent), transparent 55%), var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-status {
+      border-color: var(--cq-border);
+      color: var(--cq-accent-tertiary);
+      background: var(--cq-surface-pill);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-status.is-running {
+      border-color: color-mix(in srgb, var(--cq-success) 48%, var(--cq-border));
+      color: var(--cq-success);
+      background: color-mix(in srgb, var(--cq-success) 11%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-status.is-completed {
+      border-color: color-mix(in srgb, var(--cq-warning) 52%, var(--cq-border));
+      color: var(--cq-warning);
+      background: color-mix(in srgb, var(--cq-warning) 11%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-status.is-paused {
+      border-color: color-mix(in srgb, var(--cq-danger) 46%, var(--cq-border));
+      color: var(--cq-danger);
+      background: color-mix(in srgb, var(--cq-danger) 11%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-stage {
+      gap: var(--cq-space-3);
+      background: linear-gradient(135deg, var(--cq-accent-primary-soft), transparent 60%), var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-progress {
+      height: 6px;
+      border: 1px solid var(--cq-border);
+      background: var(--cq-surface-elevated);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-progress i {
+      background: var(--cq-accent-gradient);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-section-title span,
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-player small,
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-standing-stats span {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-place,
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-standing-stats span:first-child {
+      color: var(--cq-accent-tertiary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-pairing-row {
+      border-top-color: var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-chat-messages p {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-chat-messages p strong,
+    :is(body:not(.theme-light), body.theme-light) #play .tournament-chat-messages p.is-self {
+      color: var(--cq-text-primary);
+    }
+
+    @media (max-width: 1080px) {
+      :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-compare-card {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 680px) {
+      :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-head,
+      :is(body:not(.theme-light), body.theme-light) #play :is(.friend-lobby-head, .tournament-head) {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-source {
+        white-space: normal;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-overview-grid,
+      :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-position-stats {
+        grid-template-columns: 1fr;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-position-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #leaderboards .leaderboard-row {
+        grid-template-columns: 32px minmax(0, 1fr) auto;
+        padding-inline: 12px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play :is(.friend-lobby-grid, .tournament-create-grid) {
+        gap: var(--cq-space-2);
+        padding: 11px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .friend-share-row {
+        align-items: stretch;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .friend-share-row :is(input, .button) {
+        flex: 1 1 100%;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .tournament-dashboard {
+        gap: var(--cq-space-2);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) :is(#leaderboards .leaderboard-compare-track span, #play .tournament-progress i, #play .friend-result-card, #play .friend-chip, #play .tournament-card) {
+        transition: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -29781,6 +30338,36 @@
           </div>
           <p class="section-intro">Compare puzzle growth and AI victories with registered players. Offline builds clearly show a local-only fallback.</p>
         </div>
+
+        <section class="leaderboard-overview cq-panel" aria-labelledby="leaderboardOverviewTitle">
+          <div class="leaderboard-overview-head">
+            <div>
+              <span class="leaderboard-overview-kicker">Your position</span>
+              <h3 id="leaderboardOverviewTitle">Progress at a glance</h3>
+            </div>
+            <span class="leaderboard-overview-source" data-leaderboard-source>Loading rankings</span>
+          </div>
+          <div class="leaderboard-overview-grid">
+            <article class="leaderboard-player-summary">
+              <span class="leaderboard-summary-avatar" data-leaderboard-profile-avatar aria-hidden="true">&#10022;</span>
+              <span class="leaderboard-summary-copy">
+                <strong data-profile-field="name">Guest Explorer</strong>
+                <small data-profile-field="title">Explorer</small>
+              </span>
+              <span class="leaderboard-summary-rating"><strong data-profile-field="gameRating">450 Elo</strong><small>Game rating</small></span>
+            </article>
+            <dl class="leaderboard-position-stats" aria-label="Your leaderboard positions">
+              <div><dt data-leaderboard-puzzle-rank>--</dt><dd>Puzzle rank</dd></div>
+              <div><dt data-leaderboard-ai-rank>--</dt><dd>Game rank</dd></div>
+              <div><dt data-leaderboard-tournament-rank>--</dt><dd>Event rank</dd></div>
+            </dl>
+            <article class="leaderboard-compare-card" aria-label="Compare your game rating with the current leader">
+              <div><span>Rating comparison</span><strong data-leaderboard-compare-title>Establish your first ranking</strong></div>
+              <div class="leaderboard-compare-track" aria-hidden="true"><span data-leaderboard-compare-fill></span></div>
+              <small data-leaderboard-compare-meta>Complete a game to see how you compare.</small>
+            </article>
+          </div>
+        </section>
 
         <div class="leaderboard-toolbar" aria-label="Leaderboard filters">
           <button type="button" data-leaderboard-scope="global" aria-pressed="true">Global</button>
@@ -37890,6 +38477,51 @@
       }));
     }
 
+    function renderLeaderboardOverview({ puzzleEntries = [], aiEntries = [], tournamentEntries = [] } = {}) {
+      const overview = document.querySelector(".leaderboard-overview");
+      if (!overview) return;
+      const profile = getDragonProfileSnapshot();
+      const source = getLeaderboardDataSourceLabel();
+      const scope = `${getLeaderboardScopeLabel()} ${getLeaderboardPeriodLabel()}`;
+      const rankFor = (entries) => {
+        const index = entries.findIndex((entry) => entry.isPlayer);
+        return index < 0 ? "--" : `#${index + 1}`;
+      };
+      const setText = (selector, value) => {
+        overview.querySelectorAll(selector).forEach((element) => {
+          element.textContent = value;
+        });
+      };
+      const currentAi = aiEntries.find((entry) => entry.isPlayer);
+      const leader = aiEntries[0];
+      const currentRating = Math.max(400, Number(currentAi?.tieRating) || getLearnerGameRating());
+      const leaderRating = Math.max(currentRating, Number(leader?.tieRating) || currentRating);
+      const gap = Math.max(0, leaderRating - currentRating);
+      const fill = currentAi ? Math.round(Math.max(10, Math.min(100, (currentRating / leaderRating) * 100))) : 10;
+      const comparisonTitle = !currentAi
+        ? "Complete a game to enter the standings"
+        : currentAi === leader
+          ? "You are leading this ranking"
+          : `${formatProfileNumber(gap)} rating behind ${leader.name}`;
+      const comparisonMeta = currentAi
+        ? `${formatProfileNumber(currentRating)} Elo vs ${formatProfileNumber(leaderRating)} Elo at the top`
+        : "Your current game rating will appear here once a completed game is recorded.";
+
+      setText("[data-leaderboard-source]", `${source} · ${scope}`);
+      setText("[data-leaderboard-puzzle-rank]", rankFor(puzzleEntries));
+      setText("[data-leaderboard-ai-rank]", rankFor(aiEntries));
+      setText("[data-leaderboard-tournament-rank]", rankFor(tournamentEntries));
+      setText("[data-leaderboard-compare-title]", comparisonTitle);
+      setText("[data-leaderboard-compare-meta]", comparisonMeta);
+      overview.querySelectorAll("[data-leaderboard-profile-avatar]").forEach((avatar) => {
+        avatar.textContent = profile.avatar;
+        avatar.title = `${profile.avatarLabel || "Player"} avatar`;
+      });
+      overview.querySelectorAll("[data-leaderboard-compare-fill]").forEach((bar) => {
+        bar.style.width = `${fill}%`;
+      });
+    }
+
     function renderLeaderboards() {
       syncCurrentPlayerStatsToRegistry();
       ensureLeaderboardControls();
@@ -37898,6 +38530,7 @@
       const puzzleEntries = buildLeaderboardEntries("puzzles");
       const aiEntries = buildLeaderboardEntries("ai");
       const tournamentEntries = buildTournamentLeaderboardEntries();
+      renderLeaderboardOverview({ puzzleEntries, aiEntries, tournamentEntries });
       renderLeaderboardList("puzzleLeaderboardList", puzzleEntries);
       renderLeaderboardList("aiLeaderboardList", aiEntries);
       renderLeaderboardList("tournamentLeaderboardList", tournamentEntries);
