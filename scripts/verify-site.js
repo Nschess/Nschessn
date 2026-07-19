@@ -52,7 +52,7 @@ const requiredRegressionContracts = [
   ["visible desktop profile metadata", /\.player-flex-chip > \.player-flex-main:last-child\s*\{\s*display: grid;/],
   ["player-card coins binding", /data-match-coins/],
   ["compact player-frame grid", /"footer footer footer"\s*\n\s*"details details details"/],
-  ["wide player side-seat grid", /Wide desktop gives each player[\s\S]*?"opponent board player"/],
+  ["board-dominant player-card stack", /grid-template-areas:\s*\n\s*"setup"\s*\n\s*"opponent"\s*\n\s*"board"\s*\n\s*"player"\s*\n\s*"actions"\s*\n\s*"options"/],
   ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/]
 ];
 
