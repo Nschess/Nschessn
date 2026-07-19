@@ -25842,6 +25842,151 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
+    /* Homepage Phase 2: calm, data-led dashboard presentation. */
+    .hero-command-center {
+      --home-accent: #7c6cff;
+      --home-accent-strong: #5b5cf0;
+      --home-accent-soft: #7dd3fc;
+      min-height: min(780px, calc(100svh - 68px));
+      background:
+        radial-gradient(circle at 52% 42%, rgba(124, 108, 255, 0.18), transparent 27rem),
+        radial-gradient(circle at 88% 16%, rgba(125, 211, 252, 0.09), transparent 22rem),
+        linear-gradient(145deg, #070d1c 0%, #0c1730 54%, #080d1a 100%);
+    }
+
+    .hero-command-center::before {
+      background: linear-gradient(90deg, rgba(7, 13, 28, 0.98) 0%, rgba(7, 13, 28, 0.68) 31%, rgba(7, 13, 28, 0.14) 62%, rgba(7, 13, 28, 0.92) 100%);
+    }
+
+    .hero-command-center .hero-layout { gap: clamp(22px, 2.7vw, 44px); }
+    .hero-command-center .hero-copy { max-width: 390px; }
+    .hero-command-center .hero-copy h1 { max-width: 8.8ch; letter-spacing: -0.065em; text-wrap: balance; }
+    .hero-command-center .hero-copy h1 span { color: var(--home-accent-soft); }
+    .hero-command-center .hero-welcome-badge { border-color: rgba(125, 211, 252, 0.22); background: rgba(125, 211, 252, 0.08); }
+    .hero-command-center .hero-welcome-dot { background: var(--home-accent-soft); box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.1); }
+    .hero-command-center .hero-description { max-width: 35ch; color: #b7c3d9; line-height: 1.65; }
+
+    .hero-command-center .hero-actions .button:not(.secondary) {
+      border-color: rgba(174, 165, 255, 0.48);
+      background: linear-gradient(135deg, var(--home-accent), var(--home-accent-strong));
+      box-shadow: 0 12px 28px rgba(91, 92, 240, 0.27), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .hero-command-center .hero-actions .button.secondary {
+      border-color: rgba(148, 163, 184, 0.28);
+      background: rgba(15, 23, 42, 0.72);
+      color: #dce7f8;
+    }
+
+    .hero-command-center .hero-actions .button:hover,
+    .hero-command-center .hero-actions .button:focus-visible { transform: translateY(-2px); }
+    .hero-command-center .hero-stat-row { gap: 9px; }
+    .hero-command-center .home-stat { border-color: rgba(148, 163, 184, 0.18); background: rgba(7, 13, 28, 0.35); }
+    .hero-command-center .home-stat strong { color: #eff6ff; }
+    .hero-command-center .home-stat.is-highlight strong { color: #c4b5fd; }
+
+    .hero-stage { isolation: isolate; min-height: clamp(510px, 43vw, 670px); padding: clamp(20px, 2.25vw, 34px); }
+    .hero-stage::before, .hero-stage::after, .hero-stage-halo::before, .hero-stage-halo::after { display: none; }
+    .hero-stage-halo { inset: 4% 2%; background: radial-gradient(ellipse at 50% 52%, rgba(124, 108, 255, 0.22), transparent 66%); filter: blur(18px); }
+
+    .hero-command-center .hero-board.hero-board--center {
+      width: min(100%, 660px);
+      transform: none;
+      border-color: rgba(148, 163, 184, 0.42);
+      background: linear-gradient(145deg, #334155, #0b1325);
+      box-shadow: 0 28px 64px rgba(2, 6, 23, 0.58), 0 0 0 1px rgba(148, 163, 184, 0.16), 0 0 46px rgba(124, 108, 255, 0.17), inset 0 1px 0 rgba(248, 250, 252, 0.16);
+    }
+
+    .hero-command-center .hero-stage:hover .hero-board.hero-board--center {
+      transform: translateY(-3px);
+      box-shadow: 0 34px 72px rgba(2, 6, 23, 0.62), 0 0 0 1px rgba(167, 139, 250, 0.4), 0 0 52px rgba(124, 108, 255, 0.22), inset 0 1px 0 rgba(248, 250, 252, 0.16);
+    }
+
+    .hero-player-card { border-color: rgba(148, 163, 184, 0.28); background: linear-gradient(145deg, rgba(26, 37, 67, 0.94), rgba(8, 15, 31, 0.92)); box-shadow: 0 16px 32px rgba(2, 6, 23, 0.42), inset 0 1px 0 rgba(248, 250, 252, 0.1); }
+    .hero-player-card--you { border-color: rgba(125, 211, 252, 0.46); }
+    .hero-player-avatar--you { background: linear-gradient(135deg, #7dd3fc, #818cf8); color: #0b1020; }
+
+    .hero-command-center .hero-dashboard { gap: 10px; padding: 0; border: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .hero-command-center :is(.hero-quick-card, .hero-progress-card) {
+      min-height: 78px;
+      border-color: rgba(148, 163, 184, 0.18);
+      background: linear-gradient(105deg, rgba(125, 211, 252, 0.055), transparent 48%), linear-gradient(145deg, rgba(25, 39, 65, 0.9), rgba(10, 18, 36, 0.92));
+      box-shadow: 0 14px 28px rgba(2, 6, 23, 0.22), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    .hero-command-center .hero-quick-card::before, .hero-command-center .hero-progress-card::before { background: linear-gradient(var(--home-accent-soft), transparent); }
+    .hero-command-center .hero-quick-card--play { border-color: rgba(124, 108, 255, 0.5); background: linear-gradient(145deg, rgba(91, 92, 240, 0.33), rgba(10, 18, 36, 0.94)); }
+    .hero-command-center .hero-quick-card--play .hero-quick-icon { background: linear-gradient(135deg, #a5b4fc, #7c6cff); color: #10152c; box-shadow: 0 8px 20px rgba(91, 92, 240, 0.27); }
+    .hero-command-center .hero-quick-icon { border-color: rgba(125, 211, 252, 0.28); background: rgba(125, 211, 252, 0.1); color: #c5f2ff; }
+
+    .home-feature-strip { margin-top: 0; padding-block: clamp(24px, 3vw, 36px); background: linear-gradient(180deg, #080f20 0%, #0a1224 100%); }
+    .home-feature-grid { gap: 12px; }
+    .home-feature-card { min-height: 72px; padding: 13px; border-color: rgba(148, 163, 184, 0.17); border-radius: 14px; background: linear-gradient(145deg, rgba(24, 38, 63, 0.86), rgba(10, 18, 36, 0.9)); box-shadow: 0 10px 24px rgba(2, 6, 23, 0.2), inset 0 1px 0 rgba(248, 250, 252, 0.06); }
+    .home-feature-card:hover, .home-feature-card:focus-visible { border-color: rgba(125, 211, 252, 0.46); box-shadow: 0 16px 28px rgba(2, 6, 23, 0.28), 0 0 0 1px rgba(125, 211, 252, 0.08); }
+    .home-feature-icon { border-color: rgba(125, 211, 252, 0.26); background: rgba(125, 211, 252, 0.1); color: #bdefff; }
+    .home-feature-card:nth-child(3) .home-feature-icon { border-color: rgba(167, 139, 250, 0.3); background: rgba(167, 139, 250, 0.12); color: #d8d1ff; }
+    .home-feature-card:nth-child(4) .home-feature-icon { border-color: rgba(125, 211, 252, 0.28); background: rgba(125, 211, 252, 0.1); color: #bdefff; }
+    .home-feature-card:nth-child(5) .home-feature-icon { border-color: rgba(251, 191, 36, 0.3); background: rgba(251, 191, 36, 0.1); color: #fde68a; }
+
+    .home-lower-dashboard {
+      padding: clamp(18px, 2.5vw, 34px) 0 clamp(60px, 7vw, 98px);
+      background: radial-gradient(circle at 16% 4%, rgba(124, 108, 255, 0.09), transparent 25rem), linear-gradient(180deg, #0a1224 0%, #070e1c 82%);
+    }
+    .home-lower-grid { gap: clamp(14px, 1.7vw, 22px); overflow: visible; }
+    .home-lower-card {
+      position: relative;
+      min-height: 252px;
+      padding: clamp(17px, 1.7vw, 22px);
+      border-color: rgba(148, 163, 184, 0.18);
+      border-radius: 18px;
+      background: radial-gradient(circle at 95% 0%, rgba(125, 211, 252, 0.1), transparent 33%), linear-gradient(145deg, rgba(20, 33, 57, 0.92), rgba(8, 15, 30, 0.96));
+      box-shadow: 0 16px 32px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(248, 250, 252, 0.07);
+    }
+    .home-lower-card::before { content: ""; position: absolute; top: 0; right: 22px; left: 22px; height: 1px; background: linear-gradient(90deg, transparent, rgba(191, 219, 254, 0.42), transparent); }
+    .home-lower-card--tournaments::before { background: linear-gradient(90deg, transparent, rgba(196, 181, 253, 0.46), transparent); }
+    .home-lower-card--players::before { background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.48), transparent); }
+    .home-lower-card:hover { transform: translateY(-2px); border-color: rgba(125, 211, 252, 0.36); box-shadow: 0 22px 40px rgba(2, 6, 23, 0.35), inset 0 1px 0 rgba(248, 250, 252, 0.08); }
+    .home-lower-card-head { gap: 14px; }
+    .home-lower-card-head h3 { font-size: clamp(0.94rem, 1.08vw, 1.08rem); }
+    .home-lower-card-head a { color: #b9eaff; font-size: 0.68rem; }
+    .home-lower-card-head a:hover, .home-lower-card-head a:focus-visible { color: #d8d1ff; }
+    .home-lower-games, .home-tournament-list { display: grid; align-content: start; min-height: 0; }
+    .home-lower-game-row, .home-lower-tournament { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px; min-height: 58px; margin-top: 14px; padding-block: 11px; border-bottom-color: rgba(148, 163, 184, 0.12); }
+    .home-lower-tournament { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+    .home-lower-mark { width: 38px; height: 38px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 11px; }
+    .home-lower-mark--game { background: linear-gradient(145deg, #263956, #101a30); }
+    .home-lower-game-row.is-win .home-lower-mark { border-color: rgba(110, 231, 183, 0.42); background: linear-gradient(145deg, #075c4d, #123a42); color: #d1fae5; }
+    .home-lower-game-row.is-loss .home-lower-mark { border-color: rgba(251, 113, 133, 0.35); background: linear-gradient(145deg, #59233c, #25162b); color: #fecdd3; }
+    .home-lower-game-row.is-draw .home-lower-mark { border-color: rgba(125, 211, 252, 0.34); background: linear-gradient(145deg, #1e4561, #172a46); color: #d7f1ff; }
+    .home-lower-mark--tournament { border-color: rgba(196, 181, 253, 0.35); background: linear-gradient(145deg, #6656c9, #34256d); color: #f2eeff; }
+    .home-lower-game-row strong, .home-lower-tournament strong { font-size: 0.79rem; }
+    .home-lower-game-row p, .home-lower-tournament p { margin-top: 4px; font-size: 0.66rem; line-height: 1.42; }
+    .home-game-result, .home-tournament-status { max-width: 74px; overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 999px; color: #bfd0e7; font-size: 0.56rem; font-weight: 900; letter-spacing: 0.035em; line-height: 1; text-align: center; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; padding: 5px 7px; }
+    .home-lower-game-row.is-win .home-game-result { border-color: rgba(110, 231, 183, 0.34); color: #a7f3d0; }
+    .home-lower-game-row.is-loss .home-game-result { border-color: rgba(251, 113, 133, 0.3); color: #fda4af; }
+    .home-tournament-status.is-running { border-color: rgba(125, 211, 252, 0.38); color: #bdefff; }
+    .home-tournament-status.is-draft { border-color: rgba(196, 181, 253, 0.38); color: #ddd6fe; }
+    .home-tournament-status.is-paused { border-color: rgba(251, 191, 36, 0.32); color: #fde68a; }
+    .home-lower-row-action { width: 28px; height: 28px; border-color: rgba(125, 211, 252, 0.26); border-radius: 9px; color: #bdefff; transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }
+    .home-lower-row-action:hover, .home-lower-row-action:focus-visible { transform: translateX(2px); border-color: rgba(125, 211, 252, 0.58); background: rgba(125, 211, 252, 0.1); }
+    .home-lower-footer { margin-top: 16px; color: #d4dfef; font-size: 0.7rem; }
+    .home-lower-footer span { color: #bdefff; }
+    .home-lower-rankings { margin-top: 12px; }
+    .home-lower-rankings li { grid-template-columns: 31px minmax(0, 1fr) auto; gap: 10px; min-height: 51px; transition: background 160ms ease; }
+    .home-lower-rankings li.is-current { margin-inline: -7px; padding-inline: 7px; border-radius: 10px; background: rgba(125, 211, 252, 0.075); }
+    .home-lower-rankings b { color: #b7a8ff; font-size: 0.68rem; }
+    .home-lower-rankings strong { color: #ebf3ff; font-size: 0.76rem; }
+    .home-lower-rankings small { color: #91a3bd; font-size: 0.62rem; }
+    .home-rank-score { color: #bdefff; font-size: 0.63rem; font-style: normal; font-weight: 900; white-space: nowrap; }
+    .home-lower-empty { display: grid; grid-column: 1 / -1; min-height: 112px; align-content: center; margin: 14px 0 0; padding: 13px; border: 1px dashed rgba(148, 163, 184, 0.22); border-radius: 12px; color: #9eafc6; font-size: 0.7rem; line-height: 1.5; }
+
+    @media (max-width: 1180px) { .hero-command-center .hero-dashboard { grid-template-columns: repeat(4, minmax(0, 1fr)); } .hero-command-center .hero-dashboard :is(.hero-quick-card, .hero-progress-card) { min-height: 102px; } }
+    @media (max-width: 920px) { .home-feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .home-lower-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .home-lower-card--tournaments { grid-column: 1 / -1; min-height: 210px; } .home-lower-card--tournaments .home-tournament-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; } }
+    @media (max-width: 820px) { .hero-stage { min-height: min(104vw, 610px); } .hero-command-center .hero-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hero-command-center .hero-dashboard :is(.hero-quick-card, .hero-progress-card) { min-height: 88px; } }
+    @media (max-width: 620px) { .hero-command-center .hero-copy h1 { font-size: clamp(3rem, 12vw, 4.55rem); } .home-feature-grid, .home-lower-grid, .home-lower-card--tournaments .home-tournament-list { grid-template-columns: 1fr; } .home-lower-card--tournaments { grid-column: auto; } .home-lower-card { min-height: 0; padding: 17px; } .home-lower-game-row { grid-template-columns: auto minmax(0, 1fr) auto; } .home-lower-game-row .home-game-result { display: none; } .home-lower-tournament { grid-template-columns: auto minmax(0, 1fr) auto; } }
+    @media (max-width: 480px) { .hero-command-center .hero-actions { grid-template-columns: 1fr; } .hero-command-center .hero-dashboard { grid-template-columns: 1fr; } .hero-stage { min-height: min(118vw, 510px); padding: 12px; } .hero-player-card { width: min(82%, 228px); } .home-lower-card::before { right: 17px; left: 17px; } .home-lower-mark { width: 35px; height: 35px; } .home-lower-game-row, .home-lower-tournament { gap: 8px; } .home-lower-rankings li { grid-template-columns: 27px minmax(0, 1fr) auto; gap: 7px; } .home-rank-score { font-size: 0.58rem; } }
+    @media (prefers-reduced-motion: reduce) { .hero-command-center :is(.hero-board, .hero-actions .button, .hero-quick-card, .home-feature-card, .home-lower-card, .home-lower-row-action) { transition: none; } .hero-command-center .hero-stage:hover .hero-board, .hero-command-center .hero-actions .button:hover, .home-lower-card:hover, .home-lower-row-action:hover { transform: none; } }
   </style>
 </head>
 <body>
@@ -26080,12 +26225,12 @@
 
     <section class="home-lower-dashboard" aria-label="Chess activity overview">
       <div class="wrap home-lower-grid">
-        <article class="home-lower-card">
+        <article class="home-lower-card home-lower-card--recent">
           <div class="home-lower-card-head">
             <h3>Recent Games</h3>
             <a href="#play" data-site-tab="play" data-site-panel="play">View all</a>
           </div>
-          <div class="home-lower-games" id="homeRecentGames" aria-live="polite">
+          <div class="home-lower-games" id="homeRecentGames" aria-live="polite" aria-busy="true">
             <div class="home-lower-game-row">
               <span class="home-lower-mark home-lower-mark--game" aria-hidden="true">G</span>
               <div><strong>Your latest board</strong><p>Play a game and it will appear here.</p></div>
@@ -26095,24 +26240,26 @@
           <a class="home-lower-footer" href="#play" data-site-tab="play" data-site-panel="play">Play a new game <span aria-hidden="true">&gt;</span></a>
         </article>
 
-        <article class="home-lower-card">
+        <article class="home-lower-card home-lower-card--tournaments">
           <div class="home-lower-card-head">
             <h3>Upcoming Tournaments</h3>
             <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">View all</a>
           </div>
-          <div class="home-lower-tournament">
-            <span class="home-lower-mark home-lower-mark--tournament" aria-hidden="true">T</span>
-            <div><strong>Friendly Arena</strong><p>Join a live event or create one with friends.</p></div>
+          <div class="home-tournament-list" id="homeTournaments" aria-live="polite" aria-busy="true">
+            <div class="home-lower-tournament">
+              <span class="home-lower-mark home-lower-mark--tournament" aria-hidden="true">T</span>
+              <div><strong>Loading tournaments</strong><p>Checking the live tournament lobby.</p></div>
+            </div>
           </div>
           <a class="home-lower-footer" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Open tournament lobby <span aria-hidden="true">&gt;</span></a>
         </article>
 
-        <article class="home-lower-card">
+        <article class="home-lower-card home-lower-card--players">
           <div class="home-lower-card-head">
             <h3>Top Players</h3>
             <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">View all</a>
           </div>
-          <ol class="home-lower-rankings" id="homeTopPlayers" aria-label="Top ranked players">
+          <ol class="home-lower-rankings" id="homeTopPlayers" aria-label="Top ranked players" aria-busy="true">
             <li><b>#1</b><span><strong>Loading rankings</strong><small>Preparing player standings</small></span></li>
           </ol>
         </article>
@@ -36912,12 +37059,14 @@
       const list = document.getElementById("homeTopPlayers");
       if (!list) return;
       const rankedPlayers = Array.isArray(entries) ? entries.slice(0, 3) : [];
+      list.setAttribute("aria-busy", "false");
       if (!rankedPlayers.length) {
         list.replaceChildren(createBookText("li", "home-lower-empty", "No ranked players yet. Complete a game to join the standings."));
         return;
       }
       list.replaceChildren(...rankedPlayers.map((entry, index) => {
         const row = document.createElement("li");
+        row.classList.toggle("is-current", Boolean(entry.isPlayer));
         const rank = createBookText("b", "", `#${index + 1}`);
         const copy = createBookText("span", "", "");
         const name = createBookText("strong", "", "");
@@ -36934,8 +37083,8 @@
           badge.title = title.full;
           name.append(" ", badge);
         }
-        copy.append(name, createBookText("small", "", `${entry.primary} · ${entry.meta?.[0] || "Ranked player"}`));
-        row.append(rank, copy);
+        copy.append(name, createBookText("small", "", entry.meta?.[0] || "Ranked player"));
+        row.append(rank, copy, createBookText("em", "home-rank-score", entry.primary));
         return row;
       }));
     }
@@ -37659,6 +37808,8 @@
       const list = document.getElementById("homeRecentGames");
       if (!list) return;
       const games = getRecentCompletedGames();
+      list.setAttribute("aria-busy", "false");
+      list.dataset.state = games.length ? "ready" : "empty";
       if (!games.length) {
         const empty = document.createElement("div");
         empty.className = "home-lower-game-row";
@@ -37700,7 +37851,56 @@
         link.dataset.siteTab = "play";
         link.dataset.sitePanel = "play";
         link.setAttribute("aria-label", `Open Play after ${resultLabels[game.result] || "completed"} game versus ${game.opponentName}`);
-        row.append(mark, copy, link);
+        row.append(mark, copy, createBookText("span", "home-game-result", resultLabels[game.result] || "Game"), link);
+        return row;
+      }));
+    }
+
+    function renderHomeTournaments() {
+      const list = document.getElementById("homeTournaments");
+      if (!list) return;
+      const provider = getTournamentProvider();
+      const isLoading = Boolean(provider && tournamentRuntime.refreshPromise && !tournamentRuntime.lastRefresh && !tournamentRuntime.events.length);
+      list.setAttribute("aria-busy", String(isLoading));
+      if (!provider) {
+        list.dataset.state = "signed-out";
+        list.replaceChildren(createBookText("p", "home-lower-empty", "Sign in to browse live events and join a tournament."));
+        return;
+      }
+      if (isLoading) {
+        list.dataset.state = "loading";
+        list.replaceChildren(createBookText("p", "home-lower-empty", "Loading live tournaments…"));
+        return;
+      }
+      const statusOrder = { running: 0, draft: 1, paused: 2 };
+      const events = tournamentRuntime.events
+        .filter((event) => ["running", "draft", "paused"].includes(event.status))
+        .sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9) || Date.parse(a.startsAt || "") - Date.parse(b.startsAt || ""))
+        .slice(0, 2);
+      if (!events.length) {
+        list.dataset.state = "empty";
+        list.replaceChildren(createBookText("p", "home-lower-empty", "No live tournaments right now. Create one from the tournament lobby."));
+        return;
+      }
+      list.dataset.state = "ready";
+      list.replaceChildren(...events.map((event) => {
+        const row = document.createElement("div");
+        row.className = `home-lower-tournament is-${event.status}`;
+        const mark = createBookText("span", "home-lower-mark home-lower-mark--tournament", "T");
+        mark.setAttribute("aria-hidden", "true");
+        const copy = createBookText("div", "", "");
+        copy.append(
+          createBookText("strong", "", event.title),
+          createBookText("p", "", `${event.format === "swiss" ? "Swiss" : "Arena"} · ${event.clock} · ${event.participantCount}/${event.maxPlayers} players`)
+        );
+        const status = createBookText("span", `home-tournament-status is-${event.status}`, formatTournamentStatus(event.status));
+        const link = createBookText("a", "home-lower-row-action", ">");
+        link.href = `#play?mode=tournament&tournament=${encodeURIComponent(event.code)}`;
+        link.dataset.siteTab = "tournaments";
+        link.dataset.sitePanel = "play";
+        link.dataset.siteFocus = "tournamentLobby";
+        link.setAttribute("aria-label", `Open ${event.title}`);
+        row.append(mark, copy, status, link);
         return row;
       }));
     }
@@ -37771,6 +37971,7 @@
         : "Play a game to establish your rating.";
       renderHomeRecentGames();
       renderHomeTopPlayers();
+      renderHomeTournaments();
       renderDailyGoals();
       document.getElementById("homeInsight").textContent = needsTactics
         ? "You struggled with tactics recently. Try one quick pattern."
@@ -43726,6 +43927,7 @@
       if (!provider) {
         list.replaceChildren(createBookText("p", "tournament-empty", "Sign in to browse, host, and join live tournaments."));
         detail.replaceChildren(createBookText("p", "tournament-empty", "Tournament pairings use your secure Friend Challenge account."));
+        renderHomeTournaments();
         return;
       }
       const events = tournamentRuntime.events;
@@ -43733,6 +43935,7 @@
       if (tournamentRuntime.renderSignature === renderSignature) {
         const selected = getSelectedTournament();
         if (selected) scheduleTournamentLaunch(selected);
+        renderHomeTournaments();
         return;
       }
       tournamentRuntime.renderSignature = renderSignature;
@@ -43759,6 +43962,7 @@
       const event = getSelectedTournament();
       if (!event) {
         detail.replaceChildren(createBookText("p", "tournament-empty", "Choose an event to see its live pairings and standings."));
+        renderHomeTournaments();
         return;
       }
       const currentUserId = getFriendCurrentUserId();
@@ -43934,6 +44138,7 @@
       sections.append(standings, games, pairings, chat);
       detail.replaceChildren(head, stage, actionRow, share, inviteResults, sections);
       scheduleTournamentLaunch(event);
+      renderHomeTournaments();
     }
 
     async function refreshTournamentNetwork(force = false) {
@@ -43953,7 +44158,11 @@
           renderTournamentLobby();
         })
         .catch(() => { renderTournamentLobby(); })
-        .finally(() => { tournamentRuntime.refreshPromise = null; });
+        .finally(() => {
+          tournamentRuntime.refreshPromise = null;
+          renderHomeTournaments();
+        });
+      renderHomeTournaments();
       return tournamentRuntime.refreshPromise;
     }
 

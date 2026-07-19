@@ -45,6 +45,8 @@ const requiredRegressionContracts = [
   ["homepage top-player target", /id="homeTopPlayers"/],
   ["homepage rankings renderer", /function renderHomeTopPlayers\(entries = buildLeaderboardEntries\("ai"\)\)/],
   ["homepage recent-game target", /id="homeRecentGames"/],
+  ["homepage tournaments target", /id="homeTournaments"/],
+  ["homepage tournaments renderer", /function renderHomeTournaments\([\s\S]*?tournamentRuntime\.events/],
   ["completed-game persistence", /completedGames: completedGameHistory\.slice\(0, 12\)/],
   ["AI completed-game recording", /function recordCoachGameResult[\s\S]*?recordCompletedGame\(/],
   ["online completed-game recording", /remote\.status === "completed"[\s\S]*?recordCompletedGame\(/],
