@@ -25418,6 +25418,146 @@
     body:is(.perf-lite, .low-performance) .puzzle-board-wrap {
       animation: none;
     }
+
+    /* Layout A: a calm match stage with players framing the board and one
+       expandable match console. Native details elements keep these controls
+       keyboard-accessible without adding another interaction layer. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+      --cq-play-stage-chrome: 336px;
+      --cq-play-board-max: min(780px, max(420px, calc(100svh - var(--cq-play-stage-chrome))));
+    }
+
+    @media (min-width: 1181px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-columns: clamp(210px, 15.8vw, 238px) minmax(520px, 780px) clamp(300px, 21vw, 348px);
+        max-width: 1640px;
+      }
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer {
+      display: grid;
+      min-width: 0;
+      overflow: clip;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-panel);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary {
+      display: flex;
+      align-items: center;
+      min-height: 42px;
+      gap: var(--cq-space-2);
+      padding: 0 var(--cq-space-2);
+      color: var(--cq-text-primary);
+      cursor: pointer;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      list-style: none;
+      user-select: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary small {
+      margin-left: auto;
+      color: var(--cq-text-subtle);
+      font-size: 0.64rem;
+      font-weight: 700;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary::after {
+      content: "+";
+      color: var(--cq-accent-tertiary);
+      font-size: 1.1rem;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer[open] > summary {
+      border-bottom: 1px solid var(--cq-border);
+      background: rgba(255, 255, 255, 0.028);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer[open] > summary::after {
+      content: "−";
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary:focus-visible {
+      outline: 2px solid var(--cq-focus-outline);
+      outline-offset: -2px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer-content {
+      display: grid;
+      min-width: 0;
+      gap: var(--cq-space-2);
+      padding: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > .play-rail-drawer--moves { order: 1; }
+    :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > .captured-row { order: 2; }
+    :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > .play-rail-drawer--coach { order: 3; }
+    :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > .trainer-note { order: 4; }
+    :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > .play-rail-drawer--chat { order: 5; }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer--moves .play-rail-drawer-content {
+      padding: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer--moves .move-history {
+      order: initial;
+      min-height: clamp(180px, 26svh, 300px);
+      max-height: clamp(220px, 34svh, 360px);
+      padding: var(--cq-space-2);
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer--moves .move-history::before {
+      content: none;
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer--coach .play-rail-drawer-content {
+      padding: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer--chat .friend-game-chat {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    @media (max-width: 1180px) {
+      :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > :is(.play-rail-drawer, .captured-row, .trainer-note) {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 699px) {
+      :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary {
+        min-height: 40px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer--moves .move-history {
+        min-height: 146px;
+        max-height: 260px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary { transition: none; }
+    }
+
     @media (max-width: 480px) {
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
         grid-template-columns: 38px minmax(0, 1fr) max-content 24px;
@@ -28264,6 +28404,9 @@
             </section>
           </div>
           <aside class="puzzle-info coach-panel play-right-sidebar cq-sidebar cq-sidebar--insight">
+            <details class="play-rail-drawer play-rail-drawer--coach cq-panel" id="coachToolsDrawer" data-play-drawer="coach">
+              <summary><span>Coach &amp; analysis</span><small>Optional tools</small></summary>
+              <div class="play-rail-drawer-content">
             <article class="featured-coach-card cq-panel cq-panel--featured" aria-label="KingNorbert Coach Bot profile">
               <span class="featured-coach-avatar" data-coach-avatar="assets/kingnorbert-coach.png" data-coach-fallback="KN" role="img" aria-label="KingNorbert Coach Bot"></span>
               <div class="featured-coach-copy">
@@ -28324,6 +28467,8 @@
               </div>
               <div class="opening-compass-list" id="openingCompassList" aria-label="Opening goals"></div>
             </div>
+              </div>
+            </details>
             <div class="guided-review" id="guidedReview" hidden aria-live="polite">
               <strong>Guided review</strong>
               <div id="guidedReviewList"></div>
@@ -28395,6 +28540,12 @@
               <div class="review-move-list" id="reviewMoveList" aria-label="Reviewed moves"></div>
             </div>
             <div class="mini-game-row" id="coachPracticeLinks" hidden aria-label="Recommended practice"></div>
+            <details class="play-rail-drawer play-rail-drawer--moves cq-panel" id="moveHistoryDrawer" data-play-drawer="moves">
+              <summary><span>Move history</span><small>Game record</small></summary>
+              <div class="play-rail-drawer-content">
+                <div class="move-history" id="moveHistory" aria-label="Move history"></div>
+              </div>
+            </details>
             <div class="captured-row" aria-label="Captured pieces">
               <div>
                 <strong>White captured</strong>
@@ -28405,8 +28556,10 @@
                 <div class="captured-pieces" id="blackCaptured"></div>
               </div>
             </div>
-            <div class="move-history" id="moveHistory" aria-label="Move history"></div>
             <p class="trainer-note" id="gamePgn">PGN appears here after export.</p>
+            <details class="play-rail-drawer play-rail-drawer--chat cq-panel" id="friendGameChatDrawer" data-play-drawer="chat" hidden>
+              <summary><span>Game chat</span><small>Messages</small></summary>
+              <div class="play-rail-drawer-content">
             <section class="friend-game-chat" id="friendGameChat" hidden aria-label="Game chat">
               <div class="friend-game-chat-head"><strong>Game chat</strong><small>Friendly and game-focused</small></div>
               <div class="friend-game-chat-messages" id="friendGameChatMessages" aria-live="polite"></div>
@@ -28415,6 +28568,8 @@
                 <button class="button secondary" type="submit">Send</button>
               </form>
             </section>
+              </div>
+            </details>
           </aside>
         </div>
       </div>
@@ -42194,9 +42349,11 @@
 
     function renderFriendGameChat(state = friendChallengeState || readFriendChallengeState()) {
       const panel = document.getElementById("friendGameChat");
+      const drawer = document.getElementById("friendGameChatDrawer");
       const messages = document.getElementById("friendGameChatMessages");
       if (!panel || !messages) return;
       const enabled = Boolean(state?.remote && ["active", "completed"].includes(state.status));
+      if (drawer) drawer.hidden = !enabled;
       panel.hidden = !enabled;
       if (!enabled) return;
       const rows = Array.isArray(state.messages) ? state.messages.slice(-24) : [];
@@ -45334,6 +45491,16 @@
       renderRealPuzzle();
     }
 
+    function setupPlayWorkspaceDrawers() {
+      if (setupPlayWorkspaceDrawers.ready) return;
+      setupPlayWorkspaceDrawers.ready = true;
+      const compactWorkspace = window.matchMedia("(max-width: 1180px)").matches;
+      document.querySelectorAll("#play details[data-play-drawer]").forEach((drawer) => {
+        if (!(drawer instanceof HTMLDetailsElement)) return;
+        drawer.open = drawer.dataset.playDrawer === "moves" || !compactWorkspace;
+      });
+    }
+
     async function setupPlayableChess() {
       const board = document.getElementById("coachBoard");
       if (!board || setupPlayableChess.ready) return;
@@ -45692,6 +45859,7 @@
         return setupSupabaseAuthUi();
       },
       play: () => {
+        setupPlayWorkspaceDrawers();
         setupCoachAvatarAssets();
         renderCoordinates();
         const setup = setupPlayableChess();
