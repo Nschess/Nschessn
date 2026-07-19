@@ -27271,6 +27271,881 @@
         transition: none;
       }
     }
+
+    /* Phase 6: learning workspaces use one clear, board-first study language.
+       This layer only refines presentation; existing lesson and puzzle controls
+       retain their own state, bindings, and interactions. */
+    :is(body:not(.theme-light), body.theme-light) :is(#tutorial, #academy, #paths, #openings, #videos, #notation, #puzzles, #plan) {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :is(#tutorial, #academy, #paths, #openings, #videos, #notation, #puzzles, #plan) .section-intro {
+      max-width: 62ch;
+      color: var(--cq-text-muted);
+      line-height: 1.55;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :is(#tutorial, #academy, #paths, #openings, #videos, #notation, #puzzles, #plan) :is(h3, h4, strong) {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-shell {
+      grid-template-columns: minmax(176px, 0.54fr) minmax(0, 1.35fr) minmax(210px, 0.64fr);
+      align-items: start;
+      gap: var(--cq-space-3);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial :is(.tutorial-rail, .tutorial-stage, .tutorial-coach) {
+      min-width: 0;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-rail {
+      display: grid;
+      gap: 6px;
+      padding: 9px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-rail button {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 10px;
+      border: 1px solid transparent;
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-muted);
+      background: transparent;
+      font-size: 0.76rem;
+      font-weight: 750;
+      text-align: left;
+      transition: transform var(--cq-transition-fast), background var(--cq-transition-fast), border-color var(--cq-transition-fast), color var(--cq-transition-fast);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-rail button:hover,
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-rail button:focus-visible {
+      border-color: var(--cq-border);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-focus-ring);
+      transform: translateX(1px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-rail button[aria-current="step"] {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-on-accent);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-stage {
+      display: grid;
+      gap: var(--cq-space-3);
+      padding: clamp(13px, 2vw, 20px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial :is(.tutorial-progress, .tutorial-info, .tutorial-actions, .tutorial-quiz) {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-progress {
+      gap: 9px;
+      padding: 11px 13px;
+      color: var(--cq-text-muted);
+      font-size: 0.72rem;
+      font-weight: 750;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-progress-bar {
+      height: 7px;
+      overflow: hidden;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-progress-bar span {
+      border-radius: inherit;
+      background: var(--cq-accent-gradient);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-info {
+      padding: 14px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-info h3 {
+      margin: 3px 0 6px;
+      font-family: var(--cq-font-display);
+      font-size: clamp(1.08rem, 2vw, 1.32rem);
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial :is(.tutorial-info p, .tutorial-coach p, .tutorial-reward small) {
+      color: var(--cq-text-muted);
+      line-height: 1.5;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-board-wrap {
+      width: min(100%, 640px);
+      margin-inline: auto;
+      padding: clamp(6px, 1vw, 10px);
+      border-color: var(--cq-border-strong);
+      border-radius: calc(var(--cq-radius-card) + 2px);
+      background: linear-gradient(135deg, var(--cq-accent-primary-soft), transparent 48%), var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+      gap: 8px;
+      padding: 9px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-actions .button {
+      min-height: 36px;
+      padding-inline: 10px;
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-coach {
+      display: grid;
+      align-content: start;
+      gap: var(--cq-space-3);
+      padding: 16px;
+      background: linear-gradient(145deg, var(--cq-accent-primary-soft), transparent 52%), var(--cq-card-surface);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-coach h3 {
+      margin: 0;
+      font-family: var(--cq-font-display);
+      font-size: 1.02rem;
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-reward {
+      display: grid;
+      gap: 4px;
+      padding: 11px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-reward span {
+      color: var(--cq-accent-tertiary);
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :is(#academy .academy-shell, #paths .gentle-start) {
+      gap: var(--cq-space-3);
+      padding: clamp(14px, 2vw, 22px);
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #academy :is(.academy-hero-card, .academy-panel, .academy-track, .academy-quiz),
+    :is(body:not(.theme-light), body.theme-light) #paths :is(.gentle-copy, .gentle-coach, .lesson-flow, .lesson-journey) {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #academy .academy-hero-card {
+      background: linear-gradient(135deg, var(--cq-accent-primary-soft), transparent 52%), var(--cq-surface-elevated);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #academy :is(.academy-hero-card h3, .academy-track h3) {
+      font-family: var(--cq-font-display);
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #academy :is(.academy-hero-card p, .academy-reward, .academy-track p) {
+      color: var(--cq-text-muted);
+      line-height: 1.5;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #academy .academy-mini-stats {
+      gap: 8px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #academy .academy-mini-stats span {
+      padding: 9px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #academy .academy-mini-stats strong {
+      color: var(--cq-accent-tertiary);
+      font-family: var(--cq-font-display);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #academy .academy-mini-stats small {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-flow {
+      overflow: auto hidden;
+      padding: 10px;
+      scrollbar-width: thin;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-flow-step {
+      min-width: 116px;
+      padding: 11px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-flow-step strong {
+      font-family: var(--cq-font-display);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-flow-step span,
+    :is(body:not(.theme-light), body.theme-light) #paths :is(.gentle-copy p, .gentle-output, .lesson-card p) {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .path-tabs {
+      gap: 7px;
+      padding: 8px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-glass);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .path-tabs .tab-button {
+      min-height: 36px;
+      padding-inline: 12px;
+      border-color: transparent;
+      border-radius: var(--cq-radius-pill);
+      color: var(--cq-text-muted);
+      background: transparent;
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .path-tabs .tab-button:hover,
+    :is(body:not(.theme-light), body.theme-light) #paths .path-tabs .tab-button:focus-visible {
+      border-color: var(--cq-border);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-focus-ring);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .path-tabs .tab-button[aria-selected="true"] {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-on-accent);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-grid {
+      gap: var(--cq-space-3);
+      margin-top: var(--cq-space-3);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-card {
+      min-height: 0;
+      padding: 17px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-card:hover {
+      border-color: var(--cq-border-strong);
+      transform: translateY(-2px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-number {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-on-accent);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .lesson-card h3 {
+      margin-block: 12px 6px;
+      font-family: var(--cq-font-display);
+      font-size: 1rem;
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths :is(.topic-list, .gentle-badges) {
+      gap: 6px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #paths .topic-list li,
+    :is(body:not(.theme-light), body.theme-light) #paths .gentle-badge {
+      border-color: var(--cq-border);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .principle-strip {
+      gap: 7px;
+      padding: 8px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-glass);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .principle-strip span {
+      padding: 7px 10px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-elevated);
+      font-size: 0.72rem;
+      font-weight: 750;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .opening-grid {
+      gap: var(--cq-space-3);
+      margin-top: var(--cq-space-3);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .opening-card {
+      overflow: hidden;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .opening-card:hover {
+      border-color: var(--cq-border-strong);
+      transform: translateY(-2px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .mini-board {
+      border-bottom: 1px solid var(--cq-border);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .opening-body {
+      display: grid;
+      gap: 11px;
+      padding: 16px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .opening-line {
+      width: fit-content;
+      max-width: 100%;
+      overflow: hidden;
+      padding: 5px 8px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      color: var(--cq-accent-tertiary);
+      background: var(--cq-surface-pill);
+      font-family: var(--cq-font-mono);
+      font-size: 0.7rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .opening-body h3 {
+      margin: 0;
+      font-family: var(--cq-font-display);
+      font-size: 1.05rem;
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .opening-body > p,
+    :is(body:not(.theme-light), body.theme-light) #openings .book-lines span {
+      color: var(--cq-text-muted);
+      line-height: 1.48;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .book-lines {
+      display: grid;
+      gap: 7px;
+      padding-top: 3px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .book-lines li {
+      display: grid;
+      gap: 4px;
+      padding: 9px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #openings .book-lines code {
+      color: var(--cq-text-primary);
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-watch-path {
+      gap: var(--cq-space-2);
+      margin-bottom: var(--cq-space-3);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-path-card {
+      min-height: 90px;
+      display: grid;
+      align-content: center;
+      gap: 5px;
+      padding: 14px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-path-card:hover,
+    :is(body:not(.theme-light), body.theme-light) #videos .video-path-card:focus-visible {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      transform: translateY(-2px);
+      box-shadow: var(--cq-focus-ring), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-path-card strong {
+      font-family: var(--cq-font-display);
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-path-card span,
+    :is(body:not(.theme-light), body.theme-light) #videos .video-tier-head p,
+    :is(body:not(.theme-light), body.theme-light) #videos .video-card p {
+      color: var(--cq-text-muted);
+      line-height: 1.45;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-tier {
+      padding: clamp(14px, 2vw, 20px);
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-tier-head {
+      padding-bottom: 13px;
+      border-bottom: 1px solid var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-tier-head h3,
+    :is(body:not(.theme-light), body.theme-light) #videos .video-card h3 {
+      font-family: var(--cq-font-display);
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-card {
+      overflow: hidden;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-card:hover {
+      border-color: var(--cq-border-strong);
+      transform: translateY(-2px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #videos .video-body {
+      padding: 14px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-grid {
+      gap: var(--cq-space-3);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-card {
+      min-height: 0;
+      padding: clamp(15px, 2vw, 20px);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-card.callout {
+      background: linear-gradient(135deg, var(--cq-accent-primary-soft), transparent 60%), var(--cq-card-surface);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-card h3 {
+      font-family: var(--cq-font-display);
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-card p,
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-list span {
+      color: var(--cq-text-muted);
+      line-height: 1.5;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-list li {
+      display: grid;
+      grid-template-columns: minmax(64px, auto) minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      padding: 9px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #notation .notation-list code {
+      color: var(--cq-accent-tertiary);
+      font-size: 0.76rem;
+      font-weight: 800;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzles-panel,
+    :is(body:not(.theme-light), body.theme-light) #puzzles .puzzle-shell:not([hidden]) {
+      padding: clamp(14px, 2vw, 22px);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzles-head, .puzzle-info, .real-puzzle-info) {
+      min-width: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzles-head {
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzles-head h3, .puzzle-info h3, .real-puzzle-info h3) {
+      margin-block: 3px 6px;
+      font-family: var(--cq-font-display);
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzles-head p, .puzzle-info > p, .real-puzzle-info > p) {
+      color: var(--cq-text-muted);
+      line-height: 1.5;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-shell {
+      grid-template-columns: minmax(320px, 1.18fr) minmax(280px, 0.82fr);
+      align-items: start;
+      gap: clamp(14px, 2vw, 24px);
+      margin-top: var(--cq-space-3);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-board-wrap, .puzzle-board-wrap) {
+      border-color: var(--cq-border-strong);
+      border-radius: calc(var(--cq-radius-card) + 2px);
+      background: linear-gradient(135deg, var(--cq-accent-primary-soft), transparent 48%), var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-board-quick-actions {
+      gap: 8px;
+      margin-top: 10px;
+      padding: 9px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-info,
+    :is(body:not(.theme-light), body.theme-light) #puzzles .puzzle-info {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.puzzle-meta, .puzzle-brief, .real-puzzle-modes, .real-puzzle-difficulties, .puzzle-level-picker, .puzzle-plan-selector) {
+      gap: 7px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .puzzle-meta .badge,
+    :is(body:not(.theme-light), body.theme-light) #puzzles .puzzle-brief > span,
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-info .badge {
+      padding: 6px 8px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-input);
+      font-size: 0.68rem;
+      font-weight: 750;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .pressure-rating strong,
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(#realPuzzleTimer, #puzzleClock) {
+      color: var(--cq-accent-tertiary);
+      font-family: var(--cq-font-display);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-control, .real-puzzle-card, .puzzle-progress-drawer, .vision-drill, .puzzle-complete) {
+      padding: 11px;
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      background: var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-control-head {
+      margin-bottom: 8px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-control-head small,
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-card span, .puzzle-progress-drawer summary, .vision-drill p, .puzzle-complete p) {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties, .puzzle-level-picker, .puzzle-plan-selector) .mission-button {
+      min-height: 34px;
+      padding: 7px 9px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-elevated);
+      box-shadow: none;
+      font-size: 0.7rem;
+      line-height: 1.2;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties, .puzzle-level-picker, .puzzle-plan-selector) .mission-button:hover,
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties, .puzzle-level-picker, .puzzle-plan-selector) .mission-button:focus-visible {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      box-shadow: var(--cq-focus-ring);
+      transform: translateY(-1px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties, .puzzle-level-picker, .puzzle-plan-selector) .mission-button[aria-pressed="true"] {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-on-accent);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-stats,
+    :is(body:not(.theme-light), body.theme-light) #puzzles .puzzle-stats {
+      gap: 7px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-card, .stat-pill) {
+      border-color: var(--cq-border);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-card, .stat-pill) strong {
+      color: var(--cq-accent-tertiary);
+      font-family: var(--cq-font-display);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-card, .stat-pill) span {
+      color: var(--cq-text-muted);
+      font-size: 0.68rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-actions, .puzzle-actions) {
+      gap: 7px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-actions, .puzzle-actions) .button {
+      min-height: 35px;
+      padding-inline: 9px;
+      font-size: 0.7rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .study-plan {
+      gap: var(--cq-space-3);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .plan-panel {
+      min-height: 0;
+      padding: clamp(15px, 2vw, 21px);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      color: var(--cq-text-primary);
+      background: var(--cq-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .plan-panel:hover {
+      border-color: var(--cq-border-strong);
+      transform: translateY(-2px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .plan-panel h3 {
+      font-family: var(--cq-font-display);
+      letter-spacing: var(--cq-tracking-heading);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan :is(.plan-panel p, .plan-focus, .plan-list li div) {
+      color: var(--cq-text-muted);
+      line-height: 1.5;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .plan-meta {
+      gap: 6px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .plan-meta .badge {
+      border-color: var(--cq-border);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan :is(.trainer-form, .trainer-output, .weekly-roadmap) {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-elevated);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .trainer-form :is(select, input) {
+      border-color: var(--cq-control-border);
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .day-card {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .day-card:hover,
+    :is(body:not(.theme-light), body.theme-light) #plan .day-card:focus-visible {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface-panel-strong);
+      box-shadow: var(--cq-focus-ring);
+      transform: translateY(-2px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #plan .day-card :is(span, p) {
+      color: var(--cq-text-muted);
+    }
+
+    @media (max-width: 1160px) {
+      :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-shell {
+        grid-template-columns: minmax(168px, 0.55fr) minmax(0, 1.25fr);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-coach {
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr) minmax(0, 1fr);
+        align-items: center;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-shell {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-board-wrap {
+        width: min(100%, 680px);
+        margin-inline: auto;
+      }
+    }
+
+    @media (max-width: 760px) {
+      :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-shell {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-rail {
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(132px, 0.7fr);
+        overflow-x: auto;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-coach {
+        grid-column: auto;
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-actions .button:last-child {
+        grid-column: 1 / -1;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #paths .lesson-flow {
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(132px, 0.8fr);
+        grid-template-columns: none;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #paths .path-tabs,
+      :is(body:not(.theme-light), body.theme-light) #openings .principle-strip {
+        display: flex;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #paths .path-tabs .tab-button,
+      :is(body:not(.theme-light), body.theme-light) #openings .principle-strip span {
+        flex: 0 0 auto;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzles-panel,
+      :is(body:not(.theme-light), body.theme-light) #puzzles .puzzle-shell:not([hidden]) {
+        padding: 12px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-stats,
+      :is(body:not(.theme-light), body.theme-light) #puzzles .puzzle-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+
+      :is(body:not(.theme-light), body.theme-light) #notation .notation-list li {
+        grid-template-columns: 1fr;
+        gap: 5px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) :is(#tutorial .tutorial-rail button, #paths .lesson-card, #openings .opening-card, #videos .video-path-card, #videos .video-card, #puzzles .mission-button, #plan .plan-panel, #plan .day-card) {
+        transition: none;
+      }
+    }
   </style>
 </head>
 <body>
