@@ -57,6 +57,8 @@ const requiredRegressionContracts = [
   ["leaderboard personal context", /class="leaderboard-overview cq-panel"[\s\S]*?data-leaderboard-puzzle-rank[\s\S]*?data-leaderboard-compare-fill/],
   ["leaderboard overview renderer", /function renderLeaderboardOverview\([\s\S]*?data-leaderboard-compare-fill/],
   ["social workspace consistency adapter", /#play :is\(\.friend-lobby, \.tournament-lobby\) \{/],
+  ["learning workspace consistency adapter", /Phase 6: learning workspaces[\s\S]*?#tutorial \.tutorial-shell[\s\S]*?#puzzles \.real-puzzle-shell[\s\S]*?#plan \.plan-panel/],
+  ["learning reduced-motion safeguards", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?#puzzles \.mission-button/],
   ["completed-game persistence", /completedGames: completedGameHistory\.slice\(0, 12\)/],
   ["AI completed-game recording", /function recordCoachGameResult[\s\S]*?recordCompletedGame\(/],
   ["online completed-game recording", /remote\.status === "completed"[\s\S]*?recordCompletedGame\(/],
