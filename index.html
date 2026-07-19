@@ -25185,6 +25185,91 @@
         transition: none;
       }
     }
+
+    /* Store board-border compatibility: the preference module owns these
+       variables, and every visible board frame consumes them. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+      border: 2px solid transparent;
+      background:
+        linear-gradient(145deg, var(--cq-surface-elevated), var(--cq-surface-input)) padding-box,
+        var(--board-frame-gradient) border-box;
+      box-shadow:
+        0 0 0 1px var(--board-frame-outline),
+        0 0 0 4px var(--board-frame-glow),
+        var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap::after {
+      border-color: var(--board-frame-outline);
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .board-border-frame .tutorial-board {
+      border-color: transparent;
+      background: var(--board-frame-gradient) border-box;
+      box-shadow:
+        0 0 0 1px var(--board-frame-outline),
+        0 0 22px var(--board-frame-glow),
+        var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .adventure-board-wrap {
+      border-color: transparent;
+      background: var(--board-frame-gradient) border-box;
+      box-shadow:
+        0 0 0 1px var(--board-frame-outline),
+        0 0 22px var(--board-frame-glow),
+        var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .home-main-board-link {
+      border-color: transparent;
+      background:
+        linear-gradient(145deg, var(--cq-surface-elevated), var(--cq-surface-input)) padding-box,
+        var(--board-frame-gradient) border-box;
+      box-shadow:
+        0 0 0 1px var(--board-frame-outline),
+        0 0 20px var(--board-frame-glow),
+        var(--cq-shadow-md);
+      transition: transform var(--cq-transition-fast) ease, opacity var(--cq-transition-fast) ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      :is(body:not(.theme-light), body.theme-light) .home-main-board-link:hover,
+      :is(body:not(.theme-light), body.theme-light) .home-main-board-link:focus-visible {
+        border-color: transparent;
+        box-shadow:
+          0 0 0 1px var(--board-frame-outline),
+          0 0 26px var(--board-frame-hover-glow),
+          var(--cq-shadow-md);
+      }
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #store .store-card.is-equipped .store-preview-board-border,
+    :is(body:not(.theme-light), body.theme-light) #store .store-equipped-border-preview {
+      box-shadow:
+        0 0 0 3px var(--border-preview-soft),
+        0 0 22px var(--border-preview-glow),
+        var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #store .store-equipped-border-preview {
+      width: 30px;
+      aspect-ratio: 1;
+      flex: 0 0 auto;
+      border: 4px solid transparent;
+      border-radius: 8px;
+      background:
+        linear-gradient(45deg, var(--board-light) 25%, var(--board-dark) 25% 50%, var(--board-light) 50% 75%, var(--board-dark) 75%) padding-box,
+        var(--border-preview-gradient) border-box;
+      background-size: 12px 12px, auto;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) .home-main-board-link {
+        transition: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -34451,10 +34536,14 @@
         `Frame: ${prefs.avatarFrame || "none"}`,
         `Avatar FX: ${avatarEffectThemes[prefs.avatarEffect]?.label || "No Effect"}`,
         `Last move: ${getLastMoveHighlightTheme(prefs.lastMoveColor).label}`,
-        `Board border: ${prefs.boardBorder || "classic"}`,
+        `Board border: ${getBoardBorderTheme(prefs.boardBorder).label}`,
         `Trail: ${prefs.trail || "none"}`
       ];
-      inventory.replaceChildren(...inventoryItems.map((item) => createBookText("span", "game-unlock", item)));
+      const equippedBorderPreview = createBookText("span", "store-equipped-border-preview", "");
+      equippedBorderPreview.setAttribute("aria-hidden", "true");
+      equippedBorderPreview.title = `${getBoardBorderTheme(prefs.boardBorder).label} board border`;
+      applyBoardBorderPreview(equippedBorderPreview, prefs.boardBorder);
+      inventory.replaceChildren(...inventoryItems.map((item) => createBookText("span", "game-unlock", item)), equippedBorderPreview);
       renderStoreShowcase(prefs);
       const categoryNotes = {
         Featured: "Premium cosmetic picks, ready to preview, unlock, and equip.",
