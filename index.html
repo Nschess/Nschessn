@@ -24769,6 +24769,422 @@
         transition: none;
       }
     }
+
+    /* Phase 6: site-wide consistency adapters. These reuse the existing token
+       system and component classes so visual polish never changes application
+       structure, routes, data attributes, or interaction bindings. */
+    :root {
+      --cq-page-section-padding: clamp(var(--cq-space-3), 2.5vw, var(--cq-space-4));
+      --cq-page-section-surface:
+        radial-gradient(circle at 88% 8%, var(--cq-accent-secondary-soft), transparent 34%),
+        var(--cq-component-surface);
+      --cq-page-card-surface: var(--cq-card-highlight), var(--cq-component-surface);
+      --cq-page-overlay: rgba(3, 7, 18, 0.72);
+      --cq-page-card-lift: -2px;
+    }
+
+    body.theme-light {
+      --cq-page-overlay: rgba(15, 23, 42, 0.56);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .site-header {
+      border-bottom-color: var(--cq-border);
+      background: var(--cq-page-card-surface);
+      box-shadow: var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .site-header :is(.nav-links, .nav-menu, .nav-mobile-panel) {
+      border-color: var(--cq-border);
+      background: var(--cq-component-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .site-header :is(.nav-links > a, .nav-group-label, .nav-mobile-panel > a) {
+      border-radius: var(--cq-radius-control);
+      color: var(--cq-text-muted);
+      transition: transform var(--cq-transition-fast) ease, opacity var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .site-header :is(.nav-links > a.is-active-tab, .nav-links > a[aria-current="page"], .nav-group[open] > .nav-group-label, .nav-group.is-active-group > .nav-group-label) {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) main .section-head {
+      align-items: end;
+      gap: var(--cq-space-3);
+      margin-bottom: var(--cq-space-4);
+      padding: var(--cq-page-section-padding);
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-stage);
+      background: var(--cq-page-section-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) main .section-head .section-intro {
+      max-width: 60ch;
+      margin: 0;
+      color: var(--cq-text-muted);
+      font-size: 0.88rem;
+      line-height: var(--cq-leading-body);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(.section-kicker, .eyebrow, .store-wallet-kicker, .player-profile-kicker) {
+      color: var(--cq-accent-secondary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(
+      .tutorial-rail,
+      .tutorial-stage,
+      .tutorial-coach,
+      .academy-panel,
+      .academy-track,
+      .academy-quiz,
+      .login-pass-panel,
+      .auth-panel,
+      .auth-account-panel,
+      .settings-sidebar,
+      .settings-content,
+      .admin-guard,
+      .admin-console,
+      .friend-lobby,
+      .tournament-lobby,
+      .real-puzzles-panel,
+      .leaderboard-list,
+      .store-premium-shell,
+      .books-shell,
+      .video-modal-panel
+    ) {
+      border: 1px solid var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-page-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(
+      .academy-hero-card,
+      .academy-card,
+      .admin-card,
+      .adventure-card,
+      .boss-card,
+      .book-card,
+      .daily-goals-card,
+      .day-card,
+      .first-tour-card,
+      .friend-code-card,
+      .friend-request-card,
+      .friend-search-panel,
+      .hero-player-card,
+      .hero-progress-card,
+      .hero-quick-card,
+      .home-board-panel,
+      .home-feature-card,
+      .home-lower-card,
+      .home-quick-card,
+      .leaderboard-card,
+      .lesson-card,
+      .login-card,
+      .mission-card,
+      .next-step-card,
+      .notation-card,
+      .opening-card,
+      .real-puzzle-card,
+      .review-focus-card,
+      .rule-item,
+      .settings-card,
+      .store-card,
+      .store-showcase-card,
+      .story-mode-card,
+      .tournament-detail,
+      .video-card,
+      .video-path-card
+    ) {
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-page-card-surface);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+      transition: transform var(--cq-transition-fast) ease, opacity var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(
+      .academy-hero-card,
+      .academy-card,
+      .admin-card,
+      .adventure-card,
+      .book-card,
+      .home-board-panel,
+      .home-feature-card,
+      .home-lower-card,
+      .home-quick-card,
+      .leaderboard-card,
+      .lesson-card,
+      .login-card,
+      .mission-card,
+      .notation-card,
+      .opening-card,
+      .real-puzzle-card,
+      .rule-item,
+      .settings-card,
+      .store-card,
+      .story-mode-card,
+      .video-card,
+      .video-path-card
+    ) :is(h3, h4) {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(
+      .academy-hero-card,
+      .academy-card,
+      .admin-card,
+      .adventure-card,
+      .book-card,
+      .home-board-panel,
+      .home-feature-card,
+      .home-lower-card,
+      .home-quick-card,
+      .leaderboard-card,
+      .lesson-card,
+      .login-card,
+      .mission-card,
+      .notation-card,
+      .opening-card,
+      .real-puzzle-card,
+      .rule-item,
+      .settings-card,
+      .store-card,
+      .story-mode-card,
+      .video-card,
+      .video-path-card
+    ) > :is(p, small) {
+      color: var(--cq-text-muted);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      :is(body:not(.theme-light), body.theme-light) :where(
+        .adventure-card,
+        .book-card,
+        .home-feature-card,
+        .home-quick-card,
+        .leaderboard-card,
+        .lesson-card,
+        .mission-card,
+        .notation-card,
+        .opening-card,
+        .store-card,
+        .video-card,
+        .video-path-card
+      ):hover {
+        transform: translateY(var(--cq-page-card-lift));
+        border-color: var(--cq-border-strong);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) .site-header :is(.nav-links > a, .nav-group-label, .nav-mobile-panel > a):hover {
+        transform: translateY(-1px);
+      }
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(
+      .button,
+      .audio-control,
+      .mission-button,
+      .tab-button,
+      .store-category-tab,
+      .auth-tab,
+      .settings-tab,
+      .leaderboard-toolbar button,
+      .tutorial-rail button
+    ) {
+      min-height: var(--cq-control-height);
+      border-radius: var(--cq-radius-control);
+      font-weight: 700;
+      transition: transform var(--cq-transition-fast) ease, opacity var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(.button, .audio-control):not(.secondary):not(.danger):not(.is-danger):not(.success):not(.is-success) {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      background: var(--cq-button-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(.button.secondary, .audio-control:not(.is-primary)) {
+      border-color: var(--cq-border);
+      color: var(--cq-text-muted);
+      background: var(--cq-button-secondary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .button:is(.danger, .is-danger) {
+      border-color: color-mix(in srgb, var(--cq-danger) 62%, transparent);
+      color: var(--cq-text-primary);
+      background: var(--cq-button-danger);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .button:is(.success, .is-success) {
+      border-color: color-mix(in srgb, var(--cq-success) 62%, transparent);
+      color: var(--cq-text-on-success);
+      background: var(--cq-button-success);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(.mission-button, .tab-button, .store-category-tab, .auth-tab, .settings-tab, .leaderboard-toolbar button, .tutorial-rail button)[aria-pressed="true"],
+    :is(body:not(.theme-light), body.theme-light) :where(.tab-button, .auth-tab, .settings-tab)[aria-selected="true"] {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(.button, .audio-control):is(:disabled, [aria-disabled="true"]) {
+      cursor: not-allowed;
+      border-color: var(--cq-border);
+      color: var(--cq-text-subtle);
+      background: var(--cq-button-disabled);
+      box-shadow: none;
+      opacity: 0.62;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) main :is(input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+      box-sizing: border-box;
+      min-height: var(--cq-control-height);
+      border-color: var(--cq-control-border);
+      border-radius: var(--cq-control-radius);
+      color: var(--cq-text-primary);
+      background: var(--cq-control-surface);
+      font: inherit;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) main textarea {
+      min-height: 96px;
+      padding-block: var(--cq-space-2);
+      resize: vertical;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) main :is(input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea):focus-visible {
+      border-color: var(--cq-accent-tertiary);
+      box-shadow: var(--cq-focus-ring);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(.badge, .settings-status, .admin-status, .tournament-status, .xp-pill) {
+      border-radius: var(--cq-radius-pill);
+      font-variant-numeric: tabular-nums;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) :where(.tournament-empty, .book-empty, .cq-empty-state) {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-muted);
+      background: var(--cq-control-surface);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .video-modal {
+      padding: var(--cq-space-3);
+      background: var(--cq-page-overlay);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .video-modal-panel {
+      overflow: hidden;
+      border-color: var(--cq-border-strong);
+      border-radius: var(--cq-radius-stage);
+      background: var(--cq-page-card-surface);
+      box-shadow: var(--cq-shadow-lg);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .video-modal-bar {
+      border-bottom-color: var(--cq-border);
+      background: var(--cq-component-surface);
+    }
+
+    :where(
+      .tutorial-shell,
+      .academy-shell,
+      .login-shell,
+      .settings-shell,
+      .admin-shell,
+      .store-shell,
+      .books-shell,
+      .real-puzzle-shell,
+      .friend-lobby-grid,
+      .tournament-grid,
+      .leaderboard-grid,
+      .settings-grid,
+      .admin-grid
+    ) {
+      min-inline-size: 0;
+    }
+
+    @media (max-width: 699px) {
+      :is(body:not(.theme-light), body.theme-light) main .section-head {
+        align-items: flex-start;
+        margin-bottom: var(--cq-space-3);
+        padding: var(--cq-space-3);
+        border-radius: var(--cq-radius-card);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) .video-modal {
+        padding: var(--cq-space-2);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) .video-modal-panel {
+        border-radius: var(--cq-radius-card);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) :where(
+        .tutorial-rail,
+        .tutorial-stage,
+        .tutorial-coach,
+        .academy-panel,
+        .academy-track,
+        .academy-quiz,
+        .login-pass-panel,
+        .auth-panel,
+        .auth-account-panel,
+        .settings-sidebar,
+        .settings-content,
+        .admin-guard,
+        .admin-console,
+        .friend-lobby,
+        .tournament-lobby,
+        .real-puzzles-panel,
+        .leaderboard-list,
+        .store-premium-shell,
+        .books-shell
+      ) {
+        border-radius: var(--cq-radius-card);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) :where(
+        .site-header .nav-links > a,
+        .site-header .nav-group-label,
+        .site-header .nav-mobile-panel > a,
+        .academy-hero-card,
+        .academy-card,
+        .adventure-card,
+        .book-card,
+        .home-feature-card,
+        .home-quick-card,
+        .leaderboard-card,
+        .lesson-card,
+        .mission-card,
+        .notation-card,
+        .opening-card,
+        .store-card,
+        .video-card,
+        .video-path-card,
+        .button,
+        .audio-control,
+        .mission-button,
+        .tab-button,
+        .store-category-tab,
+        .auth-tab,
+        .settings-tab,
+        .leaderboard-toolbar button,
+        .tutorial-rail button
+      ) {
+        transition: none;
+      }
+    }
   </style>
 </head>
 <body>
