@@ -50,7 +50,9 @@ const requiredRegressionContracts = [
   ["online completed-game recording", /remote\.status === "completed"[\s\S]*?recordCompletedGame\(/],
   ["header rating binding", /data-profile-field="gameRating"/],
   ["player-card coins binding", /data-match-coins/],
-  ["compact player-frame grid", /"footer footer footer"\s*\n\s*"details details details"/]
+  ["compact player-frame grid", /"footer footer footer"\s*\n\s*"details details details"/],
+  ["wide player side-seat grid", /Wide desktop gives each player[\s\S]*?"opponent board player"/],
+  ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/]
 ];
 
 for (const [label, pattern] of requiredRegressionContracts) {
