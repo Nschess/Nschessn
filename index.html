@@ -25348,44 +25348,6 @@
       display: none;
     }
 
-    /* Wide desktop gives each player a compact side seat without taking priority from the board. */
-    @media (min-width: 1280px) {
-      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
-        grid-template-columns: clamp(190px, 15vw, 240px) minmax(0, 1fr) clamp(260px, 18vw, 320px);
-        grid-template-areas: "left center right";
-      }
-
-      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
-      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
-        grid-template-columns: minmax(164px, 0.4fr) minmax(360px, 1fr) minmax(164px, 0.4fr);
-        grid-template-areas:
-          "setup setup setup"
-          "opponent board player"
-          "actions actions actions"
-          "options options options";
-        width: 100%;
-        max-width: none;
-        align-items: center;
-        justify-items: stretch;
-        gap: var(--cq-space-2);
-      }
-
-      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card).player-frame {
-        width: 100%;
-        max-width: none;
-        min-width: 0;
-        align-self: center;
-        justify-self: stretch;
-      }
-
-      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
-        width: 100%;
-        max-width: var(--cq-play-board-max);
-        margin-inline: auto;
-        justify-self: center;
-      }
-    }
-
     @media (max-width: 480px) {
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
         grid-template-columns: 38px minmax(0, 1fr) max-content;
