@@ -41,4 +41,20 @@ if (imagesWithoutAlt.length) {
   throw new Error(`Found ${imagesWithoutAlt.length} static image(s) without alternative text.`);
 }
 
+const requiredRegressionContracts = [
+  ["homepage top-player target", /id="homeTopPlayers"/],
+  ["homepage rankings renderer", /function renderHomeTopPlayers\(entries = buildLeaderboardEntries\("ai"\)\)/],
+  ["homepage recent-game target", /id="homeRecentGames"/],
+  ["completed-game persistence", /completedGames: completedGameHistory\.slice\(0, 12\)/],
+  ["AI completed-game recording", /function recordCoachGameResult[\s\S]*?recordCompletedGame\(/],
+  ["online completed-game recording", /remote\.status === "completed"[\s\S]*?recordCompletedGame\(/],
+  ["header rating binding", /data-profile-field="gameRating"/],
+  ["player-card coins binding", /data-match-coins/],
+  ["compact player-frame grid", /"footer footer footer"\s*\n\s*"details details details"/]
+];
+
+for (const [label, pattern] of requiredRegressionContracts) {
+  if (!pattern.test(html)) throw new Error(`Missing regression contract: ${label}.`);
+}
+
 console.log("Site structure and inline application syntax verified.");
