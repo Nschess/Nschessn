@@ -23988,7 +23988,7 @@
     :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
       --cq-play-rail-gap: var(--cq-space-2);
       --cq-play-workspace-gap: clamp(var(--cq-space-2), 1.5vw, var(--cq-space-3));
-      --cq-play-stage-chrome: 410px;
+      --cq-play-stage-chrome: 360px;
       --cq-play-board-max: min(760px, max(420px, calc(100svh - var(--cq-play-stage-chrome))));
     }
 
@@ -24011,7 +24011,7 @@
 
     :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
       grid-template-areas: "left center right";
-      grid-template-columns: minmax(210px, 0.7fr) minmax(520px, 760px) minmax(258px, 0.84fr);
+      grid-template-columns: minmax(224px, 248px) minmax(520px, 760px) minmax(300px, 340px);
       max-width: 1580px;
       gap: var(--cq-play-workspace-gap);
       padding: var(--cq-space-3);
@@ -24112,31 +24112,35 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .player-frame {
-      grid-template-columns: 46px minmax(0, 1fr) auto;
+      grid-template-columns: 42px minmax(0, 1fr) max-content 28px;
       grid-template-areas:
-        "top top top"
-        "avatar identity clock"
-        "footer footer footer"
-        "details details details";
+        "avatar identity clock details"
+        "footer footer footer details";
       width: 100%;
       max-width: none;
       min-height: 0;
-      gap: var(--cq-space-1) var(--cq-space-2);
-      padding: 10px;
+      gap: 4px var(--cq-space-2);
+      padding: 8px 10px;
       overflow: visible;
       border-radius: var(--cq-radius-card);
       box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-topline {
-      min-height: 18px;
+      grid-area: footer;
+      align-self: center;
+      justify-self: end;
+      min-height: 24px;
       gap: var(--cq-space-1);
-      padding-bottom: 5px;
+      padding: 0;
+      border: 0;
     }
 
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-kicker { display: none; }
+
     :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
-      width: 46px;
-      height: 46px;
+      width: 42px;
+      height: 42px;
       border-radius: var(--cq-radius-control);
       font-size: 1.1rem;
     }
@@ -24161,19 +24165,20 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
-      min-width: 64px;
-      min-height: 34px;
+      min-width: 78px;
+      min-height: 38px;
       padding-inline: var(--cq-space-2);
       border-radius: var(--cq-radius-control);
-      font-size: 0.76rem;
+      font-size: 0.84rem;
       font-variant-numeric: tabular-nums;
       box-shadow: var(--cq-shadow-sm);
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer,
     :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta {
-      min-height: 26px;
+      min-height: 24px;
       gap: var(--cq-space-1);
+      flex-wrap: nowrap;
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-side],
@@ -24202,19 +24207,21 @@
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-details {
       grid-area: details;
-      min-width: 0;
-      margin: 1px 0 0;
-      border-top: 1px solid var(--cq-border);
+      align-self: stretch;
+      min-width: 28px;
+      margin: 0;
+      border-top: 0;
+      border-left: 1px solid var(--cq-border);
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary {
       display: flex;
-      min-height: 27px;
+      min-height: 100%;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       color: var(--cq-text-muted);
       cursor: pointer;
-      font-size: 0.64rem;
+      font-size: 0;
       font-weight: 800;
       letter-spacing: 0.04em;
       list-style: none;
@@ -24226,10 +24233,25 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary::after {
-      content: "+";
+      content: "⋯";
       color: var(--cq-accent-tertiary);
-      font-size: 0.95rem;
+      font-size: 1.1rem;
       line-height: 1;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details[open] {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      width: 100%;
+      margin-top: var(--cq-space-1);
+      border-top: 1px solid var(--cq-border);
+      border-left: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details[open] > summary {
+      min-height: 27px;
+      justify-content: space-between;
+      font-size: 0.64rem;
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-details[open] > summary::after {
@@ -24469,11 +24491,17 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .captured-row {
-      order: 1;
+      order: 2;
       gap: var(--cq-space-1);
     }
 
-    :is(body:not(.theme-light), body.theme-light) #play .move-history { order: 2; }
+    :is(body:not(.theme-light), body.theme-light) #play .move-history {
+      order: 1;
+      min-height: clamp(180px, 26svh, 300px);
+      max-height: clamp(220px, 34svh, 360px);
+      overflow: auto;
+      scrollbar-width: thin;
+    }
     :is(body:not(.theme-light), body.theme-light) #play .featured-coach-card { order: 3; }
     :is(body:not(.theme-light), body.theme-light) #play .engine-panel { order: 4; }
     :is(body:not(.theme-light), body.theme-light) #play .coach-library { order: 5; }
@@ -24494,13 +24522,42 @@
       font-size: 0.6rem;
     }
 
-    :is(body:not(.theme-light), body.theme-light) #play .move-history {
-      max-height: 190px;
-      overflow: auto;
-      scrollbar-width: thin;
+    :is(body:not(.theme-light), body.theme-light) #play .move-history::before {
+      content: "Move list";
+      display: block;
+      margin-bottom: var(--cq-space-2);
+      color: var(--cq-text-primary);
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-history:empty {
+      align-items: start;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-history:empty::before {
+      content: "Move list\A\AWaiting for the opening move.";
+      margin: 0;
+      color: var(--cq-text-subtle);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: normal;
+      line-height: 1.5;
+      text-transform: none;
+      white-space: pre-line;
     }
 
     @media (min-width: 1181px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .preference-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .preference-grid .board-size-slider {
+        grid-column: 1 / -1;
+      }
+
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
         position: sticky;
         top: 84px;
@@ -24584,13 +24641,18 @@
       }
 
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .player-frame {
-        grid-template-columns: 42px minmax(0, 1fr) auto;
+        grid-template-columns: 42px minmax(0, 1fr) max-content 28px;
         padding: var(--cq-space-2);
       }
 
       :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
         width: 42px;
         height: 42px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer,
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta {
+        flex-wrap: wrap;
       }
 
       :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
@@ -25285,7 +25347,7 @@
     }
     @media (max-width: 480px) {
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
-        grid-template-columns: 38px minmax(0, 1fr) max-content;
+        grid-template-columns: 38px minmax(0, 1fr) max-content 24px;
         gap: 5px 7px;
         padding: 8px;
       }

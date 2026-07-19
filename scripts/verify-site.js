@@ -51,10 +51,10 @@ const requiredRegressionContracts = [
   ["header rating binding", /data-profile-field="gameRating"/],
   ["visible desktop profile metadata", /\.player-flex-chip > \.player-flex-main:last-child\s*\{\s*display: grid;/],
   ["player-card coins binding", /data-match-coins/],
-  ["compact player-frame grid", /"footer footer footer"\s*\n\s*"details details details"/],
   ["board-dominant player-card stack", /grid-template-areas:\s*\n\s*"setup"\s*\n\s*"opponent"\s*\n\s*"board"\s*\n\s*"player"\s*\n\s*"actions"\s*\n\s*"options"/],
   ["viewport-balanced board sizing", /--cq-play-board-max: min\(760px, max\(420px, calc\(100svh - var\(--cq-play-stage-chrome\)\)\)\);/],
-  ["live capture context priority", /#play \.captured-row \{\s*order: 1;/],
+  ["compact player-strip grid", /"avatar identity clock details"\s*\n\s*"footer footer footer details"/],
+  ["live move context priority", /#play \.move-history \{\s*order: 1;/],
   ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/]
 ];
 
