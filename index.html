@@ -28146,6 +28146,21 @@
         transition: none;
       }
     }
+
+    /* Phase 7: keep long, static collections out of layout and paint work
+       until they approach the viewport. Interactive boards are intentionally
+       excluded so their input surfaces are always ready when opened. */
+    @supports (content-visibility: auto) {
+      :is(#openings .opening-card, #paths .lesson-card, #plan .plan-panel, #leaderboards .leaderboard-card, #books .book-card) {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 420px;
+      }
+
+      #videos .video-tier {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 640px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -35459,23 +35474,52 @@
       });
     }
 
+    let miniBoardObserver = null;
+
+    function renderMiniBoard(board) {
+      if (!(board instanceof HTMLElement)) return;
+      const renderKey = `${pieceSvgRenderVersion}:${activePieceSvgSet}:${board.dataset.fen || ""}`;
+      if (board.dataset.pieceRenderKey === renderKey && board.childElementCount === 64) return;
+
+      const squares = fenToSquares(board.dataset.fen);
+      const fragment = document.createDocumentFragment();
+      squares.forEach((piece, index) => {
+        const row = Math.floor(index / 8);
+        const col = index % 8;
+        const square = document.createElement("span");
+        square.className = `mini-square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
+        const colorClass = pieceColorClass(piece);
+        if (colorClass) square.classList.add(colorClass);
+        renderPieceOnSquare(square, piece);
+        fragment.appendChild(square);
+      });
+      board.replaceChildren(fragment);
+      board.dataset.pieceRenderKey = renderKey;
+    }
+
     function renderMiniBoards() {
-      document.querySelectorAll(".mini-board").forEach((board) => {
+      const boards = [...document.querySelectorAll(".mini-board")];
+      if (!boards.length) return;
+
+      if (!("IntersectionObserver" in window)) {
+        boards.forEach(renderMiniBoard);
+        return;
+      }
+
+      if (!miniBoardObserver) {
+        miniBoardObserver = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            miniBoardObserver.unobserve(entry.target);
+            renderMiniBoard(entry.target);
+          });
+        }, { rootMargin: "900px 0px" });
+      }
+
+      boards.forEach((board) => {
         const renderKey = `${pieceSvgRenderVersion}:${activePieceSvgSet}:${board.dataset.fen || ""}`;
         if (board.dataset.pieceRenderKey === renderKey && board.childElementCount === 64) return;
-        const squares = fenToSquares(board.dataset.fen);
-        board.innerHTML = "";
-        squares.forEach((piece, index) => {
-          const row = Math.floor(index / 8);
-          const col = index % 8;
-          const square = document.createElement("span");
-          square.className = `mini-square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
-          const colorClass = pieceColorClass(piece);
-          if (colorClass) square.classList.add(colorClass);
-          renderPieceOnSquare(square, piece);
-          board.appendChild(square);
-        });
-        board.dataset.pieceRenderKey = renderKey;
+        miniBoardObserver.observe(board);
       });
     }
 
@@ -35627,6 +35671,7 @@
         });
         card.querySelector(".opening-body")?.appendChild(button);
       });
+      renderMiniBoards();
     }
 
     function getPuzzleAccuracy(fallback = 100) {
@@ -53882,7 +53927,7 @@
       connection?.addEventListener?.("change", applyPerformanceMode);
 
       document.querySelectorAll("iframe").forEach((iframe) => {
-        iframe.loading = iframe.loading || "lazy";
+        if (!iframe.hasAttribute("loading")) iframe.loading = "lazy";
         iframe.fetchPriority = iframe.closest(".short-slide.is-active, .video-modal") ? "high" : "low";
       });
       document.querySelectorAll("img").forEach((image) => {
