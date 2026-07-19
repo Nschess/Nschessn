@@ -60,6 +60,9 @@ const requiredRegressionContracts = [
   ["collapsible friend chat", /id="friendGameChatDrawer"[\s\S]*?data-play-drawer="chat"[\s\S]*?id="friendGameChat"/],
   ["responsive drawer defaults", /function setupPlayWorkspaceDrawers\([\s\S]*?drawer\.dataset\.playDrawer === "moves" \|\| !compactWorkspace/],
   ["friend chat drawer visibility", /function renderFriendGameChat[\s\S]*?drawer\.hidden = !enabled/],
+  ["visible player-strip essentials", /match-player-meta :is\(\[data-match-side\], \[data-match-rating\], \[data-match-coins\], \[data-match-online\]\)[\s\S]*?display: inline-flex/],
+  ["captured-piece presentation", /#play \.captured-pieces \{\s*display: flex;/],
+  ["active move emphasis", /#play \.move-pair:last-child \{\s*border-color:/],
   ["play preference controls", /id="prefTheme"[\s\S]*?id="prefPressure"/],
   ["play preference bindings", /function setupLearnerPreferences\([\s\S]*?field\.addEventListener\("change"/],
   ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/]

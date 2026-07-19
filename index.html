@@ -24261,7 +24261,6 @@
       flex-wrap: nowrap;
     }
 
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-side],
     :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-frame-status],
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer :is([data-ai-games], [data-ai-win-rate]) {
       display: none;
@@ -25556,6 +25555,256 @@
 
     @media (prefers-reduced-motion: reduce) {
       :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary { transition: none; }
+    }
+
+    /* Layout A presentation polish: reinforce the board stage while keeping
+       player state and match tools immediately scannable. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar {
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer {
+      padding: 0;
+      border-color: var(--cq-border);
+      background: var(--cq-surface-panel);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > :is(.captured-row, .trainer-note) {
+      padding: var(--cq-space-2);
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-card);
+      background: var(--cq-surface-panel);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .player-frame {
+      gap: 5px var(--cq-space-2);
+      padding: 9px var(--cq-space-2);
+      border-color: var(--cq-border);
+      background:
+        linear-gradient(105deg, var(--cq-accent-secondary-soft), transparent 32%),
+        var(--cq-surface-glass-strong);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .player-frame--you {
+      border-color: color-mix(in srgb, var(--cq-accent-tertiary) 54%, var(--cq-border));
+      background:
+        linear-gradient(105deg, var(--cq-accent-primary-soft), transparent 32%),
+        var(--cq-surface-glass-strong);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-main, .ai-player-main) strong {
+      color: var(--cq-text-primary);
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-main, .ai-player-main) small,
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-subline {
+      color: var(--cq-text-muted);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.match-player-timer, .ai-player-timer) {
+      min-width: 86px;
+      min-height: 38px;
+      padding-inline: 11px;
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      background: var(--cq-accent-gradient);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+      font-family: var(--cq-font-mono);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.045em;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.match-player-card.is-player-turn .match-player-timer, .ai-player-card.is-active .ai-player-timer) {
+      border-color: var(--cq-accent-tertiary);
+      box-shadow: 0 0 0 3px var(--cq-accent-tertiary-soft), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer,
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta {
+      align-self: center;
+      justify-self: start;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame--opponent .player-frame-topline {
+      justify-self: end;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-card .player-frame-topline {
+      justify-self: end;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-card .player-frame-topline .player-frame-side {
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-card .match-player-meta {
+      max-width: calc(100% - 92px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta :is([data-match-side], [data-match-rating], [data-match-coins], [data-match-online]) {
+      display: inline-flex;
+      align-items: center;
+      min-height: 23px;
+      padding: 3px 7px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-pill);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-pill);
+      font-size: 0.62rem;
+      font-weight: 750;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-side] {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-coins] {
+      color: var(--cq-warning);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-online] {
+      border-color: color-mix(in srgb, var(--cq-success) 42%, var(--cq-border));
+      color: var(--cq-success);
+      background: color-mix(in srgb, var(--cq-success) 12%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-online].is-offline {
+      border-color: color-mix(in srgb, var(--cq-danger) 46%, var(--cq-border));
+      color: var(--cq-danger);
+      background: color-mix(in srgb, var(--cq-danger) 11%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-card.is-player-turn .match-player-meta [data-match-online] {
+      border-color: color-mix(in srgb, var(--cq-accent-tertiary) 54%, var(--cq-border));
+      color: var(--cq-accent-tertiary);
+      background: var(--cq-accent-tertiary-soft);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame--opponent .player-frame-footer :is(.ai-player-move, .ai-player-last) {
+      max-width: 14ch;
+      border-color: var(--cq-border);
+      color: var(--cq-text-muted);
+      background: var(--cq-surface-pill);
+      font-size: 0.62rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame--opponent .ai-player-move,
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-card.is-player-turn .player-frame-topline::after {
+      color: var(--cq-accent-tertiary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .captured-row {
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .captured-row > div {
+      min-height: 58px;
+      padding: 8px;
+      border-color: var(--cq-border);
+      background: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .captured-row strong {
+      color: var(--cq-text-subtle);
+      font-size: 0.58rem;
+      letter-spacing: 0.075em;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .captured-pieces {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      min-height: 1.45rem;
+      margin-top: 3px;
+      color: var(--cq-text-primary);
+      font-size: 1.02rem;
+      letter-spacing: 0.06em;
+      line-height: 1.2;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer--moves .move-history {
+      gap: 4px;
+      color: var(--cq-text-muted);
+      font-size: 0.74rem;
+      line-height: 1.25;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-pair {
+      grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr);
+      min-height: 30px;
+      gap: 6px;
+      padding: 5px 6px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      font-family: var(--cq-font-mono);
+      transition: background-color var(--cq-transition-fast) ease, border-color var(--cq-transition-fast) ease, color var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-pair strong {
+      color: var(--cq-text-subtle);
+      font-weight: 700;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-pair span {
+      overflow: hidden;
+      color: var(--cq-text-muted);
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-pair:last-child {
+      border-color: color-mix(in srgb, var(--cq-accent-secondary) 44%, var(--cq-border));
+      color: var(--cq-text-primary);
+      background: linear-gradient(100deg, var(--cq-accent-secondary-soft), transparent 88%);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-pair:last-child :is(strong, span) {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions :is(.button, .play-extra-actions > summary) {
+      min-height: 40px;
+      border-color: var(--cq-border);
+      border-radius: var(--cq-radius-control);
+      font-size: 0.72rem;
+      font-weight: 750;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions :is(.button, .play-extra-actions > summary):focus-visible,
+    :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary:focus-visible {
+      outline: 2px solid var(--cq-focus-outline);
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 699px) {
+      :is(body:not(.theme-light), body.theme-light) #play :is(.match-player-timer, .ai-player-timer) {
+        min-width: 72px;
+        min-height: 34px;
+        padding-inline: 8px;
+        font-size: 0.72rem;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .match-player-card .match-player-meta {
+        max-width: calc(100% - 74px);
+        flex-wrap: wrap;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .play-rail-drawer > summary small {
+        display: none;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .move-pair {
+        min-height: 29px;
+        padding-inline: 5px;
+      }
     }
 
     @media (max-width: 480px) {
