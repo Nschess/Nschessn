@@ -28218,8 +28218,11 @@
     #login .login-pass-grid > .login-pass-panel {
       border: 1px solid var(--cq-border);
       border-radius: clamp(20px, 1.8vw, 24px);
+      background-clip: padding-box;
       color: var(--cq-text-primary);
       box-shadow: var(--cq-inset-highlight), 0 20px 42px rgba(2, 6, 23, 0.24);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
     }
 
     #login .login-card {
@@ -28251,7 +28254,7 @@
     }
 
     #login .login-card::after {
-      content: "♞";
+      content: "\265E";
       position: absolute;
       z-index: 0;
       bottom: -0.24em;
@@ -28376,6 +28379,28 @@
       justify-content: center;
       padding-inline: 12px;
       font-size: 0.74rem;
+    }
+
+    #login :is(.login-card-actions .button:not(.secondary), .login-actions .button:not(.secondary), .auth-form > .button:not(.secondary)) {
+      border-color: color-mix(in srgb, var(--cq-accent-secondary) 54%, var(--cq-border));
+      background: var(--cq-accent-gradient);
+      box-shadow: inset 0 1px 0 var(--cq-highlight), 0 10px 22px color-mix(in srgb, var(--cq-accent-primary) 24%, transparent);
+    }
+
+    #login :is(.login-card-actions .button.secondary, .login-actions .button.secondary, #authGoogleLogin) {
+      border-color: var(--cq-border);
+      color: var(--cq-text-primary);
+      background: color-mix(in srgb, var(--cq-surface-input) 84%, transparent);
+      box-shadow: inset 0 1px 0 var(--cq-highlight);
+    }
+
+    #login :is(.login-card-actions .button, .login-actions .button, .auth-form > .button, #authGoogleLogin):hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    #login :is(.login-card-actions .button, .login-actions .button, .auth-form > .button, #authGoogleLogin):focus-visible {
+      border-color: var(--cq-border-strong);
+      box-shadow: var(--cq-focus-ring), inset 0 1px 0 var(--cq-highlight);
     }
 
     #login .login-pass {
@@ -28533,6 +28558,11 @@
     #login .auth-form { gap: 9px; }
     #login .auth-field { gap: 5px; color: var(--cq-text-primary); font-size: 0.72rem; }
     #login .auth-field :is(input, select) { min-height: 40px; padding-inline: 10px; border-radius: 11px; font-size: 0.76rem; }
+    #login :is(.login-form, .auth-form) :is(input, select):focus-visible {
+      border-color: var(--cq-border-strong);
+      background: var(--cq-surface-panel-strong);
+      box-shadow: var(--cq-focus-ring), inset 0 1px 0 var(--cq-highlight);
+    }
     #login .auth-field small { color: var(--cq-text-subtle); font-size: 0.62rem; line-height: 1.35; }
     #login .auth-form > .button:not(.secondary),
     #login #authGoogleLogin { width: 100%; min-height: 42px; justify-content: center; font-size: 0.74rem; }
@@ -28548,6 +28578,17 @@
       border-color: var(--cq-border-strong);
       box-shadow: var(--cq-inset-highlight), 0 25px 48px rgba(2, 6, 23, 0.3);
       transform: translateY(-2px);
+    }
+
+    @media (min-width: 1280px) {
+      #login .login-card {
+        padding-left: clamp(132px, 10.6vw, 164px);
+      }
+
+      #login .login-card::after {
+        left: -0.18em;
+        opacity: 0.16;
+      }
     }
 
     @media (max-width: 1120px) {
