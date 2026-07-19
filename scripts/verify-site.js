@@ -89,7 +89,9 @@ const requiredRegressionContracts = [
   ["live puzzle feedback", /id="feedback" role="status" aria-live="polite" aria-atomic="true"[\s\S]*?id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true"/],
   ["player pass dashboard layout", /Player Pass dashboard:[\s\S]*?#login \.login-shell \{[\s\S]*?grid-template-columns: minmax\(340px, 1\.2fr\) minmax\(318px, 0\.98fr\) minmax\(292px, 0\.9fr\);/],
   ["player pass dashboard preservation", /#login \.login-pass \{[\s\S]*?display: contents;[\s\S]*?#login \.login-pass-grid \{ display: contents; \}/],
-  ["player pass compact breakpoint", /@media \(max-width: 760px\) \{[\s\S]*?#login \.login-shell \{ grid-template-columns: minmax\(0, 1fr\); grid-template-rows: none; \}/]
+  ["player pass compact breakpoint", /@media \(max-width: 760px\) \{[\s\S]*?#login \.login-shell \{ grid-template-columns: minmax\(0, 1fr\); grid-template-rows: none; \}/],
+  ["profile stats first", /grid-template-areas:\s*\n\s*"overview"\s*\n\s*"stats"\s*\n\s*"ratings"\s*\n\s*"progress"/],
+  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/]
 ];
 
 for (const [label, pattern] of requiredRegressionContracts) {
