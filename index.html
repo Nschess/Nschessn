@@ -25270,6 +25270,14 @@
         transition: none;
       }
     }
+
+    /* Performance mode keeps the selected theme intact while dropping the
+       paint-heavy decorative loops that do not affect interaction or state. */
+    body:is(.perf-lite, .low-performance),
+    body:is(.perf-lite, .low-performance)::before,
+    body:is(.perf-lite, .low-performance) .puzzle-board-wrap {
+      animation: none;
+    }
   </style>
 </head>
 <body>
@@ -50280,11 +50288,34 @@
 
       function closeVideo() {
         const shouldResume = Boolean(activeVideoCard);
+        const returnFocusTarget = activeVideoButton;
         modal.hidden = true;
         modal.setAttribute("aria-hidden", "true");
         modal.classList.remove("is-short");
         modalFrame.innerHTML = "";
-        if (shouldResume) resumeVideoScroll();
+        if (shouldResume) {
+          resumeVideoScroll();
+        } else if (returnFocusTarget?.isConnected) {
+          returnFocusTarget.focus({ preventScroll: true });
+        }
+      }
+
+      function containVideoDialogFocus(event) {
+        if (event.key !== "Tab" || modal.hidden) return;
+        const player = modalFrame.querySelector("iframe");
+        const focusTargets = player ? [closeButton, player] : [closeButton];
+        const activeIndex = focusTargets.indexOf(document.activeElement);
+
+        if (activeIndex === -1) {
+          event.preventDefault();
+          focusTargets[event.shiftKey ? focusTargets.length - 1 : 0].focus();
+          return;
+        }
+
+        if ((event.shiftKey && activeIndex === 0) || (!event.shiftKey && activeIndex === focusTargets.length - 1)) {
+          event.preventDefault();
+          focusTargets[event.shiftKey ? focusTargets.length - 1 : 0].focus();
+        }
       }
 
       function openVideo(src, title, isShort = false, trigger = null) {
@@ -50360,7 +50391,11 @@
         if (event.target === modal) closeVideo();
       });
       document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && !modal.hidden) closeVideo();
+        containVideoDialogFocus(event);
+        if (event.key === "Escape" && !modal.hidden) {
+          event.preventDefault();
+          closeVideo();
+        }
       });
       window.addEventListener("message", (event) => {
         const activePlayer = modalFrame.querySelector("iframe");

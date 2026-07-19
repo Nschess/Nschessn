@@ -20,4 +20,25 @@ if (!/<main id="top" tabindex="-1">/.test(html)) {
   throw new Error("The skip link target must be keyboard focusable.");
 }
 
+const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+const ids = [...markup.matchAll(/(?:^|\s)id=["']([^"']+)["']/gim)].map((match) => match[1]);
+const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+if (duplicateIds.length) {
+  throw new Error(`Duplicate static IDs: ${duplicateIds.join(", ")}.`);
+}
+
+for (const attribute of ["aria-labelledby", "aria-describedby", "aria-controls", "for"]) {
+  const references = [...markup.matchAll(new RegExp(`(?:^|\\s)${attribute}=["']([^"']+)["']`, "gim"))]
+    .flatMap((match) => match[1].trim().split(/\s+/));
+  const missing = [...new Set(references.filter((reference) => reference && !ids.includes(reference)))];
+  if (missing.length) {
+    throw new Error(`Missing targets for ${attribute}: ${missing.join(", ")}.`);
+  }
+}
+
+const imagesWithoutAlt = [...markup.matchAll(/<img\b(?![^>]*\balt=)[^>]*>/gi)];
+if (imagesWithoutAlt.length) {
+  throw new Error(`Found ${imagesWithoutAlt.length} static image(s) without alternative text.`);
+}
+
 console.log("Site structure and inline application syntax verified.");
