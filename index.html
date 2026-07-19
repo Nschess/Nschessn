@@ -16195,8 +16195,6 @@
 
       #play .match-board-column,
       #puzzles .match-board-column {
-        position: sticky;
-        top: 82px;
         align-self: start;
         width: 100%;
       }
@@ -16778,12 +16776,6 @@
       background:
         linear-gradient(145deg, rgba(255, 248, 237, 0.055), transparent 32%),
         rgba(10, 12, 14, 0.3);
-    }
-
-    #play:not(.is-review-mode) .match-board-column {
-      position: sticky;
-      top: 82px;
-      max-height: none;
     }
 
     #play:not(.is-review-mode) .play-board-wrap {
@@ -22825,7 +22817,6 @@
     body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap {
       width: min(100%, clamp(var(--cq-board-stage-min), 46vw, var(--cq-board-stage-max)));
       max-width: var(--cq-board-stage-max);
-      margin-block: var(--cq-space-2);
       border-color: var(--cq-board-frame-border);
       background: var(--cq-board-frame);
       box-shadow:
@@ -22884,7 +22875,6 @@
 
       body:not(.theme-light) #play:not(.is-review-mode) .play-board-wrap {
         width: 100%;
-        margin-block: var(--cq-space-1);
         box-shadow:
           0 0 0 1px var(--cq-border),
           0 0 0 4px var(--cq-accent-secondary-soft),
@@ -23991,19 +23981,22 @@
       }
     }
 
-    /* Phase 4: the Play workspace is board-first, deliberately quiet, and
-       reuses the Phase 3 tokens rather than adding a second visual system. */
+    /* Play workspace: board-first, deliberately quiet, and built from the
+       shared tokens instead of a separate visual system. The board uses the
+       available height on compact desktop screens so both player frames stay
+       in the workspace without turning the board into a side panel. */
     :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
       --cq-play-rail-gap: var(--cq-space-2);
       --cq-play-workspace-gap: clamp(var(--cq-space-2), 1.5vw, var(--cq-space-3));
-      --cq-play-board-max: 760px;
+      --cq-play-stage-chrome: 410px;
+      --cq-play-board-max: min(760px, max(420px, calc(100svh - var(--cq-play-stage-chrome))));
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .section-head {
       align-items: center;
-      gap: var(--cq-space-3);
-      margin-bottom: var(--cq-space-3);
-      padding: var(--cq-space-3) var(--cq-space-4);
+      gap: var(--cq-space-2);
+      margin-bottom: var(--cq-space-2);
+      padding: var(--cq-space-2) var(--cq-space-3);
       border-radius: var(--cq-radius-card);
       box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
     }
@@ -24125,16 +24118,20 @@
         "avatar identity clock"
         "footer footer footer"
         "details details details";
+      width: 100%;
+      max-width: none;
       min-height: 0;
       gap: var(--cq-space-1) var(--cq-space-2);
-      padding: var(--cq-space-2) var(--cq-space-3);
+      padding: 10px;
+      overflow: visible;
       border-radius: var(--cq-radius-card);
       box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-topline {
-      min-height: 20px;
-      padding-bottom: var(--cq-space-1);
+      min-height: 18px;
+      gap: var(--cq-space-1);
+      padding-bottom: 5px;
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
@@ -24164,7 +24161,7 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
-      min-width: 72px;
+      min-width: 64px;
       min-height: 34px;
       padding-inline: var(--cq-space-2);
       border-radius: var(--cq-radius-control);
@@ -24206,18 +24203,18 @@
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-details {
       grid-area: details;
       min-width: 0;
-      margin: var(--cq-space-1) 0 0;
+      margin: 1px 0 0;
       border-top: 1px solid var(--cq-border);
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary {
       display: flex;
-      min-height: 30px;
+      min-height: 27px;
       align-items: center;
       justify-content: space-between;
       color: var(--cq-text-muted);
       cursor: pointer;
-      font-size: 0.68rem;
+      font-size: 0.64rem;
       font-weight: 800;
       letter-spacing: 0.04em;
       list-style: none;
@@ -24472,8 +24469,16 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #play .captured-row {
+      order: 1;
       gap: var(--cq-space-1);
     }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-history { order: 2; }
+    :is(body:not(.theme-light), body.theme-light) #play .featured-coach-card { order: 3; }
+    :is(body:not(.theme-light), body.theme-light) #play .engine-panel { order: 4; }
+    :is(body:not(.theme-light), body.theme-light) #play .coach-library { order: 5; }
+    :is(body:not(.theme-light), body.theme-light) #play .simple-coach { order: 6; }
+    :is(body:not(.theme-light), body.theme-light) #play .opening-compass { order: 7; }
 
     :is(body:not(.theme-light), body.theme-light) #play .captured-row > div {
       min-height: 50px;
@@ -25278,76 +25283,6 @@
     body:is(.perf-lite, .low-performance) .puzzle-board-wrap {
       animation: none;
     }
-    /* Post-audit: player cards stay compact so the board remains the workspace anchor. */
-    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
-      grid-template-columns: 46px minmax(0, 1fr) max-content;
-      grid-template-areas:
-        "top top top"
-        "avatar identity clock"
-        "footer footer footer"
-        "details details details";
-      gap: 6px 9px;
-      min-height: 0;
-      padding: 10px;
-      overflow: visible;
-      border-radius: var(--cq-radius-card);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 18px rgba(0, 0, 0, 0.18);
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame-topline {
-      min-height: 18px;
-      gap: 8px;
-      padding-bottom: 5px;
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
-      width: 46px;
-      height: 46px;
-      border-radius: var(--cq-radius-control);
-      font-size: 1.1rem;
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
-      min-width: 64px;
-      min-height: 34px;
-      padding-inline: var(--cq-space-2);
-      font-size: 0.76rem;
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details {
-      grid-area: details;
-      min-width: 0;
-      margin: 1px 0 0;
-      border-top: 1px solid var(--cq-border);
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary {
-      min-height: 27px;
-      font-size: 0.64rem;
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary::after { content: "+"; }
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details[open] > summary::after { content: "−"; }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame-stats {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: var(--cq-space-1);
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame-stats > div {
-      min-height: 40px;
-      padding: 6px 7px;
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-side] {
-      display: inline-flex;
-    }
-
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-frame-status],
-    :is(body:not(.theme-light), body.theme-light) #play .player-frame--opponent :is(.ai-player-last, [data-ai-games], [data-ai-win-rate]) {
-      display: none;
-    }
-
     @media (max-width: 480px) {
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
         grid-template-columns: 38px minmax(0, 1fr) max-content;
