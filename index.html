@@ -28539,6 +28539,155 @@
     #login .login-actions .button { min-height: 39px; padding-inline: 10px; font-size: 0.72rem; }
     #login #loginStatus { margin: 8px 2px 0; color: var(--cq-text-subtle); font-size: 0.66rem; }
 
+    /* Keep the player facts visible before optional collection and history
+       content. The full profile remains available in the same scroll area. */
+    #login .login-player-profile {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "overview"
+        "stats"
+        "ratings"
+        "progress"
+        "collection"
+        "activity"
+        "achievements";
+      align-content: start;
+      gap: 10px;
+      max-height: 448px;
+      padding: 11px;
+    }
+
+    #login .login-player-profile .profile-overview { grid-area: overview; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    #login .login-player-profile .profile-stat-section { grid-area: stats; }
+    #login .login-player-profile .profile-performance { grid-area: ratings; }
+    #login .login-player-profile .profile-progress-section { grid-area: progress; }
+    #login .login-player-profile .profile-collection { grid-area: collection; }
+    #login .login-player-profile .profile-activity { grid-area: activity; }
+    #login .login-player-profile .profile-achievement-section { grid-area: achievements; }
+
+    #login .login-player-profile .profile-overview .player-profile-row {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      width: 100%;
+    }
+
+    #login .login-player-profile .profile-overview .player-profile-title {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    #login .login-player-profile .profile-overview :is(.player-profile-kicker, .player-profile-level) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #login .login-player-profile .profile-overview .profile-presence {
+      align-self: center;
+      margin-left: 0;
+    }
+
+    #login .login-player-profile .profile-overview-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+    }
+
+    #login .profile-stat-section {
+      display: grid;
+      gap: 7px;
+      padding: 10px;
+      border: 1px solid var(--cq-border);
+      border-radius: 16px;
+      background: linear-gradient(110deg, var(--cq-accent-primary-soft), transparent 56%), var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight);
+    }
+
+    #login .profile-stat-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #login .profile-stat-heading span {
+      color: var(--cq-text-primary);
+      font-family: var(--cq-font-display);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    #login .profile-stat-heading small {
+      color: var(--cq-text-subtle);
+      font-size: 0.64rem;
+      font-weight: 700;
+    }
+
+    #login .profile-stat-section .player-profile-stats { gap: 7px; }
+
+    #login .profile-stat-section .player-profile-stat {
+      min-height: 58px;
+      padding: 8px 9px;
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--cq-surface-elevated) 88%, transparent);
+    }
+
+    #login .profile-stat-section .player-profile-stat strong {
+      color: var(--cq-accent-tertiary);
+      font-size: 1.08rem;
+    }
+
+    #login .profile-stat-section .player-profile-stat span {
+      color: var(--cq-text-muted);
+      font-size: 0.62rem;
+      font-weight: 700;
+    }
+
+    #login .profile-performance .profile-section-heading { margin-bottom: 1px; }
+    #login .profile-performance .profile-rating-card { min-height: 78px; padding: 10px; }
+    #login .profile-performance .profile-rating-card strong { color: var(--cq-accent-tertiary); font-size: 1.18rem; }
+
+    #login .profile-optional-detail {
+      border: 1px solid var(--cq-border);
+      border-radius: 13px;
+      background: var(--cq-surface-input);
+      box-shadow: inset 0 1px 0 var(--cq-highlight);
+    }
+
+    #login .profile-optional-detail summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 35px;
+      padding: 7px 10px;
+      color: var(--cq-text-primary);
+      cursor: pointer;
+      font-size: 0.68rem;
+      font-weight: 800;
+      list-style: none;
+    }
+
+    #login .profile-optional-detail summary::-webkit-details-marker { display: none; }
+    #login .profile-optional-detail summary::after { content: "+"; color: var(--cq-accent-tertiary); font-size: 1rem; line-height: 1; }
+    #login .profile-optional-detail[open] summary::after { content: "–"; }
+    #login .profile-optional-detail summary small { color: var(--cq-text-subtle); font-size: 0.6rem; font-weight: 700; text-align: right; }
+    #login .profile-optional-detail .profile-rating-history { margin: 0 10px 10px; }
+
+    #login .profile-progress-section { padding: 10px 11px; }
+    #login .profile-progress-section .profile-section-heading { align-items: center; }
+    #login .profile-progress-section .player-profile-progress-labels { margin-top: 1px; }
+
+    #login .profile-collection .profile-section-heading { margin-bottom: 1px; }
+    #login .login-player-profile .player-avatar-strip { padding-bottom: 3px; }
+
     #login .auth-panel {
       display: grid;
       align-content: start;
@@ -29103,18 +29252,25 @@
                     <small data-profile-field="puzzleAccuracy">Solve a puzzle to begin</small>
                   </article>
                 </div>
-                <div class="profile-rating-history">
-                  <div class="profile-rating-history-head">
-                    <span>Puzzle rating trend</span>
-                    <small data-profile-history-status>First puzzle starts your trend</small>
+                <details class="profile-optional-detail">
+                  <summary>Rating history <small data-profile-history-status>First puzzle starts your trend</small></summary>
+                  <div class="profile-rating-history">
+                    <div class="profile-rating-history-head">
+                      <span>Puzzle rating trend</span>
+                      <small>Recent progress</small>
+                    </div>
+                    <div class="profile-rating-chart" data-profile-rating-history role="img" aria-label="Puzzle rating history">
+                      <span class="profile-rating-empty">Current rating</span>
+                    </div>
                   </div>
-                  <div class="profile-rating-chart" data-profile-rating-history role="img" aria-label="Puzzle rating history">
-                    <span class="profile-rating-empty">Current rating</span>
-                  </div>
-                </div>
+                </details>
               </section>
 
               <section class="profile-stat-section" aria-label="Profile stats">
+                <div class="profile-stat-heading">
+                  <span>Player stats</span>
+                  <small>At a glance</small>
+                </div>
                 <div class="player-profile-stats">
                   <div class="player-profile-stat">
                     <strong data-profile-field="streak">0</strong>
