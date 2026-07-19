@@ -55,6 +55,11 @@ const requiredRegressionContracts = [
   ["viewport-balanced board sizing", /--cq-play-board-max: min\(760px, max\(420px, calc\(100svh - var\(--cq-play-stage-chrome\)\)\)\);/],
   ["compact player-strip grid", /"avatar identity clock details"\s*\n\s*"footer footer footer details"/],
   ["live move context priority", /#play \.move-history \{\s*order: 1;/],
+  ["collapsible move history", /id="moveHistoryDrawer"[\s\S]*?data-play-drawer="moves"[\s\S]*?id="moveHistory"/],
+  ["collapsible coach tools", /id="coachToolsDrawer"[\s\S]*?data-play-drawer="coach"/],
+  ["collapsible friend chat", /id="friendGameChatDrawer"[\s\S]*?data-play-drawer="chat"[\s\S]*?id="friendGameChat"/],
+  ["responsive drawer defaults", /function setupPlayWorkspaceDrawers\([\s\S]*?drawer\.dataset\.playDrawer === "moves" \|\| !compactWorkspace/],
+  ["friend chat drawer visibility", /function renderFriendGameChat[\s\S]*?drawer\.hidden = !enabled/],
   ["play preference controls", /id="prefTheme"[\s\S]*?id="prefPressure"/],
   ["play preference bindings", /function setupLearnerPreferences\([\s\S]*?field\.addEventListener\("change"/],
   ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/]
