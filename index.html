@@ -28778,6 +28778,203 @@
       #login .login-actions .button.secondary { width: 100%; }
     }
 
+    /* Final interface audit: retain every binding while making account status,
+       premium rewards, and Store previews easier to read at a glance. */
+    .site-header .nav-utilities .player-flex-chip {
+      grid-template-columns: 38px minmax(0, 1fr);
+      min-width: 214px;
+      max-width: 232px;
+      min-height: 54px;
+      gap: 8px;
+      padding: 7px 9px 6px 7px;
+      border-radius: 14px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 58%),
+        var(--cq-surface-input);
+      box-shadow: var(--cq-inset-highlight), 0 10px 22px rgba(2, 6, 23, 0.18);
+    }
+
+    .site-header .nav-utilities .player-flex-chip .player-profile-avatar {
+      width: 38px;
+      height: 38px;
+      min-height: 38px;
+      border-radius: 12px;
+      font-size: 1rem;
+    }
+
+    .site-header .nav-utilities .player-flex-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "name name"
+        "title meta"
+        "progress progress";
+      align-content: center;
+      column-gap: 7px;
+      row-gap: 3px;
+      min-width: 0;
+    }
+
+    .site-header .nav-utilities .player-flex-name {
+      grid-area: name;
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+    }
+
+    .site-header .nav-utilities .player-flex-title {
+      grid-area: title;
+      max-width: 13ch;
+      font-size: 0.56rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .site-header .nav-utilities .player-flex-meta {
+      grid-area: meta;
+      justify-self: end;
+      overflow: visible;
+      color: var(--cq-text-secondary);
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+
+    .site-header .nav-utilities .player-flex-progress {
+      grid-area: progress;
+      height: 3px;
+      margin-top: 1px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--cq-text-primary) 11%, transparent);
+    }
+
+    .site-header .nav-utilities .player-flex-progress > span {
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cq-accent-primary), var(--cq-accent-secondary));
+    }
+
+    .site-header .nav-utilities .player-flex-chip:is([data-name-rarity="Legendary"], [data-name-rarity="Mythic"], [data-name-rarity="Divine"]) {
+      border-color: color-mix(in srgb, var(--name-glow, var(--cq-accent-secondary)) 62%, var(--cq-border));
+      box-shadow: var(--cq-inset-highlight), 0 10px 22px rgba(2, 6, 23, 0.18), 0 0 18px color-mix(in srgb, var(--name-glow, var(--cq-accent-secondary)) 20%, transparent);
+    }
+
+    #store .name-style-preview-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.85fr);
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    #store .name-style-preview-panel > p {
+      min-width: 0;
+      max-width: none;
+      overflow-wrap: anywhere;
+    }
+
+    #store #nameStyleLivePreview {
+      display: block;
+      min-width: 0;
+      max-width: 100%;
+      padding: 13px 18px;
+      overflow: visible;
+      font-size: clamp(1rem, 2vw, 1.34rem);
+      line-height: 1.18;
+      text-align: center;
+    }
+
+    #store .store-card.is-name-style .store-preview {
+      min-height: 112px;
+      padding: 32px 12px 12px;
+      overflow: visible;
+    }
+
+    #store .store-card.is-name-style .store-preview-name-style {
+      display: block;
+      width: min(100%, 21rem);
+      min-width: 0;
+      padding: 11px 15px;
+      overflow: visible;
+      font-size: clamp(0.95rem, 1.5vw, 1.15rem);
+      line-height: 1.15;
+      text-align: center;
+    }
+
+    #store .store-card[data-premium-tier="true"] {
+      border-color: color-mix(in srgb, var(--rarity-color) 64%, var(--cq-border));
+      background:
+        radial-gradient(circle at 86% 12%, color-mix(in srgb, var(--rarity-color) 22%, transparent), transparent 33%),
+        linear-gradient(145deg, color-mix(in srgb, var(--rarity-color) 9%, transparent), transparent 58%),
+        var(--cq-surface-panel);
+      box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md), 0 0 24px color-mix(in srgb, var(--rarity-color) 13%, transparent);
+    }
+
+    #store .store-card[data-premium-tier="true"] .store-preview {
+      border: 1px solid color-mix(in srgb, var(--rarity-color) 34%, transparent);
+      border-radius: 14px;
+      background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--rarity-color) 14%, transparent), transparent 62%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 20px color-mix(in srgb, var(--rarity-color) 16%, transparent);
+    }
+
+    #store .store-card[data-premium-tier="true"] .store-preview-badge {
+      border-color: color-mix(in srgb, var(--rarity-color) 46%, rgba(255, 255, 255, 0.22));
+      box-shadow: 0 0 14px color-mix(in srgb, var(--rarity-color) 20%, transparent);
+    }
+
+    #store .store-tier-signal {
+      position: relative;
+      min-width: 26px;
+      justify-content: center;
+      overflow: visible;
+      padding-inline: 0;
+      border-color: color-mix(in srgb, var(--rarity-color) 56%, transparent);
+      background: color-mix(in srgb, var(--rarity-color) 14%, transparent);
+      color: color-mix(in srgb, var(--rarity-color) 84%, white);
+      box-shadow: 0 0 14px color-mix(in srgb, var(--rarity-color) 28%, transparent);
+    }
+
+    #store .store-tier-signal::after {
+      content: "";
+      position: absolute;
+      inset: -5px;
+      border: 1px solid color-mix(in srgb, var(--rarity-color) 46%, transparent);
+      border-radius: inherit;
+      opacity: 0.28;
+      transform: scale(0.82);
+      animation: storeTierSignal 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes storeTierSignal {
+      0%, 100% { opacity: 0.2; transform: scale(0.82); }
+      50% { opacity: 0.72; transform: scale(1.14); }
+    }
+
+    @media (max-width: 1210px) {
+      .site-header .nav-utilities .player-flex-chip {
+        min-width: 188px;
+        max-width: 198px;
+      }
+
+      .site-header .nav-utilities .player-flex-title { max-width: 10ch; }
+    }
+
+    @media (max-width: 700px) {
+      #store .name-style-preview-panel { grid-template-columns: minmax(0, 1fr); }
+      #store #nameStyleLivePreview { width: 100%; }
+    }
+
+    @media (max-width: 560px) {
+      .site-header .nav-utilities .player-flex-main { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #store .store-tier-signal::after { animation: none; }
+    }
+
+    body.low-performance #store .store-tier-signal::after { animation: none; }
+
     @media (prefers-reduced-motion: reduce) {
       #login :is(.login-card, .login-pass-hero, .login-pass-grid > .login-pass-panel) { transition: none; }
       #login :is(.login-card, .login-pass-hero, .login-pass-grid > .login-pass-panel):hover { transform: none; }
@@ -38079,9 +38276,9 @@
       return items.filter((item) => {
         const key = `${item.type}:${item.value}`;
         if (avatarStoreUi.favoritesOnly && !favorites.has(key)) return false;
-        if (avatarStoreUi.rarity !== "All" && (item.rarity || "Common") !== avatarStoreUi.rarity) return false;
+        if (avatarStoreUi.rarity !== "All" && (getStoreDisplayRarity(item) || "Common") !== avatarStoreUi.rarity) return false;
         if (avatarStoreUi.collection !== "All" && (item.collection || item.tag || "Classic") !== avatarStoreUi.collection) return false;
-        if (query && !`${item.name} ${item.tag} ${item.collection || ""} ${item.rarity || ""}`.toLowerCase().includes(query)) return false;
+        if (query && !`${item.name} ${item.tag} ${item.collection || ""} ${getStoreDisplayRarity(item)}`.toLowerCase().includes(query)) return false;
         return true;
       });
     }
@@ -38228,6 +38425,16 @@
             : "Profile";
     }
 
+    function getStoreDisplayRarity(item = {}) {
+      const explicit = String(item.rarity || "").trim();
+      if (explicit) return explicit;
+      const descriptor = `${item.name || ""} ${item.tag || ""}`.toLowerCase();
+      if (descriptor.includes("divine")) return "Divine";
+      if (descriptor.includes("mythic")) return "Mythic";
+      if (descriptor.includes("legendary")) return "Legendary";
+      return "";
+    }
+
     function getStoreItemsForCategory(category) {
       const categoryItems = storeItems.filter((item) => getStoreCategory(item) === category);
       const cosmeticTypes = new Set(["backgroundTheme", "board", "skin", "avatar", "frame", "avatarEffect"]);
@@ -38236,14 +38443,14 @@
         return storeItems
           .filter((item) => cosmeticTypes.has(item.type))
           .slice()
-          .sort((first, second) => (rarityRank[second.rarity] || 0) - (rarityRank[first.rarity] || 0))
+          .sort((first, second) => (rarityRank[getStoreDisplayRarity(second)] || 0) - (rarityRank[getStoreDisplayRarity(first)] || 0))
           .slice(0, 12);
       }
       if (category === "Bundles") {
         return storeItems
-          .filter((item) => cosmeticTypes.has(item.type) && (rarityRank[item.rarity] || 0) >= rarityRank.Epic)
+          .filter((item) => cosmeticTypes.has(item.type) && (rarityRank[getStoreDisplayRarity(item)] || 0) >= rarityRank.Epic)
           .slice()
-          .sort((first, second) => (rarityRank[second.rarity] || 0) - (rarityRank[first.rarity] || 0));
+          .sort((first, second) => (rarityRank[getStoreDisplayRarity(second)] || 0) - (rarityRank[getStoreDisplayRarity(first)] || 0));
       }
       return categoryItems;
     }
@@ -38261,10 +38468,11 @@
       ].filter((pick) => pick.item);
       showcase.replaceChildren(...picks.map(({ label, category, item }) => {
         const card = document.createElement("button");
+        const rarity = getStoreDisplayRarity(item) || "Common";
         card.type = "button";
         card.className = "store-showcase-card";
-        card.dataset.rarity = item.rarity || "Common";
-        card.style.setProperty("--rarity-color", item.rarity === "Divine" ? "#fff2b8" : item.rarity === "Mythic" ? "#ff7adf" : item.rarity === "Legendary" ? "#ffd36b" : item.rarity === "Epic" ? "#ae87ff" : item.rarity === "Rare" ? "#6fa8dc" : "rgba(255,248,237,.34)");
+        card.dataset.rarity = rarity;
+        card.style.setProperty("--rarity-color", rarity === "Divine" ? "#fff2b8" : rarity === "Mythic" ? "#ff7adf" : rarity === "Legendary" ? "#ffd36b" : rarity === "Epic" ? "#ae87ff" : rarity === "Rare" ? "#6fa8dc" : "rgba(255,248,237,.34)");
         card.append(createBookText("strong", "", label), createBookText("span", "", item.name));
         card.addEventListener("click", () => {
           activeStoreCategory = category;
@@ -38383,7 +38591,7 @@
               ? getFilteredAvatarItems(categoryItems, prefs)
             : category === "Music"
               ? getFilteredMusicItems(categoryItems, prefs)
-            : categoryItems;
+              : categoryItems;
         const header = document.createElement("article");
         header.className = "store-category-header";
         header.append(
@@ -38398,6 +38606,8 @@
           return;
         }
         items.forEach((item) => {
+          const displayRarity = getStoreDisplayRarity(item);
+          const hasPremiumTier = ["Legendary", "Mythic", "Divine"].includes(displayRarity);
           const isOwned = item.type === "flexBadge" ? userOwnsFlexBadge(item.value) : owned.has(item.id);
           const isEquipped = getEquippedStoreId(item.type) === item.id;
           const card = document.createElement("article");
@@ -38415,7 +38625,8 @@
                 ? prefs.lastMoveFavorites.includes(item.value)
                 : ["musicPack", "sfxPack"].includes(item.type) && ((prefs.musicFavorites || []).includes(`${item.type}:${item.value}`) || (prefs.musicFavorites || []).includes(item.value));
           card.className = `store-card${isOwned ? " is-owned" : ""}${isEquipped ? " is-equipped" : ""}${item.type === "board" ? " is-board-theme" : ""}${["skin", "pieceFinish"].includes(item.type) ? " is-piece-set" : ""}${item.type === "backgroundTheme" ? " is-background-theme" : ""}${item.type === "nameStyle" ? " is-name-style" : ""}${["avatar", "frame", "avatarEffect"].includes(item.type) ? " is-avatar-cosmetic" : ""}${item.petAvatar ? " is-pet-avatar" : ""}${item.type === "lastMove" ? " is-highlight" : ""}${["musicPack", "sfxPack"].includes(item.type) ? " is-music-pack" : ""}${isFavorite ? " is-favorite" : ""}`;
-          card.dataset.rarity = item.rarity || "";
+          card.dataset.rarity = displayRarity;
+          if (hasPremiumTier) card.dataset.premiumTier = "true";
           if (item.petAvatar) card.dataset.petId = item.id;
           if (item.type === "board") card.style.setProperty("--board-preview-glow", getBoardTheme(item.value).glow);
           if (item.type === "nameStyle") card.style.setProperty("--name-glow", getNameStyleGlow(item.value));
@@ -38424,9 +38635,15 @@
           const meta = document.createElement("div");
           meta.className = "store-meta";
           meta.append(
-            createBookText("span", "", item.rarity || item.tag),
+            createBookText("span", "", displayRarity || item.tag),
             createBookText("span", isOwned ? "" : "store-lock", isOwned ? isFavorite ? "Owned | Favorite" : "Owned" : item.awardOnly ? `\uD83C\uDFC6 Win vs ${item.cost}` : `\uD83D\uDD12 ${item.cost} coins`)
           );
+          if (hasPremiumTier) {
+            const tierSignal = createBookText("span", "store-tier-signal", "\u2726");
+            tierSignal.setAttribute("role", "img");
+            tierSignal.setAttribute("aria-label", `${displayRarity} visual effect preview`);
+            meta.append(tierSignal);
+          }
           const button = document.createElement("button");
           button.type = "button";
           button.className = isOwned ? "button secondary" : "button";
@@ -49049,6 +49266,8 @@
         if (!(drawer instanceof HTMLDetailsElement)) return;
         drawer.open = drawer.dataset.playDrawer === "moves" || !compactWorkspace;
       });
+      const coachLibrary = document.querySelector("#play .coach-library");
+      if (coachLibrary instanceof HTMLDetailsElement) coachLibrary.open = !compactWorkspace;
     }
 
     async function setupPlayableChess() {
