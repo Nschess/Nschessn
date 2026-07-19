@@ -24623,6 +24623,152 @@
         animation: none;
       }
     }
+
+    /* Phase 5: a final Play-only polish pass. This keeps the board-first
+       workspace intact while making supporting controls quieter and clearer. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+      --cq-play-control-height: 40px;
+      --cq-play-panel-edge: 0 0 0 1px var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+      border-color: var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+      padding: clamp(4px, 0.5vw, 6px);
+      box-shadow:
+        0 0 0 1px var(--cq-accent-secondary-soft),
+        0 0 0 4px var(--cq-accent-primary-soft),
+        var(--cq-shadow-md);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.player-frame, .play-bottom-actionbar, .game-options-panel) {
+      border-color: var(--cq-border);
+      box-shadow: var(--cq-play-panel-edge), var(--cq-inset-highlight), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .match-player-card.is-player-turn {
+      border-color: var(--cq-accent-tertiary);
+      box-shadow: 0 0 0 1px var(--cq-accent-tertiary-soft), var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-nav,
+    :is(body:not(.theme-light), body.theme-light) #play .preference-panel,
+    :is(body:not(.theme-light), body.theme-light) #play .play-right-sidebar > :not([hidden]) {
+      border-color: var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card {
+      min-height: 46px;
+      padding: var(--cq-space-1) var(--cq-space-2);
+      border-radius: var(--cq-radius-control);
+      transition: transform var(--cq-transition-fast) ease, opacity var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card:hover,
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card:focus-visible {
+      transform: translateX(3px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card:active {
+      transform: translateX(1px) scale(0.99);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-topline {
+      border-bottom: 1px solid var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
+      min-height: 36px;
+      border-color: var(--cq-border-strong);
+      letter-spacing: 0.03em;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame :is(.player-frame-kicker, .player-frame-side, .ai-player-status) {
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary,
+    :is(body:not(.theme-light), body.theme-light) #play .coach-library > summary {
+      transition: transform var(--cq-transition-fast) ease, opacity var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.player-frame-details, .coach-library)[open] > summary {
+      color: var(--cq-text-primary);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions :is(.button, .play-extra-actions > summary) {
+      min-height: var(--cq-play-control-height);
+      transition: transform var(--cq-transition-fast) ease, opacity var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions :is(.button, .play-extra-actions > summary):not(:disabled):not([aria-disabled="true"]):hover {
+      transform: translateY(-1px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions :is(.button, .play-extra-actions > summary):not(:disabled):not([aria-disabled="true"]):active {
+      transform: translateY(0) scale(0.985);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .game-options-heading .section-kicker {
+      display: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .game-options-heading h3,
+    :is(body:not(.theme-light), body.theme-light) #play .preference-panel h3 {
+      color: var(--cq-text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.game-options-grid select, .preference-grid select) {
+      min-height: 36px;
+      border-color: var(--cq-border);
+      background-color: var(--cq-surface-input);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.game-options-grid select, .preference-grid select):focus-visible,
+    :is(body:not(.theme-light), body.theme-light) #play :is(.player-frame-details, .coach-library) > summary:focus-visible,
+    :is(body:not(.theme-light), body.theme-light) #play .play-mode-card:focus-visible {
+      outline: 2px solid var(--cq-focus-outline);
+      outline-offset: 2px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-history:empty {
+      display: grid;
+      min-height: 54px;
+      align-items: center;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .move-history:empty::before {
+      content: "Moves will appear here.";
+      color: var(--cq-text-subtle);
+      font-size: 0.7rem;
+      font-style: italic;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .captured-pieces:empty::before {
+      content: "—";
+      color: var(--cq-text-subtle);
+    }
+
+    @media (max-width: 699px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+        box-shadow: 0 0 0 1px var(--cq-accent-secondary-soft), var(--cq-shadow-sm);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .play-mode-card:hover,
+      :is(body:not(.theme-light), body.theme-light) #play .play-mode-card:focus-visible {
+        transform: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-mode-card, .play-primary-actions :is(.button, .play-extra-actions > summary), .player-frame-details > summary, .coach-library > summary) {
+        transition: none;
+      }
+    }
   </style>
 </head>
 <body>
