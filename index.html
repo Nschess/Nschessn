@@ -25278,6 +25278,111 @@
     body:is(.perf-lite, .low-performance) .puzzle-board-wrap {
       animation: none;
     }
+    /* Post-audit: player cards stay compact so the board remains the workspace anchor. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
+      grid-template-columns: 46px minmax(0, 1fr) max-content;
+      grid-template-areas:
+        "top top top"
+        "avatar identity clock"
+        "footer footer footer"
+        "details details details";
+      gap: 6px 9px;
+      min-height: 0;
+      padding: 10px;
+      overflow: visible;
+      border-radius: var(--cq-radius-card);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 18px rgba(0, 0, 0, 0.18);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-topline {
+      min-height: 18px;
+      gap: 8px;
+      padding-bottom: 5px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
+      width: 46px;
+      height: 46px;
+      border-radius: var(--cq-radius-control);
+      font-size: 1.1rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
+      min-width: 64px;
+      min-height: 34px;
+      padding-inline: var(--cq-space-2);
+      font-size: 0.76rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details {
+      grid-area: details;
+      min-width: 0;
+      margin: 1px 0 0;
+      border-top: 1px solid var(--cq-border);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary {
+      min-height: 27px;
+      font-size: 0.64rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details > summary::after { content: "+"; }
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-details[open] > summary::after { content: "−"; }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-stats {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--cq-space-1);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame-stats > div {
+      min-height: 40px;
+      padding: 6px 7px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-side] {
+      display: inline-flex;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta [data-match-frame-status],
+    :is(body:not(.theme-light), body.theme-light) #play .player-frame--opponent :is(.ai-player-last, [data-ai-games], [data-ai-win-rate]) {
+      display: none;
+    }
+
+    @media (max-width: 480px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
+        grid-template-columns: 38px minmax(0, 1fr) max-content;
+        gap: 5px 7px;
+        padding: 8px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame > :is(.match-player-avatar, .ai-player-avatar) {
+        width: 38px;
+        height: 38px;
+        font-size: 0.92rem;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play :is(.ai-player-timer, .match-player-timer) {
+        min-width: 58px;
+        min-height: 31px;
+        padding-inline: 6px;
+        font-size: 0.69rem;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta {
+        gap: 4px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame .match-player-meta .match-player-pill,
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame-footer :is(.ai-player-move, .player-frame-record) {
+        min-height: 22px;
+        padding: 3px 6px;
+        font-size: 0.58rem;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play .player-frame-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
   </style>
 </head>
 <body>
@@ -25327,6 +25432,11 @@
               <span data-profile-field="name">Guest Explorer</span>
             </span>
             <span class="player-flex-title" data-profile-field="rank">Rank: Explorer</span>
+            <span class="player-flex-meta" aria-label="Player rating and coins">
+              <span data-profile-field="gameRating">450 Elo</span>
+              <span aria-hidden="true">&middot;</span>
+              <span class="player-flex-coin-label" title="Coins"><span aria-hidden="true">&#9670;</span> <span data-profile-field="tokens">0</span></span>
+            </span>
             <span class="player-flex-progress" aria-hidden="true"><span data-profile-progress-fill></span></span>
           </span>
         </a>
@@ -25516,10 +25626,12 @@
             <h3>Recent Games</h3>
             <a href="#play" data-site-tab="play" data-site-panel="play">View all</a>
           </div>
-          <div class="home-lower-game-row">
-            <span class="home-lower-mark home-lower-mark--game" aria-hidden="true">G</span>
-            <div><strong>Your latest board</strong><p id="homeRecentGames">Play a game and it will appear here.</p></div>
-            <a class="home-lower-row-action" href="#play" data-site-tab="play" data-site-panel="play" aria-label="Open Play">&gt;</a>
+          <div class="home-lower-games" id="homeRecentGames" aria-live="polite">
+            <div class="home-lower-game-row">
+              <span class="home-lower-mark home-lower-mark--game" aria-hidden="true">G</span>
+              <div><strong>Your latest board</strong><p>Play a game and it will appear here.</p></div>
+              <a class="home-lower-row-action" href="#play" data-site-tab="play" data-site-panel="play" aria-label="Open Play">&gt;</a>
+            </div>
           </div>
           <a class="home-lower-footer" href="#play" data-site-tab="play" data-site-panel="play">Play a new game <span aria-hidden="true">&gt;</span></a>
         </article>
@@ -25541,10 +25653,8 @@
             <h3>Top Players</h3>
             <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">View all</a>
           </div>
-          <ol class="home-lower-rankings" aria-label="Leaderboard categories">
-            <li><b>#1</b><span><strong>Global rankings</strong><small>Registered players</small></span></li>
-            <li><b>#2</b><span><strong>Puzzle trainers</strong><small>Daily tactics leaders</small></span></li>
-            <li><b>#3</b><span><strong>AI beaters</strong><small>Coach battle results</small></span></li>
+          <ol class="home-lower-rankings" id="homeTopPlayers" aria-label="Top ranked players">
+            <li><b>#1</b><span><strong>Loading rankings</strong><small>Preparing player standings</small></span></li>
           </ol>
         </article>
       </div>
@@ -27991,6 +28101,7 @@
               <span class="match-player-meta" aria-label="Player match details">
                 <span class="match-player-pill" data-match-side>White</span>
                 <span class="match-player-pill" data-match-rating>450 Elo</span>
+                <span class="match-player-pill match-player-coins" data-match-coins title="Coins">&#9670; 0</span>
                 <span class="match-player-pill is-premium" data-match-premium hidden>Premium</span>
                 <span class="match-player-pill match-player-online" data-match-online>Online</span>
                 <span class="player-frame-record" data-match-frame-status>Ready</span>
@@ -31468,6 +31579,9 @@
       endgameWins: Math.max(0, Number(gameStats.endgameWins) || 0)
     };
     let matchReviews = Array.isArray(savedPuzzleState.matchReviews) ? savedPuzzleState.matchReviews.slice(-12) : [];
+    let completedGameHistory = Array.isArray(savedPuzzleState.completedGames)
+      ? savedPuzzleState.completedGames.map((game) => normalizeCompletedGameRecord(game)).filter(Boolean).slice(0, 12)
+      : [];
     let beginnerBotState = readBeginnerBotState();
     const completedPathLessons = new Set(Array.isArray(savedPuzzleState.completedPathLessons) ? savedPuzzleState.completedPathLessons : []);
     let dailyHabit = savedPuzzleState.habit && typeof savedPuzzleState.habit === "object" ? savedPuzzleState.habit : {};
@@ -33183,7 +33297,7 @@
     }
 
     function readPuzzleState() {
-      const fallback = { bankVersion: puzzleBankVersion, activePlan: "main", currentPuzzle: 0, solved: [], streak: 0, xp: 0, coins: 0, stars: 0, keys: 0, chests: 0, bestStreak: 0, attempts: 0, correct: 0, failed: 0, solveTimes: [], ratingHistory: [], randomSeen: {}, weekly: {}, habit: {}, dailyGoals: {}, gameStats: {}, matchReviews: [], completedPathLessons: [], favoriteOpening: "Italian Game", spacedReview: null, weaknesses: {}, store: {}, flexBadges: { badges: ["rookie"], equippedBadge: "rookie" }, videoRewards: { shorts: [], videos: [] }, bossBattles: { active: "", cleared: [], world: "village" }, loginReward: { lastClaimDate: "", streak: 0, bestStreak: 0, lastReward: 0 } };
+      const fallback = { bankVersion: puzzleBankVersion, activePlan: "main", currentPuzzle: 0, solved: [], streak: 0, xp: 0, coins: 0, stars: 0, keys: 0, chests: 0, bestStreak: 0, attempts: 0, correct: 0, failed: 0, solveTimes: [], ratingHistory: [], randomSeen: {}, weekly: {}, habit: {}, dailyGoals: {}, gameStats: {}, matchReviews: [], completedGames: [], completedPathLessons: [], favoriteOpening: "Italian Game", spacedReview: null, weaknesses: {}, store: {}, flexBadges: { badges: ["rookie"], equippedBadge: "rookie" }, videoRewards: { shorts: [], videos: [] }, bossBattles: { active: "", cleared: [], world: "village" }, loginReward: { lastClaimDate: "", streak: 0, bestStreak: 0, lastReward: 0 } };
       const state = readJsonStorage(puzzleStorageKey, fallback);
       return recoverProgressBackup(state && typeof state === "object" ? { ...fallback, ...state } : fallback, fallback);
     }
@@ -33260,6 +33374,7 @@
         dailyGoals,
         gameStats,
         matchReviews: matchReviews.slice(-12),
+        completedGames: completedGameHistory.slice(0, 12),
         completedPathLessons: [...completedPathLessons],
         favoriteOpening,
         spacedReview,
@@ -33272,6 +33387,61 @@
       });
       saveProgressSnapshot("puzzle progress");
       renderLeaderboards();
+    }
+
+    function normalizeCompletedGameRecord(record = {}) {
+      if (!record || typeof record !== "object") return null;
+      const result = ["win", "loss", "draw", "aborted"].includes(record.result) ? record.result : "draw";
+      const completedAt = new Date(record.completedAt || record.date || Date.now());
+      return {
+        id: String(record.id || "").trim(),
+        completedAt: Number.isNaN(completedAt.getTime()) ? new Date().toISOString() : completedAt.toISOString(),
+        mode: String(record.mode || "Game").trim().slice(0, 30) || "Game",
+        opponentName: String(record.opponentName || "Opponent").trim().slice(0, 48) || "Opponent",
+        opponentTitle: String(record.opponentTitle || "").trim().slice(0, 48),
+        opponentRating: Math.max(0, Number(record.opponentRating) || 0),
+        result,
+        side: record.side === "Black" ? "Black" : "White",
+        moves: Math.max(0, Math.round(Number(record.moves) || 0)),
+        termination: String(record.termination || "Game complete").replace(/_/g, " ").trim().slice(0, 48) || "Game complete"
+      };
+    }
+
+    function recordCompletedGame(record) {
+      const next = normalizeCompletedGameRecord(record);
+      if (!next) return false;
+      if (!next.id) next.id = `game-${next.completedAt}-${next.opponentName}-${next.moves}`;
+      if (completedGameHistory.some((game) => game.id === next.id)) return false;
+      completedGameHistory = [next, ...completedGameHistory]
+        .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))
+        .slice(0, 12);
+      return true;
+    }
+
+    function getRecentCompletedGames() {
+      const reviewedGames = matchReviews.map((review) => {
+        const summary = review?.summary || {};
+        const text = String(summary.result || "").toLowerCase();
+        return normalizeCompletedGameRecord({
+          id: review?.pgn ? `review-${review.pgn}` : review?.id,
+          completedAt: review?.date,
+          mode: "AI review",
+          opponentName: "Coach",
+          opponentTitle: summary.opening || "Reviewed game",
+          result: /you won/.test(text) ? "win" : /peacefully|draw/.test(text) ? "draw" : /coach won/.test(text) ? "loss" : "draw",
+          moves: Array.isArray(review?.moves) ? Math.ceil(review.moves.length / 2) : 0,
+          termination: summary.result || "Reviewed game"
+        });
+      }).filter(Boolean);
+      const seen = new Set();
+      return [...completedGameHistory, ...reviewedGames]
+        .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))
+        .filter((game) => {
+          if (!game?.id || seen.has(game.id)) return false;
+          seen.add(game.id);
+          return true;
+        })
+        .slice(0, 3);
     }
 
     function getLocalRewardDate(date = new Date()) {
@@ -36264,6 +36434,38 @@
       }));
     }
 
+    function renderHomeTopPlayers(entries = buildLeaderboardEntries("ai")) {
+      const list = document.getElementById("homeTopPlayers");
+      if (!list) return;
+      const rankedPlayers = Array.isArray(entries) ? entries.slice(0, 3) : [];
+      if (!rankedPlayers.length) {
+        list.replaceChildren(createBookText("li", "home-lower-empty", "No ranked players yet. Complete a game to join the standings."));
+        return;
+      }
+      list.replaceChildren(...rankedPlayers.map((entry, index) => {
+        const row = document.createElement("li");
+        const rank = createBookText("b", "", `#${index + 1}`);
+        const copy = createBookText("span", "", "");
+        const name = createBookText("strong", "", "");
+        const flag = createBookText("span", "player-country-flag", entry.flag || "");
+        flag.dataset.countryCode = normalizeCountryFlagValue(entry.countryCode || entry.flag || "");
+        flag.title = `${getCountryFlagLabel(entry.countryCode || entry.flag)} flag`;
+        flag.setAttribute("aria-label", flag.title);
+        name.append(flag, document.createTextNode(` ${entry.name}`));
+        const title = getCompactPlayerTitle(entry.title);
+        if (title) {
+          const badge = createBookText("span", "player-title-badge", title.short);
+          badge.dataset.playerTitleBadge = "";
+          badge.dataset.titleTier = title.tier;
+          badge.title = title.full;
+          name.append(" ", badge);
+        }
+        copy.append(name, createBookText("small", "", `${entry.primary} · ${entry.meta?.[0] || "Ranked player"}`));
+        row.append(rank, copy);
+        return row;
+      }));
+    }
+
     function renderLeaderboards() {
       syncCurrentPlayerStatsToRegistry();
       ensureLeaderboardControls();
@@ -36275,6 +36477,7 @@
       renderLeaderboardList("puzzleLeaderboardList", puzzleEntries);
       renderLeaderboardList("aiLeaderboardList", aiEntries);
       renderLeaderboardList("tournamentLeaderboardList", tournamentEntries);
+      renderHomeTopPlayers(aiEntries);
       const puzzleBadge = document.getElementById("puzzleLeaderboardBadge");
       const aiBadge = document.getElementById("aiLeaderboardBadge");
       const label = leaderboardRuntime.status === "global" ? "Global"
@@ -36356,9 +36559,15 @@
       setProfileText('[data-profile-field="xp"]', formatProfileNumber(profile.xp));
       setProfileText('[data-profile-field="tokens"]', formatProfileNumber(profile.tokens));
       setProfileText('[data-profile-field="rank"]', `Rank: ${profile.rank}`);
+      setProfileText('[data-profile-field="title"]', profile.rank || "Chess player");
+      const gameRating = getLearnerGameRating();
+      setProfileText('[data-profile-field="gameRating"]', `${formatProfileNumber(gameRating)} Elo`);
       document.querySelectorAll(".player-flex-chip [data-profile-field='rank']").forEach((rank) => {
         const compact = getCompactPlayerTitle(profile.rank);
         rank.textContent = compact ? `Rank: ${compact.short}` : `Rank: ${String(profile.rank || "Explorer").replace(/\s+Avatar$/i, "").slice(0, 18)}`;
+      });
+      document.querySelectorAll(".player-flex-chip").forEach((chip) => {
+        chip.setAttribute("aria-label", `Open profile for ${profile.name}, ${formatProfileNumber(gameRating)} Elo and ${formatProfileNumber(profile.tokens)} coins`);
       });
       setProfileText('[data-profile-field="progress"]', `${profile.progress}%`);
       setProfileText('[data-profile-field="next"]', profile.nextLevelXp ? `Next Level: ${formatProfileNumber(profile.nextLevelXp)} XP` : "Legend path complete");
@@ -36972,6 +37181,56 @@
       renderDailyGoals();
     }
 
+    function renderHomeRecentGames() {
+      const list = document.getElementById("homeRecentGames");
+      if (!list) return;
+      const games = getRecentCompletedGames();
+      if (!games.length) {
+        const empty = document.createElement("div");
+        empty.className = "home-lower-game-row";
+        empty.append(
+          createBookText("span", "home-lower-mark home-lower-mark--game", "G"),
+          (() => {
+            const copy = createBookText("div", "", "");
+            copy.append(createBookText("strong", "", "Your latest board"), createBookText("p", "", "Complete a game and its result will appear here."));
+            return copy;
+          })(),
+          (() => {
+            const link = createBookText("a", "home-lower-row-action", ">");
+            link.href = "#play";
+            link.dataset.siteTab = "play";
+            link.dataset.sitePanel = "play";
+            link.setAttribute("aria-label", "Open Play");
+            return link;
+          })()
+        );
+        list.replaceChildren(empty);
+        return;
+      }
+      const resultLabels = { win: "Won", loss: "Lost", draw: "Draw", aborted: "Aborted" };
+      const resultMarks = { win: "W", loss: "L", draw: "D", aborted: "–" };
+      list.replaceChildren(...games.map((game) => {
+        const row = document.createElement("div");
+        row.className = `home-lower-game-row is-${game.result}`;
+        const mark = createBookText("span", "home-lower-mark home-lower-mark--game", resultMarks[game.result] || "G");
+        mark.setAttribute("aria-hidden", "true");
+        const copy = createBookText("div", "", "");
+        const rating = game.opponentRating ? ` · ${formatProfileNumber(game.opponentRating)} Elo` : "";
+        const meta = [game.side, game.moves ? `${game.moves} moves` : "", game.termination].filter(Boolean).join(" · ");
+        copy.append(
+          createBookText("strong", "", `${resultLabels[game.result] || "Game"} vs ${game.opponentName}${rating}`),
+          createBookText("p", "", `${game.mode} · ${meta}`)
+        );
+        const link = createBookText("a", "home-lower-row-action", ">");
+        link.href = "#play";
+        link.dataset.siteTab = "play";
+        link.dataset.sitePanel = "play";
+        link.setAttribute("aria-label", `Open Play after ${resultLabels[game.result] || "completed"} game versus ${game.opponentName}`);
+        row.append(mark, copy, link);
+        return row;
+      }));
+    }
+
     function renderHomeDashboard() {
       const welcome = document.getElementById("homeWelcome");
       const delta = document.getElementById("homeWelcomeDelta");
@@ -37036,10 +37295,8 @@
       if (mainRatingMeta) mainRatingMeta.textContent = gameStats.played
         ? `${gameStats.wins || 0} wins from ${gameStats.played} game${gameStats.played === 1 ? "" : "s"}.`
         : "Play a game to establish your rating.";
-      const recentGames = document.getElementById("homeRecentGames");
-      if (recentGames) recentGames.textContent = gameStats.played
-        ? `${gameStats.played} game${gameStats.played === 1 ? "" : "s"} played, ${gameStats.wins || 0} win${gameStats.wins === 1 ? "" : "s"} recorded.`
-        : "Play a game and it will appear here.";
+      renderHomeRecentGames();
+      renderHomeTopPlayers();
       renderDailyGoals();
       document.getElementById("homeInsight").textContent = needsTactics
         ? "You struggled with tactics recently. Try one quick pattern."
@@ -38326,6 +38583,7 @@
     let coachMistakeNote = "";
     let coachWhyText = "Select or make a move, then ask why.";
     let coachGameRecorded = false;
+    let coachGameSessionId = 0;
     let coachEndSoundPlayed = false;
     let coachReviewMoments = [];
     let coachCurrentHanging = 0;
@@ -39100,6 +39358,7 @@
       const friendSelf = friendChallengeState?.active ? getFriendMatchProfiles().self : null;
       const prefs = readLearnerPrefs();
       const rating = document.querySelector("[data-match-rating]");
+      const coins = card.querySelector("[data-match-coins]");
       const premium = document.querySelector("[data-match-premium]");
       const premiumLabel = getPremiumMatchBadge();
 
@@ -39118,6 +39377,7 @@
       }
       const playerRating = Math.max(400, Number(friendSelf?.rating) || getLearnerGameRating());
       if (rating) rating.textContent = `${playerRating} Elo`;
+      if (coins) coins.textContent = `◆ ${formatProfileNumber(profile.tokens)}`;
       const gamesPlayed = Math.max(0, Number(gameStats.played) || 0);
       const wins = Math.min(gamesPlayed, Math.max(0, Number(gameStats.wins) || 0));
       const draws = Math.min(Math.max(0, gamesPlayed - wins), Math.max(0, Number(gameStats.draws) || 0));
@@ -41124,6 +41384,23 @@
         xpResult = addPuzzleXp(coachCurrentHanging === 0 ? 18 : 10);
         showCelebration("Nice practice!", `+${coachCurrentHanging === 0 ? 18 : 10} XP`, beginnerBotResult?.line || (coachCurrentHanging === 0 ? "No Hanging Pieces progress!" : "You learned one idea."));
       }
+      const opponent = getAiHeaderProfile();
+      const draw = coachDrawAgreed
+        || callCoachRule(coachGame, "isDraw", "in_draw")
+        || callCoachRule(coachGame, "isStalemate", "in_stalemate");
+      const checkmate = callCoachRule(coachGame, "isCheckmate", "in_checkmate");
+      recordCompletedGame({
+        id: `ai-${coachGameSessionId}-${coachGame.pgn() || `${Date.now()}-${history.length}`}`,
+        completedAt: new Date().toISOString(),
+        mode: "AI game",
+        opponentName: opponent.name || "Coach",
+        opponentTitle: opponent.title || "AI opponent",
+        opponentRating: Math.max(400, Number(opponent.rating) || Number(getCoachConfig().elo) || 450),
+        result: draw ? "draw" : playerWon ? "win" : "loss",
+        side: getCoachColorName(coachPlayerColor),
+        moves: Math.ceil(history.length / 2),
+        termination: matchClockExpiredColor ? "Timeout" : checkmate ? "Checkmate" : draw ? "Draw" : "Game complete"
+      });
       if (beginnerBotResult?.line) coachMessage = `${beginnerBotResult.line} ${buildCoachSummary()}`;
       savePuzzleState();
       renderBeginnerProgress();
@@ -41790,6 +42067,7 @@
       coachThreatMode = false;
       coachReplayFen = "";
       coachGameRecorded = false;
+      coachGameSessionId += 1;
       coachEndSoundPlayed = false;
       coachMistakeNote = "";
       coachWhyText = "Select or make a move, then ask why.";
@@ -42054,6 +42332,31 @@
         coachDrawAgreed = outcome?.result === "draw";
         if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
         coachMessage = formatFriendGameOutcome(outcome);
+        const opponent = getFriendMatchProfiles(next).opponent
+          || normalizeFriendMatchProfile(next.color === remote.creatorColor ? remote.opponentProfile : remote.creatorProfile, {
+            id: next.targetId,
+            name: next.targetName || "Friend"
+          });
+        const playerResult = outcome?.result === "draw"
+          ? "draw"
+          : outcome?.result === "aborted"
+            ? "aborted"
+            : outcome?.result === (next.color === "b" ? "black" : "white")
+              ? "win"
+              : "loss";
+        const recorded = recordCompletedGame({
+          id: `friend-${remote.id || remote.code}`,
+          completedAt: remote.updatedAt || new Date().toISOString(),
+          mode: remote.gameType === "rated" ? "Rated online" : "Online game",
+          opponentName: opponent?.displayName || next.targetName || "Friend",
+          opponentTitle: opponent?.title || "Chess Player",
+          opponentRating: opponent?.rating,
+          result: playerResult,
+          side: getCoachColorName(next.color),
+          moves: Math.ceil(remote.moves.filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)).length / 2),
+          termination: outcome?.termination || "Game complete"
+        });
+        if (recorded) savePuzzleState();
       }
       if (boardNeedsRestore) {
         try {
