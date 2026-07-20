@@ -29669,16 +29669,19 @@
           <div class="settings-content">
             <article class="settings-page is-active" data-settings-page="audio">
               <div class="settings-page-head">
-                <div><h3>Audio</h3><p>Premium sounds with separate music, SFX, and UI controls.</p></div>
+                <div><h3>Audio</h3><p>Fine-tune ambient, game, UI, puzzle, coach, and notification mixes.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
               </div>
               <div class="settings-grid">
                 <div class="settings-card">
                   <h4>Volume</h4>
                   <label class="settings-field">Master Volume <input type="range" min="0" max="100" data-audio-setting="master" /></label>
-                  <label class="settings-field">Music Volume <input type="range" min="0" max="100" data-audio-setting="music" /></label>
-                  <label class="settings-field">Sound Effects Volume <input type="range" min="0" max="100" data-audio-setting="sfx" /></label>
-                  <label class="settings-field">UI Click Volume <input type="range" min="0" max="100" data-audio-setting="ui" /></label>
+                  <label class="settings-field">Game Effects <input type="range" min="0" max="100" data-audio-setting="game" /></label>
+                  <label class="settings-field">UI Controls <input type="range" min="0" max="100" data-audio-setting="ui" /></label>
+                  <label class="settings-field">Notifications <input type="range" min="0" max="100" data-audio-setting="notifications" /></label>
+                  <label class="settings-field">Puzzle Feedback <input type="range" min="0" max="100" data-audio-setting="puzzle" /></label>
+                  <label class="settings-field">Coach & Results <input type="range" min="0" max="100" data-audio-setting="coach" /></label>
+                  <label class="settings-field">Ambient Mix <input type="range" min="0" max="100" data-audio-setting="ambience" /></label>
                 </div>
                 <div class="settings-card">
                   <h4>Music & Sound Pack</h4>
@@ -29700,7 +29703,9 @@
                     <label class="settings-check"><input type="checkbox" data-audio-setting="checkmateSound" /> Checkmate Sound</label>
                     <label class="settings-check"><input type="checkbox" data-audio-setting="promotionSound" /> Promotion Sound</label>
                     <label class="settings-check"><input type="checkbox" data-audio-setting="timerWarning" /> Timer Warning</label>
-                    <label class="settings-check"><input type="checkbox" data-audio-setting="outcomeSounds" /> Victory/Defeat Sounds</label>
+                    <label class="settings-check"><input type="checkbox" data-audio-setting="outcomeSounds" /> Game Outcome Sounds</label>
+                    <label class="settings-check"><input type="checkbox" data-audio-setting="ambientEnabled" /> Ambient Audio</label>
+                    <label class="settings-check"><input type="checkbox" data-audio-setting="hoverSounds" /> Subtle Hover Sounds</label>
                   </div>
                 </div>
               </div>
@@ -37807,6 +37812,7 @@
         if (!userOwnsFlexBadge(item.value)) return;
         equipFlexBadge(item.value);
         refreshPurchasedCosmetics();
+        playAudioCue("equip");
         return;
       }
       const prefs = readLearnerPrefs();
@@ -37847,6 +37853,7 @@
       refreshPurchasedCosmetics(nextPrefs);
       if (item.type === "musicPack" && audioRuntime.playing) startAudioMusic(inferAudioScene(), item.value);
       else syncAudioSystem(nextPrefs.audio);
+      playAudioCue("equip");
     }
 
     function buyOrEquipStoreItem(itemId) {
@@ -37871,6 +37878,7 @@
           owned.add(item.id);
           storeState.owned = [...owned];
         }
+        playAudioCue("purchase");
         showCelebration("Reward unlocked!", `-${item.cost} coins`, item.name);
       }
       equipStoreItem(item);
@@ -38794,12 +38802,61 @@
       renderStore();
     }
 
+    const audioCueProfiles = Object.freeze({
+      ui: { notes: [720], duration: 0.032, volume: 0.004, noise: 0.014, output: "ui", channel: "ui", priority: 10, cooldown: 35, cutoff: 2600, q: 0.9, release: 0.025 },
+      hover: { notes: [980], duration: 0.018, volume: 0.0024, output: "ui", channel: "ui", priority: 4, cooldown: 90, cutoff: 4200, release: 0.018 },
+      menu: { notes: [330, 495], duration: 0.046, volume: 0.008, noise: 0.012, output: "ui", channel: "ui", priority: 18, gap: 0.026, cooldown: 70, cutoff: 3600, reverb: 0.1 },
+      tab: { notes: [392, 587.33], duration: 0.042, volume: 0.007, output: "ui", channel: "ui", priority: 18, gap: 0.025, cooldown: 80, cutoff: 4200, reverb: 0.08 },
+      modal: { notes: [523.25, 783.99], duration: 0.054, volume: 0.009, output: "ui", channel: "ui", priority: 22, gap: 0.03, cooldown: 110, cutoff: 5200, reverb: 0.14 },
+      notification: { notes: [587.33, 880, 1174.66], duration: 0.072, volume: 0.018, noise: 0.005, channel: "notifications", priority: 48, gap: 0.038, reverb: 0.22, cooldown: 100, cutoff: 6200 },
+      save: { notes: [659.25, 880], duration: 0.042, volume: 0.009, channel: "notifications", priority: 34, gap: 0.025, cooldown: 130, cutoff: 5200 },
+      purchase: { notes: [523.25, 659.25, 1046.5], duration: 0.07, volume: 0.018, channel: "notifications", priority: 58, gap: 0.038, cooldown: 180, cutoff: 6600, reverb: 0.2 },
+      equip: { notes: [440, 659.25, 880], duration: 0.06, volume: 0.014, channel: "notifications", priority: 46, gap: 0.032, cooldown: 150, cutoff: 5800, reverb: 0.16 },
+      move: { notes: [118, 177], duration: 0.042, volume: 0.011, noise: 0.032, channel: "game", priority: 28, gap: 0.012, cooldown: 38, cutoff: 1250, q: 0.9, release: 0.024 },
+      "bot-move": { notes: [104, 156], duration: 0.044, volume: 0.01, noise: 0.028, channel: "game", priority: 28, gap: 0.014, cooldown: 38, cutoff: 1120, pan: -0.08, q: 0.9, release: 0.025 },
+      capture: { notes: [92, 138, 220], duration: 0.066, volume: 0.018, noise: 0.052, channel: "game", priority: 60, gap: 0.026, cutoff: 1450, cooldown: 55, reverb: 0.09, q: 1.1 },
+      check: { notes: [587.33, 880, 1318.51], duration: 0.066, volume: 0.018, noise: 0.006, channel: "game", priority: 76, gap: 0.035, cooldown: 95, reverb: 0.24, cutoff: 7200 },
+      checkmate: { notes: [220, 330, 523.25, 987.77], duration: 0.118, volume: 0.026, noise: 0.03, channel: "coach", priority: 100, gap: 0.052, cooldown: 260, reverb: 0.28, cutoff: 6200 },
+      castle: { notes: [98, 196, 392], duration: 0.082, volume: 0.018, noise: 0.036, channel: "game", priority: 52, gap: 0.036, cooldown: 130, reverb: 0.12, cutoff: 1800 },
+      promotion: { notes: [523.25, 783.99, 1046.5, 1567.98], duration: 0.094, volume: 0.024, noise: 0.007, channel: "game", priority: 68, gap: 0.044, cooldown: 150, reverb: 0.28, cutoff: 7600 },
+      illegal: { notes: [170, 128], duration: 0.07, volume: 0.012, noise: 0.026, channel: "game", priority: 34, gap: 0.042, cooldown: 120, cutoff: 1500, glide: 0.82 },
+      timer: { notes: [880, 880], duration: 0.058, volume: 0.02, noise: 0.005, channel: "notifications", priority: 74, gap: 0.16, cooldown: 650, cutoff: 6500 },
+      victory: { notes: [392, 523.25, 659.25, 1046.5], duration: 0.112, volume: 0.027, noise: 0.01, channel: "coach", priority: 92, gap: 0.052, cooldown: 300, reverb: 0.27, cutoff: 7000 },
+      defeat: { notes: [220, 185, 146.83], duration: 0.11, volume: 0.017, noise: 0.017, channel: "coach", priority: 88, gap: 0.055, cooldown: 300, cutoff: 2200, glide: 0.9 },
+      draw: { notes: [261.63, 293.66, 261.63], duration: 0.088, volume: 0.016, noise: 0.008, channel: "coach", priority: 84, gap: 0.048, cooldown: 240, reverb: 0.12 },
+      correct: { notes: [493.88, 739.99], duration: 0.076, volume: 0.019, noise: 0.005, channel: "puzzle", priority: 48, gap: 0.04, cooldown: 90, reverb: 0.18 },
+      milestone: { notes: [392, 523.25, 783.99, 1174.66], duration: 0.11, volume: 0.027, noise: 0.012, channel: "puzzle", priority: 82, gap: 0.05, cooldown: 260, reverb: 0.3 },
+      achievement: { notes: [392, 523.25, 783.99, 1174.66], duration: 0.11, volume: 0.025, noise: 0.01, channel: "notifications", priority: 80, gap: 0.05, cooldown: 260, reverb: 0.28, cutoff: 6800 },
+      "game-start": { notes: [130.81, 196, 392], duration: 0.082, volume: 0.017, noise: 0.015, channel: "game", priority: 48, gap: 0.044, cooldown: 220, reverb: 0.14 },
+      "puzzle-start": { notes: [246.94, 370, 493.88], duration: 0.074, volume: 0.017, noise: 0.01, channel: "puzzle", priority: 42, gap: 0.038, cooldown: 180, reverb: 0.18 },
+      "puzzle-step": { notes: [440, 659.25], duration: 0.062, volume: 0.018, noise: 0.006, channel: "puzzle", priority: 48, gap: 0.034, cooldown: 80, reverb: 0.15 },
+      "puzzle-wrong": { notes: [196, 155.56], duration: 0.074, volume: 0.013, noise: 0.022, channel: "puzzle", priority: 42, gap: 0.04, cooldown: 130, cutoff: 1800, glide: 0.86 },
+      "puzzle-solved": { notes: [392, 587.33, 783.99, 1174.66], duration: 0.105, volume: 0.027, noise: 0.014, channel: "puzzle", priority: 86, gap: 0.048, cooldown: 260, reverb: 0.28 },
+      hint: { notes: [349.23, 523.25, 698.46], duration: 0.055, volume: 0.013, noise: 0.004, channel: "coach", priority: 38, gap: 0.035, cooldown: 120, reverb: 0.18 },
+      replay: { notes: [293.66, 440, 587.33], duration: 0.064, volume: 0.014, noise: 0.006, channel: "coach", priority: 36, gap: 0.04, cooldown: 160, reverb: 0.16 },
+      "page-home": { notes: [196, 293.66, 392], duration: 0.07, volume: 0.013, noise: 0.008, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 220, reverb: 0.15 },
+      "page-learn": { notes: [261.63, 329.63, 493.88], duration: 0.064, volume: 0.014, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.038, cooldown: 220, reverb: 0.16 },
+      "page-play": { notes: [130.81, 196, 261.63], duration: 0.074, volume: 0.016, noise: 0.018, output: "ui", channel: "ui", priority: 24, gap: 0.036, cooldown: 220, cutoff: 1800, reverb: 0.12 },
+      "page-puzzles": { notes: [246.94, 370, 554.37], duration: 0.066, volume: 0.016, noise: 0.008, output: "ui", channel: "ui", priority: 24, gap: 0.037, cooldown: 220, reverb: 0.18 },
+      "page-store": { notes: [329.63, 493.88, 659.25], duration: 0.066, volume: 0.016, noise: 0.008, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 220, reverb: 0.2 },
+      "page-media": { notes: [220, 330, 440], duration: 0.062, volume: 0.014, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.036, cooldown: 220, reverb: 0.14 },
+      "page-plan": { notes: [174.61, 261.63, 349.23], duration: 0.066, volume: 0.015, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.038, cooldown: 220, reverb: 0.15 },
+      "page-profile": { notes: [392, 587.33, 783.99], duration: 0.064, volume: 0.014, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.038, cooldown: 220, reverb: 0.16 }
+    });
+
     const audioRuntime = {
       context: null,
       master: null,
       music: null,
       sfx: null,
       ui: null,
+      game: null,
+      notifications: null,
+      puzzle: null,
+      coach: null,
+      ambience: null,
+      duck: null,
+      intensity: null,
       compressor: null,
       playing: false,
       current: "calm",
@@ -38811,7 +38868,139 @@
       trackLength: 18000,
       reverb: null,
       noiseBuffer: null,
-      lastCueAt: {}
+      lastCueAt: {},
+      timerWarningBucket: "",
+      voices: new Set()
+    };
+
+    const audioManager = {
+      maxVoices: 16,
+      cueCache: new Map(),
+      unlocked: false,
+      duckTimer: 0,
+      preloaded: false,
+
+      preload() {
+        if (this.preloaded) return;
+        Object.entries(audioCueProfiles).forEach(([name, cue]) => {
+          this.cueCache.set(name, Object.freeze({ ...cue, notes: [...cue.notes] }));
+        });
+        this.preloaded = true;
+      },
+
+      getCue(name) {
+        this.preload();
+        return this.cueCache.get(name) || this.cueCache.get("ui");
+      },
+
+      getOutput(channel = "game") {
+        return audioRuntime[channel] || audioRuntime.game || audioRuntime.sfx || audioRuntime.ui;
+      },
+
+      beginCue(name, cue) {
+        const priority = Number(cue?.priority) || 10;
+        const dominantVoice = [...audioRuntime.voices].some((voice) => voice.priority >= priority + 18);
+        if (dominantVoice && priority < 58) return null;
+        this.trimVoices(priority);
+        if (priority >= 76) this.duckForPriority(priority);
+        return { priority, channel: cue?.channel || (cue?.output === "ui" ? "ui" : "game"), name };
+      },
+
+      trimVoices(incomingPriority = 0) {
+        const voices = [...audioRuntime.voices];
+        const overflow = Math.max(0, voices.length - this.maxVoices + 1);
+        const replaceable = voices
+          .filter((voice) => voice.priority < incomingPriority)
+          .sort((left, right) => left.priority - right.priority || left.startedAt - right.startedAt);
+        replaceable.slice(0, Math.max(overflow, incomingPriority >= 76 ? Math.min(3, replaceable.length) : 0)).forEach((voice) => this.stopVoice(voice));
+      },
+
+      registerVoice(source, gain, options = {}) {
+        if (!source || !gain) return false;
+        const voice = {
+          source,
+          gain,
+          priority: Number(options.priority) || 0,
+          channel: options.channel || "game",
+          startedAt: performance.now()
+        };
+        if (audioRuntime.voices.size >= this.maxVoices) {
+          const replaceable = [...audioRuntime.voices]
+            .sort((left, right) => left.priority - right.priority || left.startedAt - right.startedAt)[0];
+          if (!replaceable || replaceable.priority > voice.priority) return false;
+          audioRuntime.voices.delete(replaceable);
+          this.stopVoice(replaceable);
+        }
+        audioRuntime.voices.add(voice);
+        source.addEventListener("ended", () => {
+          audioRuntime.voices.delete(voice);
+          try { source.disconnect(); } catch {}
+          try { gain.disconnect(); } catch {}
+        }, { once: true });
+        return true;
+      },
+
+      stopVoice(voice, fade = 0.035) {
+        if (!voice || !audioRuntime.context) return;
+        const now = audioRuntime.context.currentTime;
+        try {
+          voice.gain.gain.cancelScheduledValues(now);
+          voice.gain.gain.setTargetAtTime(0.0001, now, Math.max(0.008, fade / 3));
+          voice.source.stop(now + fade + 0.012);
+        } catch {}
+      },
+
+      duckForPriority(priority) {
+        if (!audioRuntime.duck || priority < 76) return;
+        const amount = priority >= 96 ? 0.38 : priority >= 88 ? 0.52 : 0.68;
+        setGain(audioRuntime.duck, amount, 0.018);
+        window.clearTimeout(this.duckTimer);
+        this.duckTimer = window.setTimeout(() => setGain(audioRuntime.duck, 1, 0.12), priority >= 96 ? 440 : 280);
+      },
+
+      updateGameplayIntensity(activeMs = 0, baseMs = 0, running = false) {
+        if (!audioRuntime.intensity) return;
+        if (!running || !baseMs) {
+          audioRuntime.timerWarningBucket = "";
+          setGain(audioRuntime.intensity, 1, 0.14);
+          return;
+        }
+        const remaining = Math.max(0, Number(activeMs) || 0);
+        const ratio = Math.min(1, remaining / Math.max(1, Number(baseMs) || 1));
+        const pressure = Math.max(0, Math.min(1, (0.34 - ratio) / 0.34));
+        setGain(audioRuntime.intensity, 1 - pressure * 0.28, 0.18);
+        const seconds = Math.ceil(remaining / 1000);
+        const bucket = seconds <= 5 ? `critical-${seconds}` : seconds <= 10 ? `low-${Math.ceil(seconds / 2)}` : seconds <= 30 ? "warning" : "";
+        if (bucket && bucket !== audioRuntime.timerWarningBucket) playAudioCue("timer");
+        audioRuntime.timerWarningBucket = bucket;
+      },
+
+      unlock() {
+        this.preload();
+        if (!ensureAudioGraph()) return;
+        getAudioNoiseBuffer();
+        const context = audioRuntime.context;
+        Promise.resolve(context.state === "suspended" ? context.resume() : undefined)
+          .then(() => {
+            this.unlocked = context.state === "running";
+            const audio = readLearnerPrefs().audio;
+            if (this.unlocked && audio.playing && audio.backgroundMusic && audio.ambientEnabled && !audioRuntime.playing) {
+              startAudioMusic(inferAudioScene(), "", false);
+            }
+          })
+          .catch(() => {});
+      },
+
+      release() {
+        window.clearTimeout(this.duckTimer);
+        [...audioRuntime.voices].forEach((voice) => {
+          this.stopVoice(voice, 0.012);
+          try { voice.source.disconnect(); } catch {}
+          try { voice.gain.disconnect(); } catch {}
+        });
+        audioRuntime.voices.clear();
+        if (audioRuntime.context?.state === "running") audioRuntime.context.suspend().catch(() => {});
+      }
     };
 
     function getOwnedAudioValues(type = "musicPack") {
@@ -38854,7 +39043,14 @@
 
     function writeAudioPrefs(patch = {}) {
       const prefs = readLearnerPrefs();
-      const next = { ...prefs, audio: { ...prefs.audio, ...patch } };
+      const nextAudio = { ...prefs.audio, ...patch };
+      if (Object.prototype.hasOwnProperty.call(patch, "sfx") && !Object.prototype.hasOwnProperty.call(patch, "game")) nextAudio.game = patch.sfx;
+      if (Object.prototype.hasOwnProperty.call(patch, "music") && !Object.prototype.hasOwnProperty.call(patch, "ambience")) nextAudio.ambience = patch.music;
+      nextAudio.game = clampNumber(nextAudio.game, 0, 100);
+      nextAudio.ambience = clampNumber(nextAudio.ambience, 0, 100);
+      nextAudio.sfx = nextAudio.game;
+      nextAudio.music = nextAudio.ambience;
+      const next = { ...prefs, audio: nextAudio };
       writeJsonStorage(learnerPrefsStorageKey, next);
       saveProgressSnapshot("audio settings");
       syncAudioSystem(next.audio);
@@ -38897,21 +39093,30 @@
         const context = new AudioCtor();
         audioRuntime.context = context;
         audioRuntime.master = context.createGain();
-        audioRuntime.music = context.createGain();
-        audioRuntime.sfx = context.createGain();
+        audioRuntime.ambience = context.createGain();
+        audioRuntime.game = context.createGain();
         audioRuntime.ui = context.createGain();
+        audioRuntime.notifications = context.createGain();
+        audioRuntime.puzzle = context.createGain();
+        audioRuntime.coach = context.createGain();
+        audioRuntime.intensity = context.createGain();
+        audioRuntime.duck = context.createGain();
+        // Legacy aliases keep the existing player and sound-pack features intact.
+        audioRuntime.music = audioRuntime.ambience;
+        audioRuntime.sfx = audioRuntime.game;
         audioRuntime.compressor = context.createDynamicsCompressor();
         audioRuntime.compressor.threshold.value = -24;
         audioRuntime.compressor.knee.value = 24;
         audioRuntime.compressor.ratio.value = 4;
         audioRuntime.compressor.attack.value = 0.006;
         audioRuntime.compressor.release.value = 0.12;
-        audioRuntime.music.connect(audioRuntime.master);
-        audioRuntime.sfx.connect(audioRuntime.master);
-        audioRuntime.ui.connect(audioRuntime.master);
+        audioRuntime.ambience.connect(audioRuntime.intensity);
+        audioRuntime.intensity.connect(audioRuntime.duck);
+        [audioRuntime.game, audioRuntime.ui, audioRuntime.notifications, audioRuntime.puzzle, audioRuntime.coach].forEach((channel) => channel.connect(audioRuntime.duck));
+        audioRuntime.duck.connect(audioRuntime.master);
         audioRuntime.reverb = context.createConvolver();
         audioRuntime.reverb.buffer = createAudioReverbImpulse(context);
-        audioRuntime.reverb.connect(audioRuntime.master);
+        audioRuntime.reverb.connect(audioRuntime.duck);
         audioRuntime.master.connect(audioRuntime.compressor);
         audioRuntime.compressor.connect(context.destination);
       }
@@ -38931,9 +39136,12 @@
       if (!audioRuntime.context) return;
       const muted = Boolean(audio.muted);
       setGain(audioRuntime.master, muted ? 0 : (audio.master || 0) / 100, 0.04);
-      setGain(audioRuntime.music, (audio.music || 0) / 100, 0.08);
-      setGain(audioRuntime.sfx, (audio.sfx || 0) / 100, 0.03);
+      setGain(audioRuntime.ambience, audio.ambientEnabled === false ? 0 : (audio.ambience || 0) / 100, 0.12);
+      setGain(audioRuntime.game, (audio.game || 0) / 100, 0.03);
       setGain(audioRuntime.ui, (audio.ui || 0) / 100, 0.03);
+      setGain(audioRuntime.notifications, (audio.notifications || 0) / 100, 0.05);
+      setGain(audioRuntime.puzzle, (audio.puzzle || 0) / 100, 0.04);
+      setGain(audioRuntime.coach, (audio.coach || 0) / 100, 0.06);
     }
 
     function connectAudioVoice(sourceNode, gain, output, options = {}) {
@@ -38976,6 +39184,12 @@
       gain.gain.setTargetAtTime(0.0001, Math.max(start, end - (options.release || 0.045)), (options.release || 0.045) / 3);
       oscillator.connect(filter);
       connectAudioVoice(filter, gain, output, { ...options, volume });
+      if (!audioManager.registerVoice(oscillator, gain, options)) {
+        try { oscillator.disconnect(); } catch {}
+        try { filter.disconnect(); } catch {}
+        try { gain.disconnect(); } catch {}
+        return;
+      }
       oscillator.start(start);
       oscillator.stop(end + 0.04);
     }
@@ -39001,16 +39215,23 @@
       gain.gain.setTargetAtTime(0.0001, Math.max(start, end - 0.025), 0.012);
       source.connect(filter);
       connectAudioVoice(filter, gain, output, { ...options, volume });
+      if (!audioManager.registerVoice(source, gain, options)) {
+        try { source.disconnect(); } catch {}
+        try { filter.disconnect(); } catch {}
+        try { gain.disconnect(); } catch {}
+        return;
+      }
       source.start(start);
       source.stop(end + 0.03);
     }
 
     function playAudioCue(type = "ui") {
       const prefs = readLearnerPrefs().audio;
-      if (prefs.muted || !ensureAudioGraph()) return;
-      const pack = getAudioSfxPack(prefs.sfxPack);
       const aliases = { button: "ui", click: "ui", navigation: "menu", wrong: "illegal", win: "victory", loss: "defeat", "checkmate-win": "checkmate" };
       const cueType = aliases[type] || type || "ui";
+      if (cueType === "hover" && !audioManager.unlocked) return;
+      if (prefs.muted || !ensureAudioGraph()) return;
+      const pack = getAudioSfxPack(prefs.sfxPack);
       if ((["move", "bot-move", "castle", "game-start"].includes(cueType) && prefs.pieceSounds === false)
         || (cueType === "capture" && prefs.captureSounds === false)
         || (cueType === "check" && prefs.checkSound === false)
@@ -39018,49 +39239,17 @@
         || (cueType === "promotion" && prefs.promotionSound === false)
         || (cueType === "timer" && prefs.timerWarning === false)
         || (["victory", "defeat", "draw"].includes(cueType) && prefs.outcomeSounds === false)) return;
-      const cues = {
-        ui: { notes: [720], duration: 0.032, volume: 0.004, noise: 0.014, output: "ui", cooldown: 35, cutoff: 2600, q: 0.9, release: 0.025 },
-        menu: { notes: [330, 495], duration: 0.046, volume: 0.008, noise: 0.012, output: "ui", gap: 0.026, cooldown: 70, cutoff: 3600, reverb: 0.1 },
-        notification: { notes: [587.33, 880, 1174.66], duration: 0.072, volume: 0.018, noise: 0.005, gap: 0.038, reverb: 0.22, cooldown: 100, cutoff: 6200 },
-        move: { notes: [118, 177], duration: 0.042, volume: 0.011, noise: 0.032, gap: 0.012, cooldown: 38, cutoff: 1250, q: 0.9, release: 0.024 },
-        "bot-move": { notes: [104, 156], duration: 0.044, volume: 0.01, noise: 0.028, gap: 0.014, cooldown: 38, cutoff: 1120, pan: -0.08, q: 0.9, release: 0.025 },
-        capture: { notes: [92, 138, 220], duration: 0.066, volume: 0.018, noise: 0.052, gap: 0.026, cutoff: 1450, cooldown: 55, reverb: 0.09, q: 1.1 },
-        check: { notes: [587.33, 880, 1318.51], duration: 0.066, volume: 0.018, noise: 0.006, gap: 0.035, cutoff: 7200, cooldown: 95, reverb: 0.24 },
-        checkmate: { notes: [220, 330, 523.25, 987.77], duration: 0.118, volume: 0.026, noise: 0.03, gap: 0.052, cooldown: 260, reverb: 0.28, cutoff: 6200 },
-        castle: { notes: [98, 196, 392], duration: 0.082, volume: 0.018, noise: 0.036, gap: 0.036, cooldown: 130, reverb: 0.12, cutoff: 1800 },
-        promotion: { notes: [523.25, 783.99, 1046.5, 1567.98], duration: 0.094, volume: 0.024, noise: 0.007, gap: 0.044, cooldown: 150, reverb: 0.28, cutoff: 7600 },
-        illegal: { notes: [170, 128], duration: 0.07, volume: 0.012, noise: 0.026, gap: 0.042, cooldown: 120, cutoff: 1500, glide: 0.82 },
-        timer: { notes: [880, 880], duration: 0.058, volume: 0.02, noise: 0.005, gap: 0.16, cooldown: 650, cutoff: 6500 },
-        victory: { notes: [392, 523.25, 659.25, 1046.5], duration: 0.112, volume: 0.027, noise: 0.01, gap: 0.052, cooldown: 300, reverb: 0.27, cutoff: 7000 },
-        defeat: { notes: [220, 185, 146.83], duration: 0.11, volume: 0.017, noise: 0.017, gap: 0.055, cooldown: 300, cutoff: 2200, glide: 0.9 },
-        draw: { notes: [261.63, 293.66, 261.63], duration: 0.088, volume: 0.016, noise: 0.008, gap: 0.048, cooldown: 240, reverb: 0.12 },
-        correct: { notes: [493.88, 739.99], duration: 0.076, volume: 0.019, noise: 0.005, gap: 0.04, cooldown: 90, reverb: 0.18 },
-        milestone: { notes: [392, 523.25, 783.99, 1174.66], duration: 0.11, volume: 0.027, noise: 0.012, gap: 0.05, cooldown: 260, reverb: 0.3 },
-        "game-start": { notes: [130.81, 196, 392], duration: 0.082, volume: 0.017, noise: 0.015, gap: 0.044, cooldown: 220, reverb: 0.14 },
-        "puzzle-start": { notes: [246.94, 370, 493.88], duration: 0.074, volume: 0.017, noise: 0.01, gap: 0.038, cooldown: 180, reverb: 0.18 },
-        "puzzle-step": { notes: [440, 659.25], duration: 0.062, volume: 0.018, noise: 0.006, gap: 0.034, cooldown: 80, reverb: 0.15 },
-        "puzzle-wrong": { notes: [196, 155.56], duration: 0.074, volume: 0.013, noise: 0.022, gap: 0.04, cooldown: 130, cutoff: 1800, glide: 0.86 },
-        "puzzle-solved": { notes: [392, 587.33, 783.99, 1174.66], duration: 0.105, volume: 0.027, noise: 0.014, gap: 0.048, cooldown: 260, reverb: 0.28 },
-        hint: { notes: [349.23, 523.25, 698.46], duration: 0.055, volume: 0.013, noise: 0.004, gap: 0.035, cooldown: 120, reverb: 0.18 },
-        replay: { notes: [293.66, 440, 587.33], duration: 0.064, volume: 0.014, noise: 0.006, gap: 0.04, cooldown: 160, reverb: 0.16 },
-        "page-home": { notes: [196, 293.66, 392], duration: 0.07, volume: 0.013, noise: 0.008, gap: 0.04, cooldown: 220, reverb: 0.15 },
-        "page-learn": { notes: [261.63, 329.63, 493.88], duration: 0.064, volume: 0.014, noise: 0.006, gap: 0.038, cooldown: 220, reverb: 0.16 },
-        "page-play": { notes: [130.81, 196, 261.63], duration: 0.074, volume: 0.016, noise: 0.018, gap: 0.036, cooldown: 220, cutoff: 1800, reverb: 0.12 },
-        "page-puzzles": { notes: [246.94, 370, 554.37], duration: 0.066, volume: 0.016, noise: 0.008, gap: 0.037, cooldown: 220, reverb: 0.18 },
-        "page-store": { notes: [329.63, 493.88, 659.25], duration: 0.066, volume: 0.016, noise: 0.008, gap: 0.04, cooldown: 220, reverb: 0.2 },
-        "page-media": { notes: [220, 330, 440], duration: 0.062, volume: 0.014, noise: 0.006, gap: 0.036, cooldown: 220, reverb: 0.14 },
-        "page-plan": { notes: [174.61, 261.63, 349.23], duration: 0.066, volume: 0.015, noise: 0.006, gap: 0.038, cooldown: 220, reverb: 0.15 },
-        "page-profile": { notes: [392, 587.33, 783.99], duration: 0.064, volume: 0.014, noise: 0.006, gap: 0.038, cooldown: 220, reverb: 0.16 }
-      };
-      const cue = cues[cueType] || cues.ui;
+      const cue = audioManager.getCue(cueType);
       const now = performance.now();
       const lockKey = cue.group || cueType;
       if (now - (audioRuntime.lastCueAt[lockKey] || 0) < (cue.cooldown || 50)) return;
       audioRuntime.lastCueAt[lockKey] = now;
+      const event = audioManager.beginCue(cueType, cue);
+      if (!event) return;
       const recent = Object.values(audioRuntime.lastCueAt).filter((time) => now - time < 260).length;
       const balance = Math.max(0.58, 1 - recent * 0.08);
       const wave = cue.wave || pack.wave || "sine";
-      const output = cue.output === "ui" ? audioRuntime.ui : audioRuntime.sfx;
+      const output = audioManager.getOutput(event.channel);
       cue.notes.forEach((note, index) => {
         const pan = (cue.pan || 0) + (index % 2 ? pack.pan : -pack.pan);
         playAudioTone(note * pack.pitch, cue.duration, cue.volume * pack.gain * balance, wave, output, index * (cue.gap || 0.045), {
@@ -39069,7 +39258,9 @@
           pan,
           reverb: cue.reverb ?? pack.room,
           attack: cue.attack || 0.006,
-          release: cue.release || 0.04
+          release: cue.release || 0.04,
+          priority: event.priority,
+          channel: event.channel
         });
       });
       if (cue.noise) {
@@ -39077,7 +39268,9 @@
           cutoff: cue.cutoff || 1800,
           pan: cue.pan || pack.pan,
           reverb: (cue.reverb ?? pack.room) * 0.7,
-          rate: pack.pitch
+          rate: pack.pitch,
+          priority: event.priority,
+          channel: event.channel
         });
       }
     }
@@ -39090,6 +39283,7 @@
       audioRuntime.playing = false;
       if (save) writeAudioPrefs({ playing: false });
       syncAudioSystem({ ...readLearnerPrefs().audio, playing: false });
+      setGain(audioRuntime.ambience, 0, 0.1);
     }
 
     function updateAudioProgress() {
@@ -39102,7 +39296,7 @@
     function playMusicStep() {
       if (!audioRuntime.playing) return;
       const prefs = readLearnerPrefs().audio;
-      if (prefs.muted) return;
+      if (prefs.muted || prefs.ambientEnabled === false) return;
       const theme = getAudioMusicTheme(audioRuntime.current);
       const beat = Math.max(160, 60000 / theme.tempo);
       const notes = theme.notes || audioMusicThemes.calm.notes;
@@ -39119,7 +39313,7 @@
 
     function startAudioMusic(scene = inferAudioScene(), forceTrack = "", saveChoice = true) {
       const prefs = readLearnerPrefs();
-      if (prefs.audio.backgroundMusic === false) {
+      if (prefs.audio.backgroundMusic === false || prefs.audio.ambientEnabled === false) {
         stopAudioMusic(false);
         syncAudioSystem({ ...prefs.audio, playing: false });
         return;
@@ -39206,7 +39400,7 @@
         }
         if (sfxPack.value !== audio.sfxPack) sfxPack.value = audio.sfxPack;
       }
-      [["audioMaster", "master"], ["audioMusic", "music"], ["audioSfx", "sfx"], ["audioUi", "ui"]].forEach(([id, key]) => {
+      [["audioMaster", "master"], ["audioMusic", "ambience"], ["audioSfx", "game"], ["audioUi", "ui"]].forEach(([id, key]) => {
         const input = document.getElementById(id);
         if (input && input.value !== String(audio[key])) input.value = String(audio[key]);
       });
@@ -39216,7 +39410,13 @@
     }
 
     function setupAudioSystem() {
+      if (setupAudioSystem.ready) return;
+      setupAudioSystem.ready = true;
+      audioManager.preload();
       syncAudioSystem(readLearnerPrefs().audio);
+      const unlockAudio = () => audioManager.unlock();
+      document.addEventListener("pointerdown", unlockAudio, { capture: true, passive: true, once: true });
+      document.addEventListener("keydown", unlockAudio, { capture: true, once: true });
       document.getElementById("audioPlay")?.addEventListener("click", () => {
         if (audioRuntime.playing) stopAudioMusic();
         else startAudioMusic(inferAudioScene());
@@ -39234,7 +39434,7 @@
         activeStoreCategory = "Music";
         renderStore();
       });
-      [["audioMaster", "master"], ["audioMusic", "music"], ["audioSfx", "sfx"], ["audioUi", "ui"]].forEach(([id, key]) => {
+      [["audioMaster", "master"], ["audioMusic", "ambience"], ["audioSfx", "game"], ["audioUi", "ui"]].forEach(([id, key]) => {
         document.getElementById(id)?.addEventListener("input", (event) => {
           writeAudioPrefs({ [key]: Number(event.target.value) });
         });
@@ -39250,11 +39450,25 @@
         if (target.closest(".shorts-feed iframe")) return;
         if (target.closest(".play-square, .puzzle-square, .answer-button")) return;
         if (target.closest("[data-site-tab], [data-home-link]")) return;
-        playAudioCue("ui");
+        const cue = target.closest("[data-settings-tab], [role='tab']") ? "tab"
+          : target.closest(".video-close, [aria-haspopup='dialog']") ? "modal"
+            : "ui";
+        playAudioCue(cue);
+      }, { passive: true });
+      document.addEventListener("pointerover", (event) => {
+        if (event.pointerType === "touch" || readLearnerPrefs().audio.hoverSounds === false) return;
+        const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+        if (!target?.closest("button, a, summary, [role='tab']")) return;
+        playAudioCue("hover");
       }, { passive: true });
       window.addEventListener("hashchange", () => {
         window.setTimeout(() => setAudioScene(inferAudioScene()), 80);
       });
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") audioManager.release();
+        else audioManager.unlock();
+      });
+      window.addEventListener("pagehide", () => audioManager.release(), { passive: true });
     }
 
     function animateCoinsToInventory() {
@@ -39298,7 +39512,8 @@
       const subtle = options.subtle ?? !major;
       if (major) fireConfettiBurst();
       if (major || /coin/i.test(xpText)) animateCoinsToInventory();
-      playPuzzleTone(major ? "milestone" : "correct");
+      const isPuzzleReward = /puzzle|tactic|streak/i.test(`${title} ${badgeText}`);
+      playAudioCue(isPuzzleReward ? (major ? "puzzle-solved" : "correct") : (major ? "achievement" : "notification"));
       const toast = document.createElement("div");
       toast.className = `celebration-toast${subtle ? " is-subtle" : ""}`;
       toast.setAttribute("role", "status");
@@ -43327,12 +43542,13 @@
       const playerMs = coachPlayerColor === "b" ? clock.blackMs : clock.whiteMs;
       const opponentMs = coachPlayerColor === "b" ? clock.whiteMs : clock.blackMs;
       const activeMs = clock.activeColor === "b" ? clock.blackMs : clock.whiteMs;
+      const baseMs = Math.max(1, parseMatchClock(getActiveMatchClockControl()).baseMs || 600000);
       if (clock.running && activeMs <= 0) finishMatchOnTime(clock.activeColor);
+      audioManager.updateGameplayIntensity(activeMs, baseMs, Boolean(clock.running));
       if (timer) timer.textContent = clock.running ? formatMatchClock(playerMs) : "--:--";
       if (aiTimer) aiTimer.textContent = clock.running ? formatMatchClock(opponentMs) : "--:--";
       if (avatar) {
-        const base = Math.max(1, parseMatchClock(getActiveMatchClockControl()).baseMs || 600000);
-        const progress = Math.min(1, Math.max(0, 1 - playerMs / base));
+        const progress = Math.min(1, Math.max(0, 1 - playerMs / baseMs));
         avatar.dataset.timerRing = "on";
         avatar.style.setProperty("--match-timer-angle", `${Math.round(progress * 360)}deg`);
         avatar.style.setProperty("--timer-ring-color", progress > 0.8 ? "#d86f62" : progress > 0.6 ? "#ffd36b" : "var(--rank-b)");
@@ -45484,8 +45700,18 @@
     function playCoachEndSound(isMate, isDrawn) {
       if (coachEndSoundPlayed) return;
       coachEndSoundPlayed = true;
-      if (isMate) playAudioCue(coachGame.turn() === getCoachBotColor() ? "checkmate" : "defeat");
-      else if (isDrawn || coachDrawAgreed) playAudioCue("draw");
+      const playerResult = coachPlayerColor === "w" ? "white" : "black";
+      const outcome = friendChallengeState?.active ? getFriendGameOutcome(friendChallengeState) : null;
+      const result = outcome?.result || (matchClockExpiredColor ? (matchClockExpiredColor === "w" ? "black" : "white") : "");
+      if (isMate) {
+        const playerWon = coachGame.turn() === getCoachBotColor();
+        playAudioCue("checkmate");
+        window.setTimeout(() => playAudioCue(playerWon ? "victory" : "defeat"), 360);
+      } else if (isDrawn || coachDrawAgreed || result === "draw") {
+        playAudioCue("draw");
+      } else if (result === "white" || result === "black") {
+        playAudioCue(result === playerResult ? "victory" : "defeat");
+      }
     }
 
     function updateCoachPanel() {
@@ -51627,9 +51853,12 @@
 
     function readLearnerPrefs() {
       const fallbackAudio = {
-        master: 70, music: 45, sfx: 70, ui: 55, muted: false, playing: false, musicPack: "calm", sfxPack: "classic",
+        master: 70, game: 70, ui: 55, notifications: 62, puzzle: 72, coach: 66, ambience: 45,
+        // Keep the legacy keys mirrored so existing saved preferences and controls remain compatible.
+        music: 45, sfx: 70, muted: false, playing: false, musicPack: "calm", sfxPack: "classic",
         shuffle: false, loop: true, crossfade: true, backgroundMusic: true, pieceSounds: true, captureSounds: true,
-        checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true
+        checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true,
+        ambientEnabled: true, hoverSounds: true
       };
       const fallback = { theme: "dark", backgroundTheme: "classic", backgroundFavorites: [], board: "wood", boardFavorites: [], boardSize: "large", boardScale: 100, pieces: "classic", pieceSkin: "chessnut", pieceFinish: "classic", pieceFavorites: [], archetype: "balanced", nameStyle: "classic", nameFx: "on", nameStyleFavorites: [], musicFavorites: [], coords: "on", speed: "normal", motion: "system", pressure: "on", contrast: "normal", trail: "none", avatar: "auto", avatarFrame: "", avatarEffect: "none", avatarFavorites: [], boardBorder: "classic", lastMoveColor: "classic", lastMoveFavorites: [], title: "", audio: fallbackAudio };
       const saved = readJsonStorage(learnerPrefsStorageKey, fallback);
@@ -51665,15 +51894,19 @@
       const legacySfxPackMap = { arcade: "modern", crystal: "fantasy", royal: "medieval", shadow: "minimal" };
       if (legacySfxPackMap[prefs.audio.sfxPack]) prefs.audio.sfxPack = legacySfxPackMap[prefs.audio.sfxPack];
       if (!audioSfxPacks[prefs.audio.sfxPack]) prefs.audio.sfxPack = "classic";
-      ["master", "music", "sfx", "ui"].forEach((key) => {
+      if (prefs.audio.game == null) prefs.audio.game = prefs.audio.sfx;
+      if (prefs.audio.ambience == null) prefs.audio.ambience = prefs.audio.music;
+      ["master", "game", "ui", "notifications", "puzzle", "coach", "ambience"].forEach((key) => {
         prefs.audio[key] = clampNumber(prefs.audio[key], 0, 100);
       });
+      prefs.audio.music = prefs.audio.ambience;
+      prefs.audio.sfx = prefs.audio.game;
       prefs.audio.muted = Boolean(prefs.audio.muted);
       prefs.audio.playing = Boolean(prefs.audio.playing);
       prefs.audio.shuffle = Boolean(prefs.audio.shuffle);
       prefs.audio.loop = prefs.audio.loop !== false;
       prefs.audio.crossfade = prefs.audio.crossfade !== false;
-      ["backgroundMusic", "pieceSounds", "captureSounds", "checkSound", "checkmateSound", "promotionSound", "timerWarning", "outcomeSounds"].forEach((key) => {
+      ["backgroundMusic", "pieceSounds", "captureSounds", "checkSound", "checkmateSound", "promotionSound", "timerWarning", "outcomeSounds", "ambientEnabled", "hoverSounds"].forEach((key) => {
         prefs.audio[key] = prefs.audio[key] !== false;
       });
       prefs.lastMoveColor = normalizeLastMoveValue(prefs.lastMoveColor);
@@ -51874,9 +52107,11 @@
 
     function getDefaultAudioSettings() {
       return {
-        master: 70, music: 45, sfx: 70, ui: 55, muted: false, playing: false, musicPack: "calm", sfxPack: "classic",
+        master: 70, game: 70, ui: 55, notifications: 62, puzzle: 72, coach: 66, ambience: 45,
+        music: 45, sfx: 70, muted: false, playing: false, musicPack: "calm", sfxPack: "classic",
         shuffle: false, loop: true, crossfade: true, backgroundMusic: true, pieceSounds: true, captureSounds: true,
-        checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true
+        checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true,
+        ambientEnabled: true, hoverSounds: true
       };
     }
 
@@ -52043,10 +52278,10 @@
         const profileKey = field.dataset.profileSetting;
         if (audioKey) {
           const value = field.type === "checkbox" ? field.checked : field.tagName === "SELECT" ? field.value : Number(field.value);
-          if (audioKey === "backgroundMusic" && !value) stopAudioMusic(true);
+          if (["backgroundMusic", "ambientEnabled"].includes(audioKey) && !value) stopAudioMusic(true);
           if (audioKey === "musicPack" && audioRuntime.playing) startAudioMusic(inferAudioScene(), value);
           else writeAudioPrefs({ [audioKey]: value });
-          playAudioCue(audioKey === "sfxPack" ? "notification" : "ui");
+          playAudioCue(audioKey === "sfxPack" ? "notification" : "save");
           setSettingsStatus("Saved");
         }
         if (prefKey) applySettingsPrefsPatch({ [prefKey]: field.value }, prefKey);
@@ -52068,6 +52303,7 @@
       document.getElementById("settingsResetAudio")?.addEventListener("click", () => {
         writeAudioPrefs(getDefaultAudioSettings());
         syncSettingsAudioFields(readLearnerPrefs().audio);
+        playAudioCue("save");
         setSettingsStatus("Audio reset");
       });
       document.getElementById("settingsDeleteAccount")?.addEventListener("click", () => {
@@ -55104,6 +55340,7 @@
     applyStartupTheme();
     setupRuntimeSafety();
     setupSiteTabs();
+    setupAudioSystem();
     primeHomeRankings();
     void setupSupabaseAuthUi();
     window.requestAnimationFrame(() => {
