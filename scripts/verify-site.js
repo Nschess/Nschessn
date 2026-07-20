@@ -46,7 +46,7 @@ const requiredRegressionContracts = [
   ["homepage rankings renderer", /function renderHomeTopPlayers\(entries = buildLeaderboardEntries\("ai"\)\)/],
   ["homepage rankings startup priming", /function primeHomeRankings\(\) \{[\s\S]*?hydrateSharedLeaderboardSnapshot\(\);[\s\S]*?renderHomeTopPlayers\(\);[\s\S]*?ensureSharedLeaderboardSync\(\);/],
   ["homepage rankings snapshot cache", /const leaderboardSnapshotStorageKey = "checkmateQuest\.leaderboardSnapshot\.v1";[\s\S]*?function cacheSharedLeaderboardSnapshot\(/],
-  ["startup session detection", /setupSiteTabs\(\);\s*primeHomeRankings\(\);\s*void setupSupabaseAuthUi\(\);/],
+  ["startup session detection", /setupSiteTabs\(\);\s*(?:setupAudioSystem\(\);\s*)?primeHomeRankings\(\);\s*void setupSupabaseAuthUi\(\);/],
   ["homepage recent-game target", /id="homeRecentGames"/],
   ["homepage tournaments target", /id="homeTournaments"/],
   ["homepage tournaments renderer", /function renderHomeTournaments\([\s\S]*?tournamentRuntime\.events/],
