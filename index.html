@@ -36111,7 +36111,7 @@
       }
       selectedTutorialSquare = "";
       tutorialLastMove = [played.from, played.to];
-      playAudioCue(played.promotion ? "promotion" : played.captured ? "capture" : played.san?.includes("+") ? "check" : "move");
+      playChessMoveSound(played);
       tutorialMoveStep += 1;
       syncTutorialTurn(lesson);
       const nextMove = getActiveTutorialMove(lesson);
@@ -38814,6 +38814,12 @@
       equip: { notes: [329.63, 440, 554.37], duration: 0.068, volume: 0.012, channel: "notifications", priority: 46, gap: 0.036, cooldown: 170, cutoff: 4400, reverb: 0.12, variation: 0.014 },
       move: { notes: [164.81, 220], duration: 0.058, volume: 0.013, noise: 0.068, noiseDuration: 0.078, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.018, cooldown: 42, cutoff: 1300, q: 0.65, release: 0.034, variation: 0.045 },
       "bot-move": { notes: [146.83, 196], duration: 0.06, volume: 0.012, noise: 0.062, noiseDuration: 0.08, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.019, cooldown: 42, cutoff: 1180, pan: -0.06, q: 0.7, release: 0.034, variation: 0.045 },
+      "move-pawn": { notes: [164.81], duration: 0.05, volume: 0.009, noise: 0.042, noiseDuration: 0.057, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, cooldown: 42, cutoff: 1000, q: 0.55, release: 0.03, variation: 0.05 },
+      "move-knight": { notes: [196, 246.94], duration: 0.04, volume: 0.009, noise: 0.028, noiseDuration: 0.052, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.012, cooldown: 42, cutoff: 1650, q: 0.8, release: 0.028, variation: 0.04 },
+      "move-bishop": { notes: [220, 277.18], duration: 0.046, volume: 0.009, noise: 0.024, noiseDuration: 0.058, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.014, cooldown: 42, cutoff: 1900, q: 0.65, release: 0.03, variation: 0.04 },
+      "move-rook": { notes: [130.81], duration: 0.062, volume: 0.011, noise: 0.058, noiseDuration: 0.072, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, cooldown: 42, cutoff: 900, q: 0.7, release: 0.036, variation: 0.045 },
+      "move-queen": { notes: [174.61, 220], duration: 0.052, volume: 0.011, noise: 0.042, noiseDuration: 0.064, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.016, cooldown: 42, cutoff: 1300, q: 0.75, release: 0.032, variation: 0.04 },
+      "move-king": { notes: [146.83, 185], duration: 0.06, volume: 0.011, noise: 0.05, noiseDuration: 0.07, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.018, cooldown: 42, cutoff: 1050, q: 0.65, release: 0.036, variation: 0.035 },
       capture: { notes: [98, 146.83, 196], duration: 0.082, volume: 0.016, noise: 0.105, noiseDuration: 0.12, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 60, gap: 0.03, cutoff: 1120, cooldown: 65, reverb: 0.06, q: 0.85, variation: 0.035 },
       check: { notes: [440, 554.37, 659.25], duration: 0.074, volume: 0.016, noise: 0.004, channel: "game", priority: 76, gap: 0.04, cooldown: 110, reverb: 0.2, cutoff: 5200, variation: 0.012 },
       checkmate: { notes: [196, 246.94, 329.63, 493.88], duration: 0.13, volume: 0.024, noise: 0.018, channel: "coach", priority: 100, gap: 0.058, cooldown: 280, reverb: 0.25, cutoff: 4800, variation: 0.008 },
@@ -45727,13 +45733,31 @@
       });
     }
 
-    function playCoachMoveSound(move, actor = "player") {
+    const chessPieceMoveCues = Object.freeze({
+      p: "move-pawn",
+      n: "move-knight",
+      b: "move-bishop",
+      r: "move-rook",
+      q: "move-queen",
+      k: "move-king"
+    });
+
+    function getChessPieceMoveCue(move, actor = "player") {
+      const piece = String(move?.piece || "").toLowerCase();
+      return chessPieceMoveCues[piece] || (actor === "bot" ? "bot-move" : "move");
+    }
+
+    function playChessMoveSound(move, actor = "player") {
       if (!move || move.san?.includes("#")) return;
       if (move.promotion) playAudioCue("promotion");
       else if (move.flags?.includes("k") || move.flags?.includes("q")) playAudioCue("castle");
       else if (move.san?.includes("+")) playAudioCue("check");
       else if (move.captured || move.flags?.includes("e")) playAudioCue("capture");
-      else playAudioCue(actor === "bot" ? "bot-move" : "move");
+      else playAudioCue(getChessPieceMoveCue(move, actor));
+    }
+
+    function playCoachMoveSound(move, actor = "player") {
+      playChessMoveSound(move, actor);
     }
 
     function playCoachEndSound(isMate, isDrawn) {
