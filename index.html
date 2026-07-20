@@ -22341,7 +22341,7 @@
       box-shadow: 0 0 0 3px var(--cq-accent-secondary-soft), var(--cq-shadow-sm);
     }
 
-    /* Nschess brand: one clear monogram that remains readable at favicon and mobile-header sizes. */
+    /* Nschess mark: a single clear monogram with a restrained chessboard baseline. */
     :is(body:not(.theme-light), body.theme-light) .brand-mark {
       display: grid;
       place-items: center;
@@ -34863,7 +34863,7 @@
       modern: { label: "Modern", accent: "#7fa650", glow: "rgba(127, 166, 80, 0.24)", wave: "sine", pitch: 1.08, gain: 0.95, room: 0.08, pan: 0.1, noise: 0.42, description: "Polished, crisp UI sounds for focused play." },
       medieval: { label: "Medieval", accent: "#d19a45", glow: "rgba(209, 154, 69, 0.26)", wave: "triangle", pitch: 0.84, gain: 1.04, room: 0.2, pan: 0.12, noise: 0.62, description: "Soft bells and shield taps for story battles." },
       fantasy: { label: "Fantasy", accent: "#ae87ff", glow: "rgba(174, 135, 255, 0.28)", wave: "sine", pitch: 1.18, gain: 0.98, room: 0.24, pan: 0.14, noise: 0.36, description: "Light magical chimes for puzzles and rewards." },
-      sciFi: { label: "Sci-Fi", accent: "#5cffe0", glow: "rgba(92, 255, 224, 0.28)", wave: "sine", pitch: 1.2, gain: 0.8, room: 0.12, pan: 0.18, noise: 0.28, description: "Clean glass-and-metal detail with a refined futuristic finish." },
+      sciFi: { label: "Sci-Fi", accent: "#5cffe0", glow: "rgba(92, 255, 224, 0.28)", wave: "sawtooth", pitch: 1.32, gain: 0.82, room: 0.12, pan: 0.18, noise: 0.3, description: "Tight futuristic blips with low-latency snap." },
       minimal: { label: "Minimal", accent: "#d7dde3", glow: "rgba(215, 221, 227, 0.18)", wave: "sine", pitch: 0.95, gain: 0.68, room: 0.03, pan: 0.04, noise: 0.18, description: "Very quiet, short sounds for distraction-free games." }
     };
     const sfxPackMeta = {
@@ -36155,7 +36155,7 @@
       }
       selectedTutorialSquare = "";
       tutorialLastMove = [played.from, played.to];
-      playChessMoveSound(played);
+      playAudioCue(played.promotion ? "promotion" : played.captured ? "capture" : played.san?.includes("+") ? "check" : "move");
       tutorialMoveStep += 1;
       syncTutorialTurn(lesson);
       const nextMove = getActiveTutorialMove(lesson);
@@ -38847,51 +38847,45 @@
     }
 
     const audioCueProfiles = Object.freeze({
-      ui: { notes: [392], duration: 0.03, volume: 0.006, noise: 0.006, output: "ui", channel: "ui", priority: 10, cooldown: 45, cutoff: 2800, q: 0.75, release: 0.028, variation: 0.018 },
-      hover: { notes: [493.88], duration: 0.02, volume: 0.0015, output: "ui", channel: "ui", priority: 4, cooldown: 120, cutoff: 3400, release: 0.02, variation: 0.012 },
-      menu: { notes: [293.66, 392], duration: 0.052, volume: 0.008, noise: 0.007, output: "ui", channel: "ui", priority: 18, gap: 0.03, cooldown: 90, cutoff: 3200, reverb: 0.08, variation: 0.02 },
-      tab: { notes: [349.23, 440], duration: 0.046, volume: 0.007, output: "ui", channel: "ui", priority: 18, gap: 0.028, cooldown: 90, cutoff: 3600, reverb: 0.07, variation: 0.018 },
-      modal: { notes: [369.99, 493.88], duration: 0.06, volume: 0.009, output: "ui", channel: "ui", priority: 22, gap: 0.035, cooldown: 120, cutoff: 4200, reverb: 0.12, variation: 0.016 },
-      notification: { notes: [440, 554.37, 659.25], duration: 0.078, volume: 0.016, noise: 0.004, channel: "notifications", priority: 48, gap: 0.042, reverb: 0.18, cooldown: 120, cutoff: 4800, variation: 0.014 },
-      save: { notes: [392, 523.25], duration: 0.048, volume: 0.008, channel: "notifications", priority: 34, gap: 0.03, cooldown: 150, cutoff: 4000, variation: 0.016 },
-      purchase: { notes: [392, 493.88, 659.25], duration: 0.078, volume: 0.016, channel: "notifications", priority: 58, gap: 0.044, cooldown: 200, cutoff: 5000, reverb: 0.18, variation: 0.012 },
-      equip: { notes: [329.63, 440, 554.37], duration: 0.068, volume: 0.012, channel: "notifications", priority: 46, gap: 0.036, cooldown: 170, cutoff: 4400, reverb: 0.12, variation: 0.014 },
-      move: { notes: [164.81, 220], duration: 0.058, volume: 0.013, noise: 0.068, noiseDuration: 0.078, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.018, cooldown: 42, cutoff: 1300, q: 0.65, release: 0.034, variation: 0.045 },
-      "bot-move": { notes: [146.83, 196], duration: 0.06, volume: 0.012, noise: 0.062, noiseDuration: 0.08, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.019, cooldown: 42, cutoff: 1180, pan: -0.06, q: 0.7, release: 0.034, variation: 0.045 },
-      "move-pawn": { notes: [164.81], duration: 0.05, volume: 0.009, noise: 0.042, noiseDuration: 0.057, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, cooldown: 42, cutoff: 1000, q: 0.55, release: 0.03, variation: 0.05 },
-      "move-knight": { notes: [196, 246.94], duration: 0.04, volume: 0.009, noise: 0.028, noiseDuration: 0.052, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.012, cooldown: 42, cutoff: 1650, q: 0.8, release: 0.028, variation: 0.04 },
-      "move-bishop": { notes: [220, 277.18], duration: 0.046, volume: 0.009, noise: 0.024, noiseDuration: 0.058, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.014, cooldown: 42, cutoff: 1900, q: 0.65, release: 0.03, variation: 0.04 },
-      "move-rook": { notes: [130.81], duration: 0.062, volume: 0.011, noise: 0.058, noiseDuration: 0.072, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, cooldown: 42, cutoff: 900, q: 0.7, release: 0.036, variation: 0.045 },
-      "move-queen": { notes: [174.61, 220], duration: 0.052, volume: 0.011, noise: 0.042, noiseDuration: 0.064, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.016, cooldown: 42, cutoff: 1300, q: 0.75, release: 0.032, variation: 0.04 },
-      "move-king": { notes: [146.83, 185], duration: 0.06, volume: 0.011, noise: 0.05, noiseDuration: 0.07, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.018, cooldown: 42, cutoff: 1050, q: 0.65, release: 0.036, variation: 0.035 },
-      capture: { notes: [98, 146.83, 196], duration: 0.082, volume: 0.016, noise: 0.105, noiseDuration: 0.12, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 60, gap: 0.03, cutoff: 1120, cooldown: 65, reverb: 0.06, q: 0.85, variation: 0.035 },
-      check: { notes: [440, 554.37, 659.25], duration: 0.074, volume: 0.016, noise: 0.004, channel: "game", priority: 76, gap: 0.04, cooldown: 110, reverb: 0.2, cutoff: 5200, variation: 0.012 },
-      checkmate: { notes: [196, 246.94, 329.63, 493.88], duration: 0.13, volume: 0.024, noise: 0.018, channel: "coach", priority: 100, gap: 0.058, cooldown: 280, reverb: 0.25, cutoff: 4800, variation: 0.008 },
-      castle: { notes: [130.81, 174.61, 220], duration: 0.09, volume: 0.015, noise: 0.074, noiseDuration: 0.1, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 52, gap: 0.04, cooldown: 150, reverb: 0.08, cutoff: 1350, variation: 0.03 },
-      promotion: { notes: [392, 493.88, 659.25, 783.99], duration: 0.105, volume: 0.021, noise: 0.004, channel: "game", priority: 68, gap: 0.048, cooldown: 170, reverb: 0.24, cutoff: 5800, variation: 0.01 },
-      illegal: { notes: [174.61, 146.83], duration: 0.075, volume: 0.01, noise: 0.032, noiseFilter: "bandpass", channel: "game", priority: 34, gap: 0.045, cooldown: 140, cutoff: 1150, glide: 0.88, variation: 0.02 },
-      timer: { notes: [659.25, 659.25], duration: 0.062, volume: 0.016, noise: 0.003, channel: "notifications", priority: 74, gap: 0.17, cooldown: 700, cutoff: 5000, variation: 0.01 },
-      victory: { notes: [329.63, 440, 554.37, 659.25], duration: 0.12, volume: 0.023, noise: 0.006, channel: "coach", priority: 92, gap: 0.056, cooldown: 320, reverb: 0.24, cutoff: 5600, variation: 0.01 },
-      defeat: { notes: [246.94, 220, 174.61], duration: 0.118, volume: 0.015, noise: 0.012, channel: "coach", priority: 88, gap: 0.06, cooldown: 320, cutoff: 1700, glide: 0.92, variation: 0.01 },
-      draw: { notes: [246.94, 277.18, 246.94], duration: 0.096, volume: 0.014, noise: 0.005, channel: "coach", priority: 84, gap: 0.052, cooldown: 260, reverb: 0.1, variation: 0.012 },
-      correct: { notes: [392, 493.88], duration: 0.082, volume: 0.016, noise: 0.004, channel: "puzzle", priority: 48, gap: 0.044, cooldown: 110, reverb: 0.14, variation: 0.015 },
-      milestone: { notes: [329.63, 440, 554.37, 659.25], duration: 0.118, volume: 0.023, noise: 0.008, channel: "puzzle", priority: 82, gap: 0.054, cooldown: 280, reverb: 0.25, variation: 0.012 },
-      achievement: { notes: [329.63, 440, 554.37, 659.25], duration: 0.118, volume: 0.021, noise: 0.006, channel: "notifications", priority: 80, gap: 0.054, cooldown: 280, reverb: 0.23, cutoff: 5600, variation: 0.012 },
-      "game-start": { notes: [130.81, 174.61, 220], duration: 0.09, volume: 0.015, noise: 0.032, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 48, gap: 0.044, cooldown: 240, reverb: 0.1, cutoff: 1450, variation: 0.025 },
-      "puzzle-start": { notes: [246.94, 329.63, 440], duration: 0.078, volume: 0.015, noise: 0.006, channel: "puzzle", priority: 42, gap: 0.042, cooldown: 200, reverb: 0.14, cutoff: 4400, variation: 0.014 },
-      "puzzle-step": { notes: [349.23, 440], duration: 0.064, volume: 0.014, noise: 0.004, channel: "puzzle", priority: 48, gap: 0.036, cooldown: 90, reverb: 0.12, cutoff: 4100, variation: 0.014 },
-      "puzzle-wrong": { notes: [196, 164.81], duration: 0.078, volume: 0.011, noise: 0.026, noiseFilter: "bandpass", channel: "puzzle", priority: 42, gap: 0.045, cooldown: 150, cutoff: 1300, glide: 0.88, variation: 0.018 },
-      "puzzle-solved": { notes: [329.63, 440, 554.37, 659.25], duration: 0.112, volume: 0.022, noise: 0.007, channel: "puzzle", priority: 86, gap: 0.054, cooldown: 280, reverb: 0.24, cutoff: 5500, variation: 0.01 },
-      hint: { notes: [329.63, 440, 554.37], duration: 0.058, volume: 0.011, noise: 0.003, channel: "coach", priority: 38, gap: 0.036, cooldown: 140, reverb: 0.14, cutoff: 4500, variation: 0.014 },
-      replay: { notes: [261.63, 329.63, 440], duration: 0.066, volume: 0.012, noise: 0.004, channel: "coach", priority: 36, gap: 0.042, cooldown: 180, reverb: 0.12, cutoff: 3800, variation: 0.014 },
-      "page-home": { notes: [196, 261.63, 329.63], duration: 0.072, volume: 0.011, noise: 0.004, output: "ui", channel: "ui", priority: 24, gap: 0.042, cooldown: 240, reverb: 0.12, cutoff: 3600, variation: 0.014 },
-      "page-learn": { notes: [246.94, 329.63, 440], duration: 0.066, volume: 0.012, noise: 0.003, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 240, reverb: 0.12, cutoff: 4000, variation: 0.014 },
-      "page-play": { notes: [130.81, 164.81, 220], duration: 0.078, volume: 0.013, noise: 0.028, noiseFilter: "bandpass", toneFilter: "lowpass", output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 240, cutoff: 1450, reverb: 0.08, variation: 0.022 },
-      "page-puzzles": { notes: [220, 293.66, 392], duration: 0.068, volume: 0.013, noise: 0.004, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 240, reverb: 0.14, cutoff: 4300, variation: 0.014 },
-      "page-store": { notes: [293.66, 392, 493.88], duration: 0.068, volume: 0.013, noise: 0.004, output: "ui", channel: "ui", priority: 24, gap: 0.042, cooldown: 240, reverb: 0.16, cutoff: 4500, variation: 0.014 },
-      "page-media": { notes: [220, 293.66, 369.99], duration: 0.064, volume: 0.011, noise: 0.003, output: "ui", channel: "ui", priority: 24, gap: 0.038, cooldown: 240, reverb: 0.1, cutoff: 3400, variation: 0.014 },
-      "page-plan": { notes: [164.81, 220, 293.66], duration: 0.068, volume: 0.012, noise: 0.003, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 240, reverb: 0.11, cutoff: 3600, variation: 0.014 },
-      "page-profile": { notes: [329.63, 440, 554.37], duration: 0.066, volume: 0.012, noise: 0.003, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 240, reverb: 0.12, cutoff: 4200, variation: 0.014 }
+      ui: { notes: [720], duration: 0.032, volume: 0.004, noise: 0.014, output: "ui", channel: "ui", priority: 10, cooldown: 35, cutoff: 2600, q: 0.9, release: 0.025 },
+      hover: { notes: [980], duration: 0.018, volume: 0.0024, output: "ui", channel: "ui", priority: 4, cooldown: 90, cutoff: 4200, release: 0.018 },
+      menu: { notes: [330, 495], duration: 0.046, volume: 0.008, noise: 0.012, output: "ui", channel: "ui", priority: 18, gap: 0.026, cooldown: 70, cutoff: 3600, reverb: 0.1 },
+      tab: { notes: [392, 587.33], duration: 0.042, volume: 0.007, output: "ui", channel: "ui", priority: 18, gap: 0.025, cooldown: 80, cutoff: 4200, reverb: 0.08 },
+      modal: { notes: [523.25, 783.99], duration: 0.054, volume: 0.009, output: "ui", channel: "ui", priority: 22, gap: 0.03, cooldown: 110, cutoff: 5200, reverb: 0.14 },
+      notification: { notes: [587.33, 880, 1174.66], duration: 0.072, volume: 0.018, noise: 0.005, channel: "notifications", priority: 48, gap: 0.038, reverb: 0.22, cooldown: 100, cutoff: 6200 },
+      save: { notes: [659.25, 880], duration: 0.042, volume: 0.009, channel: "notifications", priority: 34, gap: 0.025, cooldown: 130, cutoff: 5200 },
+      purchase: { notes: [523.25, 659.25, 1046.5], duration: 0.07, volume: 0.018, channel: "notifications", priority: 58, gap: 0.038, cooldown: 180, cutoff: 6600, reverb: 0.2 },
+      equip: { notes: [440, 659.25, 880], duration: 0.06, volume: 0.014, channel: "notifications", priority: 46, gap: 0.032, cooldown: 150, cutoff: 5800, reverb: 0.16 },
+      move: { notes: [164.81, 220], duration: 0.058, volume: 0.017, noise: 0.062, noiseDuration: 0.078, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.018, cooldown: 42, cutoff: 1300, q: 0.65, release: 0.034 },
+      "bot-move": { notes: [146.83, 196], duration: 0.06, volume: 0.016, noise: 0.058, noiseDuration: 0.08, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.019, cooldown: 42, cutoff: 1180, pan: -0.06, q: 0.7, release: 0.034 },
+      capture: { notes: [92, 138, 220], duration: 0.066, volume: 0.018, noise: 0.052, channel: "game", priority: 60, gap: 0.026, cutoff: 1450, cooldown: 55, reverb: 0.09, q: 1.1 },
+      check: { notes: [587.33, 880, 1318.51], duration: 0.066, volume: 0.018, noise: 0.006, channel: "game", priority: 76, gap: 0.035, cooldown: 95, reverb: 0.24, cutoff: 7200 },
+      checkmate: { notes: [220, 330, 523.25, 987.77], duration: 0.118, volume: 0.026, noise: 0.03, channel: "coach", priority: 100, gap: 0.052, cooldown: 260, reverb: 0.28, cutoff: 6200 },
+      castle: { notes: [98, 196, 392], duration: 0.082, volume: 0.018, noise: 0.036, channel: "game", priority: 52, gap: 0.036, cooldown: 130, reverb: 0.12, cutoff: 1800 },
+      promotion: { notes: [523.25, 783.99, 1046.5, 1567.98], duration: 0.094, volume: 0.024, noise: 0.007, channel: "game", priority: 68, gap: 0.044, cooldown: 150, reverb: 0.28, cutoff: 7600 },
+      illegal: { notes: [170, 128], duration: 0.07, volume: 0.012, noise: 0.026, channel: "game", priority: 34, gap: 0.042, cooldown: 120, cutoff: 1500, glide: 0.82 },
+      timer: { notes: [880, 880], duration: 0.058, volume: 0.02, noise: 0.005, channel: "notifications", priority: 74, gap: 0.16, cooldown: 650, cutoff: 6500 },
+      victory: { notes: [392, 523.25, 659.25, 1046.5], duration: 0.112, volume: 0.027, noise: 0.01, channel: "coach", priority: 92, gap: 0.052, cooldown: 300, reverb: 0.27, cutoff: 7000 },
+      defeat: { notes: [220, 185, 146.83], duration: 0.11, volume: 0.017, noise: 0.017, channel: "coach", priority: 88, gap: 0.055, cooldown: 300, cutoff: 2200, glide: 0.9 },
+      draw: { notes: [261.63, 293.66, 261.63], duration: 0.088, volume: 0.016, noise: 0.008, channel: "coach", priority: 84, gap: 0.048, cooldown: 240, reverb: 0.12 },
+      correct: { notes: [493.88, 739.99], duration: 0.076, volume: 0.019, noise: 0.005, channel: "puzzle", priority: 48, gap: 0.04, cooldown: 90, reverb: 0.18 },
+      milestone: { notes: [392, 523.25, 783.99, 1174.66], duration: 0.11, volume: 0.027, noise: 0.012, channel: "puzzle", priority: 82, gap: 0.05, cooldown: 260, reverb: 0.3 },
+      achievement: { notes: [392, 523.25, 783.99, 1174.66], duration: 0.11, volume: 0.025, noise: 0.01, channel: "notifications", priority: 80, gap: 0.05, cooldown: 260, reverb: 0.28, cutoff: 6800 },
+      "game-start": { notes: [130.81, 196, 392], duration: 0.082, volume: 0.017, noise: 0.015, channel: "game", priority: 48, gap: 0.044, cooldown: 220, reverb: 0.14 },
+      "puzzle-start": { notes: [246.94, 370, 493.88], duration: 0.074, volume: 0.017, noise: 0.01, channel: "puzzle", priority: 42, gap: 0.038, cooldown: 180, reverb: 0.18 },
+      "puzzle-step": { notes: [440, 659.25], duration: 0.062, volume: 0.018, noise: 0.006, channel: "puzzle", priority: 48, gap: 0.034, cooldown: 80, reverb: 0.15 },
+      "puzzle-wrong": { notes: [196, 155.56], duration: 0.074, volume: 0.013, noise: 0.022, channel: "puzzle", priority: 42, gap: 0.04, cooldown: 130, cutoff: 1800, glide: 0.86 },
+      "puzzle-solved": { notes: [392, 587.33, 783.99, 1174.66], duration: 0.105, volume: 0.027, noise: 0.014, channel: "puzzle", priority: 86, gap: 0.048, cooldown: 260, reverb: 0.28 },
+      hint: { notes: [349.23, 523.25, 698.46], duration: 0.055, volume: 0.013, noise: 0.004, channel: "coach", priority: 38, gap: 0.035, cooldown: 120, reverb: 0.18 },
+      replay: { notes: [293.66, 440, 587.33], duration: 0.064, volume: 0.014, noise: 0.006, channel: "coach", priority: 36, gap: 0.04, cooldown: 160, reverb: 0.16 },
+      "page-home": { notes: [196, 293.66, 392], duration: 0.07, volume: 0.013, noise: 0.008, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 220, reverb: 0.15 },
+      "page-learn": { notes: [261.63, 329.63, 493.88], duration: 0.064, volume: 0.014, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.038, cooldown: 220, reverb: 0.16 },
+      "page-play": { notes: [130.81, 196, 261.63], duration: 0.074, volume: 0.016, noise: 0.018, output: "ui", channel: "ui", priority: 24, gap: 0.036, cooldown: 220, cutoff: 1800, reverb: 0.12 },
+      "page-puzzles": { notes: [246.94, 370, 554.37], duration: 0.066, volume: 0.016, noise: 0.008, output: "ui", channel: "ui", priority: 24, gap: 0.037, cooldown: 220, reverb: 0.18 },
+      "page-store": { notes: [329.63, 493.88, 659.25], duration: 0.066, volume: 0.016, noise: 0.008, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 220, reverb: 0.2 },
+      "page-media": { notes: [220, 330, 440], duration: 0.062, volume: 0.014, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.036, cooldown: 220, reverb: 0.14 },
+      "page-plan": { notes: [174.61, 261.63, 349.23], duration: 0.066, volume: 0.015, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.038, cooldown: 220, reverb: 0.15 },
+      "page-profile": { notes: [392, 587.33, 783.99], duration: 0.064, volume: 0.014, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.038, cooldown: 220, reverb: 0.16 }
     });
 
     const audioOutputTuning = Object.freeze({
@@ -38906,18 +38900,6 @@
       const ceiling = kind === "ambience" ? audioOutputTuning.maxAmbienceGain : audioOutputTuning.maxCueGain;
       const numericValue = Number(value);
       return Math.min(ceiling, Math.max(0.0001, Number.isFinite(numericValue) ? numericValue * boost : 0.0001));
-    }
-
-    function getAudioCueVariation(amount = 0) {
-      const range = clampNumber(Number(amount) || 0, 0, 0.08);
-      if (!range) return { pitch: 1, gain: 1, duration: 1, pan: 0 };
-      const randomOffset = () => Math.random() * 2 - 1;
-      return {
-        pitch: 1 + randomOffset() * range,
-        gain: 1 + randomOffset() * range * 0.42,
-        duration: 1 + randomOffset() * range * 0.28,
-        pan: randomOffset() * range * 0.35
-      };
     }
 
     const audioRuntime = {
@@ -39328,15 +39310,11 @@
       const balance = Math.max(0.58, 1 - recent * 0.08);
       const wave = cue.wave || pack.wave || "sine";
       const output = audioManager.getOutput(event.channel);
-      const variation = getAudioCueVariation(cue.variation);
-      const sourceGain = scaleAudioSourceGain(cue.volume * pack.gain * balance * variation.gain);
-      const duration = Math.max(0.014, cue.duration * variation.duration);
+      const sourceGain = scaleAudioSourceGain(cue.volume * pack.gain * balance);
       cue.notes.forEach((note, index) => {
-        const pan = (cue.pan || 0) + (index % 2 ? pack.pan : -pack.pan) + variation.pan;
-        playAudioTone(note * pack.pitch * variation.pitch, duration, sourceGain, wave, output, index * (cue.gap || 0.045), {
+        const pan = (cue.pan || 0) + (index % 2 ? pack.pan : -pack.pan);
+        playAudioTone(note * pack.pitch, cue.duration, sourceGain, wave, output, index * (cue.gap || 0.045), {
           cutoff: cue.cutoff || 5200,
-          filterType: cue.toneFilter || "lowpass",
-          q: cue.q,
           glide: cue.glide,
           pan,
           reverb: cue.reverb ?? pack.room,
@@ -39347,13 +39325,11 @@
         });
       });
       if (cue.noise) {
-        playAudioNoise(Math.min(0.14, cue.noiseDuration || duration * 0.9), cue.noise * pack.noise * pack.gain * balance * variation.gain, output, 0.004, {
+        playAudioNoise(Math.min(0.11, cue.duration * 0.9), cue.noise * pack.noise * pack.gain * balance, output, 0.004, {
           cutoff: cue.cutoff || 1800,
-          filterType: cue.noiseFilter || "bandpass",
-          q: cue.noiseQ || cue.q,
-          pan: (cue.pan || pack.pan) + variation.pan,
+          pan: cue.pan || pack.pan,
           reverb: (cue.reverb ?? pack.room) * 0.7,
-          rate: pack.pitch * variation.pitch,
+          rate: pack.pitch,
           priority: event.priority,
           channel: event.channel
         });
@@ -39387,12 +39363,11 @@
       const notes = theme.notes || audioMusicThemes.calm.notes;
       const index = audioRuntime.step % notes.length;
       const note = notes[index];
-      const wave = theme.wave === "sawtooth" ? "triangle" : (theme.wave || "triangle");
+      const wave = theme.wave || "triangle";
       const normalized = theme.scene === "boss" ? 0.024 : theme.scene === "victory" ? 0.022 : 0.018;
       const sourceGain = scaleAudioSourceGain(normalized, "ambience");
-      const microVariation = 1 + (Math.random() * 2 - 1) * 0.004;
-      playAudioTone(note * microVariation, Math.min(0.28, beat / 1000 * 0.55), sourceGain, wave, audioRuntime.music, 0, { cutoff: 3600, reverb: 0.14 });
-      if (audioRuntime.step % 4 === 0) playAudioTone(note * microVariation / 2, 0.42, sourceGain * 0.62, "sine", audioRuntime.music, 0.02, { cutoff: 1800, reverb: 0.1 });
+      playAudioTone(note, Math.min(0.28, beat / 1000 * 0.55), sourceGain, wave, audioRuntime.music, 0, { cutoff: 3600, reverb: 0.14 });
+      if (audioRuntime.step % 4 === 0) playAudioTone(note / 2, 0.42, sourceGain * 0.62, "sine", audioRuntime.music, 0.02, { cutoff: 1800, reverb: 0.1 });
       if (theme.scene === "boss" && audioRuntime.step % 2 === 0) playAudioNoise(0.035, 0.006, audioRuntime.music, 0.01, { cutoff: 900, rate: 0.8 });
       audioRuntime.step += 1;
       if (!prefs.loop && Date.now() - audioRuntime.startedAt > audioRuntime.trackLength) nextAudioTrack();
@@ -39546,8 +39521,6 @@
         if (event.pointerType === "touch" || readLearnerPrefs().audio.hoverSounds === false) return;
         const target = event.target instanceof Element ? event.target : event.target?.parentElement;
         if (!target?.closest("button, a, summary, [role='tab']")) return;
-        // Board squares are buttons for keyboard accessibility; they should only sound after a legal move, never on pointer travel.
-        if (target.closest(".play-square, .puzzle-square, .real-puzzle-square, .answer-button")) return;
         playAudioCue("hover");
       }, { passive: true });
       window.addEventListener("hashchange", () => {
@@ -45777,31 +45750,13 @@
       });
     }
 
-    const chessPieceMoveCues = Object.freeze({
-      p: "move-pawn",
-      n: "move-knight",
-      b: "move-bishop",
-      r: "move-rook",
-      q: "move-queen",
-      k: "move-king"
-    });
-
-    function getChessPieceMoveCue(move, actor = "player") {
-      const piece = String(move?.piece || "").toLowerCase();
-      return chessPieceMoveCues[piece] || (actor === "bot" ? "bot-move" : "move");
-    }
-
-    function playChessMoveSound(move, actor = "player") {
+    function playCoachMoveSound(move, actor = "player") {
       if (!move || move.san?.includes("#")) return;
       if (move.promotion) playAudioCue("promotion");
       else if (move.flags?.includes("k") || move.flags?.includes("q")) playAudioCue("castle");
       else if (move.san?.includes("+")) playAudioCue("check");
       else if (move.captured || move.flags?.includes("e")) playAudioCue("capture");
-      else playAudioCue(getChessPieceMoveCue(move, actor));
-    }
-
-    function playCoachMoveSound(move, actor = "player") {
-      playChessMoveSound(move, actor);
+      else playAudioCue(actor === "bot" ? "bot-move" : "move");
     }
 
     function playCoachEndSound(isMate, isDrawn) {
