@@ -40,3 +40,4 @@ node scripts/check-deploy-assets.js dist
 ## Chess piece assets
 
 The bundled Lichess piece themes are copied from [lila](https://github.com/lichess-org/lila/tree/master/public/piece) and are licensed under AGPL-3.0-or-later. The license copy is in `assets/pieces/LICENSE.lila`.
+
