@@ -1,6 +1,6 @@
 {
-  "name": "Checkmate Quest",
-  "short_name": "Checkmate Quest",
+  "name": "Nschess",
+  "short_name": "Nschess",
   "description": "Guided chess lessons, practical puzzles, and coach games for every level.",
   "start_url": "./",
   "display": "standalone",

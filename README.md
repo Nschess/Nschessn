@@ -1,4 +1,4 @@
-# Checkmate Quest
+# Nschess
 
 Static chess learning website ready for GitHub Pages.
 

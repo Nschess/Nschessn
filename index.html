@@ -8,8 +8,8 @@
   <meta name="theme-color" content="#0f172a" />
   <meta name="color-scheme" content="dark light" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Checkmate Quest" />
-  <meta property="og:title" content="Checkmate Quest — Learn Chess One Clear Idea at a Time" />
+  <meta property="og:site_name" content="Nschess" />
+  <meta property="og:title" content="Nschess — Learn Chess One Clear Idea at a Time" />
   <meta property="og:description" content="Guided chess lessons, practical puzzles, coach games, and progress tracking for every level." />
   <meta name="twitter:card" content="summary" />
   <link rel="canonical" href="./" />
@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-  <title>Checkmate Quest - Learn Chess From First Move to Strategy</title>
+  <title>Nschess - Learn Chess From First Move to Strategy</title>
   <style>
     :root {
       --bg: #201d1a;
@@ -22341,6 +22341,50 @@
       box-shadow: 0 0 0 3px var(--cq-accent-secondary-soft), var(--cq-shadow-sm);
     }
 
+    /* Nschess brand: one clear monogram that remains readable at favicon and mobile-header sizes. */
+    :is(body:not(.theme-light), body.theme-light) .brand-mark {
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      padding: 0;
+      border: 1px solid var(--cq-border-strong);
+      border-radius: 11px;
+      background: var(--cq-accent-gradient), var(--cq-surface-elevated);
+      background-position: center;
+      background-size: auto;
+      box-shadow: 0 0 0 3px var(--cq-accent-secondary-soft), var(--cq-shadow-sm);
+      color: #f8fafc;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .brand-symbol {
+      display: block;
+      width: 70%;
+      height: 70%;
+      overflow: visible;
+      filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.26));
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .brand-copy {
+      display: grid;
+      gap: 2px;
+      line-height: 1;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .brand-copy strong {
+      color: var(--cq-text-primary);
+      font-size: 0.78rem;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) .brand-copy small {
+      color: var(--cq-accent-secondary);
+      font-size: 0.47rem;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
     body:not(.theme-light) .nav-links {
       gap: 4px;
       padding: 4px;
@@ -28985,9 +29029,9 @@
   <a class="skip-link" href="#top">Skip to main content</a>
   <header class="site-header">
     <nav class="nav cq-navigation" aria-label="Main navigation">
-      <a class="brand" href="#top" data-home-link aria-label="Checkmate Quest home">
-        <span class="brand-mark" aria-hidden="true">CQ</span>
-        <span class="brand-copy"><strong>Checkmate</strong><small>Quest</small></span>
+      <a class="brand" href="#top" data-home-link aria-label="Nschess home">
+        <span class="brand-mark" aria-hidden="true"><svg class="brand-symbol" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 23V9l14 14V9" stroke="currentColor" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 25.25h15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".56"/></svg></span>
+        <span class="brand-copy"><strong>Nschess</strong><small>Chess platform</small></span>
       </a>
       <div class="nav-links cq-navigation-list" aria-label="Primary navigation">
         <a class="cq-navigation-item" href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" data-lucide="swords" aria-hidden="true">&#9822;</span><span>Play</span></a>
@@ -29147,7 +29191,7 @@
       </div>
     </section>
 
-    <section class="home-feature-strip" aria-label="Explore Checkmate Quest">
+    <section class="home-feature-strip" aria-label="Explore Nschess">
       <div class="wrap home-feature-grid">
         <a class="home-feature-card" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">
           <span class="home-feature-icon" aria-hidden="true">&#9671;</span>
@@ -29363,7 +29407,7 @@
           <div class="login-card">
             <p class="eyebrow">Start friendly</p>
             <h3>Your <span>quest</span> remembers you</h3>
-            <p>Pick a chess name and Checkmate Quest turns your practice into a tiny RPG: one goal, one reward, one friendly coach tip at a time.</p>
+            <p>Pick a chess name and Nschess turns your practice into a tiny RPG: one goal, one reward, one friendly coach tip at a time.</p>
             <div class="login-perks" aria-label="Profile perks">
               <span><strong>XP path</strong><small>Level up from Explorer to Legend with lessons, puzzles, and calm games.</small></span>
               <span><strong>Daily streak</strong><small>Keep a small habit alive with short no-pressure practice.</small></span>
@@ -32622,7 +32666,7 @@
   <footer class="footer">
     <div class="wrap footer-grid">
       <div class="footer-brand">
-        <strong>Checkmate Quest</strong>
+        <strong>Nschess</strong>
         <span>Learn the board, spot the pattern, make the plan.</span>
       </div>
       <nav class="footer-links" aria-label="Footer navigation">
@@ -32686,7 +32730,7 @@
 
   <script>
     function reportDeployAssetError(asset, detail = "") {
-      const message = `[Checkmate Quest] Asset failed to load: ${asset}${detail ? ` (${detail})` : ""}`;
+      const message = `[Nschess] Asset failed to load: ${asset}${detail ? ` (${detail})` : ""}`;
       console.warn(message);
       document.body?.setAttribute("data-asset-warning", "true");
     }
@@ -34615,7 +34659,7 @@
       }));
       const report = { themes, valid: Object.values(themes).every((theme) => theme.valid) };
       window.checkmatePieceSetReport = report;
-      if (!report.valid) console.error("[Checkmate Quest pieces] asset validation failed", report);
+      if (!report.valid) console.error("[Nschess pieces] asset validation failed", report);
       return report.valid;
     }
 
@@ -48339,7 +48383,7 @@
         tierCounts: tiers
       };
       window.checkmatePuzzleRuntime = snapshot;
-      if (puzzleRuntimeDebug) console.info("[Checkmate Quest Puzzles]", snapshot);
+      if (puzzleRuntimeDebug) console.info("[Nschess Puzzles]", snapshot);
       return snapshot;
     }
 
@@ -48791,7 +48835,7 @@
       try {
         const debug = new URLSearchParams(window.location.search).has("debug")
           || window.localStorage.getItem("checkmateQuest.debug") === "true";
-        if (debug) console.info("[Checkmate Quest Puzzle diagnostics]", report);
+        if (debug) console.info("[Nschess Puzzle diagnostics]", report);
       } catch {}
     }
 
@@ -49356,7 +49400,7 @@
         }
         completionMessage = `Solved in ${formatPuzzleTime(seconds * 1000)}. Line: ${realPuzzleMoveSans.join(" ")}. ${puzzle.note}`;
       } catch (error) {
-        console.warn("[Checkmate Quest Puzzles] Completion side effect failed.", error);
+        console.warn("[Nschess Puzzles] Completion side effect failed.", error);
         completionMessage = "Puzzle solved. Your progress has been saved; choose the next challenge when ready.";
       } finally {
         if (completionId !== realPuzzleTransitionId) return;
@@ -49364,7 +49408,7 @@
           savePuzzleState();
           saveRealPuzzleState();
         } catch (error) {
-          console.warn("[Checkmate Quest Puzzles] Completion save failed.", error);
+          console.warn("[Nschess Puzzles] Completion save failed.", error);
         }
         setRealPuzzlePhase("Completed");
         const feedback = document.getElementById("realPuzzleFeedback");
@@ -49375,7 +49419,7 @@
           renderRealPuzzleAchievements();
           renderRealPuzzleBoard();
         } catch (error) {
-          console.warn("[Checkmate Quest Puzzles] Completion render failed.", error);
+          console.warn("[Nschess Puzzles] Completion render failed.", error);
         }
         autoAdvanceRealPuzzleIfNeeded();
       }
@@ -50011,7 +50055,7 @@
       const task = Promise.resolve()
         .then(initializer)
         .catch((error) => {
-          console.warn(`[Checkmate Quest] Deferred ${name} setup failed.`, error);
+          console.warn(`[Nschess] Deferred ${name} setup failed.`, error);
           deferredFeaturePromises.delete(name);
           return false;
         });
@@ -50585,7 +50629,7 @@
       const authDebug = (message, detail = {}) => {
         try {
           const enabled = localStorage.getItem("checkmateQuest.authDebug") === "1" || new URLSearchParams(location.search).get("authDebug") === "1";
-          if (enabled) console.debug("[Checkmate Quest Auth]", message, detail);
+          if (enabled) console.debug("[Nschess Auth]", message, detail);
         } catch {}
       };
 
@@ -51386,7 +51430,7 @@
       if (title) title.textContent = profile.title || getDragonProfileSnapshot().rank || "Chess learner";
       if (email) email.textContent = account.email || "Connected account";
       if (new URLSearchParams(location.search).get("authDebug") === "1") {
-        console.debug("[Checkmate Quest Auth] UI rendered", {
+        console.debug("[Nschess Auth] UI rendered", {
           authenticated,
           guestHidden: Array.from(document.querySelectorAll("[data-auth-guest]")).every((element) => element.hidden),
           accountVisible: Boolean(accountPanel && !accountPanel.hidden),
@@ -51433,7 +51477,7 @@
         }
         applyAuthenticatedAccount(await provider.getSession());
       } catch (error) {
-        console.error("[Checkmate Quest Auth] Session initialization failed.", error);
+        console.error("[Nschess Auth] Session initialization failed.", error);
         renderAuthUi(null, false);
         setAuthMessage("Secure account could not be reached. Refresh and try again.", "error");
       }
