@@ -26165,6 +26165,80 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
+
+    /* Play layout guard: keep the board-first page balanced after global style updates. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+      scroll-margin-top: 118px;
+      --cq-play-board-max: min(var(--user-board-size), 76svh, 820px);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .section-head {
+      margin: 0 auto 12px;
+      width: min(100% - 24px, 1640px);
+      padding: 10px 14px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .section-head h2 {
+      font-size: clamp(1.65rem, 3.2vw, 3rem);
+      line-height: 1;
+    }
+
+    @media (min-width: 1181px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 28px, 1680px);
+        grid-template-areas: "left center right";
+        grid-template-columns: clamp(240px, 16vw, 292px) minmax(620px, 1fr) clamp(320px, 21vw, 380px) !important;
+        justify-content: center;
+        align-items: start;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column {
+        max-width: min(100%, var(--cq-play-board-max));
+        justify-self: center;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap,
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.player-frame, .play-bottom-actionbar, .game-options-panel, .coach-setup) {
+        width: min(100%, var(--cq-play-board-max));
+        max-width: var(--cq-play-board-max);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: sticky;
+        top: 86px;
+        max-height: calc(100svh - 104px);
+        overflow: auto;
+      }
+    }
+
+    @media (min-width: 900px) and (max-width: 1180px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 22px, 1060px);
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+        width: min(100%, 760px);
+        max-width: 760px;
+        justify-self: center;
+      }
+    }
+
+    @media (max-width: 899px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+        scroll-margin-top: 86px;
+        --cq-play-board-max: min(100%, var(--user-board-size));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 14px, 780px);
+      }
+    }
     /* Homepage Phase 2: calm, data-led dashboard presentation. */
     .hero-command-center {
       --home-accent: #7c6cff;
