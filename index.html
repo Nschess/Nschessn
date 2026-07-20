@@ -39477,6 +39477,8 @@
         if (event.pointerType === "touch" || readLearnerPrefs().audio.hoverSounds === false) return;
         const target = event.target instanceof Element ? event.target : event.target?.parentElement;
         if (!target?.closest("button, a, summary, [role='tab']")) return;
+        // Board squares are buttons for keyboard accessibility; they should only sound after a legal move, never on pointer travel.
+        if (target.closest(".play-square, .puzzle-square, .real-puzzle-square, .answer-button")) return;
         playAudioCue("hover");
       }, { passive: true });
       window.addEventListener("hashchange", () => {
