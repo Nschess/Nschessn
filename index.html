@@ -38844,6 +38844,20 @@
       "page-profile": { notes: [392, 587.33, 783.99], duration: 0.064, volume: 0.014, noise: 0.006, output: "ui", channel: "ui", priority: 24, gap: 0.038, cooldown: 220, reverb: 0.16 }
     });
 
+    const audioOutputTuning = Object.freeze({
+      cueBoost: 7,
+      ambienceBoost: 4,
+      maxCueGain: 0.18,
+      maxAmbienceGain: 0.085
+    });
+
+    function scaleAudioSourceGain(value, kind = "cue") {
+      const boost = kind === "ambience" ? audioOutputTuning.ambienceBoost : audioOutputTuning.cueBoost;
+      const ceiling = kind === "ambience" ? audioOutputTuning.maxAmbienceGain : audioOutputTuning.maxCueGain;
+      const numericValue = Number(value);
+      return Math.min(ceiling, Math.max(0.0001, Number.isFinite(numericValue) ? numericValue * boost : 0.0001));
+    }
+
     const audioRuntime = {
       context: null,
       master: null,
@@ -38999,6 +39013,8 @@
           try { voice.gain.disconnect(); } catch {}
         });
         audioRuntime.voices.clear();
+        setGain(audioRuntime.duck, 1, 0.012);
+        setGain(audioRuntime.intensity, 1, 0.012);
         if (audioRuntime.context?.state === "running") audioRuntime.context.suspend().catch(() => {});
       }
     };
@@ -39250,9 +39266,10 @@
       const balance = Math.max(0.58, 1 - recent * 0.08);
       const wave = cue.wave || pack.wave || "sine";
       const output = audioManager.getOutput(event.channel);
+      const sourceGain = scaleAudioSourceGain(cue.volume * pack.gain * balance);
       cue.notes.forEach((note, index) => {
         const pan = (cue.pan || 0) + (index % 2 ? pack.pan : -pack.pan);
-        playAudioTone(note * pack.pitch, cue.duration, cue.volume * pack.gain * balance, wave, output, index * (cue.gap || 0.045), {
+        playAudioTone(note * pack.pitch, cue.duration, sourceGain, wave, output, index * (cue.gap || 0.045), {
           cutoff: cue.cutoff || 5200,
           glide: cue.glide,
           pan,
@@ -39304,8 +39321,9 @@
       const note = notes[index];
       const wave = theme.wave || "triangle";
       const normalized = theme.scene === "boss" ? 0.024 : theme.scene === "victory" ? 0.022 : 0.018;
-      playAudioTone(note, Math.min(0.28, beat / 1000 * 0.55), normalized, wave, audioRuntime.music, 0, { cutoff: 3600, reverb: 0.14 });
-      if (audioRuntime.step % 4 === 0) playAudioTone(note / 2, 0.42, normalized * 0.62, "sine", audioRuntime.music, 0.02, { cutoff: 1800, reverb: 0.1 });
+      const sourceGain = scaleAudioSourceGain(normalized, "ambience");
+      playAudioTone(note, Math.min(0.28, beat / 1000 * 0.55), sourceGain, wave, audioRuntime.music, 0, { cutoff: 3600, reverb: 0.14 });
+      if (audioRuntime.step % 4 === 0) playAudioTone(note / 2, 0.42, sourceGain * 0.62, "sine", audioRuntime.music, 0.02, { cutoff: 1800, reverb: 0.1 });
       if (theme.scene === "boss" && audioRuntime.step % 2 === 0) playAudioNoise(0.035, 0.006, audioRuntime.music, 0.01, { cutoff: 900, rate: 0.8 });
       audioRuntime.step += 1;
       if (!prefs.loop && Date.now() - audioRuntime.startedAt > audioRuntime.trackLength) nextAudioTrack();
@@ -51897,7 +51915,8 @@
       if (prefs.audio.game == null) prefs.audio.game = prefs.audio.sfx;
       if (prefs.audio.ambience == null) prefs.audio.ambience = prefs.audio.music;
       ["master", "game", "ui", "notifications", "puzzle", "coach", "ambience"].forEach((key) => {
-        prefs.audio[key] = clampNumber(prefs.audio[key], 0, 100);
+        const savedValue = Number(prefs.audio[key]);
+        prefs.audio[key] = Number.isFinite(savedValue) ? clampNumber(savedValue, 0, 100) : fallbackAudio[key];
       });
       prefs.audio.music = prefs.audio.ambience;
       prefs.audio.sfx = prefs.audio.game;
