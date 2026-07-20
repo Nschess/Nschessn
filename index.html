@@ -7481,7 +7481,6 @@
     @keyframes nameTextRuby { 0%,100% { background-position: 0% 50%; filter: drop-shadow(0 0 5px rgba(255,72,116,.38)); } 50% { background-position: 210% 50%; filter: drop-shadow(0 0 7px rgba(255,190,210,.5)); } }
     @keyframes nameTextEmerald { 0%,100% { background-position: 0% 50%; filter: drop-shadow(0 0 5px rgba(74,255,156,.34)); } 50% { background-position: 210% 50%; filter: drop-shadow(0 0 7px rgba(216,255,226,.48)); } }
     @keyframes nameTextSapphire { 0%,100% { background-position: 0% 50%; filter: drop-shadow(0 0 5px rgba(70,154,255,.34)); } 50% { background-position: 210% 50%; filter: drop-shadow(0 0 7px rgba(53,255,219,.48)); } }
-    }
 
     body:not(.name-effects-off) .styled-username[data-name-live="true"][data-rarity="Legendary"],
     body:not(.name-effects-off) .styled-username[data-name-live="true"][data-rarity="Mythic"],
@@ -7519,7 +7518,7 @@
     }
 
     body:not(.name-effects-off) .match-player-name-line .styled-username[data-name-live="true"] {
-      max-width: 12ch;
+      max-width: min(100%, 18ch);
     }
 
     body:not(.name-effects-off) .styled-username[data-name-live="true"]::before {
@@ -22213,8 +22212,288 @@
       #play:not(.is-review-mode) :is(.review-controls, .post-game-actions) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
+    /* Animation-only Play polish. No gameplay state or event wiring is changed. */
+    @keyframes playCardRise {
+      from { opacity: 0; transform: translate3d(0, 8px, 0); }
+      to { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+
+    @keyframes playButtonRipple {
+      from { opacity: 0.45; transform: translate(-50%, -50%) scale(0); }
+      to { opacity: 0; transform: translate(-50%, -50%) scale(2.4); }
+    }
+
+    @keyframes playBoardAura {
+      0%, 100% { box-shadow: 0 0 0 5px rgba(5, 13, 21, 0.7), 0 28px 52px rgba(0, 0, 0, 0.42), 0 0 34px rgba(81, 188, 109, 0.12); }
+      50% { box-shadow: 0 0 0 5px rgba(5, 13, 21, 0.7), 0 32px 58px rgba(0, 0, 0, 0.46), 0 0 46px rgba(103, 214, 132, 0.2); }
+    }
+
+    @keyframes playClockPulse {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(112, 195, 86, 0.08), 0 5px 16px rgba(0, 0, 0, 0.18); }
+      50% { box-shadow: 0 0 0 5px rgba(112, 195, 86, 0.16), 0 8px 22px rgba(0, 0, 0, 0.24); }
+    }
+
+    @keyframes playLastMoveGlow {
+      0% { filter: brightness(1.28); }
+      100% { filter: brightness(1); }
+    }
+
+    @keyframes playToastIn {
+      0% { opacity: 0; transform: translate(-50%, -18px) scale(0.96); }
+      12%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -14px) scale(0.98); }
+    }
+
+    #play:not(.is-review-mode) :is(.play-mode-card, .player-frame, .featured-coach-card, .engine-panel, .opening-compass, .coach-library, .captured-row, .move-history, .friend-game-chat, .game-options-panel, .play-bottom-actionbar) {
+      animation: playCardRise 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+
+    #play:not(.is-review-mode) :is(.button, .play-mode-card, .play-extra-actions summary) {
+      position: relative;
+      overflow: hidden;
+      transition:
+        transform 180ms ease,
+        border-color 200ms ease,
+        background-color 200ms ease,
+        box-shadow 220ms ease,
+        filter 200ms ease;
+    }
+
+    #play:not(.is-review-mode) :is(.button, .play-extra-actions summary)::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 120%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.34), transparent 58%);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0);
+    }
+
+    #play:not(.is-review-mode) :is(.button, .play-extra-actions summary):active::after {
+      animation: playButtonRipple 420ms ease-out;
+    }
+
+    #play:not(.is-review-mode) :is(.button, .play-extra-actions summary):hover {
+      transform: translate3d(0, -1px, 0);
+      filter: brightness(1.05);
+    }
+
+    #play:not(.is-review-mode) :is(.play-mode-card, .player-frame, .featured-coach-card, .engine-panel, .opening-compass, .coach-library, .game-options-panel):hover {
+      transform: translate3d(0, -2px, 0);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.065), 0 18px 38px rgba(0, 0, 0, 0.26), 0 0 24px rgba(103, 214, 132, 0.08);
+    }
+
+    #play:not(.is-review-mode) .play-board-wrap {
+      animation: playBoardAura 5.5s ease-in-out infinite;
+      transition: transform 220ms ease, border-color 220ms ease, box-shadow 240ms ease;
+      transform: translateZ(0);
+    }
+
+    #play:not(.is-review-mode) .play-board-wrap:hover {
+      transform: translate3d(0, -2px, 0);
+      border-color: rgba(234, 202, 126, 0.64);
+    }
+
+    #play:not(.is-review-mode) :is(.play-board, .play-square, .piece-symbol, .piece-svg) {
+      backface-visibility: hidden;
+    }
+
+    #play:not(.is-review-mode) :is(.piece-symbol, .piece-svg) {
+      transition: transform 170ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 170ms ease, opacity 170ms ease;
+      will-change: transform;
+    }
+
+    #play:not(.is-review-mode) .play-square.last-move {
+      animation: playLastMoveGlow 300ms ease-out;
+    }
+
+    #play:not(.is-review-mode) :is(.match-player-timer.is-active, .ai-player-timer.is-active) {
+      animation: playClockPulse 1.45s ease-in-out infinite;
+    }
+
+    .celebration-toast {
+      backdrop-filter: blur(14px);
+      animation-name: playToastIn;
+      animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      #play:not(.is-review-mode) :is(.player-frame, .move-history > *, .engine-panel .engine-eval span) { transition: none; }
+      #play:not(.is-review-mode) :is(.play-mode-card, .player-frame, .featured-coach-card, .engine-panel, .opening-compass, .coach-library, .captured-row, .move-history, .friend-game-chat, .game-options-panel, .play-bottom-actionbar, .play-board-wrap, .match-player-timer, .ai-player-timer, .move-history > *, .engine-panel .engine-eval span),
+      #play:not(.is-review-mode) :is(.button, .play-extra-actions summary),
+      .celebration-toast {
+        animation: none !important;
+        transition: none !important;
+      }
+
+      #play:not(.is-review-mode) :is(.button, .play-extra-actions summary)::after {
+        display: none;
+      }
+    }
+
+    body.reduced-motion #play:not(.is-review-mode) :is(.play-mode-card, .player-frame, .featured-coach-card, .engine-panel, .opening-compass, .coach-library, .captured-row, .move-history, .friend-game-chat, .game-options-panel, .play-bottom-actionbar, .play-board-wrap, .match-player-timer, .ai-player-timer),
+    body.low-performance #play:not(.is-review-mode) :is(.play-mode-card, .player-frame, .featured-coach-card, .engine-panel, .opening-compass, .coach-library, .captured-row, .move-history, .friend-game-chat, .game-options-panel, .play-bottom-actionbar, .play-board-wrap, .match-player-timer, .ai-player-timer) {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    /* Final responsive Play layout pass: board-first, no overlap, compact side rails. */
+    #play:not(.is-review-mode) .play-shell {
+      width: min(100% - clamp(12px, 2.4vw, 36px), 1760px);
+      overflow: visible;
+      gap: clamp(10px, 1.15vw, 18px);
+    }
+
+    #play:not(.is-review-mode) :is(.play-left-sidebar, .match-board-column, .play-right-sidebar) {
+      min-width: 0;
+    }
+
+    #play:not(.is-review-mode) .match-board-column,
+    #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas:
+        "setup setup"
+        "board board"
+        "actions actions"
+        "opponent player"
+        "options options";
+      align-content: start;
+      justify-items: stretch;
+      gap: clamp(8px, 0.85vw, 12px);
+    }
+
+    #play:not(.is-review-mode) .match-board-column > .play-board-wrap,
+    #play:not(.is-review-mode) .match-board-column > .play-bottom-actionbar,
+    #play:not(.is-review-mode) .match-board-column > .game-options-panel,
+    #play:not(.is-review-mode) .match-board-column > .coach-setup {
+      width: min(100%, var(--user-board-size));
+      justify-self: center;
+    }
+
+    #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+      width: min(100%, var(--user-board-size), 760px);
+      max-width: calc(100vw - 28px);
+    }
+
+    #play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card).player-frame {
+      width: 100%;
+      min-height: 0;
+      align-self: stretch;
+    }
+
+    @media (min-width: 1241px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas: "left center right";
+        grid-template-columns: minmax(220px, 0.72fr) minmax(520px, 1.58fr) minmax(300px, 0.92fr) !important;
+        align-items: start;
+      }
+
+      #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: sticky;
+        top: 76px;
+        max-height: calc(100dvh - 92px);
+        overflow: auto;
+        overscroll-behavior: contain;
+      }
+    }
+
+    @media (min-width: 900px) and (max-width: 1240px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center right"
+          "left left";
+        grid-template-columns: minmax(0, 1fr) minmax(270px, 330px) !important;
+        align-items: start;
+      }
+
+      #play:not(.is-review-mode) .play-left-sidebar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      #play:not(.is-review-mode) .play-mode-nav {
+        grid-row: auto;
+      }
+
+      #play:not(.is-review-mode) .play-right-sidebar {
+        position: sticky;
+        top: 76px;
+        max-height: calc(100dvh - 92px);
+        overflow: auto;
+      }
+    }
+
+    @media (min-width: 700px) and (max-width: 899px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+        width: min(100% - 20px, 820px);
+      }
+
+      #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: min(100%, var(--user-board-size));
+        justify-self: center;
+      }
+
+      #play:not(.is-review-mode) .play-mode-nav,
+      #play:not(.is-review-mode) .play-right-sidebar :is(.premium-review, .post-game-flow, .friend-game-chat) {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 699px) {
+      #play:not(.is-review-mode) .play-shell {
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+        width: min(100% - 10px, 680px);
+        padding: 7px;
+        gap: 9px;
+      }
+
+      #play:not(.is-review-mode) .match-board-column,
+      #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+          "board"
+          "actions"
+          "player"
+          "opponent"
+          "setup"
+          "options";
+      }
+
+      #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+        width: min(100%, calc(100vw - 24px));
+      }
+
+      #play:not(.is-review-mode) .play-primary-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      #play:not(.is-review-mode) .play-primary-actions .play-start-button {
+        grid-column: 1 / -1;
+      }
+
+      #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        grid-template-columns: minmax(0, 1fr);
+        width: 100%;
+        padding: 8px;
+      }
+
+      #play:not(.is-review-mode) .game-options-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
     /* Premium command-center refresh: visual-only layer that keeps the existing app contract intact. */
     :root {
@@ -38847,9 +39126,9 @@
     }
 
     const audioCueProfiles = Object.freeze({
-      ui: { notes: [720], duration: 0.032, volume: 0.004, noise: 0.014, output: "ui", channel: "ui", priority: 10, cooldown: 35, cutoff: 2600, q: 0.9, release: 0.025 },
+      ui: { notes: [720], duration: 0.03, volume: 0.003, noise: 0.008, output: "ui", channel: "ui", priority: 10, cooldown: 70, cutoff: 2400, q: 0.9, release: 0.024 },
       hover: { notes: [980], duration: 0.018, volume: 0.0024, output: "ui", channel: "ui", priority: 4, cooldown: 90, cutoff: 4200, release: 0.018 },
-      menu: { notes: [330, 495], duration: 0.046, volume: 0.008, noise: 0.012, output: "ui", channel: "ui", priority: 18, gap: 0.026, cooldown: 70, cutoff: 3600, reverb: 0.1 },
+      menu: { notes: [330, 495], duration: 0.044, volume: 0.006, noise: 0.008, output: "ui", channel: "ui", priority: 18, gap: 0.026, cooldown: 110, cutoff: 3400, reverb: 0.08 },
       tab: { notes: [392, 587.33], duration: 0.042, volume: 0.007, output: "ui", channel: "ui", priority: 18, gap: 0.025, cooldown: 80, cutoff: 4200, reverb: 0.08 },
       modal: { notes: [523.25, 783.99], duration: 0.054, volume: 0.009, output: "ui", channel: "ui", priority: 22, gap: 0.03, cooldown: 110, cutoff: 5200, reverb: 0.14 },
       notification: { notes: [587.33, 880, 1174.66], duration: 0.072, volume: 0.018, noise: 0.005, channel: "notifications", priority: 48, gap: 0.038, reverb: 0.22, cooldown: 100, cutoff: 6200 },
@@ -38858,7 +39137,7 @@
       equip: { notes: [440, 659.25, 880], duration: 0.06, volume: 0.014, channel: "notifications", priority: 46, gap: 0.032, cooldown: 150, cutoff: 5800, reverb: 0.16 },
       move: { notes: [164.81, 220], duration: 0.058, volume: 0.017, noise: 0.062, noiseDuration: 0.078, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.018, cooldown: 42, cutoff: 1300, q: 0.65, release: 0.034 },
       "bot-move": { notes: [146.83, 196], duration: 0.06, volume: 0.016, noise: 0.058, noiseDuration: 0.08, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.019, cooldown: 42, cutoff: 1180, pan: -0.06, q: 0.7, release: 0.034 },
-      capture: { notes: [92, 138, 220], duration: 0.066, volume: 0.018, noise: 0.052, channel: "game", priority: 60, gap: 0.026, cutoff: 1450, cooldown: 55, reverb: 0.09, q: 1.1 },
+      capture: { notes: [92, 138, 220], duration: 0.066, volume: 0.02, noise: 0.056, channel: "game", priority: 60, gap: 0.026, cutoff: 1450, cooldown: 58, reverb: 0.09, q: 1.1 },
       check: { notes: [587.33, 880, 1318.51], duration: 0.066, volume: 0.018, noise: 0.006, channel: "game", priority: 76, gap: 0.035, cooldown: 95, reverb: 0.24, cutoff: 7200 },
       checkmate: { notes: [220, 330, 523.25, 987.77], duration: 0.118, volume: 0.026, noise: 0.03, channel: "coach", priority: 100, gap: 0.052, cooldown: 260, reverb: 0.28, cutoff: 6200 },
       castle: { notes: [98, 196, 392], duration: 0.082, volume: 0.018, noise: 0.036, channel: "game", priority: 52, gap: 0.036, cooldown: 130, reverb: 0.12, cutoff: 1800 },
@@ -39510,7 +39789,7 @@
         const target = event.target instanceof Element ? event.target : event.target?.parentElement;
         if (!target?.closest("button, a, summary")) return;
         if (target.closest(".shorts-feed iframe")) return;
-        if (target.closest(".play-square, .puzzle-square, .answer-button")) return;
+        if (target.closest(".play-board-wrap, .play-board, .play-square, .piece-symbol, .piece-svg, .puzzle-square, .answer-button")) return;
         if (target.closest("[data-site-tab], [data-home-link]")) return;
         const cue = target.closest("[data-settings-tab], [role='tab']") ? "tab"
           : target.closest(".video-close, [aria-haspopup='dialog']") ? "modal"
@@ -39520,6 +39799,7 @@
       document.addEventListener("pointerover", (event) => {
         if (event.pointerType === "touch" || readLearnerPrefs().audio.hoverSounds === false) return;
         const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+        if (target?.closest(".play-board-wrap, .play-board, .play-square, .piece-symbol, .piece-svg, .puzzle-square")) return;
         if (!target?.closest("button, a, summary, [role='tab']")) return;
         playAudioCue("hover");
       }, { passive: true });
@@ -46167,7 +46447,6 @@
       if (!coachGame || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return false;
       const legalMoves = coachGame.moves({ square: from, verbose: true }).filter((move) => move.to === to);
       if (!legalMoves.length) {
-        playAudioCue("illegal");
         coachMessage = "Good idea to explore. The rules need one of the highlighted squares here.";
         renderCoachBoard();
         updateCoachPanel();
@@ -46191,7 +46470,6 @@
       }
 
       if (!move) {
-        playAudioCue("illegal");
         coachMessage = "Good idea to check it. The rules block that move, so choose a highlighted square.";
         renderCoachBoard();
         updateCoachPanel();
