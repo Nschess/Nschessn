@@ -27,6 +27,8 @@ npx serve .
 
 Apply `supabase/auth.sql` and then `supabase/leaderboard.sql` in the Supabase SQL editor before enabling shared accounts and leaderboards. The leaderboard schema permits public reads, while only a signed-in player can create or update the row associated with their own account.
 
+For friend requests, private challenges, and live friend status, apply `supabase/friends.sql` after `supabase/auth.sql`.
+
 ## Verification
 
 Run the following before deploying a static change:

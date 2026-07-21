@@ -43371,6 +43371,9 @@
     let friendNetworkRefreshQueued = false;
     let friendRealtimeReconnectTimer = 0;
     let friendRealtimeReconnectAttempts = 0;
+    let friendPresenceTimer = 0;
+    let friendPresenceInFlight = false;
+    let friendPresenceVisibilityHandler = null;
     let friendChallengeSyncEpoch = 0;
     let friendChallengeSyncQueue = Promise.resolve();
     let friendChallengeLastPositionSignature = "";
@@ -47317,13 +47320,14 @@
 
     function normalizeFriendRecord(row = {}) {
       const lastLogin = String(row.last_login_at || row.lastLoginAt || "");
+      const hasLivePresence = typeof row.online === "boolean";
       return {
         id: String(row.public_id || row.id || row.user_id || ""),
         name: String(row.username || row.name || "Player"),
         title: String(row.title || "Chess Player"),
         rating: Number(row.rating) || 450,
         avatar: String(row.avatar || "auto"),
-        online: Boolean(lastLogin && Date.now() - Date.parse(lastLogin) < 5 * 60 * 1000),
+        online: hasLivePresence ? row.online : Boolean(lastLogin && Date.now() - Date.parse(lastLogin) < 5 * 60 * 1000),
         requestId: String(row.request_id || row.requestId || ""),
         requestStatus: String(row.request_status || row.requestStatus || ""),
         requestDirection: String(row.request_direction || row.requestDirection || "")
@@ -48536,6 +48540,40 @@
       try { friendNetworkUnsubscribe?.(); } catch {}
       friendNetworkUnsubscribe = null;
       friendNetworkSubscribing = false;
+    }
+
+    async function syncFriendPresence(connected = !document.hidden) {
+      if (friendPresenceInFlight) return;
+      const provider = getFriendProvider();
+      if (!provider?.touchFriendPresence || !getFriendCurrentUserId()) return;
+      friendPresenceInFlight = true;
+      try {
+        await provider.touchFriendPresence(connected);
+      } catch {
+        // Presence is best-effort and is retried by the next heartbeat.
+      } finally {
+        friendPresenceInFlight = false;
+      }
+    }
+
+    function stopFriendPresence() {
+      window.clearInterval(friendPresenceTimer);
+      friendPresenceTimer = 0;
+      if (friendPresenceVisibilityHandler) document.removeEventListener("visibilitychange", friendPresenceVisibilityHandler);
+      friendPresenceVisibilityHandler = null;
+    }
+
+    function startFriendPresence() {
+      const provider = getFriendProvider();
+      if (!provider?.touchFriendPresence || !getFriendCurrentUserId()) return;
+      stopFriendPresence();
+      void syncFriendPresence(!document.hidden);
+      friendPresenceTimer = window.setInterval(() => void syncFriendPresence(!document.hidden), 25000);
+      friendPresenceVisibilityHandler = () => {
+        void syncFriendPresence(!document.hidden);
+        if (!document.hidden) void refreshFriendNetwork(true);
+      };
+      document.addEventListener("visibilitychange", friendPresenceVisibilityHandler);
     }
 
     async function syncRealtimeMatchPresence(connected = !document.hidden) {
@@ -51482,6 +51520,7 @@
         getCachedAccount: () => cachedAccount,
         searchRegisteredPlayers: (query) => callFriendRpc("search_registered_players", { p_query: String(query || "") }),
         getFriendDirectory: () => callFriendRpc("get_friend_directory"),
+        touchFriendPresence: (connected = true) => callFriendRpc("touch_friend_presence", { p_connected: Boolean(connected) }),
         sendFriendRequest: (targetId) => callFriendRpc("send_friend_request", { target_user: targetId }),
         respondFriendRequest: (requestId, accept) => callFriendRpc("respond_to_friend_request", { request_id: requestId, accept_request: Boolean(accept) }),
         cancelFriendRequest: (requestId) => callFriendRpc("cancel_friend_request", { request_id: requestId }),
@@ -51983,12 +52022,15 @@
     function applyAuthenticatedAccount(account) {
       if (!account?.username) {
         cloudProfileReady = false;
+        stopFriendPresence();
         stopFriendNetworkSync();
         stopTournamentNetworkSync();
         renderAuthUi(null, false);
         return;
       }
       activateSupabaseProfile(account);
+      startFriendPresence();
+      startFriendNetworkSync();
       const now = new Date().toISOString();
       const currentProfile = readLearnerProfile();
       writeJsonStorage(learnerProfileStorageKey, {
@@ -55823,6 +55865,8 @@
         cancelStockfishSearch("Page closing", true);
         releaseStockfishWorker();
         stopRealtimeMatchLifecycle();
+        void syncFriendPresence(false);
+        stopFriendPresence();
         stopFriendNetworkSync();
         stopTournamentNetworkSync();
       }, { once: true });
