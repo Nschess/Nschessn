@@ -26239,6 +26239,127 @@
         width: min(100% - 14px, 780px);
       }
     }
+
+    /* Play workspace restoration: keep the board stage ahead of the surrounding chrome. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+      --cq-play-board-max: min(780px, max(420px, calc(100svh - var(--cq-play-stage-chrome))));
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "setup"
+        "opponent"
+        "board"
+        "player"
+        "actions"
+        "options";
+      align-content: start;
+      justify-items: center;
+      width: 100%;
+      max-width: var(--cq-play-board-max);
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .coach-setup { grid-area: setup; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: opponent; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap { grid-area: board; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: player; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-bottom-actionbar { grid-area: actions; }
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .game-options-panel { grid-area: options; }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.player-frame, .play-bottom-actionbar, .game-options-panel, .coach-setup) {
+      width: 100%;
+      max-width: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+      width: min(100%, var(--cq-play-board-max));
+      max-width: none;
+      transform: none;
+      transition: border-color var(--cq-transition-fast) ease, box-shadow var(--cq-transition-fast) ease;
+      animation: none;
+    }
+
+    /* Remove decorative, continuous animation and permanent layers from the live match surface. */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-mode-card, .player-frame, .featured-coach-card, .engine-panel, .opening-compass, .coach-library, .captured-row, .move-history, .friend-game-chat, .game-options-panel, .play-bottom-actionbar) {
+      animation: none;
+      backface-visibility: visible;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.match-player-timer.is-active, .ai-player-timer.is-active) {
+      animation: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.piece-symbol, .piece-svg) {
+      will-change: auto;
+    }
+
+    @media (min-width: 1181px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 28px, 1640px);
+        grid-template-areas: "left center right";
+        grid-template-columns: clamp(210px, 15.8vw, 238px) minmax(520px, 780px) clamp(300px, 21vw, 348px) !important;
+        justify-content: center;
+        align-items: start;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column {
+        justify-self: center;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: sticky;
+        top: 84px;
+        max-height: calc(100svh - 96px);
+        overflow: auto;
+      }
+    }
+
+    @media (min-width: 900px) and (max-width: 1180px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 22px, 980px);
+        grid-template-areas:
+          "center center"
+          "right left";
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 899px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+        --cq-play-board-max: min(100%, var(--user-board-size), calc(100dvw - 28px));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 14px, 760px);
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 699px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+        width: min(100%, calc(100dvw - 28px));
+      }
+    }
+
     /* Homepage Phase 2: calm, data-led dashboard presentation. */
     .hero-command-center {
       --home-accent: #7c6cff;
@@ -35665,6 +35786,7 @@
     });
     let realPuzzlePhase = "Loading";
     let realPuzzleTransitionId = 0;
+    let realPuzzleRulesRetryTimer = 0;
     let realPuzzleValidationErrors = [];
     let realPuzzleValidIndexes = realPuzzleBank.map((_, index) => index);
     const realPuzzleInvalidIndexes = new Set();
@@ -39871,10 +39993,11 @@
         playAudioCue(cue);
       }, { passive: true });
       document.addEventListener("pointerover", (event) => {
-        if (event.pointerType === "touch" || readLearnerPrefs().audio.hoverSounds === false) return;
+        if (event.pointerType === "touch") return;
         const target = event.target instanceof Element ? event.target : event.target?.parentElement;
         if (target?.closest(".play-board-wrap, .play-board, .play-square, .piece-symbol, .piece-svg, .puzzle-square")) return;
         if (!target?.closest("button, a, summary, [role='tab']")) return;
+        if (readLearnerPrefs().audio.hoverSounds === false) return;
         playAudioCue("hover");
       }, { passive: true });
       window.addEventListener("hashchange", () => {
@@ -43145,9 +43268,9 @@
     const chessJsUrl = "https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm";
     const stockfishSources = [
       {
-        name: "CDN Stockfish Lite",
-        script: "https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16-single.js",
-        wasm: "https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16-single.wasm"
+        name: "Stockfish 16 Lite",
+        script: "assets/stockfish/stockfish-nnue-16-single.js",
+        wasm: "assets/stockfish/stockfish-nnue-16-single.wasm"
       }
     ];
     const stockfishLevels = {
@@ -43312,7 +43435,19 @@
     async function loadChessRules() {
       if (CoachChess) return CoachChess;
       warmResourceOrigins("https://cdn.jsdelivr.net");
-      chessRulesPromise ||= import(chessJsUrl).then((module) => module.Chess || module.default?.Chess || module.default);
+      if (!chessRulesPromise) {
+        chessRulesPromise = import(chessJsUrl)
+          .then((module) => module.Chess || module.default?.Chess || module.default)
+          .then((Chess) => {
+            if (typeof Chess !== "function") throw new Error("Chess rules module is invalid.");
+            return Chess;
+          })
+          .catch((error) => {
+            // A transient CDN or offline failure must not poison every later puzzle attempt.
+            chessRulesPromise = null;
+            throw error;
+          });
+      }
       CoachChess = await chessRulesPromise;
       return CoachChess;
     }
@@ -43601,8 +43736,9 @@
     function chooseBeginnerBotMove(moves, bot = getBeginnerBot()) {
       if (!moves.length) return null;
       const config = getCoachConfig();
+      const earlyGame = (coachGame?.history().length || 0) < 10;
       const scored = moves
-        .map((move) => ({ move, score: scoreCoachMove(move, config.skill >= 2) }))
+        .map((move) => ({ move, score: rankResponsiveCoachMove(move, earlyGame) }))
         .sort((a, b) => b.score - a.score);
       if (Math.random() < (config.blunder || 0.16) && scored.length > 2) {
         const maxIndex = bot?.elo < 500 ? 5 : bot?.elo < 850 ? 3 : 2;
@@ -44451,6 +44587,9 @@
             scheduleEnginePanelUpdate();
             stockfishInitResolve = finish;
             sendStockfishCommand(stockfishWorker, "uci");
+            // WASM compilation can be slow on the first local load. Keep the
+            // worker alive long enough to finish initialization instead of
+            // silently switching a strong bot to the lightweight fallback.
             stockfishBootTimer = window.setTimeout(failBoot, 14000);
           } catch {
             failBoot();
@@ -44497,6 +44636,8 @@
       cancelStockfishSearch("New search started");
       const worker = await loadStockfishWorker();
       if (!worker || !moves.length) return null;
+      // Use the selected profile verbatim. The worker keeps this off the main
+      // thread, so limiting depth/nodes here only weakens the bot.
       const config = getCoachConfig();
       const fen = coachGame.fen();
       const searchId = ++stockfishSearchId;
@@ -44833,6 +44974,32 @@
         .map((item) => item.move);
     }
 
+    function rankResponsiveCoachMove(move, earlyGame = false) {
+      if (!move) return -Infinity;
+      let score = Math.random() * 12;
+      if (move.captured) score += (coachPieceValues[move.captured] || 0) * 1.25 - (coachPieceValues[move.piece] || 0) * 0.12;
+      if (move.promotion) score += coachPieceValues[move.promotion] || 800;
+      if (move.flags?.includes("k") || move.flags?.includes("q")) score += 90;
+      if (["d4", "e4", "d5", "e5", "c4", "c5", "f4", "f5"].includes(move.to)) score += 28;
+      if (move.san?.includes("+")) score += 75;
+      if (move.san?.includes("#")) score += 10000;
+      if (move.piece === "q" && earlyGame) score -= 55;
+      return score;
+    }
+
+    function chooseResponsiveCoachFallback(moves = coachGame?.moves({ verbose: true }) || []) {
+      if (!moves.length) return null;
+      const bookMove = getStrongBookMove(moves);
+      if (bookMove) return bookMove;
+      const profile = getCoachStrengthProfile();
+      const earlyGame = (coachGame?.history().length || 0) < 10;
+      const ranked = moves
+        .map((move) => ({ move, score: rankResponsiveCoachMove(move, earlyGame) }))
+        .sort((a, b) => b.score - a.score);
+      const poolSize = profile.elo < 1450 ? 3 : profile.elo < 1800 ? 2 : 1;
+      return ranked[Math.floor(Math.random() * Math.min(poolSize, ranked.length))]?.move || moves[0];
+    }
+
     function searchCoachPosition(depth, alpha, beta, deadline) {
       if (depth <= 0 || isCoachGameOver() || Date.now() > deadline) return evaluateCoachPosition();
       const maximizing = coachGame.turn() === "b";
@@ -44924,9 +45091,7 @@
     function getReliableCoachFallback(moves = coachGame?.moves({ verbose: true }) || []) {
       if (!moves.length) return null;
       try {
-        const candidate = chooseCoachMove();
-        const uci = candidate && `${candidate.from}${candidate.to}${candidate.promotion || ""}`;
-        return moves.find((move) => `${move.from}${move.to}${move.promotion || ""}` === uci) || moves[0];
+        return chooseResponsiveCoachFallback(moves);
       } catch {
         return moves[0];
       }
@@ -44937,23 +45102,21 @@
       const config = getCoachConfig();
       if (config.beginnerBot) return chooseBeginnerBotMove(moves);
       try {
-        const attempts = isStrongStockfishBot(config) ? 3 : config.elo >= 1600 ? 2 : 1;
-        for (let attempt = 0; attempt < attempts; attempt += 1) {
-          const stockfishMove = await getStockfishMove(moves);
-          if (stockfishMove) return stockfishMove;
-          if (!stockfishFailed && attempt + 1 < attempts) await wait(isStrongStockfishBot(config) ? 180 : 120);
-        }
+        const stockfishMove = await getStockfishMove(moves);
+        if (stockfishMove) return stockfishMove;
       } catch {
         stockfishInfo.status = "Engine retrying";
       }
       if (isStrongStockfishBot(config)) {
+        // A strong game must never silently downgrade to the lightweight
+        // material picker when Stockfish is unavailable.
         stockfishInfo.status = stockfishFailed ? "Engine failed" : "Waiting for Stockfish";
         stockfishInfo.lastMoveSource = "";
         scheduleEnginePanelUpdate();
         return null;
       }
       const fallback = getReliableCoachFallback(moves);
-      stockfishInfo.status = stockfishFailed ? "Engine fallback" : "Engine timeout fallback";
+      stockfishInfo.status = stockfishFailed ? "Engine quick fallback" : "Engine timeout fallback";
       stockfishInfo.lastMoveSource = fallback ? "legal fallback" : "";
       scheduleEnginePanelUpdate();
       return fallback;
@@ -44997,8 +45160,7 @@
       return `The coach played ${move.san}. Look for a safe developing move or a forcing move.`;
     }
 
-    function getOpeningCompassData() {
-      const history = coachGame.history({ verbose: true });
+    function getOpeningCompassData(history = coachGame.history({ verbose: true })) {
       const whiteMoves = history.filter((move) => move.color === "w");
       const moveNumber = Math.max(1, Math.floor(history.length / 2) + 1);
       const centerSquares = ["e4", "d4", "c4", "f4"].filter((square) => coachGame.get(square)?.color === "w");
@@ -45052,8 +45214,12 @@
       const list = document.getElementById("openingCompassList");
       if (!panel || !title || !hint || !phase || !list || !coachGame) return;
 
-      const data = getOpeningCompassData();
+      const history = coachGame.history({ verbose: true });
       const isGameOver = isCoachGameOver() || coachDrawAgreed;
+      const renderKey = `${history.map((move) => move.san).join("|")}:${isGameOver ? "over" : "live"}`;
+      if (panel.dataset.renderKey === renderKey) return;
+      panel.dataset.renderKey = renderKey;
+      const data = getOpeningCompassData(history);
       title.textContent = isGameOver ? "Game review compass" : coachGame.turn() === "w" ? "Your move compass" : "Coach move compass";
       hint.textContent = isGameOver
         ? "Compare these goals with your move history."
@@ -46046,17 +46212,25 @@
     }
 
     function renderCoachCaptured() {
+      const whiteCapturedNode = document.getElementById("whiteCaptured");
+      const blackCapturedNode = document.getElementById("blackCaptured");
+      if (!whiteCapturedNode || !blackCapturedNode) return;
       const whiteCaptured = [];
       const blackCaptured = [];
-      coachGame.history({ verbose: true }).forEach((move) => {
+      const history = coachGame.history({ verbose: true });
+      const historyKey = history.map((move) => `${move.san}:${move.captured || ""}`).join("|");
+      if (whiteCapturedNode.dataset.historyKey === historyKey) return;
+      history.forEach((move) => {
         if (!move.captured) return;
         const capturedColor = move.color === "w" ? "b" : "w";
         const symbol = coachPieceSymbols[capturedColor][move.captured] || "";
         if (move.color === "w") whiteCaptured.push(symbol);
         else blackCaptured.push(symbol);
       });
-      document.getElementById("whiteCaptured").textContent = whiteCaptured.join(" ") || "None";
-      document.getElementById("blackCaptured").textContent = blackCaptured.join(" ") || "None";
+      whiteCapturedNode.dataset.historyKey = historyKey;
+      blackCapturedNode.dataset.historyKey = historyKey;
+      whiteCapturedNode.textContent = whiteCaptured.join(" ") || "None";
+      blackCapturedNode.textContent = blackCaptured.join(" ") || "None";
     }
 
     function renderCoachHistory() {
@@ -46252,7 +46426,10 @@
       const cache = { fen, scored: [], pending: true, index: 0, moves, game };
       coachLearnerMoveScores = cache;
       const scoreNextBatch = () => {
-        if (coachLearnerMoveScores !== cache || coachGame !== game || game.fen() !== fen) return;
+        if (coachThinking || coachLearnerMoveScores !== cache || coachGame !== game || game.fen() !== fen) {
+          if (coachLearnerMoveScores === cache) cache.pending = false;
+          return;
+        }
         const deadline = performance.now() + 8;
         while (cache.index < cache.moves.length && performance.now() < deadline) {
           const move = cache.moves[cache.index++];
@@ -46444,11 +46621,27 @@
       const board = document.getElementById("coachBoard");
       if (!board || !coachGame) return;
       bindCoachBoardEvents(board);
+      const boardFen = coachGame.fen();
+      const boardHistoryLength = coachGame.history().length;
+      const boardRenderKey = [coachGameSessionId, boardFen, boardHistoryLength,
+        coachSelected, coachLegalMoves.map(moveToUci).join(","),
+        coachPremove ? `${coachPremove.from}-${coachPremove.to}` : "",
+        coachThinking ? "thinking" : "ready", coachBotPaused ? "free" : "bot",
+        coachPlayerColor, coachFlipped ? "flipped" : "normal",
+        coachThreatMode ? "threats" : "quiet", matchClockExpiredColor,
+        coachDrawAgreed ? "draw" : "live", friendChallengeState?.active ? "friend-active" : "friend-local",
+        friendChallengeState?.status || "", pieceSvgRenderVersion, activePieceSvgSet,
+        activeMatchReview?.pgn || "", reviewReplayIndex, reviewCompareMode,
+        reviewBestLineActive ? "best-line" : "", reviewBestLineMove ? `${reviewBestLineMove.from}-${reviewBestLineMove.to}` : ""
+      ].join("|");
+      if (board.dataset.renderKey === boardRenderKey) return;
+      board.dataset.renderKey = boardRenderKey;
       const legalByTarget = new Map(coachLegalMoves.map((move) => [move.to, move]));
       const lastSquares = coachLastMove ? [coachLastMove.from, coachLastMove.to] : [];
       const checkedKing = isCoachCheck() ? findCoachKing(coachGame.turn()) : "";
+      const gameOver = isCoachGameOver();
       const threatSquares = coachThreatMode ? getCoachThreatSquares() : new Set();
-      const effectKey = coachLastMove ? `${coachGame.history().length}-${coachLastMove.from}-${coachLastMove.to}-${coachLastMove.san || ""}` : "";
+      const effectKey = coachLastMove ? `${boardHistoryLength}-${coachLastMove.from}-${coachLastMove.to}-${coachLastMove.san || ""}` : "";
       const animateEffect = Boolean(effectKey && board.dataset.pieceEffect !== effectKey);
       if (effectKey) board.dataset.pieceEffect = effectKey;
       else delete board.dataset.pieceEffect;
@@ -46493,7 +46686,7 @@
         if (threatSquares.has(squareNameValue)) className += " threat";
         if (coachThinking) className += " is-ai-thinking";
         if (square.className !== className) square.className = className;
-        const draggable = Boolean(piece && isCoachPlayablePiece(piece) && !coachThinking && !isCoachGameOver());
+        const draggable = Boolean(piece && isCoachPlayablePiece(piece) && !coachThinking && !gameOver);
         if (square.draggable !== draggable) square.draggable = draggable;
         const pieceKey = piece ? `${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}` : "empty";
         if (square.dataset.pieceKey !== pieceKey) {
@@ -46649,6 +46842,7 @@
       if (coachBotPaused || isCoachGameOver() || coachGame.turn() !== botColor) return;
       const token = ++coachMoveToken;
       coachThinking = true;
+      coachLearnerMoveScores = { fen: "", scored: [], pending: false };
       const engineLabel = stockfishLevels[coachDifficulty]?.label || "Coach";
       coachMessage = getBeginnerBot()
         ? `${engineLabel}: ${pickBotLine("inGame")}`
@@ -46665,7 +46859,8 @@
           if (token !== coachMoveToken || !coachGame || coachGame.turn() !== botColor || isCoachGameOver()) return;
           const replyUci = reply && `${reply.from}${reply.to}${reply.promotion || ""}`;
           const config = getCoachConfig();
-          const safeReply = legalReplies.find((move) => `${move.from}${move.to}${move.promotion || ""}` === replyUci) || (isStrongStockfishBot(config) ? null : getReliableCoachFallback(legalReplies));
+            const safeReply = legalReplies.find((move) => `${move.from}${move.to}${move.promotion || ""}` === replyUci)
+              || (isStrongStockfishBot(config) ? null : getReliableCoachFallback(legalReplies));
           const move = safeReply && coachGame.move(toCoachMoveInput(safeReply));
           if (move) {
             coachLastMove = move;
@@ -48736,6 +48931,18 @@
       return ranks.flatMap((rank) => files.map((file) => `${file}${rank}`));
     }
 
+    function getFenPieceAtSquare(fen, square) {
+      const index = squareToIndex(String(square || ""));
+      const placement = String(fen || "").trim().split(/\s+/)[0];
+      if (index < 0 || index > 63 || !placement) return null;
+      return getPieceCodeInfo(fenToSquares(placement)[index]);
+    }
+
+    function getRealPuzzleDisplayPiece(square) {
+      return realPuzzleGame?.get(square)
+        || getFenPieceAtSquare(realPuzzleBank[realPuzzleIndex]?.fen, square);
+    }
+
     function findRealUciMove(game, uci) {
       const expected = String(uci || "").trim().toLowerCase();
       if (!game || !expected) return null;
@@ -49540,13 +49747,14 @@
       bindRealPuzzleBoardEvents(board);
       const legalByTarget = new Map(realPuzzleLegalMoves.map((move) => [move.to, move]));
       const lastSquares = realPuzzleLastMove ? [realPuzzleLastMove.from, realPuzzleLastMove.to] : [];
+      const displayPositionKey = realPuzzleGame?.fen?.() || realPuzzleBank[realPuzzleIndex]?.fen || "";
       const checkedKing = realPuzzleGame && callCoachRule(realPuzzleGame, "isCheck", "in_check")
         ? getRealPuzzleSquares().find((square) => realPuzzleGame.get(square)?.type === "k" && realPuzzleGame.get(square)?.color === realPuzzleGame.turn()) || ""
         : "";
       const squareNames = getRealPuzzleSquares();
       const boardSquares = ensureRealPuzzleBoardSquares(board, squareNames);
       squareNames.forEach((squareNameValue) => {
-        const piece = realPuzzleGame?.get(squareNameValue);
+        const piece = getRealPuzzleDisplayPiece(squareNameValue);
         const legalMove = legalByTarget.get(squareNameValue);
         const square = boardSquares.get(squareNameValue);
         if (!square) return;
@@ -49556,7 +49764,9 @@
         if (legalMove) square.classList.add(legalMove.captured || legalMove.flags.includes("e") ? "capture" : "legal");
         if (lastSquares.includes(squareNameValue)) square.classList.add("last-move");
         if (squareNameValue === checkedKing) square.classList.add("in-check");
-        const pieceKey = piece ? `${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}` : "empty";
+        const pieceKey = piece
+          ? `${displayPositionKey}:${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}`
+          : `${displayPositionKey}:empty`;
         if (square.dataset.pieceKey !== pieceKey) {
           renderPieceOnSquare(square, piece, activePieceSvgSet, false);
           square.dataset.pieceKey = pieceKey;
@@ -49576,6 +49786,12 @@
       if (!document.getElementById("realPuzzleBoard")) return;
       window.clearTimeout(realPuzzleAutoNextTimer);
       realPuzzleAutoNextTimer = 0;
+      if (!CoachChess && realPuzzleBank[realPuzzleIndex]?.fen) {
+        const feedback = document.getElementById("realPuzzleFeedback");
+        if (feedback) feedback.textContent = "Position loaded. Puzzle rules are reconnecting; the board will unlock automatically.";
+        renderRealPuzzleBoard();
+        return;
+      }
       const playableIndexes = getRealPuzzleIndexes();
       if (!playableIndexes.length) {
         const feedback = document.getElementById("realPuzzleFeedback");
@@ -49881,20 +50097,38 @@
       }
     }
 
+    function retryRealPuzzleRulesOnce() {
+      if (CoachChess || realPuzzleRulesRetryTimer) return;
+      realPuzzleRulesRetryTimer = window.setTimeout(async () => {
+        realPuzzleRulesRetryTimer = 0;
+        try {
+          await loadChessRules();
+          if (setupRealPuzzles.ready && document.getElementById("realPuzzleBoard")) renderRealPuzzle();
+        } catch {
+          // The FEN renderer keeps the current position visible until a later page visit can retry.
+        }
+      }, 1200);
+    }
+
     async function setupRealPuzzles() {
       if (!document.getElementById("realPuzzleBoard") || setupRealPuzzles.ready) return;
       setupRealPuzzles.ready = true;
       document.getElementById("realPuzzles")?.setAttribute("data-loading", "true");
-      try {
-        await loadChessRules();
-        await loadRealPuzzleCollection();
-        puzzleCollectionReady = realPuzzleBank.length > 0;
+      const [rules, collection] = await Promise.allSettled([
+        loadChessRules(),
+        loadRealPuzzleCollection()
+      ]);
+      puzzleCollectionReady = realPuzzleBank.length > 0;
+      if (rules.status === "fulfilled") {
         reportRealPuzzleRuntime("collection-ready");
-      } catch {
+      } else {
         realPuzzleValidationErrors = ["Puzzle rules are temporarily unavailable."];
         realPuzzleValidIndexes = [];
-        puzzleCollectionReady = false;
       }
+      if (collection.status === "rejected" && !puzzleCollectionReady) {
+        realPuzzleValidationErrors.push("Puzzle collection is temporarily unavailable.");
+      }
+      if (rules.status === "rejected" && puzzleCollectionReady) retryRealPuzzleRulesOnce();
       reportRealPuzzleDiagnostics();
       refreshPuzzleCollectionStatus();
       document.querySelectorAll("[data-real-mode]").forEach((button) => {

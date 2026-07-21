@@ -6,7 +6,9 @@ const indexPath = path.join(siteDir, "index.html");
 const html = fs.readFileSync(indexPath, "utf8");
 const required = [
   "index.html",
-  "assets/kingnorbert-coach.png"
+  "assets/kingnorbert-coach.png",
+  "assets/stockfish/stockfish-nnue-16-single.js",
+  "assets/stockfish/stockfish-nnue-16-single.wasm"
 ];
 
 const refs = new Set(required);
