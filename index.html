@@ -48977,8 +48977,8 @@
     }
 
     function getRealPuzzleDisplayPiece(square) {
-      return realPuzzleGame?.get(square)
-        || getFenPieceAtSquare(realPuzzleBank[realPuzzleIndex]?.fen, square);
+      if (realPuzzleGame) return realPuzzleGame.get(square) || null;
+      return getFenPieceAtSquare(realPuzzleBank[realPuzzleIndex]?.fen, square);
     }
 
     function findRealUciMove(game, uci) {
@@ -49360,6 +49360,9 @@
         return true;
       }
       await refreshCollection();
+      if (!installed) {
+        installed = install(buildPuzzleEssentialsBank(), "Built-in puzzle essentials", true);
+      }
       realPuzzleCollectionLoaded = installed;
       return installed;
     }
@@ -49578,6 +49581,7 @@
       const puzzle = realPuzzleBank[realPuzzleIndex];
       realPuzzleTransitionId += 1;
       cancelPendingRealPuzzleReply();
+      clearRealPuzzleBoardPieces();
       realPuzzleCompletionTransitionId = -1;
       setRealPuzzlePhase("Loading");
       realPuzzleSelected = "";
@@ -49777,6 +49781,15 @@
       board._realPuzzleSquareOrder = order;
       board._realPuzzleSquares = squares;
       return squares;
+    }
+
+    function clearRealPuzzleBoardPieces() {
+      const squares = document.getElementById("realPuzzleBoard")?._realPuzzleSquares;
+      if (!squares) return;
+      squares.forEach((square) => {
+        square.replaceChildren();
+        delete square.dataset.pieceKey;
+      });
     }
 
     function renderRealPuzzleBoard() {
