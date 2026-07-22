@@ -29497,6 +29497,127 @@
       #login :is(.login-card, .login-pass-hero, .login-pass-grid > .login-pass-panel) { transition: none; }
       #login :is(.login-card, .login-pass-hero, .login-pass-grid > .login-pass-panel):hover { transform: none; }
     }
+
+    /* Quick Match uses the existing Play flow after a short online search. */
+    .quick-match-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(3, 10, 22, 0.68);
+      backdrop-filter: blur(12px);
+    }
+
+    .quick-match-overlay[hidden] { display: none; }
+
+    .quick-match-dialog {
+      position: relative;
+      width: min(100%, 430px);
+      display: grid;
+      justify-items: center;
+      gap: 13px;
+      padding: clamp(24px, 5vw, 38px);
+      overflow: hidden;
+      border: 1px solid var(--cq-border-strong, rgba(96, 165, 250, 0.48));
+      border-radius: 24px;
+      color: var(--cq-text-primary, var(--text));
+      background:
+        radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--cq-accent-secondary, #38bdf8) 24%, transparent), transparent 42%),
+        linear-gradient(145deg, var(--cq-surface-elevated, #101c33), var(--cq-bg-primary, #071220));
+      box-shadow: var(--cq-inset-highlight, inset 0 1px 0 rgba(255,255,255,.08)), 0 28px 72px rgba(1, 8, 20, 0.58);
+      text-align: center;
+      animation: quickMatchDialogIn 180ms ease-out both;
+    }
+
+    .quick-match-dialog::before {
+      content: "";
+      position: absolute;
+      inset: 9px;
+      border: 1px solid rgba(177, 210, 255, 0.08);
+      border-radius: 18px;
+      pointer-events: none;
+    }
+
+    .quick-match-dialog > * { position: relative; z-index: 1; }
+
+    .quick-match-close {
+      position: absolute;
+      top: 13px;
+      right: 13px;
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--cq-border, var(--line));
+      border-radius: 10px;
+      color: var(--cq-text-muted, var(--muted));
+      background: rgba(7, 18, 32, 0.52);
+      font: inherit;
+      font-size: 1.25rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .quick-match-close:hover,
+    .quick-match-close:focus-visible {
+      border-color: var(--cq-border-strong, var(--blue));
+      color: var(--cq-text-primary, var(--text));
+      background: var(--cq-surface-elevated, var(--panel-2));
+      outline: none;
+    }
+
+    .quick-match-symbol {
+      width: 64px;
+      height: 64px;
+      display: grid;
+      place-items: center;
+      border: 1px solid color-mix(in srgb, var(--cq-accent-secondary, #38bdf8) 54%, transparent);
+      border-radius: 20px;
+      color: #f0f8ff;
+      background: var(--cq-accent-gradient, linear-gradient(135deg, #3b82f6, #7c63c7));
+      box-shadow: 0 14px 28px rgba(2, 15, 34, 0.36);
+      font-size: 1.75rem;
+    }
+
+    .quick-match-dialog .section-kicker { margin: 4px 0 -7px; }
+    .quick-match-dialog h2 { margin: 0; font-family: var(--cq-font-display, inherit); font-size: clamp(1.35rem, 4vw, 1.75rem); letter-spacing: var(--cq-tracking-heading, -0.02em); }
+    .quick-match-status { min-height: 1.5em; margin: 0; color: var(--cq-text-muted, var(--muted)); font-size: 0.84rem; }
+
+    .quick-match-signal { display: flex; align-items: end; justify-content: center; gap: 6px; min-height: 28px; }
+    .quick-match-signal span { width: 7px; height: 11px; border-radius: 999px; background: var(--cq-accent-secondary, var(--blue)); animation: quickMatchPulse 1s ease-in-out infinite; }
+    .quick-match-signal span:nth-child(2) { height: 20px; animation-delay: 120ms; }
+    .quick-match-signal span:nth-child(3) { height: 28px; animation-delay: 240ms; }
+
+    .quick-match-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
+    .quick-match-meta span { padding: 5px 8px; border: 1px solid var(--cq-border, var(--line)); border-radius: 999px; color: var(--cq-text-secondary, var(--soft)); background: var(--cq-surface-pill, rgba(59, 130, 246, 0.1)); font-size: 0.68rem; font-weight: 750; }
+    .quick-match-dialog .button { min-width: 142px; margin-top: 3px; }
+
+    .quick-match-setup-dialog { justify-items: stretch; text-align: left; }
+    .quick-match-setup-dialog :is(.section-kicker, h2, .quick-match-status, .quick-match-symbol) { justify-self: center; text-align: center; }
+    .quick-match-setup-fields { display: grid; gap: 11px; width: 100%; margin-top: 2px; }
+    .quick-match-setup-fields label { display: grid; gap: 6px; color: var(--cq-text-secondary, var(--soft)); font-size: 0.75rem; font-weight: 800; }
+    .quick-match-setup-fields select { width: 100%; min-height: 42px; padding: 0 11px; border: 1px solid var(--cq-border, var(--line)); border-radius: 12px; color: var(--cq-text-primary, var(--text)); background: var(--cq-surface-input, var(--panel)); font: inherit; font-size: 0.82rem; }
+    .quick-match-setup-fields select:focus-visible { border-color: var(--cq-border-strong, var(--blue)); outline: none; box-shadow: var(--cq-focus-ring, 0 0 0 3px rgba(59,130,246,.2)); }
+    .quick-match-remember { display: flex; align-items: center; gap: 8px; color: var(--cq-text-muted, var(--muted)); font-size: 0.73rem; line-height: 1.35; cursor: pointer; }
+    .quick-match-remember input { accent-color: var(--cq-accent-secondary, var(--blue)); }
+    .quick-match-setup-actions { display: flex; justify-content: flex-end; gap: 9px; }
+    .quick-match-setup-actions .button { min-width: 0; }
+
+    @keyframes quickMatchDialogIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes quickMatchPulse { 50% { opacity: .36; transform: translateY(2px); } }
+
+    @media (max-width: 520px) {
+      .quick-match-overlay { padding: 12px; align-items: end; }
+      .quick-match-dialog { width: 100%; border-radius: 22px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .quick-match-dialog,
+      .quick-match-signal span { animation: none; }
+    }
   </style>
 </head>
 <body>
@@ -32566,6 +32687,44 @@
         </div>
       </div>
     </section>
+
+    <div class="quick-match-overlay" id="quickMatchSetup" role="dialog" aria-modal="true" aria-labelledby="quickMatchSetupTitle" hidden>
+      <form class="quick-match-dialog quick-match-setup-dialog" id="quickMatchSetupForm">
+        <button class="quick-match-close" type="button" id="quickMatchSetupCancel" aria-label="Close Quick Match setup">×</button>
+        <span class="quick-match-symbol" aria-hidden="true">⚡</span>
+        <p class="section-kicker">Quick Match</p>
+        <h2 id="quickMatchSetupTitle">Quick Match Setup</h2>
+        <p class="quick-match-status">Choose your preferred game, then we will find the closest available opponent.</p>
+        <div class="quick-match-setup-fields">
+          <label>Time Control
+            <select id="quickMatchTimeControl" name="timeControl">
+              <option value="1+0">1+0 Bullet</option><option value="2+1">2+1 Bullet</option><option value="3+0">3+0 Blitz</option><option value="3+2">3+2 Blitz</option><option value="5+0" selected>5+0 Blitz</option><option value="5+3">5+3 Blitz</option><option value="10+0">10+0 Rapid</option><option value="10+5">10+5 Rapid</option><option value="15+10">15+10 Rapid</option>
+            </select>
+          </label>
+          <label>Game Type
+            <select id="quickMatchGameType" name="gameType"><option value="casual" selected>Casual</option><option value="rated">Rated</option></select>
+          </label>
+          <label>Preferred Color
+            <select id="quickMatchColor" name="color"><option value="random" selected>Random</option><option value="w">White</option><option value="b">Black</option></select>
+          </label>
+        </div>
+        <label class="quick-match-remember"><input id="quickMatchRemember" type="checkbox" /> Remember these settings on this device</label>
+        <div class="quick-match-setup-actions"><button class="button secondary" type="button" id="quickMatchSetupStop">Cancel</button><button class="button" type="submit">Start Matchmaking</button></div>
+      </form>
+    </div>
+
+    <div class="quick-match-overlay" id="quickMatchOverlay" role="dialog" aria-modal="true" aria-labelledby="quickMatchTitle" aria-describedby="quickMatchStatus" hidden>
+      <div class="quick-match-dialog">
+        <button class="quick-match-close" type="button" id="quickMatchCancel" aria-label="Cancel matchmaking">×</button>
+        <span class="quick-match-symbol" aria-hidden="true">⚡</span>
+        <p class="section-kicker">Quick Match</p>
+        <h2 id="quickMatchTitle">Finding your opponent</h2>
+        <p class="quick-match-status" id="quickMatchStatus" role="status" aria-live="polite">Searching the online pool…</p>
+        <div class="quick-match-signal" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="quick-match-meta"><span id="quickMatchMetaType">Casual</span><span id="quickMatchMetaTime">5+0</span><span id="quickMatchMetaColor">Random color</span></div>
+        <button class="button secondary" type="button" id="quickMatchStop">Cancel search</button>
+      </div>
+    </div>
 
     <section id="leaderboards" class="section-dark" aria-labelledby="leaderboards-title">
       <div class="wrap">
@@ -43610,8 +43769,13 @@
       renderFriendChallengeLobby();
     }
 
-    function startSoloCoachGame() {
+    function startSoloCoachGame({ playerColor } = {}) {
       resetRealtimeContextForAi();
+      if (playerColor === "w" || playerColor === "b") {
+        coachPlayerColor = playerColor;
+        coachFlipped = playerColor === "b";
+        renderCoachSidePicker();
+      }
       matchClockState = null;
       matchClockExpiredColor = "";
       coachPremove = null;
@@ -56043,12 +56207,232 @@
     document.getElementById("restartAdventure").addEventListener("click", renderAdventureMission);
     }
 
+    function setupQuickMatch() {
+      const setup = document.getElementById("quickMatchSetup");
+      const setupForm = document.getElementById("quickMatchSetupForm");
+      const timeControl = document.getElementById("quickMatchTimeControl");
+      const gameType = document.getElementById("quickMatchGameType");
+      const color = document.getElementById("quickMatchColor");
+      const remember = document.getElementById("quickMatchRemember");
+      const setupCancel = document.getElementById("quickMatchSetupCancel");
+      const setupStop = document.getElementById("quickMatchSetupStop");
+      const overlay = document.getElementById("quickMatchOverlay");
+      const status = document.getElementById("quickMatchStatus");
+      const cancel = document.getElementById("quickMatchCancel");
+      const stop = document.getElementById("quickMatchStop");
+      const metaType = document.getElementById("quickMatchMetaType");
+      const metaTime = document.getElementById("quickMatchMetaTime");
+      const metaColor = document.getElementById("quickMatchMetaColor");
+      if (!setup || !setupForm || !timeControl || !gameType || !color || !remember || !overlay || !status || overlay.dataset.ready) return;
+      overlay.dataset.ready = "true";
+
+      const storageKey = "nschess.quickMatchSettings.v1";
+      const defaults = { timeControl: "5+0", gameType: "casual", color: "random" };
+      const state = { token: 0, controller: null, fallbackTimer: 0, ticker: 0, returnFocus: null, options: { ...defaults } };
+      const readSavedOptions = () => {
+        try {
+          const saved = JSON.parse(window.localStorage.getItem(storageKey) || "null");
+          return saved && typeof saved === "object" ? { ...defaults, ...saved } : { ...defaults };
+        } catch {
+          return { ...defaults };
+        }
+      };
+      const applyOptionsToForm = (options = readSavedOptions()) => {
+        state.options = { ...defaults, ...options };
+        timeControl.value = state.options.timeControl;
+        gameType.value = state.options.gameType;
+        color.value = state.options.color;
+        try {
+          remember.checked = Boolean(window.localStorage.getItem(storageKey));
+        } catch {
+          remember.checked = false;
+        }
+      };
+      const selectedOptions = () => ({
+        timeControl: timeControl.value,
+        gameType: gameType.value,
+        color: color.value
+      });
+      const setMatchMeta = (options) => {
+        if (metaType) metaType.textContent = options.gameType === "rated" ? "Rated" : "Casual";
+        if (metaTime) metaTime.textContent = options.timeControl;
+        if (metaColor) metaColor.textContent = options.color === "random" ? "Random color" : options.color === "w" ? "White" : "Black";
+      };
+      const syncAiSettings = (options) => {
+        const [minutes, increment] = options.timeControl.split("+");
+        const setSelectValue = (id, value, label) => {
+          const select = document.getElementById(id);
+          if (!select) return;
+          if (![...select.options].some((option) => option.value === value)) select.add(new Option(label, value));
+          select.value = value;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        setSelectValue("playTimeControl", minutes, `${minutes} minutes`);
+        setSelectValue("playIncrement", increment, `${increment} seconds`);
+        setSelectValue("playMatchType", options.gameType, options.gameType === "rated" ? "Rated" : "Casual");
+      };
+      const clearSearch = () => {
+        window.clearTimeout(state.fallbackTimer);
+        window.clearInterval(state.ticker);
+        state.fallbackTimer = 0;
+        state.ticker = 0;
+        state.controller?.abort();
+        state.controller = null;
+      };
+      const closeSetup = ({ restoreFocus = true } = {}) => {
+        setup.hidden = true;
+        if (restoreFocus) {
+          if (/(^|[?&])mode=quick/.test(window.location.hash)) window.history?.replaceState?.(null, "", "#play");
+          state.returnFocus?.focus?.({ preventScroll: true });
+          state.returnFocus = null;
+        }
+      };
+      const closeSearch = ({ restoreFocus = true } = {}) => {
+        state.token += 1;
+        clearSearch();
+        overlay.hidden = true;
+        document.body.classList.remove("quick-match-searching");
+        if (restoreFocus) state.returnFocus?.focus?.({ preventScroll: true });
+        state.returnFocus = null;
+      };
+      const getQueueOptions = () => {
+        const [minutes, increment] = state.options.timeControl.split("+");
+        return {
+          queue: "quick",
+          timeControl: state.options.timeControl,
+          minutes: Number(minutes),
+          increment: Number(increment),
+          gameType: state.options.gameType,
+          rated: state.options.gameType === "rated",
+          preferredColor: state.options.color
+        };
+      };
+      const waitForOnlineMatch = (signal) => {
+        const adapter = window.NschessOnlineMatchmaking;
+        if (typeof adapter?.findMatch !== "function") return new Promise(() => {});
+        return Promise.resolve(adapter.findMatch({ ...getQueueOptions(), signal }))
+          .then((match) => match ? { match } : new Promise(() => {}))
+          .catch(() => new Promise(() => {}));
+      };
+      const startOnlineMatch = async (match) => {
+        const adapter = window.NschessOnlineMatchmaking;
+        const options = getQueueOptions();
+        if (typeof adapter?.startMatch === "function") {
+          await adapter.startMatch(match, options);
+          return true;
+        }
+        if (typeof match?.start === "function") {
+          await match.start(options);
+          return true;
+        }
+        return false;
+      };
+      const launchAiFallback = async (token) => {
+        const options = { ...state.options };
+        status.textContent = "No online opponent found. Starting an AI match...";
+        await new Promise((resolve) => window.setTimeout(resolve, 420));
+        if (token !== state.token) return;
+        if (/(^|[?&])mode=quick/.test(window.location.hash)) window.history?.replaceState?.(null, "", "#play");
+        closeSearch({ restoreFocus: false });
+        await initializeDeferredFeature("play");
+        if (token !== state.token - 1) return;
+        syncAiSettings(options);
+        const playerColor = options.color === "random" ? (Math.random() < 0.5 ? "w" : "b") : options.color;
+        startSoloCoachGame({ playerColor });
+        coachMessage = `No online opponent joined this time. Your ${options.timeControl} ${options.gameType} AI match is ready—good luck!`;
+        renderCoachBoard();
+      };
+      const openSearch = () => {
+        clearSearch();
+        state.token += 1;
+        const token = state.token;
+        setMatchMeta(state.options);
+        overlay.hidden = false;
+        document.body.classList.add("quick-match-searching");
+        status.textContent = "Searching the online pool…";
+        cancel?.focus({ preventScroll: true });
+        state.controller = new AbortController();
+        const startedAt = Date.now();
+        state.ticker = window.setInterval(() => {
+          const seconds = Math.min(7, Math.floor((Date.now() - startedAt) / 1000));
+          status.textContent = `Searching the online pool… ${seconds}s`;
+        }, 1000);
+        const fallback = new Promise((resolve) => {
+          state.fallbackTimer = window.setTimeout(() => resolve(null), 7000);
+        });
+        void Promise.race([waitForOnlineMatch(state.controller.signal), fallback]).then(async (result) => {
+          if (token !== state.token) return;
+          window.clearInterval(state.ticker);
+          state.ticker = 0;
+          if (result?.match) {
+            status.textContent = "Opponent found. Starting your online game…";
+            try {
+              if (await startOnlineMatch(result.match)) {
+                closeSearch({ restoreFocus: false });
+                return;
+              }
+            } catch {
+              // The fallback keeps Quick Match playable if a future provider fails to start.
+            }
+          }
+          void launchAiFallback(token);
+        });
+      };
+
+      const openSetup = (trigger) => {
+        clearSearch();
+        state.token += 1;
+        overlay.hidden = true;
+        document.body.classList.remove("quick-match-searching");
+        state.returnFocus = trigger || document.activeElement;
+        applyOptionsToForm();
+        setup.hidden = false;
+        timeControl.focus({ preventScroll: true });
+      };
+
+      setupForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        state.options = { ...defaults, ...selectedOptions() };
+        try {
+          if (remember.checked) window.localStorage.setItem(storageKey, JSON.stringify(state.options));
+          else window.localStorage.removeItem(storageKey);
+        } catch {
+          // Quick Match remains usable when browser storage is unavailable.
+        }
+        closeSetup({ restoreFocus: false });
+        openSearch();
+      });
+      setupCancel?.addEventListener("click", () => closeSetup());
+      setupStop?.addEventListener("click", () => closeSetup());
+      cancel?.addEventListener("click", () => closeSearch());
+      stop?.addEventListener("click", () => closeSearch());
+      setup.addEventListener("click", (event) => { if (event.target === setup) closeSetup(); });
+      overlay.addEventListener("click", (event) => { if (event.target === overlay) closeSearch(); });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (!overlay.hidden) closeSearch();
+        else if (!setup.hidden) closeSetup();
+      });
+      document.addEventListener("click", (event) => {
+        const trigger = event.target instanceof Element ? event.target.closest('[data-play-mode="quick"]') : null;
+        if (!trigger) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!document.getElementById("play")?.classList.contains("is-active-panel")) {
+          [...document.querySelectorAll('[data-site-tab="play"]')].find((link) => link.dataset.playMode !== "quick")?.click();
+        }
+        window.requestAnimationFrame(() => openSetup(trigger));
+      }, true);
+      if (/(^|[?&])mode=quick/.test(window.location.hash)) window.requestAnimationFrame(() => openSetup(null));
+    }
+
     applyStartupTheme();
     setupRuntimeSafety();
     setupSiteTabs();
     setupAudioSystem();
     primeHomeRankings();
     void setupSupabaseAuthUi();
+    setupQuickMatch();
     window.requestAnimationFrame(() => {
       setupVisualEntrances();
       setupPerformanceOptimizations();
