@@ -29801,6 +29801,252 @@
       }
     }
 
+    /* Play sidebar refinement */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+      gap: 8px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-left-sidebar > :is(.play-mode-nav, .preference-panel) {
+      padding: 8px;
+      border-color: color-mix(in srgb, var(--cq-border) 72%, transparent);
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-head {
+      margin-bottom: 6px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card {
+      min-height: 38px;
+      gap: 8px;
+      padding: 5px 6px;
+      border-color: transparent;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-icon {
+      width: 27px;
+      height: 27px;
+      font-size: 0.78rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .preference-panel h3 {
+      margin-bottom: 6px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .preference-grid {
+      gap: 6px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar > :is(.play-rail-drawer, .captured-row, .trainer-note) {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border-color: color-mix(in srgb, var(--cq-border) 72%, transparent);
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer > summary {
+      min-height: 36px;
+      padding: 0 10px;
+      border-bottom-color: transparent;
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer[open] > summary {
+      border-bottom-color: color-mix(in srgb, var(--cq-border) 72%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer-content,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer--coach .play-rail-drawer-content {
+      gap: 8px;
+      padding: 8px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer--coach > summary {
+      color: var(--cq-text-primary);
+      font-weight: 800;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .engine-panel {
+      padding: 8px;
+      border-color: color-mix(in srgb, var(--cq-border) 72%, transparent);
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .engine-panel .engine-eval {
+      height: 4px;
+      margin: 5px 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library {
+      border-color: color-mix(in srgb, var(--cq-border) 72%, transparent);
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library > summary {
+      min-height: 34px;
+      padding: 0 10px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library-body {
+      gap: 8px;
+      padding: 8px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library .beginner-bot-list {
+      grid-template-columns: minmax(0, 1fr);
+      max-height: 168px;
+      gap: 4px;
+      padding-right: 1px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library .beginner-bot-card {
+      min-height: 48px;
+      gap: 6px;
+      padding: 6px;
+      border-color: color-mix(in srgb, var(--cq-border) 72%, transparent);
+      border-radius: 8px;
+      box-shadow: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library .beginner-bot-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library .beginner-bot-copy small {
+      font-size: 0.64rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar > :is(.captured-row, .trainer-note) {
+      padding: 8px;
+    }
+
+    @media (max-width: 899px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        gap: var(--cq-space-2);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library .beginner-bot-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: none;
+      }
+    }
+
+    /* Play visual polish */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+      border: 1px solid color-mix(in srgb, var(--cq-border) 84%, transparent);
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-secondary) 5%, transparent), transparent 32%),
+        linear-gradient(180deg, color-mix(in srgb, var(--cq-surface-glass-strong) 92%, transparent), color-mix(in srgb, var(--cq-surface-panel) 94%, transparent));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 18px 42px rgba(1, 8, 20, 0.24);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar > :is(.play-mode-nav, .preference-panel), .play-right-sidebar > :is(.play-rail-drawer, .captured-row, .trainer-note)) {
+      border-color: color-mix(in srgb, var(--cq-border) 88%, transparent);
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 44%),
+        var(--cq-surface-glass);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 8px 18px rgba(1, 8, 20, 0.16);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-mode-head strong, .play-rail-drawer > summary > span, .coach-library > summary > span) {
+      letter-spacing: 0.025em;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-head strong {
+      font-size: 0.72rem;
+      font-weight: 850;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card {
+      color: var(--cq-text-muted);
+      border-radius: 10px;
+      transition: background-color var(--cq-transition-fast) ease, color var(--cq-transition-fast) ease, border-color var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card:hover,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card:focus-visible {
+      border-color: color-mix(in srgb, var(--cq-accent-secondary) 28%, transparent);
+      color: var(--cq-text-primary);
+      background: linear-gradient(90deg, var(--cq-accent-secondary-soft), transparent 88%);
+      transform: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-icon {
+      border-color: color-mix(in srgb, var(--cq-border) 88%, transparent);
+      background: color-mix(in srgb, var(--cq-surface-input) 92%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer > summary {
+      color: var(--cq-text-primary);
+      background: linear-gradient(90deg, color-mix(in srgb, var(--cq-accent-primary) 7%, transparent), transparent 72%);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer > summary small {
+      color: var(--cq-text-subtle);
+      font-size: 0.62rem;
+      font-weight: 700;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer[open] > summary {
+      background: linear-gradient(90deg, color-mix(in srgb, var(--cq-accent-secondary) 11%, transparent), transparent 72%);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer-content {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 42%);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .engine-panel,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library {
+      border-color: color-mix(in srgb, var(--cq-border) 82%, transparent);
+      background: color-mix(in srgb, var(--cq-surface-input) 76%, transparent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .engine-panel .engine-row {
+      color: var(--cq-text-muted);
+      font-size: 0.68rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .engine-panel .engine-eval {
+      border-radius: var(--cq-radius-pill);
+      background: color-mix(in srgb, var(--cq-border) 82%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library > summary {
+      color: var(--cq-text-primary);
+      background: linear-gradient(90deg, color-mix(in srgb, var(--cq-accent-primary) 6%, transparent), transparent 72%);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library .beginner-bot-card {
+      color: var(--cq-text-primary);
+      background: color-mix(in srgb, var(--cq-surface-panel) 82%, transparent);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library .beginner-bot-card:hover,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-library .beginner-bot-card:focus-visible {
+      border-color: color-mix(in srgb, var(--cq-accent-secondary) 42%, var(--cq-border));
+      background: color-mix(in srgb, var(--cq-accent-secondary) 9%, var(--cq-surface-panel));
+      box-shadow: none;
+      transform: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .captured-row strong,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .trainer-note {
+      color: var(--cq-text-subtle);
+      font-size: 0.64rem;
+      letter-spacing: 0.015em;
+    }
+
+    @media (max-width: 899px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        box-shadow: var(--cq-shadow-sm);
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -32701,7 +32947,7 @@
           </div>
           <aside class="puzzle-info coach-panel play-right-sidebar cq-sidebar cq-sidebar--insight">
             <details class="play-rail-drawer play-rail-drawer--coach cq-panel" id="coachToolsDrawer" data-play-drawer="coach">
-              <summary><span>Coach &amp; analysis</span><small>Optional tools</small></summary>
+              <summary><span>Coach Advice</span><small>Open insights</small></summary>
               <div class="play-rail-drawer-content">
             <article class="featured-coach-card cq-panel cq-panel--featured" aria-label="KingNorbert Coach Bot profile">
               <span class="featured-coach-avatar" data-coach-avatar="assets/kingnorbert-coach.png" data-coach-fallback="KN" role="img" aria-label="KingNorbert Coach Bot"></span>
