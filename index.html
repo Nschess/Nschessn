@@ -30115,6 +30115,177 @@
       transition: none !important;
     }
 
+    /* Play responsive optimization */
+    @media (min-width: 700px) and (max-width: 1180px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+        --cq-play-board-max: min(836px, calc(100dvw - 28px));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 22px, 1060px);
+        grid-template-areas:
+          "center center"
+          "left right";
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+        grid-template-areas:
+          "opponent"
+          "board"
+          "player"
+          "actions"
+          "setup"
+          "options";
+        width: min(100%, var(--cq-play-board-max));
+        max-width: var(--cq-play-board-max);
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-content: start;
+        min-width: 0;
+      }
+    }
+
+    @media (min-width: 700px) and (max-width: 899px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 16px, 860px);
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+    }
+
+    @media (max-width: 699px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+        --cq-play-board-max: min(var(--user-board-size), calc(100dvw - 24px));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 8px, 680px);
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        padding: 6px;
+        gap: 10px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+        grid-template-areas:
+          "opponent"
+          "board"
+          "player"
+          "actions"
+          "setup"
+          "options";
+        width: 100%;
+        gap: 8px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+        width: min(100%, var(--cq-play-board-max));
+        padding: 4px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+        min-height: 54px;
+        padding: 6px 8px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        gap: 8px;
+      }
+    }
+
+    @media (max-width: 479px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .section-head {
+        width: min(100% - 12px, 680px);
+        margin-bottom: 8px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 4px, 680px);
+        padding: 4px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+        width: min(100%, calc(100dvw - 16px));
+        padding: 3px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar .play-rail-drawer > summary {
+        min-height: 38px;
+      }
+    }
+
+
+    /* Play production polish */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-shell, .match-board-column, .play-left-sidebar, .play-right-sidebar, .player-frame, .play-rail-drawer > summary) {
+      min-width: 0;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.ai-player-main, .match-player-main, .play-rail-drawer > summary > span, .play-rail-drawer > summary small) {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.player-frame small, .section-intro, .trainer-note) {
+      line-height: 1.4;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer > summary {
+      align-items: center;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .captured-pieces:empty {
+      display: flex;
+      min-height: 1.35rem;
+      align-items: center;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #gameStatusBadge.status-skeleton {
+      min-width: 7.5ch;
+      justify-content: center;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-skeleton {
+      min-height: 4rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-primary-actions .button, .play-bottom-actionbar .button, .play-rail-drawer > summary):disabled {
+      cursor: not-allowed;
+      opacity: 0.56;
+      transform: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-square:focus-visible {
+      position: relative;
+      z-index: 1;
+      outline: 2px solid var(--cq-focus-outline);
+      outline-offset: -2px;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap:hover {
+        border-color: color-mix(in srgb, var(--cq-accent-secondary) 46%, var(--cq-border));
+        box-shadow: 0 0 0 1px var(--cq-accent-secondary-soft), 0 16px 36px rgba(1, 8, 20, 0.42);
+      }
+    }
+
+    @media (max-width: 699px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar > :is(.play-rail-drawer, .captured-row, .trainer-note) {
+        min-width: 0;
+      }
+    }
+
   </style>
 </head>
 <body>
