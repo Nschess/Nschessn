@@ -6,3 +6,5 @@ dist/
 .agents/
 .codex/
 data/lichess_db_puzzle.csv
+.vercel
+.env*

@@ -3,7 +3,7 @@ const path = require("path");
 
 const projectDir = path.resolve(__dirname, "..");
 const outputDir = path.join(projectDir, "dist");
-const staticEntries = ["index.html", "favicon.svg", "site.webmanifest", "robots.txt", ".nojekyll", "assets", "data"];
+const staticEntries = ["index.html", "privacy.html", "terms.html", "account-deletion.html", "offline.html", "service-worker.js", "favicon.svg", "site.webmanifest", "robots.txt", ".nojekyll", "assets", "data"];
 
 fs.rmSync(outputDir, { recursive: true, force: true });
 fs.mkdirSync(outputDir, { recursive: true });
