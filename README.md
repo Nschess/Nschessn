@@ -29,6 +29,8 @@ Apply `supabase/auth.sql` and then `supabase/leaderboard.sql` in the Supabase SQ
 
 For friend requests, private challenges, and live friend status, apply `supabase/friends.sql` after `supabase/auth.sql`.
 
+For private in-app player reports, apply `supabase/moderation.sql` after `supabase/friends.sql`.
+
 ## Verification
 
 Run the following before deploying a static change:
@@ -42,4 +44,14 @@ node scripts/check-deploy-assets.js dist
 ## Chess piece assets
 
 The bundled Lichess piece themes are copied from [lila](https://github.com/lichess-org/lila/tree/master/public/piece) and are licensed under AGPL-3.0-or-later. The license copy is in `assets/pieces/LICENSE.lila`.
+## Play Store release prerequisites
 
+This repository is a web/PWA application. A signed Android App Bundle and Play Console configuration are still required before a Google Play release.
+
+1. Host the production app over HTTPS and use that production domain in the Android wrapper.
+2. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and the server-only `SUPABASE_SERVICE_ROLE_KEY` in the Vercel environment. Never expose the service-role key in browser code.
+3. Apply `supabase/auth.sql`, `supabase/leaderboard.sql`, `supabase/friends.sql`, `supabase/tournaments.sql` when tournaments are enabled, and `supabase/moderation.sql` for private player reports.
+4. Verify the public URLs for `privacy.html`, `terms.html`, and `account-deletion.html` on the production domain. Replace the support email in those pages if your production support address differs.
+5. Create the Android project using your own package ID and signing key, then build and upload a signed `.aab`. Package identity and signing credentials are intentionally not stored in this repository.
+6. Complete Play Console Data Safety, content rating, target audience, ads declaration, app access/reviewer instructions, store listing assets, and testing requirements before production rollout.
+7. Test account deletion, report submission, offline fallback, multiplayer reconnect, and mobile layouts against the production deployment.

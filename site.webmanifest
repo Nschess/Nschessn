@@ -1,17 +1,25 @@
 {
+  "id": "./",
   "name": "Nschess",
   "short_name": "Nschess",
   "description": "Guided chess lessons, practical puzzles, and coach games for every level.",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#071220",
+  "theme_color": "#071220",
   "icons": [
     {
       "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    { "name": "Play chess", "short_name": "Play", "url": "./#play", "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Daily Puzzle", "short_name": "Puzzle", "url": "./#puzzles", "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Learn chess", "short_name": "Learn", "url": "./#tutorial", "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }] }
   ]
 }

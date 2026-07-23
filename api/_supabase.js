@@ -20,6 +20,14 @@ function getSupabaseConfig() {
   return { url, anonKey };
 }
 
+function getSupabaseServiceRoleKey() {
+  const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  if (serviceRoleKey) return serviceRoleKey;
+  const error = new Error("SUPABASE_SERVICE_ROLE_KEY is not configured.");
+  error.code = "SUPABASE_SERVICE_ROLE_KEY_MISSING";
+  throw error;
+}
+
 async function supabaseRequest(path, options = {}) {
   if (!path || typeof path !== "string") {
     const error = new Error("A Supabase REST path is required.");
@@ -46,4 +54,4 @@ async function supabaseRequest(path, options = {}) {
   return payload;
 }
 
-module.exports = { getSupabaseConfig, supabaseRequest };
+module.exports = { getSupabaseConfig, getSupabaseServiceRoleKey, supabaseRequest };
