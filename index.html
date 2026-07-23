@@ -29618,6 +29618,174 @@
       .quick-match-dialog,
       .quick-match-signal span { animation: none; }
     }
+    /* Approved Play layout reference */
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+      --cq-play-stage-chrome: 228px;
+      --cq-play-board-max: min(760px, max(420px, calc(100svh - var(--cq-play-stage-chrome))));
+      background:
+        radial-gradient(circle at 52% 18%, color-mix(in srgb, var(--cq-accent-secondary) 9%, transparent), transparent 34rem),
+        linear-gradient(180deg, color-mix(in srgb, var(--cq-surface-panel) 78%, transparent), transparent 26rem);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .section-head {
+      width: min(100% - 28px, 1640px);
+      min-height: 48px;
+      margin: 0 auto var(--cq-space-2);
+      padding: 9px 14px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .section-head h2 {
+      font-size: clamp(1.05rem, 1.8vw, 1.4rem);
+      letter-spacing: -0.025em;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .section-head .section-intro {
+      max-width: 48ch;
+      font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+      width: min(100% - 28px, 1640px);
+      grid-template-areas: "left center right";
+      grid-template-columns: clamp(210px, 15.5vw, 236px) minmax(520px, 760px) clamp(278px, 20vw, 326px) !important;
+      gap: clamp(14px, 1.45vw, 22px);
+      align-items: start;
+      padding: clamp(10px, 1.25vw, 18px);
+      border-radius: 20px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+      gap: var(--cq-space-2);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas:
+        "setup setup"
+        "opponent player"
+        "board board"
+        "actions actions"
+        "options options";
+      width: min(100%, var(--cq-play-board-max));
+      max-width: var(--cq-play-board-max);
+      gap: 10px;
+      justify-self: center;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .coach-setup,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-bottom-actionbar,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .game-options-panel,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+      width: 100%;
+      max-width: none;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+      width: 100%;
+      min-height: 62px;
+      margin: 0;
+      padding: 8px 10px;
+      align-self: stretch;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+      width: min(100%, var(--cq-play-board-max));
+      aspect-ratio: 1;
+      padding: 5px;
+      border-radius: 14px;
+      box-shadow:
+        0 0 0 1px var(--cq-accent-secondary-soft),
+        0 16px 36px rgba(1, 8, 20, 0.42);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-left-sidebar > :is(.play-mode-nav, .preference-panel),
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar > :not([hidden]) {
+      border-radius: 14px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar .play-rail-drawer--moves .play-rail-drawer-content {
+      max-height: min(38svh, 340px);
+      overflow: auto;
+    }
+
+    @media (min-width: 1181px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: sticky;
+        top: 84px;
+        max-height: calc(100svh - 96px);
+        overflow: auto;
+      }
+    }
+
+    @media (min-width: 900px) and (max-width: 1180px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 22px, 1060px);
+        grid-template-areas:
+          "center center"
+          "left right";
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column {
+        width: min(100%, 760px);
+      }
+    }
+
+    @media (max-width: 899px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+        --cq-play-board-max: min(100%, var(--user-board-size), calc(100dvw - 28px));
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 14px, 760px);
+        grid-template-areas:
+          "center"
+          "right"
+          "left";
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 620px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .section-head {
+        width: min(100% - 16px, 680px);
+        padding: 9px 12px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .section-head .section-intro {
+        display: none;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        width: min(100% - 10px, 680px);
+        padding: 8px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+          "setup"
+          "opponent"
+          "board"
+          "player"
+          "actions"
+          "options";
+        gap: 8px;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+        width: min(100%, calc(100dvw - 26px));
+      }
+    }
+
   </style>
 </head>
 <body>
