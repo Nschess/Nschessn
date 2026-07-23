@@ -30047,6 +30047,74 @@
       }
     }
 
+    /* Play micro-interactions */
+    @keyframes playMicroReveal {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes playMoveHighlight {
+      0% { box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--cq-accent-secondary) 0%, transparent); }
+      45% { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--cq-accent-secondary) 58%, transparent); }
+      100% { box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--cq-accent-secondary) 0%, transparent); }
+    }
+
+    @keyframes playTimerSettle {
+      from { transform: scale(0.97); }
+      to { transform: scale(1); }
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+      animation: playMicroReveal 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-mode-card, .play-primary-actions .button, .play-bottom-actionbar .button, .play-rail-drawer > summary) {
+      transition: transform var(--cq-transition-fast) ease, border-color var(--cq-transition-fast) ease, background-color var(--cq-transition-fast) ease, box-shadow var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-mode-card, .play-primary-actions .button, .play-bottom-actionbar .button, .play-rail-drawer > summary):hover,
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-mode-card, .play-primary-actions .button, .play-bottom-actionbar .button, .play-rail-drawer > summary):focus-visible {
+      transform: translateY(-1px);
+      box-shadow: var(--cq-shadow-sm);
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-mode-card, .play-primary-actions .button, .play-bottom-actionbar .button, .play-rail-drawer > summary):active {
+      transform: translateY(0);
+      transition-duration: 90ms;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-rail-drawer[open] > .play-rail-drawer-content {
+      animation: playMicroReveal 180ms ease-out both;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-square.last-move {
+      animation: playMoveHighlight 360ms ease-out both;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.match-player-timer, .ai-player-timer) {
+      transition: color var(--cq-transition-fast) ease, background-color var(--cq-transition-fast) ease, border-color var(--cq-transition-fast) ease, box-shadow var(--cq-transition-fast) ease;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.match-player-card.is-player-turn .match-player-timer, .ai-player-card.is-active .ai-player-timer) {
+      animation: playTimerSettle 240ms ease-out both;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .move-history > * {
+      transition: color var(--cq-transition-fast) ease, background-color var(--cq-transition-fast) ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-shell, .play-mode-card, .play-primary-actions .button, .play-bottom-actionbar .button, .play-rail-drawer > summary, .play-rail-drawer-content, .play-square.last-move, .match-player-timer, .ai-player-timer, .move-history > *) {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+    body:is(.reduced-motion, .low-performance, .perf-lite) #play:not(.is-review-mode) :is(.play-shell, .play-mode-card, .play-primary-actions .button, .play-bottom-actionbar .button, .play-rail-drawer > summary, .play-rail-drawer-content, .play-square.last-move, .match-player-timer, .ai-player-timer, .move-history > *) {
+      animation: none !important;
+      transition: none !important;
+    }
+
   </style>
 </head>
 <body>
