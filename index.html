@@ -29620,8 +29620,8 @@
     }
     /* Approved Play layout reference */
     :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
-      --cq-play-stage-chrome: 228px;
-      --cq-play-board-max: min(760px, max(420px, calc(100svh - var(--cq-play-stage-chrome))));
+      --cq-play-stage-chrome: 164px;
+      --cq-play-board-max: min(836px, max(462px, calc(100svh - var(--cq-play-stage-chrome))));
       background:
         radial-gradient(circle at 52% 18%, color-mix(in srgb, var(--cq-accent-secondary) 9%, transparent), transparent 34rem),
         linear-gradient(180deg, color-mix(in srgb, var(--cq-surface-panel) 78%, transparent), transparent 26rem);
@@ -29645,10 +29645,11 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
-      width: min(100% - 28px, 1640px);
+      width: min(100% - 28px, 1660px);
       grid-template-areas: "left center right";
-      grid-template-columns: clamp(210px, 15.5vw, 236px) minmax(520px, 760px) clamp(278px, 20vw, 326px) !important;
-      gap: clamp(14px, 1.45vw, 22px);
+      grid-template-columns: clamp(190px, 14vw, 214px) minmax(572px, 836px) clamp(250px, 18vw, 294px) !important;
+      gap: clamp(12px, 1.2vw, 18px);
+      justify-content: center;
       align-items: start;
       padding: clamp(10px, 1.25vw, 18px);
       border-radius: 20px;
@@ -29710,6 +29711,20 @@
     }
 
     @media (min-width: 1181px) {
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+        grid-template-columns: minmax(250px, 1fr) minmax(572px, 836px) minmax(250px, 1fr) !important;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-left-sidebar {
+        width: min(100%, 214px);
+        justify-self: end;
+      }
+
+      :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar {
+        width: min(100%, 294px);
+        justify-self: start;
+      }
+
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
         position: sticky;
         top: 84px;
@@ -29728,7 +29743,7 @@
       }
 
       :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column {
-        width: min(100%, 760px);
+        width: min(100%, 836px);
       }
     }
 
