@@ -6,10 +6,37 @@ if (scripts.length !== 1) throw new Error(`Expected one inline application scrip
 new Function(scripts[0][1]);
 
 const manifest = JSON.parse(fs.readFileSync("site.webmanifest", "utf8"));
-if (manifest.start_url !== "./" || !Array.isArray(manifest.icons) || !manifest.icons.length) {
-  throw new Error("The web manifest needs a relative start URL and at least one icon.");
+if (
+  manifest.id !== "./"
+  || manifest.start_url !== "./"
+  || manifest.scope !== "./"
+  || manifest.display !== "standalone"
+  || !manifest.theme_color
+  || !manifest.background_color
+  || !Array.isArray(manifest.icons)
+) {
+  throw new Error("The web manifest is missing a required TWA/PWA property.");
 }
 
+const requiredPngIcons = [
+  ["assets/icons/icon-192.png", "192x192"],
+  ["assets/icons/icon-512.png", "512x512"]
+];
+for (const [src, sizes] of requiredPngIcons) {
+  const icon = manifest.icons.find((candidate) => candidate.src === src && candidate.sizes === sizes && candidate.type === "image/png");
+  if (!icon || !fs.existsSync(src)) {
+    throw new Error(`Missing required PWA icon: ${src}.`);
+  }
+
+  const png = fs.readFileSync(src);
+  const expectedSize = Number.parseInt(sizes, 10);
+  const isPng = png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  if (!isPng || width !== expectedSize || height !== expectedSize) {
+    throw new Error(`PWA icon ${src} must be a ${sizes} PNG.`);
+  }
+}
 const requiredMetadata = ["description", "robots", "theme-color", "og:title", "og:description"];
 for (const name of requiredMetadata) {
   const pattern = new RegExp(`<meta[^>]+(?:name|property)=["']${name}["']`, "i");
