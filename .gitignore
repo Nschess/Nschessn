@@ -8,3 +8,11 @@ dist/
 data/lichess_db_puzzle.csv
 .vercel
 .env*
+# Android local SDK state, build outputs, and signing material. Never commit upload keys.
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+android/*.jks
+android/*.keystore

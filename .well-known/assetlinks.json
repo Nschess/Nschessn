@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.nschess.game",
+      "sha256_cert_fingerprints": [
+        "DC:3C:B6:22:05:D3:F3:11:69:70:B5:CE:F3:A5:31:64:ED:D9:E2:88:F4:1D:81:4A:CD:67:88:D0:6F:BE:50:33",
+        "PLAY_APP_SIGNING_SHA256_FINGERPRINT"
+      ]
+    }
+  }
+]

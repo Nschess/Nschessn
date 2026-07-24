@@ -11,6 +11,18 @@
   "theme_color": "#071220",
   "icons": [
     {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
       "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
@@ -18,8 +30,8 @@
     }
   ],
   "shortcuts": [
-    { "name": "Play chess", "short_name": "Play", "url": "./#play", "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }] },
-    { "name": "Daily Puzzle", "short_name": "Puzzle", "url": "./#puzzles", "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }] },
-    { "name": "Learn chess", "short_name": "Learn", "url": "./#tutorial", "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }] }
+    { "name": "Play chess", "short_name": "Play", "url": "./#play", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Daily Puzzle", "short_name": "Puzzle", "url": "./#puzzles", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Learn chess", "short_name": "Learn", "url": "./#tutorial", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
   ]
 }
