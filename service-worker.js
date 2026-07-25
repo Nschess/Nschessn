@@ -1,9 +1,11 @@
-const CACHE_NAME = "nschess-shell-v2";
+const CACHE_NAME = "nschess-shell-v9";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
+  "./assets/app.css",
+  "./assets/app.js",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
