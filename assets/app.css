@@ -30128,7 +30128,7 @@
     @media (max-width: 560px) { .home-session-reward { align-items: flex-start; } }
     @media (max-width: 560px) { .home-session-ritual { grid-template-columns: 1fr; } .home-session-ritual-item { grid-template-columns: 20px minmax(0, 1fr); } }
     @media (max-width: 820px) { .home-session-card { grid-column: 1 / -1; } .home-dna-card { grid-template-columns: 1fr; } .home-dna-card .button { justify-self: start; } } @media (max-width: 560px) { .home-session-card, .review-one-moment { grid-template-columns: 1fr; } .home-session-card .button { justify-self: start; } .home-dna-skill { grid-template-columns: minmax(80px,.85fr) minmax(72px,1.45fr) 28px; gap: 7px; } .review-one-moment-actions { justify-content: flex-start; } }
-    
+
 /* Friendly Challenge refinement */
 .friend-lobby {
   gap: 14px;
