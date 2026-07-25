@@ -142,7 +142,7 @@ const requiredRegressionContracts = [
   ["active coach tone", /data-profile-setting="coachTone"[\s\S]*?function getCoachTone\([\s\S]*?function getPremiumSessionVoice\([\s\S]*?function getPremiumMomentumCopy\(/],
   ["premium home reduced motion", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-session-ritual-item[\s\S]*?\.home-momentum-milestone[\s\S]*?\.home-momentum-meter span/],
   ["cacheable application asset split", /href="assets\/app\.css"[\s\S]*?src="assets\/app\.js"/],
-  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v9";[\s\S]*?"\.\/assets\/app\.css"[\s\S]*?"\.\/assets\/app\.js"/],
+  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v10";[\s\S]*?"\.\/assets\/app\.css"[\s\S]*?"\.\/assets\/app\.js"/],
   ["friend challenge create and join tabs", /id="friendCreateTab"[\s\S]*?aria-controls="friendCreatePanel"[\s\S]*?id="friendJoinTab"[\s\S]*?aria-controls="friendJoinPanel"/],
   ["friend challenge valid default clock", /function normalizeFriendChallengeClock\(value\)[\s\S]*?"5\+0"[\s\S]*?function getFriendInviteLink\([\s\S]*?clock: source\.clock/],
   ["friend challenge quick time controls", /id="friendClockPresets"[\s\S]*?data-friend-clock="3\+2"[\s\S]*?data-friend-clock="5\+0"[\s\S]*?data-friend-clock="10\+0"/],
@@ -153,7 +153,9 @@ const requiredRegressionContracts = [
   ["premium light-mode parity", /body\.theme-light \{[\s\S]*?--cq-bg-primary: #eef3fb;[\s\S]*?--cq-text-primary: #18233d;[\s\S]*?body\.theme-light::before/],
   ["premium cross-page section rhythm", /main > :is\(\.section-dark, \.section-warm\)[\s\S]*?padding-block: var\(--cq-section-space\)[\s\S]*?\.wrap \{[\s\S]*?var\(--cq-content-max\)/],
   ["premium navigation shell", /Premium redesign: persistent navigation and workspace shell finish[\s\S]*?\.mobile-bottom-nav[\s\S]*?var\(--cq-surface-glass-strong\)/],
-  ["premium motion and accessibility safeguards", /Premium redesign: interaction quality, accessibility, and motion restraint[\s\S]*?@media \(prefers-contrast: more\)[\s\S]*?@media \(forced-colors: active\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/]
+  ["premium motion and accessibility safeguards", /Premium redesign: interaction quality, accessibility, and motion restraint[\s\S]*?@media \(prefers-contrast: more\)[\s\S]*?@media \(forced-colors: active\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],
+  ["deferred video embeds", /<iframe loading="lazy" data-src="https:\/\/www\.youtube-nocookie\.com\/embed\/[\s\S]*?function setupVideoTheater\([\s\S]*?iframe\.dataset\.src \|\| iframe\.getAttribute\("src"\)/],
+  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/]
 ];
 
 for (const [label, pattern] of requiredRegressionContracts) {

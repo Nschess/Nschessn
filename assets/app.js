@@ -23488,7 +23488,7 @@
       }
 
       document.querySelectorAll(".video-frame iframe").forEach((iframe) => {
-        const src = iframe.getAttribute("src");
+        const src = iframe.dataset.src || iframe.getAttribute("src");
         const title = iframe.getAttribute("title") || "Chess lesson";
         const idMatch = src.match(/embed\/([^?"]+)/);
         const videoId = idMatch ? idMatch[1] : "";
