@@ -1,10 +1,18 @@
 const fs = require("fs");
 
 const html = fs.readFileSync("index.html", "utf8");
-const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-if (scripts.length !== 1) throw new Error(`Expected one inline application script, found ${scripts.length}.`);
-new Function(scripts[0][1]);
-
+const appCssPath = "assets/app.css";
+const appScriptPath = "assets/app.js";
+const serviceWorkerPath = "service-worker.js";
+if (!fs.existsSync(appCssPath) || !fs.existsSync(appScriptPath)) throw new Error("Missing cacheable application assets.");
+const appCss = fs.readFileSync(appCssPath, "utf8");
+const appScript = fs.readFileSync(appScriptPath, "utf8");
+const serviceWorker = fs.readFileSync(serviceWorkerPath, "utf8");
+if (!/<link[^>]+href=["']assets\/app\.css["'][^>]*>/i.test(html)) throw new Error("Missing external application stylesheet link.");
+if (!/<script\b[^>]*\bsrc=["']assets\/app\.js["'][^>]*><\/script>/i.test(html)) throw new Error("Missing external application script link.");
+if (/<script>([\s\S]*?)<\/script>/i.test(html)) throw new Error("The application script must not remain inline.");
+new Function(appScript);
+const regressionSource = `${html}\n${appCss}\n${appScript}\n${serviceWorker}`;
 const manifest = JSON.parse(fs.readFileSync("site.webmanifest", "utf8"));
 if (
   manifest.id !== "./"
@@ -40,7 +48,7 @@ for (const [src, sizes] of requiredPngIcons) {
 const requiredMetadata = ["description", "robots", "theme-color", "og:title", "og:description"];
 for (const name of requiredMetadata) {
   const pattern = new RegExp(`<meta[^>]+(?:name|property)=["']${name}["']`, "i");
-  if (!pattern.test(html)) throw new Error(`Missing required metadata: ${name}.`);
+  if (!pattern.test(regressionSource)) throw new Error(`Missing required metadata: ${name}.`);
 }
 
 if (!/<main id="top" tabindex="-1">/.test(html)) {
@@ -121,11 +129,35 @@ const requiredRegressionContracts = [
   ["player pass dashboard preservation", /#login \.login-pass \{[\s\S]*?display: contents;[\s\S]*?#login \.login-pass-grid \{ display: contents; \}/],
   ["player pass compact breakpoint", /@media \(max-width: 760px\) \{[\s\S]*?#login \.login-shell \{ grid-template-columns: minmax\(0, 1fr\); grid-template-rows: none; \}/],
   ["profile stats first", /grid-template-areas:\s*\n\s*"overview"\s*\n\s*"stats"\s*\n\s*"ratings"\s*\n\s*"progress"/],
-  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/]
+  ["premium daily session", /id="homeSessionCard"[\s\S]*?id="homeSessionAction"[\s\S]*?id="homeSessionWhy"/],
+  ["Chess DNA dashboard", /id="homeDnaTitle"[\s\S]*?id="homeDnaSkills"[\s\S]*?id="homeDnaAction"/],
+  ["focused onboarding duration", /id="firstVisitSession" name="sessionMinutes"[\s\S]*?sessionMinutes: String\(data\.get\("sessionMinutes"\)/],
+  ["one-moment review loop", /id="reviewOneMoment"[\s\S]*?id="reviewOneMomentPractice"[\s\S]*?function practiceReviewOneMoment\(/],
+  ["local-only product signals", /const productSignalsStorageKey = "nschess\.productSignals\.v1";[\s\S]*?function trackProductSignal\(/],
+  ["premium home renderer", /function renderPremiumHomeExperience\([\s\S]*?renderPremiumHomeExperience\(\{ focus, focusPuzzlePlan, nextStep, latestReadyReview \}\);/],
+  ["daily ritual progress loop", /id="homeSessionRitual"[\s\S]*?function renderPremiumHomeExperience\([\s\S]*?daily_ritual_opened/],
+  ["visible daily ritual reward", /id="homeSessionReward"[\s\S]*?id="homeSessionClaim"[\s\S]*?action === "claim-daily-ritual"[\s\S]*?claimDailyGoalsReward\(/],
+  ["weekly momentum runway", /id="homeMomentumTitle"[\s\S]*?id="homeMomentumMeter"[\s\S]*?id="homeMomentumDays"[\s\S]*?function getWeeklyMomentumDays\(/],
+  ["next unlock milestone", /id="homeMomentumMilestone"[\s\S]*?id="homeMomentumMilestoneTitle"[\s\S]*?function getNextAchievementMilestone\([\s\S]*?function setPremiumHomeMilestone\(/],
+  ["active coach tone", /data-profile-setting="coachTone"[\s\S]*?function getCoachTone\([\s\S]*?function getPremiumSessionVoice\([\s\S]*?function getPremiumMomentumCopy\(/],
+  ["premium home reduced motion", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-session-ritual-item[\s\S]*?\.home-momentum-milestone[\s\S]*?\.home-momentum-meter span/],
+  ["cacheable application asset split", /href="assets\/app\.css"[\s\S]*?src="assets\/app\.js"/],
+  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v9";[\s\S]*?"\.\/assets\/app\.css"[\s\S]*?"\.\/assets\/app\.js"/],
+  ["friend challenge create and join tabs", /id="friendCreateTab"[\s\S]*?aria-controls="friendCreatePanel"[\s\S]*?id="friendJoinTab"[\s\S]*?aria-controls="friendJoinPanel"/],
+  ["friend challenge valid default clock", /function normalizeFriendChallengeClock\(value\)[\s\S]*?"5\+0"[\s\S]*?function getFriendInviteLink\([\s\S]*?clock: source\.clock/],
+  ["friend challenge quick time controls", /id="friendClockPresets"[\s\S]*?data-friend-clock="3\+2"[\s\S]*?data-friend-clock="5\+0"[\s\S]*?data-friend-clock="10\+0"/],
+  ["friend challenge full join code", /id="friendJoinCode" maxlength="10"[\s\S]*?function joinFriendChallengeCode\([\s\S]*?slice\(0, 10\)/],
+  ["friend challenge result-first sharing", /const shareReady = Boolean\(state\.remote[\s\S]*?link\.disabled = !shareReady[\s\S]*?primary\.textContent = !state\.remote \? "Create invite"/],
+  ["friend challenge accessible panel switcher", /function setFriendChallengeLobbyView\([\s\S]*?createPanel\.hidden[\s\S]*?joinPanel\.hidden[\s\S]*?aria-selected/],
+  ["global premium design foundation", /Premium redesign: global experience layer[\s\S]*?--cq-content-max:[\s\S]*?--cq-section-space:[\s\S]*?--cq-ease-premium:/],
+  ["premium light-mode parity", /body\.theme-light \{[\s\S]*?--cq-bg-primary: #eef3fb;[\s\S]*?--cq-text-primary: #18233d;[\s\S]*?body\.theme-light::before/],
+  ["premium cross-page section rhythm", /main > :is\(\.section-dark, \.section-warm\)[\s\S]*?padding-block: var\(--cq-section-space\)[\s\S]*?\.wrap \{[\s\S]*?var\(--cq-content-max\)/],
+  ["premium navigation shell", /Premium redesign: persistent navigation and workspace shell finish[\s\S]*?\.mobile-bottom-nav[\s\S]*?var\(--cq-surface-glass-strong\)/],
+  ["premium motion and accessibility safeguards", /Premium redesign: interaction quality, accessibility, and motion restraint[\s\S]*?@media \(prefers-contrast: more\)[\s\S]*?@media \(forced-colors: active\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/]
 ];
 
 for (const [label, pattern] of requiredRegressionContracts) {
-  if (!pattern.test(html)) throw new Error(`Missing regression contract: ${label}.`);
+  if (!pattern.test(regressionSource)) throw new Error(`Missing regression contract: ${label}.`);
 }
 
 console.log("Site structure and inline application syntax verified.");
