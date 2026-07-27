@@ -842,6 +842,7 @@
                 <div class="settings-card">
                   <h4>Board Behavior</h4>
                   <label class="settings-field">Coordinates <select data-pref-setting="coords"><option value="on">On</option><option value="off">Off</option></select></label>
+                  <label class="settings-field">Board Size <input type="range" min="82" max="122" step="2" value="100" data-pref-setting="boardScale" aria-label="Fine board size" /></label>
                   <label class="settings-field">Animation Speed <select data-pref-setting="speed"><option value="normal">Normal</option><option value="slow">Slow</option><option value="fast">Fast</option></select></label>
                   <label class="settings-field">Motion <select data-pref-setting="motion"><option value="system">Use device setting</option><option value="reduced">Reduced motion</option></select></label>
                 </div>
@@ -2802,36 +2803,6 @@
                 <span class="play-mode-icon" aria-hidden="true">+</span><span><strong>Custom Match</strong><small>Choose color and clock</small></span><b aria-hidden="true">›</b>
               </a>
             </nav>
-            <div class="preference-panel cq-panel" id="learnerPreferences">
-              <h3>Board style</h3>
-              <div class="preference-grid">
-                <label>Mode
-                  <select id="prefTheme"><option value="dark">Dark</option><option value="light">Light</option></select>
-                </label>
-                <label>Coordinates
-                  <select id="prefCoords"><option value="on">On</option><option value="off">Off</option></select>
-                </label>
-                <label class="board-size-slider">Fine resize
-                  <input id="prefBoardScale" type="range" min="82" max="122" step="2" value="100" aria-label="Fine board size" />
-                </label>
-                <label>Border
-                  <select id="prefBoardBorder"><option value="classic">Classic Wood</option></select>
-                </label>
-                <label>Animation
-                  <select id="prefSpeed"><option value="normal">Normal</option><option value="slow">Slow</option><option value="fast">Fast</option></select>
-                </label>
-                <label>Motion
-                  <select id="prefMotion"><option value="system">Use device setting</option><option value="reduced">Reduced motion</option></select>
-                </label>
-                <label>Contrast
-                  <select id="prefContrast"><option value="normal">Normal</option><option value="high">High contrast</option></select>
-                </label>
-                <label>No pressure
-                  <select id="prefPressure"><option value="on">On</option><option value="off">Off</option></select>
-                </label>
-              </div>
-              <p class="preference-note" id="motivationMessage">Every master was once a beginner.</p>
-            </div>
             <details class="coach-library cq-panel" open>
               <summary><span>Choose an AI bot</span><small>Ready opponents</small></summary>
               <div class="coach-library-body">
@@ -3027,7 +2998,7 @@
           <aside class="puzzle-info coach-panel play-right-sidebar analysis-panel cq-sidebar cq-sidebar--insight" aria-label="Game analysis and coaching">
             <section class="engine-panel cq-panel" id="enginePanel" aria-live="polite" aria-labelledby="gameAnalysisTitle" hidden>
               <div class="engine-panel-head">
-                <span><small>Live engine</small><strong id="gameAnalysisTitle">Game analysis</strong></span>
+                <span><small>Post-game engine</small><strong id="gameAnalysisTitle">Quick game analysis</strong></span>
                 <b id="engineEvalText">0.00</b>
               </div>
               <div class="analysis-sparkline" aria-label="Evaluation trend visualization">

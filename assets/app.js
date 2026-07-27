@@ -4815,6 +4815,12 @@
       const theme = getBackgroundTheme(value);
       document.body.dataset.backgroundTheme = theme.label;
       document.body.dataset.backgroundKey = backgroundThemes[value] ? value : "classic";
+      const themeSurfaceProperties = ["--bg", "--panel", "--panel-2", "--text", "--muted", "--line"];
+      if (document.body.classList.contains("theme-light")) {
+        themeSurfaceProperties.forEach((property) => document.body.style.removeProperty(property));
+        document.body.style.setProperty("--site-bg-image", theme.vars.image);
+        return;
+      }
       applyStyleVars(document.body, {
         "--bg": theme.vars.bg,
         "--panel": theme.vars.panel,
@@ -12069,21 +12075,21 @@
     }
 
     function getReviewAnalysisConfig() {
+      const lowPerformance = document.body.classList.contains("perf-lite") || document.body.classList.contains("low-performance");
       return normalizeStockfishConfig({
-        skill: 20,
-        depth: document.body.classList.contains("perf-lite") ? 6 : 8,
-        movetime: document.body.classList.contains("perf-lite") ? 180 : 320,
-        nodes: document.body.classList.contains("perf-lite") ? 2200 : 6500,
+        skill: lowPerformance ? 6 : 10,
+        depth: lowPerformance ? 3 : 5,
+        movetime: lowPerformance ? 60 : 110,
+        nodes: lowPerformance ? 700 : 1600,
         multipv: 1,
-        hash: 16,
+        hash: 8,
         threads: 1,
         moveOverhead: 8,
-        limitStrength: false,
-        uciElo: 2500,
-        elo: 2500
+        limitStrength: true,
+        uciElo: 1600,
+        elo: 1600
       });
     }
-
     async function analyzeFenWithStockfish(fen, config = getReviewAnalysisConfig()) {
       const cacheKey = `${fen}|d${config.depth}|t${config.movetime}|n${config.nodes}`;
       const cache = readReviewAnalysisCache();
@@ -13040,6 +13046,8 @@
       const panel = document.getElementById("premiumReview");
       if (!panel || !review) return;
       activeMatchReview = review;
+      panel.classList.remove("review-state-loading", "review-state-error");
+      panel.removeAttribute("aria-busy");
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
       document.getElementById("play")?.classList.add("is-review-mode");
       const active = review.moves[reviewReplayIndex] || review.moves[0];
@@ -13070,8 +13078,11 @@
       }
       updateReviewEvalRail(active);
       document.getElementById("reviewSummaryLine").textContent = `${review.summary.opening} · one move at a time.`;
-      const accuracyText = Number.isFinite(review.whiteAccuracy) && Number.isFinite(review.blackAccuracy)
-        ? `W ${review.whiteAccuracy}% · B ${review.blackAccuracy}%`
+      const playerIsWhite = coachPlayerColor !== "b";
+      const playerAccuracy = playerIsWhite ? review.whiteAccuracy : review.blackAccuracy;
+      const opponentAccuracy = playerIsWhite ? review.blackAccuracy : review.whiteAccuracy;
+      const accuracyText = Number.isFinite(playerAccuracy) && Number.isFinite(opponentAccuracy)
+        ? "You " + playerAccuracy + "% · Opponent " + opponentAccuracy + "%"
         : "Accuracy pending";
       document.getElementById("reviewAccuracyBadge").textContent = `Move ${reviewReplayIndex + 1}/${review.moves.length} · ${accuracyText}`;
       const qualityBadge = document.getElementById("reviewQualityBadge");
@@ -13390,8 +13401,8 @@
       const ready = activeMatchReview?.pgn === pgn || matchReviews.some((review) => review.pgn === pgn);
       if (title) title.textContent = playerWon ? "You finished strong" : isMate ? "A useful game" : "A thoughtful finish";
       if (note) note.textContent = ready
-        ? "Your review is ready whenever you want it."
-        : "Keep playing while your private review prepares in the background.";
+        ? "Your quick review is ready whenever you want it."
+        : "Your quick review is preparing in the background.";
     }
 
     function openSavedMatchReview(review) {
@@ -13474,6 +13485,9 @@
       const panel = document.getElementById("premiumReview");
       if (panel) {
         panel.hidden = false;
+        panel.classList.remove("review-state-error");
+        panel.classList.add("review-state-loading");
+        panel.setAttribute("aria-busy", "true");
         document.getElementById("play")?.classList.add("is-review-mode");
         document.getElementById("reviewSummaryLine").textContent = "Preparing your review...";
         document.getElementById("reviewAccuracyBadge").textContent = "Analyzing";
@@ -13507,6 +13521,10 @@
         })
         .catch(() => {
           if (reviewRequestedPgn === pgn) {
+            const panel = document.getElementById("premiumReview");
+            panel?.classList.remove("review-state-loading");
+            panel?.classList.add("review-state-error");
+            panel?.removeAttribute("aria-busy");
             const summary = document.getElementById("reviewSummaryLine");
             if (summary) summary.textContent = "Review could not load right now. Start another game or try again shortly.";
           }
@@ -13756,6 +13774,7 @@
       const isDrawn = Boolean(drawReason) || callCoachRule(coachGame, "isDraw", "in_draw");
       const friendOutcome = friendChallengeState?.remote ? getFriendGameOutcome(friendChallengeState) : null;
       const friendFinished = Boolean(friendOutcome) || friendChallengeState?.status === "completed";
+      const gameFinished = friendFinished || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
 
       statusBadge.classList.remove("status-skeleton");
       coach.classList.remove("coach-skeleton");
@@ -13797,9 +13816,9 @@
       renderCoachHistory();
       updateAiPlayerHeader();
       renderOpeningCompass();
-      renderCoachPracticeLinks(friendFinished || coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor);
-      renderGuidedGameReview(friendFinished || coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor);
-      ensurePostGameReview();
+      renderCoachPracticeLinks(gameFinished);
+      renderGuidedGameReview(gameFinished);
+      ensurePostGameReview(gameFinished);
       document.getElementById("undoGame").disabled = coachThinking || !coachGame.history().length;
       document.getElementById("replayMistake").disabled = coachThinking || !coachReplayFen;
       document.getElementById("showThreats").setAttribute("aria-pressed", String(coachThreatMode));
@@ -20478,6 +20497,11 @@
     function applyLearnerPrefs(prefs) {
       document.body.classList.toggle("theme-light", prefs.theme === "light");
       applyBackgroundTheme(prefs.backgroundTheme);
+      const activePanel = document.querySelector("main > .site-panel.is-active-panel");
+      if (document.body.classList.contains("site-tab-mode") && activePanel) {
+        activePanel.hidden = false;
+        activePanel.setAttribute("aria-hidden", "false");
+      }
       document.body.classList.toggle("board-wood", prefs.board === "wood");
       document.body.classList.toggle("board-marble", prefs.board === "marble");
       document.body.classList.toggle("board-neon", prefs.board === "neon");
@@ -20547,65 +20571,7 @@
     }
 
     function setupLearnerPreferences() {
-      if (setupLearnerPreferences.ready) {
-        applyLearnerPrefs(readLearnerPrefs());
-        return;
-      }
-      setupLearnerPreferences.ready = true;
-      const prefs = readLearnerPrefs();
-      syncBoardBorderOptions();
-      const fields = {
-        theme: document.getElementById("prefTheme"),
-        board: document.getElementById("prefBoard"),
-        boardSize: document.getElementById("prefBoardSize"),
-        pieces: document.getElementById("prefPieces"),
-        coords: document.getElementById("prefCoords"),
-        boardBorder: document.getElementById("prefBoardBorder"),
-        speed: document.getElementById("prefSpeed"),
-        boardScale: document.getElementById("prefBoardScale"),
-        motion: document.getElementById("prefMotion"),
-        contrast: document.getElementById("prefContrast"),
-        pressure: document.getElementById("prefPressure")
-      };
-      const note = document.getElementById("motivationMessage");
-      let boardScalePreviewFrame = 0;
-      let pendingBoardScale = null;
-
-      applyLearnerPrefs(prefs);
-      syncPreferenceLocks();
-      Object.entries(fields).forEach(([key, field]) => {
-        if (!field) return;
-        field.value = prefs[key];
-        field.addEventListener("change", () => {
-          if (key === "boardScale" && boardScalePreviewFrame) {
-            window.cancelAnimationFrame(boardScalePreviewFrame);
-            boardScalePreviewFrame = 0;
-            pendingBoardScale = null;
-          }
-          const value = key === "boardScale" ? clampNumber(Number(field.value) || 100, 82, 122) : field.value;
-          const next = { ...readLearnerPrefs(), [key]: value };
-          writeJsonStorage(learnerPrefsStorageKey, next);
-          applyLearnerPrefs(next);
-          if (preferencesRequireBoardRender([key])) {
-            renderMiniBoards();
-            renderPuzzle();
-            renderCoachBoard();
-          }
-          saveProgressSnapshot("settings");
-        });
-        if (key === "boardScale") {
-          field.addEventListener("input", () => {
-            pendingBoardScale = clampNumber(Number(field.value) || 100, 82, 122);
-            if (boardScalePreviewFrame) return;
-            boardScalePreviewFrame = window.requestAnimationFrame(() => {
-              boardScalePreviewFrame = 0;
-              applyPlayBoardScale({ ...readLearnerPrefs(), boardScale: pendingBoardScale });
-              pendingBoardScale = null;
-            });
-          });
-        }
-      });
-      if (note) note.textContent = getDailyMotivation();
+      applyLearnerPrefs(readLearnerPrefs());
     }
 
     function getDefaultAudioSettings() {
@@ -20721,7 +20687,11 @@
     }
 
     function applySettingsPrefsPatch(patch, label = "settings") {
-      const next = { ...readLearnerPrefs(), ...patch };
+      const normalizedPatch = { ...patch };
+      if (Object.prototype.hasOwnProperty.call(normalizedPatch, "boardScale")) {
+        normalizedPatch.boardScale = clampNumber(Number(normalizedPatch.boardScale) || 100, 82, 122);
+      }
+      const next = { ...readLearnerPrefs(), ...normalizedPatch };
       writeJsonStorage(learnerPrefsStorageKey, next);
       applyLearnerPrefs(next);
       syncPreferenceLocks();
@@ -20758,12 +20728,15 @@
         const field = event.target instanceof HTMLElement ? event.target : null;
         if (!field) return;
         const audioKey = field.dataset.audioSetting;
+        const prefKey = field.dataset.prefSetting;
         const profileKey = field.dataset.profileSetting;
         if (audioKey && field.type === "range") {
           writeAudioPrefs({ [audioKey]: Number(field.value) });
           setSettingsStatus("Saved");
         }
-        if (profileKey && ["INPUT", "TEXTAREA"].includes(field.tagName) && field.type !== "checkbox" && !field.disabled) {
+        if (prefKey === "boardScale" && field instanceof HTMLInputElement) {
+          applySettingsPrefsPatch({ boardScale: field.value }, "board scale");
+        }        if (profileKey && ["INPUT", "TEXTAREA"].includes(field.tagName) && field.type !== "checkbox" && !field.disabled) {
           const value = profileKey === "countryFlag" ? normalizeCountryFlagValue(field.value) : field.value;
           const next = { ...readLearnerProfile(), [profileKey]: value, updatedAt: new Date().toISOString() };
           writeJsonStorage(learnerProfileStorageKey, next);

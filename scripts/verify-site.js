@@ -76,6 +76,13 @@ if (imagesWithoutAlt.length) {
   throw new Error(`Found ${imagesWithoutAlt.length} static image(s) without alternative text.`);
 }
 
+const prohibitedStaticMarkup = [
+  ["legacy Play preference panel", /\bid="learnerPreferences"/],
+  ["legacy direct preference controls", /\bid="pref(?:Theme|Coords|BoardScale|BoardBorder|Speed|Motion|Contrast|Pressure)"/]
+];
+for (const [label, pattern] of prohibitedStaticMarkup) {
+  if (pattern.test(html)) throw new Error("Forbidden legacy markup: " + label + ".");
+}
 const requiredRegressionContracts = [
   ["homepage top-player target", /id="homeTopPlayers"/],
   ["homepage rankings renderer", /function renderHomeTopPlayers\(entries = buildLeaderboardEntries\("ai"\)\)/],
@@ -118,8 +125,11 @@ const requiredRegressionContracts = [
   ["visible player-strip essentials", /match-player-meta :is\(\[data-match-side\], \[data-match-rating\], \[data-match-coins\], \[data-match-online\]\)[\s\S]*?display: inline-flex/],
   ["captured-piece presentation", /#play \.captured-pieces \{\s*display: flex;/],
   ["active move emphasis", /#play \.move-pair:last-child \{\s*border-color:/],
-  ["play preference controls", /id="prefTheme"[\s\S]*?id="prefPressure"/],
-  ["play preference bindings", /function setupLearnerPreferences\([\s\S]*?field\.addEventListener\("change"/],
+  ["settings-owned gameplay preferences", /data-settings-page="gameplay"[\s\S]*?data-pref-setting="boardScale"[\s\S]*?data-pref-setting="boardBorder"/],
+  ["settings-owned appearance preferences", /data-settings-page="appearance"[\s\S]*?data-pref-setting="theme"[\s\S]*?data-pref-setting="backgroundTheme"/],
+  ["shared settings preference binding", /function applySettingsPrefsPatch\(patch, label = "settings"\) \{[\s\S]*?normalizedPatch\.boardScale[\s\S]*?shell\.addEventListener\("input"[\s\S]*?prefKey === "boardScale"/],
+  ["light-mode inline surface reset", /function applyBackgroundTheme\(value\) \{[\s\S]*?themeSurfaceProperties[\s\S]*?classList\.contains\("theme-light"\)[\s\S]*?style\.removeProperty\(property\)/],
+  ["light-mode active-panel preservation", /function applyLearnerPrefs\(prefs\) \{[\s\S]*?const activePanel = document\.querySelector\("main > \.site-panel\.is-active-panel"\);[\s\S]*?activePanel\.hidden = false/],
   ["mobile player-card breakpoint", /@media \(max-width: 480px\)[\s\S]*?grid-template-columns: 38px minmax\(0, 1fr\) max-content/],
   ["human-readable board labels", /const accessiblePieceNames[\s\S]*?function getAccessibleSquareLabel\(/],
   ["board keyboard focus retention", /function getFocusedBoardSquare\([\s\S]*?function restoreBoardFocus\([\s\S]*?function renderTutorialBoard\([\s\S]*?restoreBoardFocus\(board, focusedSquareName\)[\s\S]*?function renderPuzzleBoard\([\s\S]*?restoreBoardFocus\(board, focusedSquareName\)/],
@@ -133,7 +143,11 @@ const requiredRegressionContracts = [
   ["Chess DNA dashboard", /id="homeDnaTitle"[\s\S]*?id="homeDnaSkills"[\s\S]*?id="homeDnaAction"/],
   ["focused onboarding duration", /id="firstVisitSession" name="sessionMinutes"[\s\S]*?sessionMinutes: String\(data\.get\("sessionMinutes"\)/],
   ["one-moment review loop", /id="reviewOneMoment"[\s\S]*?id="reviewOneMomentPractice"[\s\S]*?function practiceReviewOneMoment\(/],
-  ["local-only product signals", /const productSignalsStorageKey = "nschess\.productSignals\.v1";[\s\S]*?function trackProductSignal\(/],
+  ["dedicated Game Review workspace", /Game Review: a dedicated analysis workspace[\s\S]*?#play\.is-review-mode \.play-shell \{[\s\S]*?grid-template-areas: "board insights";[\s\S]*?\.match-board-column > :not\(\.play-board-wrap\) \{[\s\S]*?display: none !important;/],
+  ["review analysis states", /review-state-loading::after[\s\S]*?panel\.classList\.remove\("review-state-loading", "review-state-error"\)[\s\S]*?panel\.classList\.add\("review-state-loading"\)[\s\S]*?panel\?\.classList\.add\("review-state-error"\)/],
+  ["live engine hidden during play", /id="enginePanel"[\s\S]*?#play \.engine-panel\[hidden\]\s*\{[\s\S]*?display: none !important;[\s\S]*?function updateEnginePanel\([\s\S]*?const showEval = Boolean\(coachGame && isCoachGameOver\(\)\);[\s\S]*?panel\.hidden = !showEval;/],
+  ["post-game review availability", /id="postGameFlow"[\s\S]*?id="postGameReview"[\s\S]*?function updateCoachPanel\([\s\S]*?const gameFinished = friendFinished \|\| coachDrawAgreed \|\| isMate \|\| isDrawn \|\| Boolean\(matchClockExpiredColor\);[\s\S]*?ensurePostGameReview\(gameFinished\);/],
+  ["lightweight review analysis profile", /function getReviewAnalysisConfig\(\) \{[\s\S]*?skill: lowPerformance \? 6 : 10,[\s\S]*?depth: lowPerformance \? 3 : 5,[\s\S]*?movetime: lowPerformance \? 60 : 110,[\s\S]*?limitStrength: true,[\s\S]*?uciElo: 1600,/],  ["local-only product signals", /const productSignalsStorageKey = "nschess\.productSignals\.v1";[\s\S]*?function trackProductSignal\(/],
   ["premium home renderer", /function renderPremiumHomeExperience\([\s\S]*?renderPremiumHomeExperience\(\{ focus, focusPuzzlePlan, nextStep, latestReadyReview \}\);/],
   ["daily ritual progress loop", /id="homeSessionRitual"[\s\S]*?function renderPremiumHomeExperience\([\s\S]*?daily_ritual_opened/],
   ["visible daily ritual reward", /id="homeSessionReward"[\s\S]*?id="homeSessionClaim"[\s\S]*?action === "claim-daily-ritual"[\s\S]*?claimDailyGoalsReward\(/],
@@ -142,7 +156,7 @@ const requiredRegressionContracts = [
   ["active coach tone", /data-profile-setting="coachTone"[\s\S]*?function getCoachTone\([\s\S]*?function getPremiumSessionVoice\([\s\S]*?function getPremiumMomentumCopy\(/],
   ["premium home reduced motion", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-session-ritual-item[\s\S]*?\.home-momentum-milestone[\s\S]*?\.home-momentum-meter span/],
   ["cacheable application asset split", /href="assets\/app\.css"[\s\S]*?src="assets\/app\.js"/],
-  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v10";[\s\S]*?"\.\/assets\/app\.css"[\s\S]*?"\.\/assets\/app\.js"/],
+  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v13";[\s\S]*?"\.\/assets\/app\.css"[\s\S]*?"\.\/assets\/app\.js"/],
   ["friend challenge create and join tabs", /id="friendCreateTab"[\s\S]*?aria-controls="friendCreatePanel"[\s\S]*?id="friendJoinTab"[\s\S]*?aria-controls="friendJoinPanel"/],
   ["friend challenge valid default clock", /function normalizeFriendChallengeClock\(value\)[\s\S]*?"5\+0"[\s\S]*?function getFriendInviteLink\([\s\S]*?clock: source\.clock/],
   ["friend challenge quick time controls", /id="friendClockPresets"[\s\S]*?data-friend-clock="3\+2"[\s\S]*?data-friend-clock="5\+0"[\s\S]*?data-friend-clock="10\+0"/],
