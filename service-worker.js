@@ -1,4 +1,4 @@
-const CACHE_NAME = "nschess-shell-v14";
+const CACHE_NAME = "nschess-shell-v17";
 const APP_SHELL = [
   "./",
   "./index.html",

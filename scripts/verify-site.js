@@ -83,6 +83,28 @@ const prohibitedStaticMarkup = [
 for (const [label, pattern] of prohibitedStaticMarkup) {
   if (pattern.test(html)) throw new Error("Forbidden legacy markup: " + label + ".");
 }
+const aiRoster = [...appScript.matchAll(/\["(bot-[^"]+)",\s*"[^"]+",\s*(?:"[^"]+",\s*)?(\d{3,4}),/g)]
+  .map((match) => ({ id: match[1], elo: Number(match[2]) }));
+if (!aiRoster.length) throw new Error("Missing AI roster entries.");
+const expectedAiBotConfigs = aiRoster.map((bot) => ({
+  ...bot,
+  skill: Math.max(0, Math.min(20, Math.round((bot.elo - 200) / 130))),
+  depth: Math.max(1, Math.min(15, Math.ceil((bot.elo - 100) / 200))),
+  movetime: Math.max(45, Math.min(3000, 45 + Math.round((bot.elo - 200) * 1.1))),
+  uciElo: Math.max(1320, Math.min(3190, bot.elo)),
+  fallback: bot.elo >= 2400 ? "strong" : "responsive"
+}));
+if (expectedAiBotConfigs.some((config) => !Number.isInteger(config.skill) || !Number.isInteger(config.depth) || !Number.isInteger(config.movetime) || !Number.isInteger(config.uciElo))) {
+  throw new Error("AI roster runtime profile derivation failed.");
+}
+const protectedHighEloBots = expectedAiBotConfigs.filter((config) => config.elo >= 2460 && config.elo <= 2800);
+if (protectedHighEloBots.length !== 5 || protectedHighEloBots.some((config) => config.fallback !== "strong" || config.skill < 17 || config.uciElo < 2460)) {
+  throw new Error("High-Elo AI bots must retain strong fallback profiles.");
+}
+if (expectedAiBotConfigs.filter((config) => config.elo < 2400).some((config) => config.fallback !== "responsive")) {
+  throw new Error("Lower-rated AI bots must retain responsive fallback profiles.");
+}
+
 const requiredRegressionContracts = [
   ["homepage top-player target", /id="homeTopPlayers"/],
   ["homepage rankings renderer", /function renderHomeTopPlayers\(entries = buildLeaderboardEntries\("ai"\)\)/],
@@ -156,7 +178,7 @@ const requiredRegressionContracts = [
   ["active coach tone", /data-profile-setting="coachTone"[\s\S]*?function getCoachTone\([\s\S]*?function getPremiumSessionVoice\([\s\S]*?function getPremiumMomentumCopy\(/],
   ["premium home reduced motion", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-session-ritual-item[\s\S]*?\.home-momentum-milestone[\s\S]*?\.home-momentum-meter span/],
   ["cacheable application asset split", /href="assets\/app\.css"[\s\S]*?src="assets\/app\.js"/],
-  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v14";[\s\S]*?"\.\/assets\/app\.css"[\s\S]*?"\.\/assets\/app\.js"/],
+  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v17";[\s\S]*?"\.\/assets\/app\.css"[\s\S]*?"\.\/assets\/app\.js"/],
   ["friend challenge create and join tabs", /id="friendCreateTab"[\s\S]*?aria-controls="friendCreatePanel"[\s\S]*?id="friendJoinTab"[\s\S]*?aria-controls="friendJoinPanel"/],
   ["friend challenge valid default clock", /function normalizeFriendChallengeClock\(value\)[\s\S]*?"5\+0"[\s\S]*?function getFriendInviteLink\([\s\S]*?clock: source\.clock/],
   ["friend challenge quick time controls", /id="friendClockPresets"[\s\S]*?data-friend-clock="3\+2"[\s\S]*?data-friend-clock="5\+0"[\s\S]*?data-friend-clock="10\+0"/],
@@ -169,8 +191,11 @@ const requiredRegressionContracts = [
   ["cross-page layout cohesion", /Cohesive layout refinement:[\s\S]*?\.home-main-grid[\s\S]*?#play:not\(\.is-review-mode\) \.play-shell[\s\S]*?#play\.is-review-mode \.premium-review[\s\S]*?@media \(max-width: 920px\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],
   ["premium navigation shell", /Premium redesign: persistent navigation and workspace shell finish[\s\S]*?\.mobile-bottom-nav[\s\S]*?var\(--cq-surface-glass-strong\)/],
   ["premium motion and accessibility safeguards", /Premium redesign: interaction quality, accessibility, and motion restraint[\s\S]*?@media \(prefers-contrast: more\)[\s\S]*?@media \(forced-colors: active\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],
-  ["deferred video embeds", /<iframe loading="lazy" data-src="https:\/\/www\.youtube-nocookie\.com\/embed\/[\s\S]*?function setupVideoTheater\([\s\S]*?iframe\.dataset\.src \|\| iframe\.getAttribute\("src"\)/],
-  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/]
+  ["deferred video embeds", /<iframe loading="lazy" data-src="https:\/\/www\.youtube-nocookie\.com\/embed\/[\s\S]*?function setupVideoTheater\([\s\S]*?iframe\.dataset\.src \|\| iframe\.getAttribute\("src"\)[\s\S]*?if \(!src\) return;/],
+  ["video modal watch fallback", /id="videoOpenExternal"[\s\S]*?function buildVideoWatchUrl\([\s\S]*?externalLink\.href = watchUrl/],
+  ["AI roster strength mapping", /beginnerBots\.forEach\(\(bot, index\) => \{[\s\S]*?bot\.skill = Math\.max\(0, Math\.min\(20, Math\.round\(\(bot\.elo - 200\) \/ 130\)\)\);[\s\S]*?bot\.depth = Math\.max\(1, Math\.min\(15, Math\.ceil\(\(bot\.elo - 100\) \/ 200\)\)\);[\s\S]*?bot\.movetime = Math\.max\(45, Math\.min\(3000, 45 \+ Math\.round\(\(bot\.elo - 200\) \* 1\.1\)\)\);[\s\S]*?function setCoachDifficulty\(level\) \{[\s\S]*?stockfishLevels\[level\] \|\| getBeginnerBot\(level\)[\s\S]*?function getCoachConfig\(level = coachDifficulty\) \{[\s\S]*?const bot = getBeginnerBot\(level\);[\s\S]*?label: bot\.name \+ " engine",[\s\S]*?uciElo: elo/],
+  ["AI roster high-strength fallback boundary", /function getCoachSkill\(\) \{\s*return Number\(getCoachConfig\(\)\.skill\) \|\| 0;[\s\S]*?function usesHighStrengthCoachFallback\(config = getCoachConfig\(\)\) \{[\s\S]*?getBeginnerBot\(coachDifficulty\)[\s\S]*?Number\(config\.elo\) >= 2400[\s\S]*?function getReliableCoachFallback\([\s\S]*?usesHighStrengthCoachFallback\(config\)[\s\S]*?chooseStrongCoachMove\(moves\)[\s\S]*?: chooseResponsiveCoachFallback\(moves\)/],
+  ["narrow video modal action bar", /\.video-modal-title \{[\s\S]*?min-width: 0;[\s\S]*?text-overflow: ellipsis;[\s\S]*?\.video-modal-actions \{[\s\S]*?flex: 0 0 auto;[\s\S]*?@media \(max-width: 420px\) \{[\s\S]*?\.video-modal \{[\s\S]*?padding: 12px;/],  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/]
 ];
 
 for (const [label, pattern] of requiredRegressionContracts) {
