@@ -10888,7 +10888,7 @@
     }
 
     function setCoachDifficulty(level) {
-      coachDifficulty = stockfishLevels[level] ? level : "easy";
+      coachDifficulty = stockfishLevels[level] || getBeginnerBot(level) ? level : "easy";
       cancelStockfishSearch("Difficulty changed");
       if (coachThinking) {
         coachMoveToken += 1;
@@ -10967,10 +10967,21 @@
     }
 
     function getCoachSkill() {
-      return Number((stockfishLevels[coachDifficulty] || stockfishLevels.easy).skill) || 0;
+      return Number(getCoachConfig().skill) || 0;
     }
 
     function getCoachConfig(level = coachDifficulty) {
+      const bot = getBeginnerBot(level);
+      if (bot) {
+        const elo = Math.max(200, Number(bot.elo) || 1000);
+        return normalizeStockfishConfig({
+          ...bot,
+          label: bot.name + " engine",
+          uciElo: elo,
+          nodes: 0,
+          limitStrength: true
+        });
+      }
       return normalizeStockfishConfig(stockfishLevels[level] || stockfishLevels.easy);
     }
 
@@ -11656,6 +11667,11 @@
 
     function isStrongStockfishBot(config = getCoachConfig()) {
       return coachDifficulty === "strong";
+    }
+
+    function usesHighStrengthCoachFallback(config = getCoachConfig()) {
+      const bot = getBeginnerBot(coachDifficulty);
+      return Boolean(bot && Number(config.elo) >= 2400);
     }
 
     function getStockfishOptionSnapshot(level = coachDifficulty) {
@@ -12460,8 +12476,11 @@
 
     function getReliableCoachFallback(moves = coachGame?.moves({ verbose: true }) || []) {
       if (!moves.length) return null;
+      const config = getCoachConfig();
       try {
-        return chooseResponsiveCoachFallback(moves);
+        return usesHighStrengthCoachFallback(config)
+          ? chooseStrongCoachMove(moves)
+          : chooseResponsiveCoachFallback(moves);
       } catch {
         return moves[0];
       }
@@ -13042,6 +13061,207 @@
       renderHomeDashboard();
     }
 
+    function setReviewDashboardText(id, value) {
+      const node = document.getElementById(id);
+      if (node) node.textContent = value;
+    }
+
+    function getReviewDashboardInitial(value, fallback = "?") {
+      const text = String(value || "").trim();
+      if (!text) return fallback;
+      const initials = text.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("");
+      return initials.toUpperCase() || fallback;
+    }
+
+    function renderReviewCenterGraph(review) {
+      const graph = document.getElementById("reviewCenterGraph");
+      if (!graph || !review?.moves?.length) return;
+      graph.style.setProperty("--review-move-count", String(Math.max(1, review.moves.length)));
+      graph.replaceChildren(...review.moves.map((move, index) => {
+        const markerMeta = getReviewQualityMeta(move.label);
+        const bar = document.createElement("span");
+        const evalDelta = (Number(move.eval) || 50) - 50;
+        bar.style.setProperty("--review-marker", markerMeta.color);
+        bar.style.setProperty("--review-eval-height", `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%`);
+        bar.dataset.reviewSide = evalDelta >= 0 ? "white" : "black";
+        bar.title = `${move.ply}. ${move.san} ${move.label} ${move.evalText || ""}`;
+        bar.setAttribute("role", "button");
+        bar.tabIndex = 0;
+        bar.setAttribute("aria-current", String(index === reviewReplayIndex));
+        bar.setAttribute("aria-label", `Jump to ${move.ply}. ${move.san}, ${move.label}`);
+        bar.addEventListener("click", () => showReviewPly(index));
+        bar.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            showReviewPly(index);
+          }
+        });
+        return bar;
+      }));
+    }
+
+    function renderReviewDashboard(review, active) {
+      if (!review?.moves?.length) return;
+      const profile = getDragonProfileSnapshot();
+      const opponent = getAiHeaderProfile();
+      const playerName = String(profile?.name || "Player").trim() || "Player";
+      const opponentName = String(opponent?.name || "Coach").trim() || "Coach";
+      const playerRating = Math.max(400, Number(getLearnerGameRating()) || 400);
+      const opponentRating = Math.max(400, Number(opponent?.rating || getCoachConfig()?.elo) || 400);
+      const playerIsWhite = coachPlayerColor !== "b";
+      const playerAccuracy = playerIsWhite ? review.whiteAccuracy : review.blackAccuracy;
+      const opponentAccuracy = playerIsWhite ? review.blackAccuracy : review.whiteAccuracy;
+      const playerAccuracyText = Number.isFinite(playerAccuracy) ? `${playerAccuracy}%` : "--";
+      const opponentAccuracyText = Number.isFinite(opponentAccuracy) ? `${opponentAccuracy}%` : "--";
+      const result = String(review.summary?.result || "Game complete.");
+      const won = /^You won/i.test(result);
+      const drew = /peacefully|draw/i.test(result);
+      const outcomeIcon = won ? "?" : drew ? "=" : "?";
+      const outcomeTitle = won ? "You won!" : drew ? "A balanced finish" : "Game complete";
+      const outcomeKicker = won ? "Strong result" : drew ? "Drawn game" : "Ready to learn";
+
+      setReviewDashboardText("reviewOutcomeIcon", outcomeIcon);
+      setReviewDashboardText("reviewOutcomeKicker", outcomeKicker);
+      setReviewDashboardText("reviewOutcomeTitle", outcomeTitle);
+      setReviewDashboardText("reviewOutcomeCopy", review.summary?.tip || result);
+      setReviewDashboardText("reviewPlayerAccuracy", playerAccuracyText);
+      setReviewDashboardText("reviewPlayerName", playerName);
+      setReviewDashboardText("reviewOpponentAccuracy", opponentAccuracyText);
+      setReviewDashboardText("reviewOpeningName", review.summary?.opening || "Opening started");
+      setReviewDashboardText("reviewCenterEval", active?.evalText || "0.00");
+      setReviewDashboardText("reviewPlayerIdentity", playerName);
+      setReviewDashboardText("reviewOpponentName", opponentName);
+      setReviewDashboardText("reviewPlayerRating", `${playerRating} Elo`);
+      setReviewDashboardText("reviewOpponentRating", `${opponentRating} Elo`);
+      setReviewDashboardText("reviewPlayerAvatar", profile?.avatar || getReviewDashboardInitial(playerName, "P"));
+      setReviewDashboardText("reviewOpponentAvatar", opponent?.avatar || getReviewDashboardInitial(opponentName, "C"));
+
+      const scoreRing = document.getElementById("reviewPlayerScoreRing");
+      if (scoreRing) {
+        const score = Number.isFinite(playerAccuracy) ? clampNumber(playerAccuracy, 0, 100) : 0;
+        scoreRing.style.setProperty("--review-score", `${score}%`);
+        scoreRing.setAttribute("aria-label", Number.isFinite(playerAccuracy) ? `Your accuracy: ${playerAccuracy}%` : "Your accuracy is unavailable");
+      }
+
+      const playerMoves = review.moves.filter((move) => move.color === (playerIsWhite ? "w" : "b"));
+      const phaseSize = Math.max(1, Math.ceil(playerMoves.length / 3));
+      const phaseGroups = [
+        ["Opening", playerMoves.slice(0, phaseSize)],
+        ["Middlegame", playerMoves.slice(phaseSize, phaseSize * 2)],
+        ["Endgame", playerMoves.slice(phaseSize * 2)]
+      ];
+      const phaseScore = (moves) => {
+        const verified = moves.filter((move) => move.engineVerified);
+        if (!verified.length) return null;
+        const averageLoss = verified.reduce((sum, move) => sum + clampNumber(Number(move.cpLoss) || 0, 0, 300), 0) / verified.length;
+        return Math.round(clampNumber(100 - averageLoss / 3, 0, 100));
+      };
+      const phaseScores = phaseGroups.map(([, moves]) => phaseScore(moves));
+      const verifiedPlayerMoves = playerMoves.filter((move) => move.engineVerified);
+      const tacticalErrors = verifiedPlayerMoves.filter((move) => /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label)).length;
+      const tacticsScore = verifiedPlayerMoves.length
+        ? Math.round(clampNumber(100 - (tacticalErrors / verifiedPlayerMoves.length) * 60, 0, 100))
+        : null;
+      const knownPhaseScores = phaseScores.filter(Number.isFinite);
+      const bestPhaseIndex = knownPhaseScores.length ? phaseScores.indexOf(Math.max(...knownPhaseScores)) : -1;
+      const performanceScore = Number.isFinite(playerAccuracy)
+        ? playerAccuracy
+        : knownPhaseScores.length
+          ? Math.round(knownPhaseScores.reduce((sum, score) => sum + score, 0) / knownPhaseScores.length)
+          : null;
+      const performanceLabel = !Number.isFinite(performanceScore)
+        ? "Analysis pending"
+        : performanceScore >= 90 ? "Excellent control"
+          : performanceScore >= 75 ? "Strong performance"
+            : performanceScore >= 60 ? "Solid foundation"
+              : "Useful lessons found";
+      const performanceNote = Number.isFinite(performanceScore)
+        ? bestPhaseIndex >= 0
+          ? `Your best phase: ${phaseGroups[bestPhaseIndex][0]}.`
+          : "Overall score based on the moves the engine could evaluate."
+        : "The engine did not return enough data for phase scores.";
+      setReviewDashboardText("reviewPerformanceScore", Number.isFinite(performanceScore) ? String(performanceScore) : "--");
+      setReviewDashboardText("reviewPerformanceLabel", performanceLabel);
+      setReviewDashboardText("reviewPerformanceNote", performanceNote);
+      ["reviewOpeningPhase", "reviewMiddlegamePhase", "reviewEndgamePhase"].forEach((id, index) => {
+        const score = phaseScores[index];
+        setReviewDashboardText(id, Number.isFinite(score) ? String(score) : "--");
+      });
+      setReviewDashboardText("reviewTacticsPhase", Number.isFinite(tacticsScore) ? String(tacticsScore) : "--");
+      const performanceRing = document.getElementById("reviewPerformanceRing");
+      if (performanceRing) {
+        const score = Number.isFinite(performanceScore) ? clampNumber(performanceScore, 0, 100) : 0;
+        performanceRing.style.setProperty("--review-performance", `${score}%`);
+        performanceRing.setAttribute("aria-label", Number.isFinite(performanceScore) ? `Overall performance: ${performanceScore} out of 100` : "Overall performance is unavailable");
+      }
+
+      const totalMoves = review.moves.length;
+      setReviewDashboardText("reviewQualityCount", `${totalMoves} move${totalMoves === 1 ? "" : "s"}`);
+      const qualityBreakdown = document.getElementById("reviewQualityBreakdown");
+      if (qualityBreakdown) {
+        const groups = [
+          ["Brilliant", ["Brilliant"]],
+          ["Best moves", ["Best", "Excellent", "Great", "Forced", "Opening Book"]],
+          ["Good moves", ["Good"]],
+          ["Inaccuracies", ["Inaccuracy"]],
+          ["Mistakes", ["Mistake", "Missed Win"]],
+          ["Blunders", ["Blunder"]]
+        ];
+        const rows = groups.map(([label, labels]) => {
+          const count = review.moves.filter((move) => labels.includes(move.label)).length;
+          const meta = getReviewQualityMeta(labels[0]);
+          const row = document.createElement("div");
+          row.className = "review-quality-row";
+          row.append(
+            createBookText("span", "", `${meta.icon} ${label}`),
+            (() => {
+              const meter = document.createElement("span");
+              meter.className = "review-quality-meter";
+              const fill = document.createElement("i");
+              fill.style.setProperty("--review-quality-width", `${Math.round((count / totalMoves) * 100)}%`);
+              fill.style.setProperty("--review-quality-color", meta.color);
+              meter.appendChild(fill);
+              return meter;
+            })(),
+            createBookText("b", "", String(count))
+          );
+          return row;
+        });
+        qualityBreakdown.replaceChildren(...rows);
+      }
+
+      const timeline = document.getElementById("reviewCenterTimeline");
+      if (timeline) {
+        timeline.replaceChildren(...review.moves.map((move, index) => {
+          const meta = getReviewQualityMeta(move.label);
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "review-timeline-item";
+          button.style.setProperty("--review-marker", meta.color);
+          button.setAttribute("aria-current", String(index === reviewReplayIndex));
+          button.setAttribute("aria-label", `Move ${move.ply}: ${move.san}, ${move.label}`);
+          button.title = `${move.ply}. ${move.san} ? ${move.label}`;
+          button.textContent = `${meta.icon} ${move.san}`;
+          button.addEventListener("click", () => showReviewPly(index));
+          return button;
+        }));
+      }
+      renderReviewCenterGraph(review);
+    }
+
+    function exitGameReview() {
+      if (!activeMatchReview) return;
+      window.clearInterval(reviewReplayTimer);
+      reviewReplayTimer = 0;
+      stopReviewBestLineReplay();
+      document.getElementById("premiumReview")?.setAttribute("hidden", "");
+      document.getElementById("play")?.classList.remove("is-review-mode");
+      document.getElementById("reviewEvalRail")?.setAttribute("hidden", "");
+      activeMatchReview = null;
+      renderPostGameFlow(true);
+      renderCoachBoard();
+    }
+
     function renderPremiumReview(review = activeMatchReview) {
       const panel = document.getElementById("premiumReview");
       if (!panel || !review) return;
@@ -13067,6 +13287,12 @@
             ? defaultCopy + " You found a real training clue - carry it into your next game."
             : defaultCopy;
       }
+      const practiceRecommendationTitle = document.getElementById("reviewPracticeRecommendationTitle");
+      const practiceRecommendationCopy = document.getElementById("reviewPracticeRecommendationCopy");
+      if (practiceRecommendationTitle) practiceRecommendationTitle.textContent = `Practice ${reviewPattern}`;
+      if (practiceRecommendationCopy) practiceRecommendationCopy.textContent = oneMomentMove
+        ? `Train ${reviewPattern} from move ${oneMomentMove.ply}.`
+        : "Train the pattern from this game once.";
       if (!active?.engineVerified) reviewCompareMode = "your";
       const meta = getReviewQualityMeta(active?.label);
       panel.style.setProperty("--review-accent", meta.color);
@@ -13119,7 +13345,16 @@
           button.type = "button";
           button.className = "review-key-button";
           button.style.setProperty("--review-chip", keyMeta.color);
-          button.textContent = `${keyMeta.icon} ${label}: ${move.san}`;
+          button.setAttribute("aria-label", `${label}: move ${move.ply}, ${move.san}, ${move.label}`);
+          const icon = createBookText("span", "review-key-icon", keyMeta.icon);
+          const content = document.createElement("span");
+          content.className = "review-key-content";
+          const detail = move.tactic || (move.label === "Best" ? "strong continuation" : "position awareness");
+          content.append(
+            createBookText("strong", "", label),
+            createBookText("small", "", `${move.ply}. ${move.san} - ${move.label} ? ${detail}`)
+          );
+          button.append(icon, content, createBookText("span", "review-key-chevron", ">"));
           button.addEventListener("click", () => showReviewPly(index));
           return button;
         }));
@@ -13205,6 +13440,7 @@
       }
       const replayBestButton = document.getElementById("reviewReplayBest");
       if (replayBestButton) replayBestButton.disabled = !active?.engineVerified || !(active?.pvUci || (active?.bestFrom && active?.bestTo));
+      renderReviewDashboard(review, active);
     }
 
     function stopReviewBestLineReplay() {
@@ -14297,7 +14533,7 @@
       const token = ++coachMoveToken;
       coachThinking = true;
       coachLearnerMoveScores = { fen: "", scored: [], pending: false };
-      const engineLabel = stockfishLevels[coachDifficulty]?.label || "Coach";
+      const engineLabel = getCoachConfig().label || "Coach";
       coachMessage = getBeginnerBot()
         ? `${engineLabel}: ${pickBotLine("inGame")}`
         : `${engineLabel} is thinking. Look for the coach's threat next.`;
@@ -17867,7 +18103,7 @@
           const wasRealtimeMatch = isRealtimeMatchActive();
           setCoachDifficulty(button.dataset.gameDifficulty);
           if (wasRealtimeMatch) startSoloCoachGame();
-          const label = stockfishLevels[coachDifficulty]?.label || coachDifficulty;
+          const label = getCoachConfig().label || coachDifficulty;
           coachMessage = getCoachSkill() >= 15
             ? `${label} ready. No pressure: try to survive, ask Why, and learn one idea.`
             : `Difficulty set to ${label}. Keep it friendly and focus on one idea.`;
@@ -17925,6 +18161,9 @@
       document.getElementById("postGameShare")?.addEventListener("click", () => void sharePostGameResult());
       document.getElementById("postGameHistory")?.addEventListener("click", togglePostGameHistory);
       document.getElementById("postGameHome")?.addEventListener("click", () => { window.location.hash = "#top"; });
+      document.getElementById("reviewExit")?.addEventListener("click", exitGameReview);
+      document.getElementById("reviewShare")?.addEventListener("click", () => void sharePostGameResult(document.getElementById("reviewShare")));
+      document.getElementById("reviewPlayAgain")?.addEventListener("click", startSoloCoachGame);
       document.getElementById("flipGame").addEventListener("click", () => {
         coachFlipped = !coachFlipped;
         renderCoachBoard();
@@ -23336,6 +23575,7 @@
       const modalTitle = document.getElementById("videoModalTitle");
       const modalFrame = document.getElementById("videoModalFrame");
       const closeButton = document.getElementById("videoClose");
+      const externalLink = document.getElementById("videoOpenExternal");
       let activeVideoButton = null;
       let activeVideoCard = null;
       let activeVideoWasShort = false;
@@ -23362,6 +23602,10 @@
         return url.toString();
       }
 
+      function buildVideoWatchUrl(src) {
+        const videoId = getVideoIdFromSrc(src);
+        return videoId ? "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId) : "";
+      }
       function resumeVideoScroll() {
         const shortCards = [...document.querySelectorAll(".shorts-grid .video-card")];
         const activeShortIndex = shortCards.indexOf(activeVideoCard);
@@ -23421,7 +23665,7 @@
       function containVideoDialogFocus(event) {
         if (event.key !== "Tab" || modal.hidden) return;
         const player = modalFrame.querySelector("iframe");
-        const focusTargets = player ? [closeButton, player] : [closeButton];
+        const focusTargets = [closeButton, externalLink, player].filter((target) => target && !target.hidden);
         const activeIndex = focusTargets.indexOf(document.activeElement);
 
         if (activeIndex === -1) {
@@ -23445,6 +23689,11 @@
         activeVideoWasShort = isShort;
         activeVideoEnded = false;
         activeVideoId = getVideoIdFromSrc(src);
+        const watchUrl = buildVideoWatchUrl(src);
+        if (externalLink) {
+          externalLink.href = watchUrl || "https://www.youtube.com/";
+          externalLink.hidden = !watchUrl;
+        }
 
         const player = document.createElement("iframe");
         player.src = buildPlayerSrc(src, isShort);
@@ -23462,6 +23711,7 @@
 
       document.querySelectorAll(".video-frame iframe").forEach((iframe) => {
         const src = iframe.dataset.src || iframe.getAttribute("src");
+        if (!src) return;
         const title = iframe.getAttribute("title") || "Chess lesson";
         const idMatch = src.match(/embed\/([^?"]+)/);
         const videoId = idMatch ? idMatch[1] : "";

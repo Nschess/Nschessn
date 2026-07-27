@@ -2829,6 +2829,44 @@
               </div>
             </details>
           </aside>
+          <header class="review-workspace-header" aria-label="Game Review controls">
+            <button class="review-back-button" type="button" id="reviewExit"><span aria-hidden="true">&#8592;</span><span>Back to game</span></button>
+            <div class="review-workspace-title">
+              <span class="review-workspace-kicker">Post-game analysis</span>
+              <h2>Game Review</h2>
+            </div>
+            <div class="review-workspace-actions">
+              <button class="button secondary review-share-button" type="button" id="reviewShare"><span aria-hidden="true">&#8599;</span> Share</button>
+              <button class="button review-play-again-button" type="button" id="reviewPlayAgain"><span aria-hidden="true">&#9654;</span> Play Again</button>
+            </div>
+          </header>
+          <aside class="review-left-sidebar" id="reviewLeftSidebar" aria-label="Game review performance summary">
+            <article class="review-outcome-card">
+              <span class="review-outcome-icon" id="reviewOutcomeIcon" aria-hidden="true">&#9822;</span>
+              <div>
+                <span class="review-outcome-kicker" id="reviewOutcomeKicker">Game complete</span>
+                <strong id="reviewOutcomeTitle">Preparing your result</strong>
+                <p id="reviewOutcomeCopy">Your result and strongest lesson will appear here.</p>
+              </div>
+            </article>
+            <article class="review-accuracy-card">
+              <div class="review-score-ring" id="reviewPlayerScoreRing" aria-label="Your accuracy">
+                <strong id="reviewPlayerAccuracy">--</strong><small>Your accuracy</small>
+              </div>
+              <div class="review-accuracy-compare">
+                <span><small>You</small><strong id="reviewPlayerName">Player</strong></span>
+                <span><small>Opponent</small><strong id="reviewOpponentAccuracy">--</strong></span>
+              </div>
+            </article>
+            <article class="review-quality-card">
+              <div class="review-card-heading"><span>Move quality</span><small id="reviewQualityCount">0 moves</small></div>
+              <div class="review-quality-breakdown" id="reviewQualityBreakdown" aria-label="Move quality breakdown"></div>
+            </article>
+            <article class="review-opening-card">
+              <span class="review-opening-icon" aria-hidden="true">&#9823;</span>
+              <div><small>Opening played</small><strong id="reviewOpeningName">Opening pending</strong></div>
+            </article>
+          </aside>
           <section class="match-board-column chess-board-area cq-board-stage" data-board-orientation="white" aria-label="Active chess game">
             <details class="coach-setup cq-panel cq-panel--compact" aria-label="Game setup">
               <summary class="coach-setup-summary">Options</summary>
@@ -2922,6 +2960,13 @@
                 <p class="player-frame-description" data-match-description>Ready for a focused game.</p>
               </details>
             </aside>
+            <section class="review-center-chart" aria-labelledby="reviewCenterChartTitle">
+              <div class="review-center-chart-head">
+                <span><small>Game performance</small><strong id="reviewCenterChartTitle">Evaluation by move</strong></span>
+                <strong id="reviewCenterEval">0.00</strong>
+              </div>
+              <div class="review-graph review-center-graph" id="reviewCenterGraph" aria-label="Evaluation by move"></div>
+            </section>
             <div class="puzzle-board-wrap play-board-wrap cq-glass-container" aria-label="Playable chess board">
               <div class="review-eval-rail" id="reviewEvalRail" aria-label="Review evaluation bar" hidden>
                 <span class="review-eval-side review-eval-black">Black</span>
@@ -2931,6 +2976,12 @@
                 <span class="review-eval-side review-eval-white">White</span>
               </div>
               <div class="puzzle-board play-board" id="coachBoard" role="group" aria-roledescription="chess board" aria-label="Player versus AI chess board. Select a piece, then its legal destination."></div>
+            </div>
+            <nav class="review-center-timeline" id="reviewCenterTimeline" aria-label="Review move timeline"></nav>
+            <div class="review-player-strip" aria-label="Players in this review">
+              <span class="review-player-chip"><i class="review-player-avatar" id="reviewPlayerAvatar" aria-hidden="true">P</i><span><small>You</small><strong id="reviewPlayerIdentity">Player</strong></span><b id="reviewPlayerRating">--</b></span>
+              <span class="review-player-versus" aria-hidden="true">vs</span>
+              <span class="review-player-chip review-player-chip--opponent"><i class="review-player-avatar" id="reviewOpponentAvatar" aria-hidden="true">C</i><span><small>Opponent</small><strong id="reviewOpponentName">Coach</strong></span><b id="reviewOpponentRating">--</b></span>
             </div>
             <div class="play-bottom-actionbar cq-floating-toolbar" aria-label="Game controls">
               <div class="puzzle-actions play-actions play-primary-actions">
@@ -3075,6 +3126,22 @@
                 </div>
                 <span class="badge" id="reviewAccuracyBadge">Accuracy --</span>
               </div>
+              <article class="review-performance-card" aria-label="Performance by game phase">
+                <div class="review-performance-ring" id="reviewPerformanceRing" aria-label="Overall performance score">
+                  <strong id="reviewPerformanceScore">--</strong><small>Performance</small>
+                </div>
+                <div class="review-performance-copy">
+                  <span>Performance score</span>
+                  <strong id="reviewPerformanceLabel">Reviewing your game</strong>
+                  <small id="reviewPerformanceNote">Your phase scores appear after analysis.</small>
+                </div>
+                <div class="review-phase-grid">
+                  <span><small>Opening</small><strong id="reviewOpeningPhase">--</strong></span>
+                  <span><small>Middlegame</small><strong id="reviewMiddlegamePhase">--</strong></span>
+                  <span><small>Endgame</small><strong id="reviewEndgamePhase">--</strong></span>
+                  <span><small>Tactics</small><strong id="reviewTacticsPhase">--</strong></span>
+                </div>
+              </article>
               <article class="review-focus-card" id="reviewFocusCard">
                 <div class="review-focus-top">
                   <span class="review-quality-badge" id="reviewQualityBadge">Coach ready</span>
@@ -3093,6 +3160,29 @@
                   <button class="button" type="button" id="reviewOneMomentPractice">Practice pattern</button>
                 </div>
               </article>
+              <section class="review-recommendations" aria-labelledby="reviewRecommendationsTitle">
+                <div class="review-insight-section-heading">
+                  <span id="reviewRecommendationsTitle">Recommended for you</span>
+                  <small>Keep the lesson moving</small>
+                </div>
+                <div class="review-recommendation-grid">
+                  <a class="review-recommendation-card review-recommendation-card--tactic" id="reviewPracticeRecommendation" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">
+                    <span class="review-recommendation-icon" aria-hidden="true">&#10022;</span>
+                    <strong id="reviewPracticeRecommendationTitle">Practice a tactic</strong>
+                    <small id="reviewPracticeRecommendationCopy">Train the pattern once.</small>
+                  </a>
+                  <a class="review-recommendation-card review-recommendation-card--opening" href="#openings" data-site-tab="openings" data-site-panel="openings">
+                    <span class="review-recommendation-icon" aria-hidden="true">&#9823;</span>
+                    <strong>Opening guide</strong>
+                    <small>Review the first moves.</small>
+                  </a>
+                  <a class="review-recommendation-card review-recommendation-card--plan" href="#plan" data-site-tab="plan" data-site-panel="plan">
+                    <span class="review-recommendation-icon" aria-hidden="true">&#9783;</span>
+                    <strong>Study plan</strong>
+                    <small>Set your next session.</small>
+                  </a>
+                </div>
+              </section>
               <div class="review-compare-row" aria-label="Compare move">
                 <button class="review-compare-button" type="button" id="reviewShowYour" aria-pressed="true">Your Move</button>
                 <button class="review-compare-button" type="button" id="reviewShowBest" aria-pressed="false">Show Best Move</button>
@@ -3107,6 +3197,10 @@
                 <button class="button secondary" type="button" id="reviewAuto">Auto Review</button>
                 <button class="button secondary" type="button" id="reviewFlip">Flip</button>
                 <button class="button" type="button" id="reviewMistake">Critical Move</button>
+              </div>
+              <div class="review-insight-section-heading">
+                <span>Key moments</span>
+                <small>Jump to a turning point</small>
               </div>
               <div class="review-key-row" id="reviewKeyMoments" aria-label="Key review moments"></div>
               <div class="review-detail-stack" id="reviewCoachCards">
@@ -3879,7 +3973,10 @@
     <div class="video-modal-panel">
       <div class="video-modal-bar">
         <p class="video-modal-title" id="videoModalTitle">Chess lesson</p>
-        <button class="video-close" type="button" id="videoClose" aria-label="Close video">Ã—</button>
+        <div class="video-modal-actions">
+          <a class="video-open-external" id="videoOpenExternal" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" hidden>Open on YouTube</a>
+          <button class="video-close" type="button" id="videoClose" aria-label="Close video">Ã—</button>
+        </div>
       </div>
       <div class="video-modal-frame" id="videoModalFrame"></div>
     </div>
