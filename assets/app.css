@@ -30574,3 +30574,260 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   html { scroll-behavior: auto; }
   :is(body:not(.theme-light), body.theme-light) :is(.button, .cq-button, .mission-button, .tab-button):not(:disabled):not([aria-disabled="true"]):active { transform: none; }
 }
+
+/* Game Review: a dedicated analysis workspace, separate from the live-game board. */
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode {
+  --cq-review-board-max: min(760px, max(360px, calc(100svh - 176px)));
+  background:
+    radial-gradient(circle at 42% 12%, color-mix(in srgb, var(--cq-accent-secondary) 11%, transparent), transparent 32rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--cq-surface-panel) 80%, transparent), transparent 29rem);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+  display: grid !important;
+  width: min(100% - 28px, 1240px);
+  max-width: 1240px;
+  grid-template-areas: "board insights";
+  grid-template-columns: minmax(0, var(--cq-review-board-max)) minmax(320px, 390px) !important;
+  justify-content: center;
+  align-items: start;
+  gap: clamp(16px, 2vw, 28px);
+  padding: clamp(12px, 1.5vw, 20px);
+  border-radius: 20px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode :is(.play-app-rail, .play-left-sidebar) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .match-board-column {
+  grid-area: board;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "board";
+  width: min(100%, var(--cq-review-board-max));
+  max-width: var(--cq-review-board-max);
+  min-width: 0;
+  gap: 0;
+  justify-self: center;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .match-board-column > :not(.play-board-wrap) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-board-wrap {
+  display: grid;
+  grid-area: board;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  max-width: none;
+  aspect-ratio: auto;
+  padding: 5px;
+  border-radius: 16px;
+  justify-self: center;
+  box-shadow: 0 0 0 1px var(--cq-accent-secondary-soft), 0 18px 42px rgba(1, 8, 20, 0.42);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #coachBoard {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-right-sidebar {
+  grid-area: insights;
+  width: min(100%, 390px);
+  min-width: 0;
+  max-height: calc(100svh - 104px);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  justify-self: start;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-right-sidebar > :not(#premiumReview) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+  width: 100%;
+  min-height: min(560px, calc(100svh - 124px));
+  margin: 0;
+  padding: 16px;
+  border-color: var(--cq-border-strong);
+  box-shadow: var(--cq-inset-highlight), var(--cq-shadow-lg);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-graph:empty,
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-row:empty,
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-detail-stack:empty,
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-move-list:empty {
+  display: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-compare-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-compare-row small {
+  grid-column: 1 / -1;
+  padding: 2px 4px 0;
+  color: var(--cq-text-muted);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 8px;
+  border: 1px solid var(--cq-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cq-surface-raised) 92%, transparent);
+  box-shadow: 0 -10px 24px color-mix(in srgb, var(--cq-bg-primary) 68%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading,
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error {
+  align-content: start;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading > :not(.premium-review-head),
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error > :not(.premium-review-head) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading::after,
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error::after {
+  display: grid;
+  min-height: 230px;
+  place-items: center;
+  padding: 24px;
+  border: 1px solid var(--cq-border);
+  border-radius: 16px;
+  color: var(--cq-text-secondary);
+  background:
+    linear-gradient(105deg, transparent 18%, color-mix(in srgb, var(--cq-highlight) 70%, transparent) 50%, transparent 82%),
+    var(--cq-surface-quiet);
+  background-size: 220% 100%;
+  text-align: center;
+  line-height: 1.55;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading::after {
+  content: "Reviewing your moves and finding the clearest lesson…";
+  animation: reviewWorkspaceLoad 1.6s ease-in-out infinite;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error::after {
+  content: "Analysis could not finish right now. You can start another game or try again shortly.";
+}
+
+@keyframes reviewWorkspaceLoad {
+  50% { background-position: 100% 0; }
+}
+
+@media (max-width: 920px) {
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode {
+    --cq-review-board-max: min(100%, 660px);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+    width: min(100% - 18px, 760px);
+    grid-template-areas: "board" "insights";
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-right-sidebar {
+    width: min(100%, 660px);
+    max-height: none;
+    overflow: visible;
+    justify-self: center;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode {
+    --cq-review-board-max: min(100%, calc(100dvw - 20px));
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+    width: min(100% - 10px, 560px);
+    gap: 10px;
+    padding: 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-board-wrap {
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 6px;
+    padding: 3px;
+    border-radius: 12px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-eval-rail {
+    min-width: 20px;
+    width: 20px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+    padding: 12px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-compare-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-compare-button:last-of-type {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading::after {
+    animation: none;
+  }
+}
+/* Post-game flow: engine visibility and action priority. */
+:is(body:not(.theme-light), body.theme-light) #play .engine-panel[hidden] {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar > .post-game-flow:not([hidden]) {
+  order: -2;
+  display: grid !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar > .engine-panel:not([hidden]) {
+  order: 2;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .post-game-flow:not([hidden]) {
+  border-color: var(--cq-border-strong);
+  background:
+    radial-gradient(circle at 8% 0%, var(--cq-accent-primary-soft), transparent 35%),
+    var(--cq-surface-raised);
+  box-shadow: var(--cq-inset-highlight), var(--cq-shadow-md);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .post-game-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #postGameReview {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 620px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .post-game-actions {
+    grid-template-columns: 1fr;
+  }
+}
