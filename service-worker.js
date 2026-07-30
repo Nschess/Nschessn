@@ -1,4 +1,6 @@
-const CACHE_NAME = "nschess-shell-v17";
+// Bump this name whenever the shipped shell changes. The review workspace
+// depends on its HTML, CSS, and JavaScript being from the same release.
+const CACHE_NAME = "nschess-shell-v18-review-workspace";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -12,6 +14,7 @@ const APP_SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
+  self.skipWaiting();
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
 });
 
@@ -27,14 +30,15 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || url.pathname.includes("/api/")) return;
 
-  if (request.mode === "navigate") {
+  const isReviewShellAsset = ["/index.html", "/assets/app.css", "/assets/app.js"].some((path) => url.pathname.endsWith(path));
+  if (request.mode === "navigate" || isReviewShellAsset) {
     event.respondWith(fetch(request)
       .then((response) => {
         const copy = response.clone();
         void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("./offline.html"))));
+      .catch(() => caches.match(request).then((cached) => cached || (request.mode === "navigate" ? caches.match("./offline.html") : Response.error()))));
     return;
   }
 
