@@ -31818,3 +31818,324 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-strip { padding: 5px; }
   :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-phase-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* Live games stay board-first; detailed evaluation lives in Game Review. */
+#play #enginePanel {
+  display: none !important;
+}
+
+#play .post-game-decision[hidden] {
+  display: none !important;
+}
+
+#play .post-game-decision {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 8, 20, 0.74);
+  backdrop-filter: blur(10px);
+}
+
+#play .post-game-decision-card {
+  display: grid;
+  width: min(100%, 420px);
+  justify-items: center;
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-primary) 54%, var(--cq-border));
+  border-radius: 20px;
+  color: var(--cq-text-primary);
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--cq-accent-primary) 22%, transparent), transparent 54%),
+    var(--cq-surface-raised);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), var(--cq-inset-highlight);
+}
+
+#play .post-game-decision-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 50%;
+  color: #08111f;
+  font-size: 1.25rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #96f2b2, #4ccf84);
+  box-shadow: 0 0 0 6px color-mix(in srgb, #4ccf84 14%, transparent);
+}
+
+#play .post-game-decision-card h2,
+#play .post-game-decision-card p {
+  margin: 0;
+}
+
+#play .post-game-decision-card > p:not(.section-kicker) {
+  max-width: 32ch;
+  color: var(--cq-text-secondary);
+  line-height: 1.5;
+}
+
+#play .post-game-decision-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+#play .post-game-decision-actions .button {
+  min-height: 44px;
+}
+
+@media (max-width: 430px) {
+  #play .post-game-decision-card { padding: 24px 18px; }
+  #play .post-game-decision-actions { grid-template-columns: 1fr; }
+}
+
+/* Game Review learning loop: quick-engine confidence and retry-position feedback. */
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-engine-confidence {
+  display: block;
+  margin-top: 7px;
+  color: var(--cq-text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-one-moment-actions {
+  flex-wrap: wrap;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-one-moment-actions .button[hidden],
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-retry-status[hidden] {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-retry-status {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 36%, var(--cq-border));
+  border-radius: 10px;
+  color: var(--cq-text-secondary);
+  background: color-mix(in srgb, var(--cq-accent-secondary) 8%, var(--cq-surface-quiet));
+  font-size: 0.69rem;
+  line-height: 1.45;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-one-moment:has(.review-retry-status:not([hidden])) {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 52%, var(--cq-border));
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error::after {
+  content: "Analysis could not finish right now. Use Try again or Back to game.";
+}
+
+/* Private variation workspace: explore ideas without changing the completed game. */
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis[hidden] {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-primary) 36%, var(--cq-border));
+  border-radius: 13px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-primary) 12%, transparent), transparent 58%),
+    var(--cq-surface-quiet);
+  box-shadow: var(--cq-inset-highlight);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis span {
+  color: var(--cq-accent-secondary);
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis strong {
+  color: var(--cq-text-primary);
+  font-size: 0.8rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis p {
+  margin: 0;
+  color: var(--cq-text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-line {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  max-height: 92px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-line li {
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 82%, transparent);
+  border-radius: 7px;
+  color: var(--cq-text-primary);
+  background: color-mix(in srgb, var(--cq-surface-raised) 72%, transparent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-line {
+  padding: 7px 9px;
+  border-left: 2px solid var(--cq-accent-secondary);
+  border-radius: 0 8px 8px 0;
+  color: var(--cq-text-primary);
+  background: color-mix(in srgb, var(--cq-accent-secondary) 8%, var(--cq-surface-input));
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-line[hidden] {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-actions .button {
+  min-height: 38px;
+  padding-inline: 8px;
+  font-size: 0.66rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-copy {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 520px) {
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-line {
+    grid-template-columns: 1fr;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Advanced Game Review tools: compact, optional controls for private analysis. */
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 88%, transparent);
+  border-radius: 8px;
+  color: var(--cq-text-secondary);
+  background: color-mix(in srgb, var(--cq-surface-raised) 72%, transparent);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls input {
+  inline-size: 14px;
+  block-size: 14px;
+  accent-color: var(--cq-accent-secondary);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls select {
+  min-width: 0;
+  max-width: 112px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--cq-text-primary);
+  background: var(--cq-surface-input);
+  font: inherit;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service {
+  display: grid;
+  gap: 5px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 84%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--cq-surface-raised) 58%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service > div span {
+  color: var(--cq-text-primary);
+  font-size: 0.62rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service .button {
+  min-height: 30px;
+  padding-inline: 8px;
+  font-size: 0.61rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-growth-trail {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 31%, var(--cq-border));
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-secondary) 10%, transparent), transparent 68%),
+    var(--cq-surface-quiet);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-growth-trail > strong {
+  color: var(--cq-text-primary);
+  font-size: 0.74rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-growth-trail > p,
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-growth-trail > small {
+  margin: 0;
+  color: var(--cq-text-secondary);
+  font-size: 0.66rem;
+  line-height: 1.42;
+}
+
+@media (max-width: 520px) {
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls {
+    grid-template-columns: 1fr;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

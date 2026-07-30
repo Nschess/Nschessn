@@ -2837,6 +2837,9 @@
             </div>
             <div class="review-workspace-actions">
               <button class="button secondary review-share-button" type="button" id="reviewShare"><span aria-hidden="true">&#8599;</span> Share</button>
+              <button class="button secondary" type="button" id="reviewSelfAnalysis">Self analysis</button>
+              <button class="button secondary" type="button" id="reviewDeepAnalysis">Run deep review</button>
+              <button class="button secondary" type="button" id="reviewRetry" hidden>Try again</button>
               <button class="button review-play-again-button" type="button" id="reviewPlayAgain"><span aria-hidden="true">&#9654;</span> Play Again</button>
             </div>
           </header>
@@ -2851,7 +2854,7 @@
             </article>
             <article class="review-accuracy-card">
               <div class="review-score-ring" id="reviewPlayerScoreRing" aria-label="Your accuracy">
-                <strong id="reviewPlayerAccuracy">--</strong><small>Your accuracy</small>
+                <strong id="reviewPlayerAccuracy">--</strong><small>Quick accuracy</small>
               </div>
               <div class="review-accuracy-compare">
                 <span><small>You</small><strong id="reviewPlayerName">Player</strong></span>
@@ -2859,8 +2862,14 @@
               </div>
             </article>
             <article class="review-quality-card">
-              <div class="review-card-heading"><span>Move quality</span><small id="reviewQualityCount">0 moves</small></div>
+              <div class="review-card-heading"><span>Your move quality</span><small id="reviewQualityCount">0 moves</small></div>
               <div class="review-quality-breakdown" id="reviewQualityBreakdown" aria-label="Move quality breakdown"></div>
+            </article>
+            <article class="review-growth-trail" id="reviewGrowthTrail">
+              <div class="review-card-heading"><span>Growth trail</span><small>One game at a time</small></div>
+              <strong id="reviewGrowthHabit">Best habit: reviewing your moves.</strong>
+              <p id="reviewGrowthRepair">Repair next: one important moment.</p>
+              <small id="reviewGrowthProgress">Finish a review to begin your next learning loop.</small>
             </article>
             <article class="review-opening-card">
               <span class="review-opening-icon" aria-hidden="true">&#9823;</span>
@@ -3115,7 +3124,20 @@
               </div>
 
             </section>
+            <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" aria-describedby="postGameDecisionCopy" hidden>
+              <div class="post-game-decision-card">
+                <span class="post-game-decision-mark" aria-hidden="true">&#10003;</span>
+                <p class="section-kicker">Game complete</p>
+                <h2 id="postGameDecisionTitle">Well played</h2>
+                <p id="postGameDecisionCopy">Start a new game or review the moments that mattered.</p>
+                <div class="post-game-decision-actions">
+                  <button class="button secondary" type="button" id="postGameDecisionNew">New Game</button>
+                  <button class="button" type="button" id="postGameDecisionReview">Game Review</button>
+                </div>
+              </div>
+            </div>
             <div class="premium-review" id="premiumReview" hidden aria-live="polite">
+              <p class="sr-only" id="reviewCurrentMoveStatus" role="status" aria-live="polite" aria-atomic="true">Review ready.</p>
               <div class="premium-review-head">
                 <div class="premium-review-title">
                   <span class="review-orb" aria-hidden="true">R</span>
@@ -3124,7 +3146,7 @@
                     <small id="reviewSummaryLine">Your clean replay and best lessons appear here after the game.</small>
                   </div>
                 </div>
-                <span class="badge" id="reviewAccuracyBadge">Accuracy --</span>
+                <span class="badge" id="reviewAccuracyBadge">Quick score --</span>
               </div>
               <article class="review-performance-card" aria-label="Performance by game phase">
                 <div class="review-performance-ring" id="reviewPerformanceRing" aria-label="Overall performance score">
@@ -3152,13 +3174,44 @@
                 <div class="review-focus-meta" id="reviewFocusMeta">
                   <span>Best continuation appears here</span>
                 </div>
+                <small class="review-engine-confidence" id="reviewEngineConfidence">Quick engine &middot; depth --</small>
+              </article>
+              <article class="review-self-analysis" id="reviewSelfAnalysisPanel" hidden aria-live="polite">
+                <div><span>Self analysis</span><strong id="reviewSelfAnalysisTitle">Explore a variation</strong></div>
+                <p id="reviewSelfAnalysisStatus">Move either color freely, then ask for a quick engine read when you want one.</p>
+                <div class="review-self-analysis-engine-controls" aria-label="Self-analysis engine controls">
+                  <label><input type="checkbox" id="reviewSelfEngineEnabled" checked /> Engine on</label>
+                  <label>Engine depth
+                    <select id="reviewSelfEngineMode"><option value="quick" selected>Quick &middot; depth 5</option><option value="deep">Deep &middot; depth 10</option></select>
+                  </label>
+                </div>
+                <ol class="review-self-analysis-line" id="reviewSelfAnalysisLine" aria-label="Your variation" hidden></ol>
+                <p class="review-self-analysis-engine-line" id="reviewSelfAnalysisEngineLine" hidden></p>
+                <section class="review-self-analysis-service" aria-labelledby="reviewSelfOpeningTitle">
+                  <div><span id="reviewSelfOpeningTitle">Opening explorer</span><button class="button secondary" type="button" id="reviewSelfOpeningRefresh">Look up moves</button></div>
+                  <p id="reviewSelfOpeningStatus">Use an opening position to see popular master moves.</p>
+                </section>
+                <section class="review-self-analysis-service" aria-labelledby="reviewSelfTablebaseTitle">
+                  <div><span id="reviewSelfTablebaseTitle">Endgame tablebase</span><button class="button secondary" type="button" id="reviewSelfTablebaseCheck">Check endgame</button></div>
+                  <p id="reviewSelfTablebaseStatus">Available for positions with seven pieces or fewer.</p>
+                </section>
+                <div class="review-self-analysis-actions">
+                  <button class="button secondary" type="button" id="reviewSelfAnalyze">Analyze (quick)</button>
+                  <button class="button secondary" type="button" id="reviewSelfUndo">Undo last move</button>
+                  <button class="button secondary" type="button" id="reviewSelfReset">Reset variation</button>
+                  <button class="button" type="button" id="reviewSelfExit">Back to guided review</button>
+                  <button class="button secondary review-self-analysis-copy" type="button" id="reviewSelfCopy">Copy variation</button>
+                </div>
               </article>
               <article class="review-one-moment" id="reviewOneMoment">
                 <div class="review-one-moment-copy"><span>One moment that matters</span><strong id="reviewOneMomentTitle">Your clearest lesson will appear here.</strong><p id="reviewOneMomentCopy">Review one move, understand the pattern, then train it once.</p></div>
                 <div class="review-one-moment-actions">
-                  <button class="button secondary" type="button" id="reviewOneMomentJump">Explore</button>
+                  <button class="button secondary" type="button" id="reviewOneMomentJump">Retry position</button>
+                  <button class="button secondary" type="button" id="reviewRetryHint" hidden>Show hint</button>
+                  <button class="button secondary" type="button" id="reviewRetryReturn" hidden>Return to review</button>
                   <button class="button" type="button" id="reviewOneMomentPractice">Practice pattern</button>
                 </div>
+                <p class="review-retry-status" id="reviewRetryStatus" hidden aria-live="polite"></p>
               </article>
               <section class="review-recommendations" aria-labelledby="reviewRecommendationsTitle">
                 <div class="review-insight-section-heading">

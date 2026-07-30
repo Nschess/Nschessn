@@ -2871,7 +2871,7 @@
         createBookText("strong", "", chapter[0]),
         createBookText("small", "", chapter[1]),
         createBookText("small", "", chapter[2]),
-        createBookText("span", "mission-label", `${chapter[3]} Â· ${chapter[4]}`),
+        createBookText("span", "mission-label", `${chapter[3]} - ${chapter[4]}`),
         createBookText("small", "", `${chapter[5]}. ${chapter[6]}`)
       );
     }
@@ -8467,7 +8467,7 @@
       setAccountText("achievements", `${account.achievements.length}/${profile.achievements.length}`);
       setAccountText("story", `${account.storyProgress.completed}/${account.storyProgress.total}`);
       setAccountText("settings", `${account.settings.theme} / ${account.settings.board}`);
-      setAccountText("stats", `${formatProfileNumber(account.statistics.gamesPlayed)} games Â· ${formatProfileNumber(account.statistics.puzzlesSolved)} puzzles`);
+      setAccountText("stats", `${formatProfileNumber(account.statistics.gamesPlayed)} games - ${formatProfileNumber(account.statistics.puzzlesSolved)} puzzles`);
       setAccountText("joinDate", formatAccountDate(account.joinDate));
       setAccountText("lastLogin", formatAccountDate(account.lastLogin));
     }
@@ -11573,6 +11573,8 @@
 
     function isCoachPlayablePiece(piece) {
       if (!piece || !coachGame) return false;
+      if (reviewSelfAnalysisState) return piece.color === coachGame.turn();
+      if (reviewRetryState) return piece.color === getReviewPlayerColor() && coachGame.turn() === getReviewPlayerColor();
       if (friendChallengeState?.active) return piece.color === coachPlayerColor && coachGame.turn() === coachPlayerColor;
       return coachBotPaused ? piece.color === coachGame.turn() : piece.color === coachPlayerColor && coachGame.turn() === coachPlayerColor;
     }
@@ -11750,8 +11752,7 @@
       const evalFill = document.getElementById("engineEvalFill");
       if (!rating || !depth || !thinking || !evalText || !bestMove || !evalFill) return;
       const panel = document.getElementById("enginePanel");
-      const showEval = Boolean(coachGame && isCoachGameOver());
-      if (panel) panel.hidden = !showEval;
+      if (panel) panel.hidden = true;
       if (panel) panel.classList.toggle("is-thinking", coachThinking);
       rating.textContent = String(config.elo);
       depth.textContent = String(stockfishInfo.depth || config.depth);
@@ -12090,23 +12091,29 @@
       reviewAnalysisCacheWriteTimer = window.setTimeout(flushReviewAnalysisCache, 900);
     }
 
-    function getReviewAnalysisConfig() {
+    function getReviewAnalysisModeLabel(mode = "quick") {
+      return mode === "deep" ? "Deep engine" : "Quick engine";
+    }
+
+    function getReviewAnalysisConfig(mode = "quick") {
       const lowPerformance = document.body.classList.contains("perf-lite") || document.body.classList.contains("low-performance");
-      return normalizeStockfishConfig({
-        skill: lowPerformance ? 6 : 10,
-        depth: lowPerformance ? 3 : 5,
-        movetime: lowPerformance ? 60 : 110,
-        nodes: lowPerformance ? 700 : 1600,
+      const deep = mode === "deep" && !lowPerformance;
+      const config = normalizeStockfishConfig({
+        skill: deep ? 18 : lowPerformance ? 6 : 10,
+        depth: deep ? 10 : lowPerformance ? 3 : 5,
+        movetime: deep ? 520 : lowPerformance ? 60 : 110,
+        nodes: deep ? 14000 : lowPerformance ? 700 : 1600,
         multipv: 1,
-        hash: 8,
+        hash: deep ? 24 : 8,
         threads: 1,
         moveOverhead: 8,
-        limitStrength: true,
-        uciElo: 1600,
-        elo: 1600
+        limitStrength: !deep,
+        uciElo: deep ? 2400 : 1600,
+        elo: deep ? 2400 : 1600
       });
+      return { ...config, reviewMode: deep ? "deep" : "quick" };
     }
-    async function analyzeFenWithStockfish(fen, config = getReviewAnalysisConfig()) {
+    async function analyzeFenWithStockfish(fen, config = getReviewAnalysisConfig("quick")) {
       const cacheKey = `${fen}|d${config.depth}|t${config.movetime}|n${config.nodes}`;
       const cache = readReviewAnalysisCache();
       if (cache[cacheKey]) return cache[cacheKey];
@@ -12700,7 +12707,13 @@
     let reviewBestLineActive = false;
     let reviewRequestedPgn = "";
     let activeReviewAnalysisPgn = "";
+    let reviewAnalysisToken = 0;
+    let reviewAnalysisMode = "quick";
+    let reviewReturnFocus = null;
     let lastReviewSoundKey = "";
+    let reviewRetryState = null;
+    let postGameDecisionPgn = "";
+    let reviewSelfAnalysisState = null;
 
     const reviewQualityMeta = {
       "Opening Book": { icon: "OB", color: "#82c9ff", cue: "menu" },
@@ -12780,6 +12793,78 @@
       const before = Number(beforeCp) || 0;
       const after = Number(afterCp) || 0;
       return Math.round(Math.max(0, move.color === "w" ? before - after : after - before));
+    }
+
+    function getReviewPhase(fen = "", ply = 0) {
+      const placement = String(fen).split(" ")[0] || "";
+      const pieces = placement.replace(/[1-8/]/g, "").toLowerCase();
+      const counts = (type) => (pieces.match(new RegExp(type, "g")) || []).length;
+      const queens = counts("q");
+      const nonPawnMaterial = counts("q") * 9 + counts("r") * 5 + (counts("b") + counts("n")) * 3;
+      let position = null;
+      try { position = new CoachChess(fen); } catch {}
+      const homeMinorSquares = ["b1", "g1", "c1", "f1", "b8", "g8", "c8", "f8"];
+      const undevelopedMinors = homeMinorSquares.filter((square) => {
+        const expectedColor = square[1] === "1" ? "w" : "b";
+        const expectedType = square[0] === "b" || square[0] === "g" ? "n" : "b";
+        const piece = position?.get(square);
+        return piece?.color === expectedColor && piece.type === expectedType;
+      }).length;
+      if (ply <= 24 && queens === 2 && nonPawnMaterial >= 42 && (ply <= 12 || undevelopedMinors >= 2)) return "Opening";
+      if (queens === 0 || nonPawnMaterial <= 22) return "Endgame";
+      return "Middlegame";
+    }
+
+    function getReviewPlayerColor() {
+      return coachPlayerColor === "b" ? "b" : "w";
+    }
+
+    function isReviewLearningMove(move = {}) {
+      return /Inaccuracy|Mistake|Blunder|Missed Win/.test(String(move.label || ""));
+    }
+
+    function getReviewMomentScore(move = {}) {
+      const severity = move.label === "Blunder" ? 520
+        : move.label === "Missed Win" ? 440
+          : move.label === "Mistake" ? 300
+            : move.label === "Inaccuracy" ? 150 : 0;
+      const tactic = String(move.tactic || "").toLowerCase();
+      const tacticalWeight = /mate|fork|skewer|discovered/.test(tactic) ? 90
+        : /pin|hanging|defender/.test(tactic) ? 55 : 0;
+      const phaseWeight = move.phase === "Middlegame" ? 24 : move.phase === "Endgame" ? 16 : 8;
+      return severity + clampNumber(Number(move.cpLoss) || 0, 0, 600) + tacticalWeight + phaseWeight + (move.engineVerified ? 20 : 0);
+    }
+
+    function getReviewPrimaryMoment(review = activeMatchReview) {
+      const moves = Array.isArray(review?.moves) ? review.moves : [];
+      const playerMoves = moves
+        .map((move, index) => ({ move, index }))
+        .filter(({ move }) => move.color === getReviewPlayerColor());
+      const learningMoves = playerMoves.filter(({ move }) => isReviewLearningMove(move));
+      const candidates = learningMoves.length ? learningMoves : playerMoves;
+      const ranked = candidates.slice().sort((left, right) => {
+        const score = getReviewMomentScore(right.move) - getReviewMomentScore(left.move);
+        return score || right.index - left.index;
+      });
+      return ranked[0] || { index: Math.max(0, moves.length - 1), move: moves.at(-1) || null };
+    }
+
+    function getReviewBestMoment(review = activeMatchReview) {
+      const moves = Array.isArray(review?.moves) ? review.moves : [];
+      const labels = { Brilliant: 4, Best: 3, Excellent: 2, Great: 1 };
+      const ranked = moves
+        .map((move, index) => ({ move, index }))
+        .filter(({ move }) => move.color === getReviewPlayerColor())
+        .sort((left, right) => (labels[right.move.label] || 0) - (labels[left.move.label] || 0) || (left.move.cpLoss || 0) - (right.move.cpLoss || 0));
+      return ranked.find(({ move }) => labels[move.label]) || ranked[0] || { index: -1, move: null };
+    }
+
+    function getReviewEngineConfidence(review = activeMatchReview) {
+      const analysis = review?.analysis || {};
+      const depth = Math.max(0, Math.round(Number(analysis.averageDepth || analysis.requestedDepth) || 0));
+      const mode = analysis.mode || "Quick engine";
+      if (!analysis.verifiedMoves) return `${mode} coverage limited`;
+      return `${mode} - depth ${depth || "--"}`;
     }
 
     function classifyReviewMove({ move = {}, index = 0, cpLoss = 0, bestMove = null, legalCount = 0, opening = "Opening started", engineVerified = false, tactic = "" } = {}) {
@@ -12959,7 +13044,12 @@
       if (score) score.textContent = evalText;
     }
 
-    async function buildMatchReview() {
+    function formatReviewAnalysisRemaining(milliseconds = 0) {
+      const seconds = Math.max(1, Math.ceil(Number(milliseconds) / 1000));
+      return seconds >= 60 ? `about ${Math.ceil(seconds / 60)} min left` : `about ${seconds}s left`;
+    }
+
+    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}) {
       if (!coachGame || !CoachChess) return null;
       const moves = coachGame.history({ verbose: true });
       if (!moves.length) return null;
@@ -12968,18 +13058,48 @@
       const opening = getReviewOpeningName(moves.map((move) => move.san));
       const whiteLosses = [];
       const blackLosses = [];
+      const expectedSearches = Math.max(1, moves.length + 1);
+      const expectedSearchMs = Math.max(150, Number(analysisConfig.movetime) || 0) + 180;
+      const startedAt = Date.now();
+      let completedSearches = 0;
+      const reportProgress = (index, stage = "search") => {
+        const ratio = clampNumber(completedSearches / expectedSearches, 0, 0.99);
+        const elapsed = Math.max(0, Date.now() - startedAt);
+        const estimatedTotal = Math.max(expectedSearchMs * expectedSearches, ratio > 0 ? elapsed / ratio : 0);
+        onProgress({
+          percentage: Math.round(ratio * 100),
+          completedMoves: Math.min(moves.length, Math.max(0, index + (stage === "after" ? 1 : 0))),
+          totalMoves: moves.length,
+          remainingMs: Math.max(0, estimatedTotal - elapsed),
+          stage
+        });
+      };
+      onProgress({ percentage: 0, completedMoves: 0, totalMoves: moves.length, remainingMs: expectedSearchMs * expectedSearches, stage: "starting" });
+
+      const analysisDepths = [];
       const replay = new CoachChess();
       const reviewed = [];
       let previousAfter = null;
       for (const [index, move] of moves.entries()) {
+        if (!isCurrent()) return null;
         const fenBefore = replay.fen();
         const legalCount = replay.moves().length;
-        const before = previousAfter || await analyzeFenWithStockfish(fenBefore);
+        let before = previousAfter;
+        if (!before) {
+          before = await analyzeFenWithStockfish(fenBefore, analysisConfig);
+          completedSearches += 1;
+          reportProgress(index, "before");
+        }
+        if (!isCurrent()) return null;
         try { replay.move(move.san); } catch {}
         const fenAfter = replay.fen();
-        const after = await analyzeFenWithStockfish(fenAfter);
+        const after = await analyzeFenWithStockfish(fenAfter, analysisConfig);
+        completedSearches += 1;
+        reportProgress(index, "after");
+        if (!isCurrent()) return null;
         previousAfter = after;
         const engineDataReady = Boolean(before?.bestMove && Number(before?.depth) > 0 && Number(after?.depth) > 0);
+        if (engineDataReady) analysisDepths.push(Number(before.depth) || 0, Number(after.depth) || 0);
         const bestMove = engineDataReady ? getMoveFromFenUci(fenBefore, before.bestMove) : null;
         const engineVerified = Boolean(engineDataReady && bestMove);
         const pv = engineVerified ? pvUciToSan(fenBefore, before.pv || before.bestMove) : "";
@@ -13000,6 +13120,7 @@
           color: move.color,
           fenBefore,
           fenAfter,
+          phase: getReviewPhase(fenBefore, index + 1),
           label,
           cpLoss,
           engineVerified,
@@ -13017,8 +13138,6 @@
           explanation
         });
         if (!document.hidden && (index + 1) % 4 === 0) {
-          const summary = document.getElementById("reviewSummaryLine");
-          if (summary) summary.textContent = `Reviewing move ${index + 1} of ${moves.length}...`;
           await new Promise((resolve) => window.requestAnimationFrame(resolve));
         }
       }
@@ -13027,9 +13146,14 @@
         const avg = losses.reduce((sum, loss) => sum + clampNumber(loss / 3, 0, 95), 0) / losses.length;
         return Math.round(clampNumber(100 - avg, 0, 100));
       };
-      const mistakes = reviewed.filter((move) => /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label));
-      const mvp = reviewed.find((move) => /Brilliant|Great|Best/.test(move.label)) || reviewed[0];
-      const turning = mistakes[0] || mvp;
+      const playerMoves = reviewed.filter((move) => move.color === getReviewPlayerColor());
+      const mistakes = playerMoves.filter(isReviewLearningMove).sort((left, right) => getReviewMomentScore(right) - getReviewMomentScore(left));
+      const mvp = playerMoves.find((move) => /Brilliant|Great|Best|Excellent/.test(move.label)) || playerMoves[0] || reviewed[0];
+      const turning = mistakes[0] || mvp || reviewed[0];
+      const verifiedMoves = reviewed.filter((move) => move.engineVerified).length;
+      const averageDepth = analysisDepths.length
+        ? Math.round(analysisDepths.reduce((sum, depth) => sum + depth, 0) / analysisDepths.length)
+        : 0;
       const result = callCoachRule(coachGame, "isCheckmate", "in_checkmate")
         ? (coachGame.turn() === getCoachBotColor() ? "You won by checkmate." : "The coach won by checkmate.")
         : callCoachRule(coachGame, "isDraw", "in_draw") || coachDrawAgreed ? "The game ended peacefully." : "Game finished.";
@@ -13041,6 +13165,13 @@
         moves: reviewed,
         whiteAccuracy: accuracyFromLosses(whiteLosses),
         blackAccuracy: accuracyFromLosses(blackLosses),
+        analysis: {
+          requestedDepth: analysisConfig.depth,
+          averageDepth,
+          verifiedMoves,
+          totalMoves: reviewed.length,
+          mode: getReviewAnalysisModeLabel(analysisConfig.reviewMode)
+        },
         summary: {
           opening,
           turning: `${turning.ply}. ${turning.san} (${turning.label})`,
@@ -13054,10 +13185,15 @@
     }
 
     function saveActiveMatchReview(review) {
-      if (!review || matchReviews.some((item) => item.pgn === review.pgn)) return;
-      matchReviews = [review, ...matchReviews].slice(0, 12);
+      if (!review) return;
+      const existingIndex = matchReviews.findIndex((item) => item.pgn === review.pgn);
+      if (existingIndex >= 0) {
+        matchReviews[existingIndex] = review;
+      } else {
+        matchReviews = [review, ...matchReviews].slice(0, 12);
+      }
       savePuzzleState();
-      trackProductSignal("review_ready");
+      trackProductSignal("review_ready", { mode: review.analysis?.mode || "Quick engine" });
       renderHomeDashboard();
     }
 
@@ -13144,11 +13280,10 @@
       }
 
       const playerMoves = review.moves.filter((move) => move.color === (playerIsWhite ? "w" : "b"));
-      const phaseSize = Math.max(1, Math.ceil(playerMoves.length / 3));
       const phaseGroups = [
-        ["Opening", playerMoves.slice(0, phaseSize)],
-        ["Middlegame", playerMoves.slice(phaseSize, phaseSize * 2)],
-        ["Endgame", playerMoves.slice(phaseSize * 2)]
+        ["Opening", playerMoves.filter((move) => move.phase === "Opening")],
+        ["Middlegame", playerMoves.filter((move) => move.phase === "Middlegame")],
+        ["Endgame", playerMoves.filter((move) => move.phase === "Endgame")]
       ];
       const phaseScore = (moves) => {
         const verified = moves.filter((move) => move.engineVerified);
@@ -13177,8 +13312,8 @@
               : "Useful lessons found";
       const performanceNote = Number.isFinite(performanceScore)
         ? bestPhaseIndex >= 0
-          ? `Your best phase: ${phaseGroups[bestPhaseIndex][0]}.`
-          : "Overall score based on the moves the engine could evaluate."
+          ? `Quick estimate. Your best phase: ${phaseGroups[bestPhaseIndex][0]}.`
+          : "Quick estimate based on the moves the engine could evaluate."
         : "The engine did not return enough data for phase scores.";
       setReviewDashboardText("reviewPerformanceScore", Number.isFinite(performanceScore) ? String(performanceScore) : "--");
       setReviewDashboardText("reviewPerformanceLabel", performanceLabel);
@@ -13195,8 +13330,8 @@
         performanceRing.setAttribute("aria-label", Number.isFinite(performanceScore) ? `Overall performance: ${performanceScore} out of 100` : "Overall performance is unavailable");
       }
 
-      const totalMoves = review.moves.length;
-      setReviewDashboardText("reviewQualityCount", `${totalMoves} move${totalMoves === 1 ? "" : "s"}`);
+      const totalMoves = playerMoves.length;
+      setReviewDashboardText("reviewQualityCount", `Your ${totalMoves} move${totalMoves === 1 ? "" : "s"}`);
       const qualityBreakdown = document.getElementById("reviewQualityBreakdown");
       if (qualityBreakdown) {
         const groups = [
@@ -13208,7 +13343,7 @@
           ["Blunders", ["Blunder"]]
         ];
         const rows = groups.map(([label, labels]) => {
-          const count = review.moves.filter((move) => labels.includes(move.label)).length;
+          const count = playerMoves.filter((move) => labels.includes(move.label)).length;
           const meta = getReviewQualityMeta(labels[0]);
           const row = document.createElement("div");
           row.className = "review-quality-row";
@@ -13249,17 +13384,57 @@
       renderReviewCenterGraph(review);
     }
 
+    function renderReviewGrowthTrail(review = activeMatchReview) {
+      const habit = document.getElementById("reviewGrowthHabit");
+      const repair = document.getElementById("reviewGrowthRepair");
+      const progress = document.getElementById("reviewGrowthProgress");
+      if (!habit || !repair || !progress) return;
+      const playerMoves = (review?.moves || []).filter((move) => move.color === getReviewPlayerColor());
+      const strongest = [...playerMoves]
+        .filter((move) => ["Brilliant", "Best", "Excellent", "Great", "Good", "Opening Book"].includes(move.label))
+        .sort((left, right) => (Number(right.eval) || 50) - (Number(left.eval) || 50))[0];
+      const primary = getReviewPrimaryMoment(review).move;
+      const habitTheme = strongest?.tactic || (strongest ? "steady decision-making" : "checking loose pieces");
+      const repairTheme = primary?.tactic || "piece safety";
+      const recurring = [review, ...matchReviews.filter((item) => item?.pgn !== review?.pgn)]
+        .flatMap((item) => item?.moves || [])
+        .filter((move) => move.tactic === repairTheme && /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label)).length;
+      const reliableMoves = playerMoves.filter((move) => move.engineVerified && ["Brilliant", "Best", "Excellent", "Great", "Good", "Opening Book"].includes(move.label)).length;
+      habit.textContent = `Best habit: ${habitTheme}.`;
+      repair.textContent = `Repair next: ${repairTheme}.`;
+      progress.textContent = recurring > 1
+        ? `${recurring} reviewed moments point to this pattern. Retry it once, then train it.`
+        : `${reliableMoves}/${playerMoves.length || 0} of your moves were reliable. Turn this new clue into a habit.`;
+    }
+
+    function cancelActiveReviewAnalysis(reason = "Review closed") {
+      reviewAnalysisToken += 1;
+      activeReviewAnalysisPgn = "";
+      if (stockfishPending?.purpose === "review") cancelStockfishSearch(reason);
+    }
+
     function exitGameReview() {
-      if (!activeMatchReview) return;
+      const returnFocus = reviewReturnFocus;
+      reviewReturnFocus = null;
+      cancelActiveReviewAnalysis();
       window.clearInterval(reviewReplayTimer);
       reviewReplayTimer = 0;
       stopReviewBestLineReplay();
+      reviewRetryState = null;
+      reviewRequestedPgn = "";
+      reviewSelfAnalysisState = null;
       document.getElementById("premiumReview")?.setAttribute("hidden", "");
+      document.getElementById("reviewRetry")?.setAttribute("hidden", "");
       document.getElementById("play")?.classList.remove("is-review-mode");
       document.getElementById("reviewEvalRail")?.setAttribute("hidden", "");
       activeMatchReview = null;
+      postGameDecisionPgn = "";
       renderPostGameFlow(true);
       renderCoachBoard();
+      window.requestAnimationFrame(() => {
+        const fallback = document.getElementById("postGameDecisionReview") || returnFocus;
+        if (fallback?.isConnected) fallback.focus({ preventScroll: true });
+      });
     }
 
     function renderPremiumReview(review = activeMatchReview) {
@@ -13267,6 +13442,7 @@
       if (!panel || !review) return;
       activeMatchReview = review;
       panel.classList.remove("review-state-loading", "review-state-error");
+      document.getElementById("reviewRetry")?.setAttribute("hidden", "");
       panel.removeAttribute("aria-busy");
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
       document.getElementById("play")?.classList.add("is-review-mode");
@@ -13293,6 +13469,8 @@
       if (practiceRecommendationCopy) practiceRecommendationCopy.textContent = oneMomentMove
         ? `Train ${reviewPattern} from move ${oneMomentMove.ply}.`
         : "Train the pattern from this game once.";
+      renderReviewRetryControls(review);
+      renderReviewSelfAnalysisControls(review);
       if (!active?.engineVerified) reviewCompareMode = "your";
       const meta = getReviewQualityMeta(active?.label);
       panel.style.setProperty("--review-accent", meta.color);
@@ -13303,15 +13481,25 @@
         void focusCard.offsetWidth;
       }
       updateReviewEvalRail(active);
-      document.getElementById("reviewSummaryLine").textContent = `${review.summary.opening} · one move at a time.`;
+      document.getElementById("reviewSummaryLine").textContent = `${review.summary.opening} - one move at a time.`;
       const playerIsWhite = coachPlayerColor !== "b";
       const playerAccuracy = playerIsWhite ? review.whiteAccuracy : review.blackAccuracy;
       const opponentAccuracy = playerIsWhite ? review.blackAccuracy : review.whiteAccuracy;
       const accuracyText = Number.isFinite(playerAccuracy) && Number.isFinite(opponentAccuracy)
         ? "You " + playerAccuracy + "% · Opponent " + opponentAccuracy + "%"
         : "Accuracy pending";
-      document.getElementById("reviewAccuracyBadge").textContent = `Move ${reviewReplayIndex + 1}/${review.moves.length} · ${accuracyText}`;
+      document.getElementById("reviewAccuracyBadge").textContent = `Move ${reviewReplayIndex + 1}/${review.moves.length} - ${accuracyText}`;
+      setReviewDashboardText("reviewCurrentMoveStatus", active ? `Move ${active.ply}: ${active.san}, ${active.label}. ${getReviewMoveText(active)}` : "Review ready.");
+      const deepButton = document.getElementById("reviewDeepAnalysis");
+      const reviewIsDeep = review.analysis?.mode === "Deep engine";
+      if (deepButton) {
+        deepButton.disabled = reviewIsDeep;
+        deepButton.textContent = reviewIsDeep ? "Deep review ready" : "Run deep review";
+        deepButton.title = reviewIsDeep ? "This saved review already uses the deeper engine pass." : "Re-run this game with a deeper engine pass.";
+      }
       const qualityBadge = document.getElementById("reviewQualityBadge");
+      const confidence = getReviewEngineConfidence(review);
+      setReviewDashboardText("reviewEngineConfidence", confidence);
       if (qualityBadge && active) qualityBadge.textContent = `${meta.icon} ${active.label}`;
       const evalBadge = document.getElementById("reviewEvalBadge");
       if (evalBadge && active) evalBadge.textContent = active.cpLoss ? `Eval change: -${active.cpLoss} cp` : "Eval steady";
@@ -13330,14 +13518,16 @@
       const keyRow = document.getElementById("reviewKeyMoments");
       if (keyRow) {
         keyRow.hidden = false;
-        const mistakeIndex = review.moves.findIndex((move) => /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label));
-        const bestIndex = review.moves.findIndex((move) => /Brilliant|Great|Best/.test(move.label));
+        const primaryMoment = getReviewPrimaryMoment(review);
+        const bestMoment = getReviewBestMoment(review);
+        const mistakeIndex = primaryMoment.index;
+        const bestIndex = bestMoment.index;
         const keys = [
           ["Focus", mistakeIndex >= 0 ? mistakeIndex : bestIndex],
           ["Best", bestIndex],
           ["Critical", mistakeIndex],
           ["Finish", review.moves.length - 1]
-        ].filter(([, index]) => index >= 0);
+        ].filter(([, index], position, list) => index >= 0 && list.findIndex(([, candidate]) => candidate === index) === position);
         keyRow.replaceChildren(...keys.map(([label, index]) => {
           const move = review.moves[index];
           const keyMeta = getReviewQualityMeta(move.label);
@@ -13441,6 +13631,7 @@
       const replayBestButton = document.getElementById("reviewReplayBest");
       if (replayBestButton) replayBestButton.disabled = !active?.engineVerified || !(active?.pvUci || (active?.bestFrom && active?.bestTo));
       renderReviewDashboard(review, active);
+      renderReviewGrowthTrail(review);
     }
 
     function stopReviewBestLineReplay() {
@@ -13531,6 +13722,8 @@
     function showReviewPly(index) {
       if (!activeMatchReview || !CoachChess) return;
       stopReviewBestLineReplay();
+      reviewSelfAnalysisState = null;
+      reviewRetryState = null;
       reviewReplayIndex = clampNumber(index, 0, Math.max(0, activeMatchReview.moves.length - 1));
       const replay = new CoachChess();
       const upto = reviewCompareMode === "best" ? reviewReplayIndex : reviewReplayIndex + 1;
@@ -13588,13 +13781,11 @@
 
     function jumpReviewMistake() {
       if (!activeMatchReview) return;
-      const index = activeMatchReview.moves.findIndex((move) => /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label));
+      const index = getReviewPrimaryMoment(activeMatchReview).index;
       showReviewPly(index >= 0 ? index : 0);
     }
     function getReviewOneMoment(review = activeMatchReview) {
-      const moves = Array.isArray(review?.moves) ? review.moves : [];
-      const index = moves.findIndex((move) => /Inaccuracy|Mistake|Blunder|Missed Win/.test(String(move?.label || "")));
-      return { index: index >= 0 ? index : Math.max(0, moves.length - 1), move: moves[index >= 0 ? index : Math.max(0, moves.length - 1)] || null };
+      return getReviewPrimaryMoment(review);
     }
 
     function getReviewPracticePlan(move = {}) {
@@ -13620,6 +13811,582 @@
       openRealPuzzleExperience(plan);
     }
 
+    function isReviewSelfAnalysisActive(review = activeMatchReview) {
+      return Boolean(reviewSelfAnalysisState && reviewSelfAnalysisState.reviewId === review?.id);
+    }
+
+    function renderReviewSelfAnalysisControls(review = activeMatchReview) {
+      const panel = document.getElementById("reviewSelfAnalysisPanel");
+      const title = document.getElementById("reviewSelfAnalysisTitle");
+      const status = document.getElementById("reviewSelfAnalysisStatus");
+      const line = document.getElementById("reviewSelfAnalysisLine");
+      const engineLine = document.getElementById("reviewSelfAnalysisEngineLine");
+      const engineEnabled = document.getElementById("reviewSelfEngineEnabled");
+      const engineMode = document.getElementById("reviewSelfEngineMode");
+      const openingStatus = document.getElementById("reviewSelfOpeningStatus");
+      const openingRefresh = document.getElementById("reviewSelfOpeningRefresh");
+      const tablebaseStatus = document.getElementById("reviewSelfTablebaseStatus");
+      const tablebaseCheck = document.getElementById("reviewSelfTablebaseCheck");
+      const analyze = document.getElementById("reviewSelfAnalyze");
+      const undo = document.getElementById("reviewSelfUndo");
+      const reset = document.getElementById("reviewSelfReset");
+      const copy = document.getElementById("reviewSelfCopy");
+      const exit = document.getElementById("reviewSelfExit");
+      const toggle = document.getElementById("reviewSelfAnalysis");
+      const active = isReviewSelfAnalysisActive(review);
+      if (panel) panel.hidden = !active;
+      if (toggle) toggle.textContent = active ? "Guided review" : "Self analysis";
+      if (!active || !reviewSelfAnalysisState) return;
+      const state = reviewSelfAnalysisState;
+      const currentFen = coachGame?.fen() || "";
+      const engineIsEnabled = state.engineEnabled !== false;
+      if (title) title.textContent = state.moves ? `Variation - ${state.moves} move${state.moves === 1 ? "" : "s"}` : "Explore a variation";
+      if (status) {
+        status.textContent = state.analyzing
+          ? `${getReviewAnalysisModeLabel(state.engineMode)} is analyzing this position...`
+          : state.error
+            ? "Engine read was unavailable. You can keep exploring or try again."
+            : state.analysis
+              ? state.copied
+                ? "Variation copied. Paste it into your notes or an analysis board."
+                : `${state.analysis.mode || "Engine"}: ${state.analysis.evalText || "0.00"} - best move ${state.analysis.best || "--"} - depth ${state.analysis.depth || "--"}`
+              : state.copied
+                ? "Variation copied. Paste it into your notes or an analysis board."
+                : engineIsEnabled
+                  ? "Move either color freely, then ask for an engine read when you want one."
+                  : "Engine is off. Explore freely, then switch it on when you want a check.";
+      }
+      if (line) {
+        const moves = coachGame?.history?.({ verbose: true }) || [];
+        line.hidden = moves.length === 0;
+        line.replaceChildren();
+        if (moves.length) {
+          const parts = String(state.baseFen || "").trim().split(/\s+/);
+          const baseTurn = parts[1] === "b" ? "b" : "w";
+          const baseMove = Number(parts[5]) || 1;
+          const fragment = document.createDocumentFragment();
+          moves.forEach((move, index) => {
+            const item = document.createElement("li");
+            const moveNumber = baseMove + Math.floor((index + (baseTurn === "b" ? 1 : 0)) / 2);
+            item.textContent = `${moveNumber}${move.color === "w" ? "." : "..."} ${move.san}`;
+            fragment.appendChild(item);
+          });
+          line.appendChild(fragment);
+        }
+      }
+      if (engineLine) {
+        const principalVariation = state.analysis?.line || "";
+        engineLine.hidden = !principalVariation;
+        engineLine.textContent = principalVariation ? `Engine line: ${principalVariation}` : "";
+      }
+      if (engineEnabled) engineEnabled.checked = engineIsEnabled;
+      if (engineMode) {
+        engineMode.value = state.engineMode === "deep" ? "deep" : "quick";
+        engineMode.disabled = !engineIsEnabled || Boolean(state.analyzing);
+      }
+      const localOpening = getReviewSelfAnalysisLocalOpening(state);
+      const opening = state.opening?.fen === currentFen ? state.opening : null;
+      if (openingStatus) {
+        const commonMoves = opening?.data?.moves?.slice(0, 3).map((move) => `${move.san} (${Number(move.white || 0) + Number(move.draws || 0) + Number(move.black || 0)})`).join(" - ");
+        openingStatus.textContent = opening?.loading
+          ? "Looking up master games..."
+          : opening?.error
+            ? `${localOpening}. Online explorer is unavailable right now; your variation still stays private.`
+            : opening?.data
+              ? `${opening.data.opening?.name || localOpening}: ${commonMoves || "No common master moves returned."}`
+              : `${localOpening}. Look up common master moves from this exact position.`;
+      }
+      if (openingRefresh) {
+        openingRefresh.disabled = Boolean(opening?.loading);
+        openingRefresh.textContent = opening?.loading ? "Looking up..." : opening?.data ? "Refresh moves" : "Look up moves";
+      }
+      const pieceCount = getReviewSelfAnalysisPieceCount(currentFen);
+      const tablebase = state.tablebase?.fen === currentFen ? state.tablebase : null;
+      if (tablebaseStatus) {
+        const bestMoves = tablebase?.data?.moves?.slice(0, 3).map((move) => move.san).filter(Boolean).join(", ");
+        tablebaseStatus.textContent = pieceCount > 7
+          ? `Tablebase becomes available at seven pieces or fewer. This position has ${pieceCount}.`
+          : tablebase?.loading
+            ? "Checking the endgame tablebase..."
+            : tablebase?.error
+              ? "Tablebase is unavailable right now. You can still use the engine read."
+              : tablebase?.data
+                ? `Tablebase: ${tablebase.data.category || "unknown"}.${tablebase.data.dtz != null ? ` DTZ ${tablebase.data.dtz}.` : ""}${bestMoves ? ` Best: ${bestMoves}.` : ""}`
+                : `This ${pieceCount}-piece position can be checked for a theoretical result.`;
+      }
+      if (tablebaseCheck) {
+        tablebaseCheck.disabled = pieceCount > 7 || Boolean(tablebase?.loading);
+        tablebaseCheck.textContent = tablebase?.loading ? "Checking..." : tablebase?.data ? "Refresh tablebase" : "Check endgame";
+      }
+      if (analyze) {
+        analyze.disabled = Boolean(state.analyzing) || !engineIsEnabled;
+        analyze.textContent = state.analyzing ? "Analyzing..." : state.error ? "Try analysis again" : `Analyze (${state.engineMode === "deep" ? "deep" : "quick"})`;
+      }
+      if (undo) undo.disabled = Boolean(state.analyzing) || state.moves === 0;
+      if (reset) reset.disabled = Boolean(state.analyzing) || (state.moves === 0 && !state.analysis && !state.error);
+      if (copy) copy.disabled = Boolean(state.analyzing) || state.moves === 0;
+      if (copy) copy.textContent = state.copied ? "Copied" : "Copy variation";
+      if (exit) exit.disabled = false;
+    }
+
+    function startReviewSelfAnalysis() {
+      const review = activeMatchReview;
+      if (!review?.moves?.length || !CoachChess) return;
+      window.clearInterval(reviewReplayTimer);
+      reviewReplayTimer = 0;
+      stopReviewBestLineReplay();
+      const active = review.moves[reviewReplayIndex] || review.moves.at(-1);
+      const startedFromRetry = reviewRetryState?.index === reviewReplayIndex;
+      const baseFen = startedFromRetry
+        ? active?.fenBefore
+        : coachGame?.fen() || active?.fenAfter || active?.fenBefore;
+      if (!baseFen) return;
+      const sourceMoveCount = startedFromRetry ? reviewReplayIndex : reviewReplayIndex + 1;
+      reviewRetryState = null;
+      reviewSelfAnalysisState = {
+        reviewId: review.id,
+        index: reviewReplayIndex,
+        baseFen,
+        baseHistory: review.moves.slice(0, sourceMoveCount).map((move) => move.san),
+        moves: 0,
+        analyzing: false,
+        analysis: null,
+        engineEnabled: true,
+        engineMode: "quick",
+        opening: { loading: false, data: null, error: false, fen: "" },
+        tablebase: { loading: false, data: null, error: false, fen: "" },
+        copied: false,
+        error: false
+      };
+      coachGame = new CoachChess(baseFen);
+      coachLastMove = null;
+      coachSelected = "";
+      coachLegalMoves = [];
+      coachMessage = "Self analysis: explore either side freely. Your game record will not change.";
+      trackProductSignal("review_self_analysis_opened");
+      renderCoachBoard();
+      renderPremiumReview();
+    }
+
+    function exitReviewSelfAnalysis() {
+      const index = reviewSelfAnalysisState?.index ?? reviewReplayIndex;
+      reviewSelfAnalysisState = null;
+      showReviewPly(index);
+    }
+
+    function resetReviewSelfAnalysis() {
+      const state = reviewSelfAnalysisState;
+      if (!state || !CoachChess) return;
+      coachGame = new CoachChess(state.baseFen);
+      coachLastMove = null;
+      coachSelected = "";
+      coachLegalMoves = [];
+      state.moves = 0;
+      state.analysis = null;
+      state.error = false;
+      state.copied = false;
+      clearReviewSelfAnalysisServices(state);
+      coachMessage = "Variation reset. Explore another idea or ask the engine for a quick read.";
+      renderCoachBoard();
+      renderPremiumReview();
+    }
+
+    function undoReviewSelfAnalysisMove() {
+      const state = reviewSelfAnalysisState;
+      if (!state || !coachGame || state.analyzing || state.moves === 0) return;
+      let undone = null;
+      try { undone = coachGame.undo(); } catch {}
+      if (!undone) return;
+      const history = coachGame.history({ verbose: true });
+      coachLastMove = history.at(-1) || null;
+      coachSelected = "";
+      coachLegalMoves = [];
+      state.moves = Math.max(0, state.moves - 1);
+      state.analysis = null;
+      state.error = false;
+      state.copied = false;
+      clearReviewSelfAnalysisServices(state);
+      coachMessage = `Undid ${undone.san}. Explore a different continuation.`;
+      renderCoachBoard();
+      renderPremiumReview();
+    }
+
+    function getReviewSelfAnalysisPgn(state = reviewSelfAnalysisState) {
+      if (!state?.baseFen || !coachGame) return "";
+      const moves = coachGame.history({ verbose: true });
+      if (!moves.length) return "";
+      const parts = String(state.baseFen).trim().split(/\s+/);
+      const baseTurn = parts[1] === "b" ? "b" : "w";
+      const baseMove = Number(parts[5]) || 1;
+      const variation = moves.map((move, index) => {
+        const moveNumber = baseMove + Math.floor((index + (baseTurn === "b" ? 1 : 0)) / 2);
+        return `${moveNumber}${move.color === "w" ? "." : "..."} ${move.san}`;
+      }).join(" ");
+      return `[SetUp "1"]\n[FEN "${state.baseFen}"]\n\n${variation}`;
+    }
+
+    async function copyReviewSelfAnalysis() {
+      const state = reviewSelfAnalysisState;
+      const text = getReviewSelfAnalysisPgn(state);
+      if (!state || !text) return;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const input = document.createElement("textarea");
+          input.value = text;
+          input.setAttribute("readonly", "");
+          input.style.position = "fixed";
+          input.style.opacity = "0";
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand("copy");
+          input.remove();
+        }
+        if (reviewSelfAnalysisState !== state) return;
+        state.copied = true;
+        coachMessage = "Private variation copied as PGN with its starting position.";
+        renderPremiumReview();
+        window.setTimeout(() => {
+          if (reviewSelfAnalysisState !== state) return;
+          state.copied = false;
+          renderPremiumReview();
+        }, 1800);
+      } catch {
+        if (reviewSelfAnalysisState !== state) return;
+        coachMessage = "Your browser blocked copy. You can still keep exploring this variation.";
+        renderPremiumReview();
+      }
+    }
+
+    function formatReviewSelfAnalysisPrincipalVariation(fen, pv, limit = 6) {
+      if (!fen || !pv || !CoachChess) return "";
+      try {
+        const variation = new CoachChess(fen);
+        const san = String(pv).trim().split(/\s+/).slice(0, limit).map((uci) => {
+          if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(uci)) return "";
+          const move = variation.move({
+            from: uci.slice(0, 2),
+            to: uci.slice(2, 4),
+            ...(uci[4] ? { promotion: uci[4] } : {})
+          });
+          return move?.san || "";
+        }).filter(Boolean);
+        return san.join(" ");
+      } catch {
+        return "";
+      }
+    }
+
+    function clearReviewSelfAnalysisServices(state = reviewSelfAnalysisState) {
+      if (!state) return;
+      state.opening = { loading: false, data: null, error: false, fen: "" };
+      state.tablebase = { loading: false, data: null, error: false, fen: "" };
+    }
+
+    function getReviewSelfAnalysisLocalOpening(state = reviewSelfAnalysisState) {
+      const history = [
+        ...(state?.baseHistory || []),
+        ...(coachGame?.history?.({ verbose: true }) || []).map((move) => move.san)
+      ];
+      return getReviewOpeningName(history) || "Opening position";
+    }
+
+    function getReviewSelfAnalysisPieceCount(fen = coachGame?.fen?.() || "") {
+      return (String(fen).split(" ")[0].match(/[prnbqk]/gi) || []).length;
+    }
+
+    function setReviewSelfAnalysisEngineEnabled(enabled) {
+      const state = reviewSelfAnalysisState;
+      if (!state || state.analyzing) return;
+      state.engineEnabled = Boolean(enabled);
+      state.analysis = null;
+      state.error = false;
+      coachMessage = state.engineEnabled ? "Engine is on. Choose quick or deep, then analyze whenever you want." : "Engine is off. Your variation stays available for free exploration.";
+      renderPremiumReview();
+    }
+
+    function setReviewSelfAnalysisEngineMode(mode) {
+      const state = reviewSelfAnalysisState;
+      if (!state || state.analyzing) return;
+      state.engineMode = mode === "deep" ? "deep" : "quick";
+      state.analysis = null;
+      state.error = false;
+      coachMessage = `${getReviewAnalysisModeLabel(state.engineMode)} selected for the next position check.`;
+      renderPremiumReview();
+    }
+
+    async function lookupReviewSelfOpening() {
+      const state = reviewSelfAnalysisState;
+      const fen = coachGame?.fen?.();
+      if (!state || !fen || state.opening?.loading) return;
+      state.opening = { loading: true, data: null, error: false, fen };
+      renderPremiumReview();
+      try {
+        const response = await fetch(`https://explorer.lichess.org/masters?fen=${encodeURIComponent(fen)}&moves=4&topGames=0`);
+        if (!response.ok) throw new Error(`Opening explorer ${response.status}`);
+        const data = await response.json();
+        if (reviewSelfAnalysisState !== state || state.opening?.fen !== fen || coachGame?.fen() !== fen) return;
+        state.opening = { loading: false, data, error: false, fen };
+      } catch {
+        if (reviewSelfAnalysisState === state && state.opening?.fen === fen) {
+          state.opening = { loading: false, data: null, error: true, fen };
+        }
+      } finally {
+        if (reviewSelfAnalysisState === state && state.opening?.fen === fen) renderPremiumReview();
+      }
+    }
+
+    async function lookupReviewSelfTablebase() {
+      const state = reviewSelfAnalysisState;
+      const fen = coachGame?.fen?.();
+      if (!state || !fen || state.tablebase?.loading) return;
+      const pieceCount = getReviewSelfAnalysisPieceCount(fen);
+      if (pieceCount > 7) {
+        state.tablebase = { loading: false, data: null, error: false, fen };
+        renderPremiumReview();
+        return;
+      }
+      state.tablebase = { loading: true, data: null, error: false, fen };
+      renderPremiumReview();
+      try {
+        const response = await fetch(`https://tablebase.lichess.ovh/standard?fen=${encodeURIComponent(fen)}`);
+        if (!response.ok) throw new Error(`Tablebase ${response.status}`);
+        const data = await response.json();
+        if (reviewSelfAnalysisState !== state || state.tablebase?.fen !== fen || coachGame?.fen() !== fen) return;
+        state.tablebase = { loading: false, data, error: false, fen };
+      } catch {
+        if (reviewSelfAnalysisState === state && state.tablebase?.fen === fen) {
+          state.tablebase = { loading: false, data: null, error: true, fen };
+        }
+      } finally {
+        if (reviewSelfAnalysisState === state && state.tablebase?.fen === fen) renderPremiumReview();
+      }
+    }
+
+    async function analyzeReviewSelfPosition() {
+      const state = reviewSelfAnalysisState;
+      if (!state || !coachGame || state.engineEnabled === false) return;
+      const fen = coachGame.fen();
+      const mode = state.engineMode === "deep" ? "deep" : "quick";
+      state.analyzing = true;
+      state.error = false;
+      renderPremiumReview();
+      try {
+        const result = await analyzeFenWithStockfish(fen, getReviewAnalysisConfig(mode));
+        if (reviewSelfAnalysisState !== state || coachGame?.fen() !== fen) return;
+        const bestMove = getMoveFromFenUci(fen, result?.bestMove);
+        state.analysis = {
+          mode: getReviewAnalysisModeLabel(mode),
+          evalText: result?.evalText || "0.00",
+          best: bestMove?.san || result?.bestMove || "--",
+          depth: result?.depth || "--",
+          line: formatReviewSelfAnalysisPrincipalVariation(fen, result?.pv)
+        };
+      } catch {
+        if (reviewSelfAnalysisState === state) state.error = true;
+      } finally {
+        if (reviewSelfAnalysisState === state) {
+          state.analyzing = false;
+          renderPremiumReview();
+        }
+      }
+    }
+
+    function makeReviewSelfAnalysisMove(from, to) {
+      const state = reviewSelfAnalysisState;
+      if (!state || !coachGame) return false;
+      const legalMoves = coachGame.moves({ square: from, verbose: true }).filter((move) => move.to === to);
+      if (!legalMoves.length) return false;
+      const promotion = choosePromotion(legalMoves);
+      let made = null;
+      try { made = coachGame.move({ from, to, ...(promotion ? { promotion } : {}) }); } catch {}
+      if (!made) return false;
+      coachSelected = "";
+      coachLegalMoves = [];
+      coachLastMove = made;
+      state.moves += 1;
+      state.analysis = null;
+      state.error = false;
+      state.copied = false;
+      clearReviewSelfAnalysisServices(state);
+      coachMessage = `${made.san} added to your private variation.`;
+      renderCoachBoard();
+      renderPremiumReview();
+      return true;
+    }
+
+    function handleReviewSelfAnalysisSquare(square) {
+      if (!reviewSelfAnalysisState || !coachGame) return;
+      const piece = coachGame.get(square);
+      if (coachSelected && square !== coachSelected && coachLegalMoves.some((move) => move.to === square)) {
+        makeReviewSelfAnalysisMove(coachSelected, square);
+        return;
+      }
+      if (coachSelected === square) {
+        coachSelected = "";
+        coachLegalMoves = [];
+      } else if (piece?.color === coachGame.turn()) {
+        coachSelected = square;
+        coachLegalMoves = coachGame.moves({ square, verbose: true });
+      } else {
+        coachSelected = "";
+        coachLegalMoves = [];
+      }
+      renderCoachBoard();
+    }
+
+    function getReviewRetryTarget(review = activeMatchReview) {
+      const moment = getReviewPrimaryMoment(review);
+      const move = moment.move;
+      const canRetry = Boolean(
+        move?.engineVerified
+        && move?.fenBefore
+        && move?.bestFrom
+        && move?.bestTo
+        && move.color === getReviewPlayerColor()
+      );
+      return { ...moment, canRetry };
+    }
+
+    function renderReviewRetryControls(review = activeMatchReview) {
+      const action = document.getElementById("reviewOneMomentJump");
+      const hint = document.getElementById("reviewRetryHint");
+      const returnButton = document.getElementById("reviewRetryReturn");
+      const status = document.getElementById("reviewRetryStatus");
+      if (!action || !hint || !returnButton || !status) return;
+      const isRetrying = Boolean(reviewRetryState && reviewRetryState.reviewId === review?.id);
+      if (isRetrying) {
+        const target = review.moves[reviewRetryState.index];
+        action.hidden = true;
+        hint.hidden = Boolean(reviewRetryState.attempted || reviewRetryState.hint);
+        returnButton.hidden = false;
+        status.hidden = false;
+        status.textContent = reviewRetryState.attempted
+          ? reviewRetryState.correct
+            ? `Nice find: ${target.best} was the engine's first choice. Carry that ${target.tactic || "idea"} into the next game.`
+            : `${reviewRetryState.attemptedSan} is legal, but ${target.best} was stronger. ${reviewRetryState.hint ? "The engine arrow shows why." : "Use Show hint to reveal the engine idea."}`
+          : reviewRetryState.hint
+            ? `Hint: look for ${target.best}. Follow the blue engine arrow, then explain what it improves.`
+            : `Your turn: find a stronger move for ${target.color === "w" ? "White" : "Black"}.`;
+        return;
+      }
+      const target = getReviewRetryTarget(review);
+      action.hidden = false;
+      action.disabled = !target.canRetry;
+      action.textContent = target.canRetry ? "Retry position" : "Explore move";
+      action.title = target.canRetry ? "Try to find the engine's stronger move from this position." : "Open the most useful moment in the review.";
+      hint.hidden = true;
+      returnButton.hidden = true;
+      status.hidden = true;
+      status.textContent = "";
+    }
+
+    function startReviewRetry() {
+      const target = getReviewRetryTarget();
+      if (!target.move) return;
+      if (!target.canRetry) return jumpToReviewOneMoment();
+      window.clearInterval(reviewReplayTimer);
+      reviewReplayTimer = 0;
+      stopReviewBestLineReplay();
+      reviewReplayIndex = target.index;
+      reviewCompareMode = "your";
+      reviewRetryState = {
+        reviewId: activeMatchReview.id,
+        index: target.index,
+        hint: false,
+        attempted: false,
+        correct: false,
+        attemptedSan: ""
+      };
+      coachGame = new CoachChess(target.move.fenBefore);
+      coachLastMove = null;
+      coachSelected = "";
+      coachLegalMoves = [];
+      coachMessage = "Retry position: find the stronger move before asking for the hint.";
+      trackProductSignal("review_position_retry", { focus: target.move.tactic || "position" });
+      renderCoachBoard();
+      renderPremiumReview();
+    }
+
+    function showReviewRetryHint() {
+      if (!reviewRetryState) return;
+      reviewRetryState.hint = true;
+      renderCoachBoard();
+      renderPremiumReview();
+    }
+
+    function returnFromReviewRetry() {
+      const index = reviewRetryState?.index ?? reviewReplayIndex;
+      reviewRetryState = null;
+      showReviewPly(index);
+    }
+
+    function makeReviewRetryMove(from, to) {
+      const retry = reviewRetryState;
+      const target = activeMatchReview?.moves?.[retry?.index];
+      if (!retry || !target || retry.attempted || !coachGame) return false;
+      const legalMoves = coachGame.moves({ square: from, verbose: true }).filter((move) => move.to === to);
+      if (!legalMoves.length) return false;
+      const promotion = choosePromotion(legalMoves);
+      let made = null;
+      try { made = coachGame.move({ from, to, ...(promotion ? { promotion } : {}) }); } catch {}
+      if (!made) return false;
+      retry.attempted = true;
+      retry.attemptedSan = made.san;
+      retry.correct = made.from === target.bestFrom && made.to === target.bestTo && (made.promotion || "") === (target.bestPromotion || "");
+      coachSelected = "";
+      coachLegalMoves = [];
+      coachLastMove = made;
+      coachMessage = retry.correct
+        ? "Excellent. You found the engine's first choice."
+        : "That move is legal. Compare it with the engine idea, then try to name the difference.";
+      renderCoachBoard();
+      renderPremiumReview();
+      return true;
+    }
+
+    function handleReviewRetrySquare(square) {
+      if (!reviewRetryState || !coachGame || reviewRetryState.attempted) return;
+      const piece = coachGame.get(square);
+      if (coachSelected && square !== coachSelected && coachLegalMoves.some((move) => move.to === square)) {
+        makeReviewRetryMove(coachSelected, square);
+        return;
+      }
+      if (coachSelected === square) {
+        coachSelected = "";
+        coachLegalMoves = [];
+      } else if (piece?.color === coachGame.turn() && piece.color === getReviewPlayerColor()) {
+        coachSelected = square;
+        coachLegalMoves = coachGame.moves({ square, verbose: true });
+      } else {
+        coachSelected = "";
+        coachLegalMoves = [];
+      }
+      renderCoachBoard();
+    }
+
+    function hidePostGameDecision() {
+      document.getElementById("postGameDecision")?.setAttribute("hidden", "");
+    }
+
+    function showPostGameDecision(title, copy) {
+      const dialog = document.getElementById("postGameDecision");
+      if (!dialog || !coachGame) return;
+      const pgn = coachGame.pgn();
+      const alreadyShown = Boolean(pgn) && postGameDecisionPgn === pgn;
+      if (pgn) postGameDecisionPgn = pgn;
+      const titleNode = document.getElementById("postGameDecisionTitle");
+      const copyNode = document.getElementById("postGameDecisionCopy");
+      if (titleNode) titleNode.textContent = title;
+      if (copyNode) copyNode.textContent = copy;
+      if (alreadyShown) return;
+      dialog.hidden = false;
+      window.requestAnimationFrame(() => {
+        document.getElementById("postGameDecisionReview")?.focus({ preventScroll: true });
+      });
+    }
+
     function renderPostGameFlow(show = Boolean(coachGame && (isCoachGameOver() || coachDrawAgreed))) {
       const flow = document.getElementById("postGameFlow");
       if (!flow) return;
@@ -13639,15 +14406,21 @@
       if (note) note.textContent = ready
         ? "Your quick review is ready whenever you want it."
         : "Your quick review is preparing in the background.";
+      showPostGameDecision(
+        playerWon ? "You won!" : "Game complete",
+        ready ? "Your review is ready. Start another game or see what decided this one." : "Start another game or review the key moments while analysis finishes."
+      );
     }
 
     function openSavedMatchReview(review) {
       if (!review?.moves?.length || !CoachChess) return;
       reviewRequestedPgn = review.pgn || "";
+      reviewAnalysisMode = review.analysis?.mode === "Deep engine" ? "deep" : "quick";
       activeMatchReview = review;
       reviewCompareMode = "your";
       reviewReplayIndex = Math.max(0, review.moves.length - 1);
       showReviewPly(reviewReplayIndex);
+      window.requestAnimationFrame(() => document.getElementById("reviewExit")?.focus({ preventScroll: true }));
     }
 
     function togglePostGameHistory() {
@@ -13712,43 +14485,74 @@
       }
     }
 
-    function openPostGameReview() {
+    function openPostGameReview(options = {}) {
       if (!coachGame || (!isCoachGameOver() && !coachDrawAgreed)) return;
+      const mode = options?.mode === "deep" ? "deep" : "quick";
+      const force = Boolean(options?.force);
+      reviewAnalysisMode = mode;
+      if (!force && document.activeElement instanceof HTMLElement) reviewReturnFocus = document.activeElement;
+      hidePostGameDecision();
       const pgn = coachGame.pgn();
       reviewRequestedPgn = pgn;
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
-      if (cached) return openSavedMatchReview(cached);
+      const requestedLabel = getReviewAnalysisModeLabel(mode);
+      if (cached && !force && (cached.analysis?.mode || "Quick engine") === requestedLabel) return openSavedMatchReview(cached);
       const panel = document.getElementById("premiumReview");
       if (panel) {
         panel.hidden = false;
         panel.classList.remove("review-state-error");
+        document.getElementById("reviewRetry")?.setAttribute("hidden", "");
         panel.classList.add("review-state-loading");
         panel.setAttribute("aria-busy", "true");
         document.getElementById("play")?.classList.add("is-review-mode");
-        document.getElementById("reviewSummaryLine").textContent = "Preparing your review...";
-        document.getElementById("reviewAccuracyBadge").textContent = "Analyzing";
+        document.getElementById("reviewSummaryLine").textContent = `${getReviewAnalysisModeLabel(mode)} is preparing your review...`;
+        document.getElementById("reviewAccuracyBadge").textContent = mode === "deep" ? "Deep analysis" : "Analyzing";
       }
-      ensurePostGameReview(true);
+      ensurePostGameReview(true, { force, mode });
     }
 
-    function ensurePostGameReview(shouldAnalyze = false) {
+    function startDeepGameReview() {
+      openPostGameReview({ force: true, mode: "deep" });
+    }
+
+    function ensurePostGameReview(shouldAnalyze = false, options = {}) {
       if (!coachGame || (!isCoachGameOver() && !coachDrawAgreed)) {
         renderPostGameFlow(false);
         return;
       }
       renderPostGameFlow(true);
       if (!shouldAnalyze) return;
+      const mode = options?.mode === "deep" ? "deep" : reviewAnalysisMode;
+      const force = Boolean(options?.force);
+      const requestedLabel = getReviewAnalysisModeLabel(mode);
       const pgn = coachGame.pgn();
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
-      if (cached) {
+      if (cached && !force && (cached.analysis?.mode || "Quick engine") === requestedLabel) {
         if (reviewRequestedPgn === pgn) openSavedMatchReview(cached);
         return;
       }
-      if (activeReviewAnalysisPgn === pgn) return;
+      if (activeReviewAnalysisPgn === pgn && !force) return;
+      if (force) cancelActiveReviewAnalysis("Starting a new review pass");
+      const token = ++reviewAnalysisToken;
+      const gameAtAnalysis = coachGame;
+      const analysisConfig = getReviewAnalysisConfig(mode);
+      const updateAnalysisProgress = (progress = {}) => {
+        if (reviewAnalysisToken !== token || reviewRequestedPgn !== pgn) return;
+        const totalMoves = Math.max(1, Number(progress.totalMoves) || gameAtAnalysis.history().length || 1);
+        const completedMoves = clampNumber(Number(progress.completedMoves) || 0, 0, totalMoves);
+        const percentage = clampNumber(Number(progress.percentage) || 0, 0, 99);
+        const remaining = formatReviewAnalysisRemaining(progress.remainingMs);
+        const summary = document.getElementById("reviewSummaryLine");
+        const badge = document.getElementById("reviewAccuracyBadge");
+        const modeLabel = getReviewAnalysisModeLabel(mode);
+        if (summary) summary.textContent = `${modeLabel}: ${percentage}% - move ${completedMoves}/${totalMoves} - ${remaining}.`;
+        if (badge) badge.textContent = `${percentage}% · ${remaining}`;
+      };
       activeReviewAnalysisPgn = pgn;
-      buildMatchReview()
+      updateAnalysisProgress({ percentage: 0, completedMoves: 0, totalMoves: gameAtAnalysis.history().length, remainingMs: (Number(analysisConfig.movetime) + 180) * (gameAtAnalysis.history().length + 1) });
+      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && coachGame === gameAtAnalysis && coachGame?.pgn() === pgn, updateAnalysisProgress)
         .then((review) => {
-          if (!review || review.pgn !== pgn) return;
+          if (!review || reviewAnalysisToken !== token || review.pgn !== pgn) return;
           activeMatchReview = review;
           reviewReplayIndex = Math.max(0, review.moves.length - 1);
           saveActiveMatchReview(review);
@@ -13756,17 +14560,17 @@
           else renderPostGameFlow(true);
         })
         .catch(() => {
-          if (reviewRequestedPgn === pgn) {
-            const panel = document.getElementById("premiumReview");
-            panel?.classList.remove("review-state-loading");
-            panel?.classList.add("review-state-error");
-            panel?.removeAttribute("aria-busy");
-            const summary = document.getElementById("reviewSummaryLine");
-            if (summary) summary.textContent = "Review could not load right now. Start another game or try again shortly.";
-          }
+          if (reviewAnalysisToken !== token || reviewRequestedPgn !== pgn) return;
+          const panel = document.getElementById("premiumReview");
+          panel?.classList.remove("review-state-loading");
+          panel?.classList.add("review-state-error");
+          panel?.removeAttribute("aria-busy");
+          document.getElementById("reviewRetry")?.removeAttribute("hidden");
+          const summary = document.getElementById("reviewSummaryLine");
+          if (summary) summary.textContent = "Review could not load right now. Start another game or try again shortly.";
         })
         .finally(() => {
-          if (activeReviewAnalysisPgn === pgn) activeReviewAnalysisPgn = "";
+          if (reviewAnalysisToken === token) activeReviewAnalysisPgn = "";
         });
     }
 
@@ -14159,6 +14963,9 @@
     }
 
     function getReviewMoveVisual() {
+      if (reviewRetryState || reviewSelfAnalysisState) {
+        return null;
+      }
       if (reviewBestLineActive) {
         return reviewBestLineMove ? { ...reviewBestLineMove, best: true, label: reviewBestLineMove.san } : null;
       }
@@ -14198,6 +15005,17 @@
     }
 
     function getReviewOverlayData() {
+      if (reviewSelfAnalysisState) return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
+      if (reviewRetryState) {
+        const move = activeMatchReview?.moves?.[reviewRetryState.index];
+        if (!reviewRetryState.hint || !move?.bestFrom || !move?.bestTo) {
+          return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
+        }
+        const best = { from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", label: move.best };
+        return {
+          arrows: [best], attacks: getReviewMoveAttackSquares(move, true), engineSquares: new Set([best.from, best.to]), played: null, best
+        };
+      }
       if (reviewBestLineActive) {
         if (!reviewBestLineMove?.from || !reviewBestLineMove?.to) {
           return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
@@ -14322,7 +15140,8 @@
         coachDrawAgreed ? "draw" : "live", friendChallengeState?.active ? "friend-active" : "friend-local",
         friendChallengeState?.status || "", pieceSvgRenderVersion, activePieceSvgSet,
         activeMatchReview?.pgn || "", reviewReplayIndex, reviewCompareMode,
-        reviewBestLineActive ? "best-line" : "", reviewBestLineMove ? `${reviewBestLineMove.from}-${reviewBestLineMove.to}` : ""
+        reviewBestLineActive ? "best-line" : "", reviewBestLineMove ? `${reviewBestLineMove.from}-${reviewBestLineMove.to}` : "", reviewRetryState ? `${reviewRetryState.index}:${reviewRetryState.hint}:${reviewRetryState.attempted}:${reviewRetryState.correct}` : "",
+        reviewSelfAnalysisState ? `${reviewSelfAnalysisState.index}:${reviewSelfAnalysisState.moves}:${reviewSelfAnalysisState.analyzing ? "analyzing" : "ready"}` : ""
       ].join("|");
       if (board.dataset.renderKey === boardRenderKey) return;
       board.dataset.renderKey = boardRenderKey;
@@ -14401,6 +15220,8 @@
     }
 
     function makeCoachMove(from, to) {
+      if (reviewSelfAnalysisState) return makeReviewSelfAnalysisMove(from, to);
+      if (reviewRetryState) return makeReviewRetryMove(from, to);
       if (!coachGame || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return false;
       const legalMoves = coachGame.moves({ square: from, verbose: true }).filter((move) => move.to === to);
       if (!legalMoves.length) {
@@ -14477,6 +15298,8 @@
     }
 
     function handleCoachSquare(square) {
+      if (reviewSelfAnalysisState) return handleReviewSelfAnalysisSquare(square);
+      if (reviewRetryState) return handleReviewRetrySquare(square);
       if (!coachGame || coachThinking || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return;
       const piece = coachGame.get(square);
 
@@ -14561,6 +15384,7 @@
             coachMessage = isStrictStockfishLevel(config)
               ? `${config.label} needs Stockfish before moving. Refresh or switch to Beginner/Easy while the engine reloads.`
               : "Stockfish did not return a move. Beginner backup is available, or try Free Play while the engine reloads.";
+      reviewRetryState = null;
             stockfishInfo.status = stockfishFailed ? "Engine failed" : "No best move";
             scheduleEnginePanelUpdate();
           }
@@ -14580,11 +15404,14 @@
       if (!CoachChess) return;
       coachMoveToken += 1;
       window.clearInterval(reviewReplayTimer);
+      reviewSelfAnalysisState = null;
       reviewReplayTimer = 0;
       stopReviewBestLineReplay();
       reviewReplayIndex = 0;
       reviewCompareMode = "your";
       reviewRequestedPgn = "";
+      postGameDecisionPgn = "";
+      hidePostGameDecision();
       activeMatchReview = null;
       document.getElementById("premiumReview")?.setAttribute("hidden", "");
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
@@ -18152,6 +18979,14 @@
       });
       document.getElementById("restartGame").addEventListener("click", startSoloCoachGame);
       document.getElementById("postGameAgain")?.addEventListener("click", startSoloCoachGame);
+      document.getElementById("postGameDecisionNew")?.addEventListener("click", () => {
+        hidePostGameDecision();
+        startSoloCoachGame();
+      });
+      document.getElementById("postGameDecisionReview")?.addEventListener("click", () => {
+        hidePostGameDecision();
+        openPostGameReview();
+      });
       document.getElementById("postGameNextBot")?.addEventListener("click", playNextCoachOpponent);
       document.getElementById("postGameNew")?.addEventListener("click", () => {
         startSoloCoachGame();
@@ -18162,6 +18997,10 @@
       document.getElementById("postGameHistory")?.addEventListener("click", togglePostGameHistory);
       document.getElementById("postGameHome")?.addEventListener("click", () => { window.location.hash = "#top"; });
       document.getElementById("reviewExit")?.addEventListener("click", exitGameReview);
+      document.getElementById("reviewRetry")?.addEventListener("click", openPostGameReview);
+      document.getElementById("reviewSelfAnalysis")?.addEventListener("click", () => {
+        if (isReviewSelfAnalysisActive()) exitReviewSelfAnalysis(); else startReviewSelfAnalysis();
+      });
       document.getElementById("reviewShare")?.addEventListener("click", () => void sharePostGameResult(document.getElementById("reviewShare")));
       document.getElementById("reviewPlayAgain")?.addEventListener("click", startSoloCoachGame);
       document.getElementById("flipGame").addEventListener("click", () => {
@@ -18200,10 +19039,45 @@
         else renderCoachBoard();
       });
       document.getElementById("reviewMistake")?.addEventListener("click", jumpReviewMistake);
-      document.getElementById("reviewOneMomentJump")?.addEventListener("click", jumpToReviewOneMoment);
+      document.getElementById("reviewOneMomentJump")?.addEventListener("click", startReviewRetry);
       document.getElementById("reviewOneMomentPractice")?.addEventListener("click", practiceReviewOneMoment);
       document.getElementById("reviewShowYour")?.addEventListener("click", () => setReviewCompareMode("your"));
       document.getElementById("reviewShowBest")?.addEventListener("click", () => setReviewCompareMode("best"));
+      document.getElementById("reviewRetryHint")?.addEventListener("click", showReviewRetryHint);
+      document.getElementById("reviewRetryReturn")?.addEventListener("click", returnFromReviewRetry);
+      document.getElementById("reviewDeepAnalysis")?.addEventListener("click", startDeepGameReview);
+      document.getElementById("reviewSelfAnalyze")?.addEventListener("click", () => void analyzeReviewSelfPosition());
+      document.getElementById("reviewSelfEngineEnabled")?.addEventListener("change", (event) => setReviewSelfAnalysisEngineEnabled(event.currentTarget.checked));
+      document.getElementById("reviewSelfEngineMode")?.addEventListener("change", (event) => setReviewSelfAnalysisEngineMode(event.currentTarget.value));
+      document.getElementById("reviewSelfOpeningRefresh")?.addEventListener("click", () => void lookupReviewSelfOpening());
+      document.getElementById("reviewSelfTablebaseCheck")?.addEventListener("click", () => void lookupReviewSelfTablebase());
+      document.getElementById("reviewSelfUndo")?.addEventListener("click", undoReviewSelfAnalysisMove);
+      document.getElementById("reviewSelfReset")?.addEventListener("click", resetReviewSelfAnalysis);
+      document.getElementById("reviewSelfCopy")?.addEventListener("click", () => void copyReviewSelfAnalysis());
+      document.getElementById("reviewSelfExit")?.addEventListener("click", exitReviewSelfAnalysis);
+      document.addEventListener("keydown", (event) => {
+        const play = document.getElementById("play");
+        const activeElement = document.activeElement;
+        const isTextField = activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement || activeElement instanceof HTMLSelectElement || activeElement?.isContentEditable;
+        if (!play?.classList.contains("is-review-mode") || isTextField || event.altKey || event.ctrlKey || event.metaKey) return;
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          stepReview(-1);
+        } else if (event.key === "ArrowRight") {
+          event.preventDefault();
+          stepReview(1);
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          if (isReviewSelfAnalysisActive()) exitReviewSelfAnalysis();
+          else exitGameReview();
+        } else if (event.key.toLowerCase() === "z" && isReviewSelfAnalysisActive()) {
+          event.preventDefault();
+          undoReviewSelfAnalysisMove();
+        } else if (event.key.toLowerCase() === "r") {
+          const target = event.target;
+          if (!(target instanceof HTMLButtonElement)) startReviewRetry();
+        }
+      });
       document.getElementById("reviewReplayBest")?.addEventListener("click", replayReviewBestLine);
       setupFriendlyChallengeControls();
       document.getElementById("tournamentCreateForm")?.addEventListener("submit", createTournamentFromForm);
@@ -22019,7 +22893,7 @@
       const titleWrap = document.createElement("div");
       const controls = document.createElement("div");
       const heading = createBookText("h3", "", book.title);
-      const subheading = createBookText("p", "", `${book.author} â€¢ Chapter ${activeReaderChapter + 1} of ${chapters.length}`);
+      const subheading = createBookText("p", "", `${book.author} - Chapter ${activeReaderChapter + 1} of ${chapters.length}`);
       const themeButton = createBookText("button", "button secondary", readerTheme === "dark" ? "Light Mode" : "Dark Mode");
       const bookmarkButton = createBookText("button", "button secondary", isBookmarked ? "Bookmarked" : "Bookmark Page");
       const closeButton = createBookText("button", "button secondary", "Close Reader");
@@ -22190,7 +23064,7 @@
         const row = document.createElement("div");
         const copy = document.createElement("div");
         const title = createBookText("strong", "", book.title);
-        const meta = createBookText("span", "", `${book.level} â€¢ ${book.author}`);
+        const meta = createBookText("span", "", `${book.level} - ${book.author}`);
         const remove = createBookText("button", "button secondary", "Remove");
 
         row.className = "admin-row";
@@ -22413,7 +23287,7 @@
 
         title.textContent = group.title;
         description.textContent = group.description;
-        badge.textContent = `${group.tag} Â· ${videos.length}`;
+        badge.textContent = `${group.tag} - ${videos.length}`;
         grid.setAttribute("aria-label", group.title);
 
         copy.append(title, description);
@@ -22814,7 +23688,7 @@
 
       function updateLessonProgress() {
         if (progressBadge) {
-          progressBadge.textContent = `${completedLessons.size}/${slides.length} Done Â· +10 coins each`;
+          progressBadge.textContent = `${completedLessons.size}/${slides.length} Done - +10 coins each`;
         }
 
         if (resumeButton) {
