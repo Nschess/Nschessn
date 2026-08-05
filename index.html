@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-    <link rel="stylesheet" href="assets/app.css" />
+    <link rel="stylesheet" href="assets/app.css?v=review-v57-release-icons" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -2771,7 +2771,7 @@
           </div>
         </section>
 
-        <div class="puzzle-shell play-shell cq-workspace-shell">
+        <div class="puzzle-shell play-shell cq-workspace-shell" id="playWorkspace">
           <nav class="play-app-rail cq-panel" aria-label="Play workspace navigation">
             <a class="play-app-rail-brand" href="#top" data-home-link aria-label="Nschess home"><span aria-hidden="true">&#9813;</span></a>
             <a href="#top" data-home-link><span aria-hidden="true">&#8962;</span><small>Home</small></a>
@@ -2832,15 +2832,21 @@
           <header class="review-workspace-header" aria-label="Game Review controls">
             <button class="review-back-button" type="button" id="reviewExit"><span aria-hidden="true">&#8592;</span><span>Back to game</span></button>
             <div class="review-workspace-title">
-              <span class="review-workspace-kicker">Post-game analysis</span>
+              <span class="review-workspace-kicker">Review Game Summary</span>
               <h2>Game Review</h2>
             </div>
             <div class="review-workspace-actions">
-              <button class="button secondary review-share-button" type="button" id="reviewShare"><span aria-hidden="true">&#8599;</span> Share</button>
-              <button class="button secondary" type="button" id="reviewSelfAnalysis">Self analysis</button>
-              <button class="button secondary" type="button" id="reviewDeepAnalysis">Run deep review</button>
-              <button class="button secondary" type="button" id="reviewRetry" hidden>Try again</button>
-              <button class="button review-play-again-button" type="button" id="reviewPlayAgain"><span aria-hidden="true">&#9654;</span> Play Again</button>
+              <details class="review-tools-menu" id="reviewToolsMenu">
+                <summary>More tools</summary>
+                <div class="review-tools-menu-list" aria-label="Review tools">
+                  <button class="button secondary review-share-button" type="button" id="reviewShare"><span aria-hidden="true">&#8599;</span> Share</button>
+                  <button class="button secondary" type="button" id="reviewSelfAnalysis">Self analysis</button>
+                  <button class="button secondary" type="button" id="reviewDeepAnalysis">Run deep review</button>
+                  <button class="button secondary" type="button" id="reviewRetry" hidden>Try again</button>
+                  <button class="button secondary" type="button" id="reviewExportPgn">Export PGN</button>
+                  <button class="button secondary" type="button" id="reviewPlayAgain"><span aria-hidden="true">&#9654;</span> Play Again</button>
+                </div>
+              </details>
             </div>
           </header>
           <aside class="review-left-sidebar" id="reviewLeftSidebar" aria-label="Game review performance summary">
@@ -2975,6 +2981,13 @@
                 <strong id="reviewCenterEval">0.00</strong>
               </div>
               <div class="review-graph review-center-graph" id="reviewCenterGraph" aria-label="Evaluation by move"></div>
+              <div class="review-graph-legend" id="reviewGraphLegend" aria-label="Evaluation graph legend">
+                <span class="review-graph-legend-note">Marker = move quality</span>
+                <span><i class="review-graph-legend-swatch review-graph-legend-swatch--strong" aria-hidden="true"></i>Strong</span>
+                <span><i class="review-graph-legend-swatch review-graph-legend-swatch--turn" aria-hidden="true"></i>Turning point</span>
+                <span><i class="review-graph-legend-swatch review-graph-legend-swatch--costly" aria-hidden="true"></i>Costly</span>
+                <span class="review-graph-legend-note">Height = evaluation swing</span>
+              </div>
             </section>
             <div class="puzzle-board-wrap play-board-wrap cq-glass-container" aria-label="Playable chess board">
               <div class="review-eval-rail" id="reviewEvalRail" aria-label="Review evaluation bar" hidden>
@@ -2995,6 +3008,8 @@
             <div class="play-bottom-actionbar cq-floating-toolbar" aria-label="Game controls">
               <div class="puzzle-actions play-actions play-primary-actions">
                 <button class="button play-start-button" type="button" id="restartGame"><span aria-hidden="true">&#9654;</span> Start Game</button>
+                <button class="button secondary play-draw-action" type="button" id="offerDraw">Agree Draw</button>
+                <button class="button secondary danger play-resign-action" type="button" id="resignGame">Resign</button>
                 <details class="play-extra-actions">
                   <summary aria-label="More game controls">More</summary>
                   <div class="play-extra-actions-menu">
@@ -3007,11 +3022,9 @@
                     <button class="button secondary" type="button" id="whyGame">Why?</button>
                     <button class="button secondary" type="button" id="replayMistake">Replay Mistake</button>
                     <button class="button secondary" type="button" id="showThreats">Threats</button>
-                    <button class="button secondary" type="button" id="offerDraw">Offer Draw</button>
                     <button class="button secondary" type="button" id="acceptDraw" hidden>Accept Draw</button>
                     <button class="button secondary" type="button" id="declineDraw" hidden>Decline</button>
                     <button class="button secondary danger" type="button" id="abortGame">Abort</button>
-                    <button class="button secondary danger" type="button" id="resignGame">Resign</button>
                     <button class="button secondary" type="button" id="returnLobby">Lobby</button>
                     <button class="button" type="button" id="exportPgn">Copy PGN</button>
                     <button class="button secondary" type="button" id="importPgn">Import PGN</button>
@@ -3055,6 +3068,12 @@
               </div>
             </section>
           </section>
+          <aside class="play-live-analysis cq-sidebar cq-sidebar--insight" id="playLiveAnalysis" aria-label="Live game analysis">
+            <div class="play-live-coach-slot" id="playLiveCoachSlot"></div>
+            <div class="play-live-move-slot" id="playLiveMoveSlot" aria-label="Live move list"></div>
+            <div class="play-live-captures-slot" id="playLiveCapturesSlot" aria-label="Captured pieces"></div>
+            <div class="play-live-chat-slot" id="playLiveChatSlot" aria-label="Game chat"></div>
+          </aside>
           <aside class="puzzle-info coach-panel play-right-sidebar analysis-panel cq-sidebar cq-sidebar--insight" aria-label="Game analysis and coaching">
             <section class="engine-panel cq-panel" id="enginePanel" aria-live="polite" aria-labelledby="gameAnalysisTitle" hidden>
               <div class="engine-panel-head">
@@ -3124,18 +3143,6 @@
               </div>
 
             </section>
-            <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" aria-describedby="postGameDecisionCopy" hidden>
-              <div class="post-game-decision-card">
-                <span class="post-game-decision-mark" aria-hidden="true">&#10003;</span>
-                <p class="section-kicker">Game complete</p>
-                <h2 id="postGameDecisionTitle">Well played</h2>
-                <p id="postGameDecisionCopy">Start a new game or review the moments that mattered.</p>
-                <div class="post-game-decision-actions">
-                  <button class="button secondary" type="button" id="postGameDecisionNew">New Game</button>
-                  <button class="button" type="button" id="postGameDecisionReview">Game Review</button>
-                </div>
-              </div>
-            </div>
             <div class="premium-review" id="premiumReview" hidden aria-live="polite">
               <p class="sr-only" id="reviewCurrentMoveStatus" role="status" aria-live="polite" aria-atomic="true">Review ready.</p>
               <div class="premium-review-head">
@@ -3170,11 +3177,13 @@
                   <span class="badge" id="reviewEvalBadge">Eval --</span>
                 </div>
                 <h3 class="review-focus-move" id="reviewFocusMove">Pick a move</h3>
-                <p id="reviewWhyText">Pick a reviewed move to see the idea.</p>
-                <div class="review-focus-meta" id="reviewFocusMeta">
-                  <span>Best continuation appears here</span>
-                </div>
-                <small class="review-engine-confidence" id="reviewEngineConfidence">Quick engine &middot; depth --</small>
+                <p class="review-focus-summary" id="reviewFocusSummary">Pick a reviewed move to surface one clear idea.</p>
+                <details class="review-focus-details" id="reviewFocusDetails">
+                  <summary>Coach explanation</summary>
+                  <p id="reviewWhyText">Pick a reviewed move to see the idea.</p>
+                  <div class="review-focus-meta" id="reviewFocusMeta"><span>Best continuation appears here</span></div>
+                  <small class="review-engine-confidence" id="reviewEngineConfidence">Quick engine &middot; depth --</small>
+                </details>
               </article>
               <article class="review-self-analysis" id="reviewSelfAnalysisPanel" hidden aria-live="polite">
                 <div><span>Self analysis</span><strong id="reviewSelfAnalysisTitle">Explore a variation</strong></div>
@@ -3206,7 +3215,8 @@
               <article class="review-one-moment" id="reviewOneMoment">
                 <div class="review-one-moment-copy"><span>One moment that matters</span><strong id="reviewOneMomentTitle">Your clearest lesson will appear here.</strong><p id="reviewOneMomentCopy">Review one move, understand the pattern, then train it once.</p></div>
                 <div class="review-one-moment-actions">
-                  <button class="button secondary" type="button" id="reviewOneMomentJump">Retry position</button>
+                  <button class="button secondary" type="button" id="reviewOneMomentJump">Retry this move</button>
+                  <button class="button secondary" type="button" id="reviewReplayBest" disabled aria-label="Replay best line">Replay Best Line</button>
                   <button class="button secondary" type="button" id="reviewRetryHint" hidden>Show hint</button>
                   <button class="button secondary" type="button" id="reviewRetryReturn" hidden>Return to review</button>
                   <button class="button" type="button" id="reviewOneMomentPractice">Practice pattern</button>
@@ -3239,7 +3249,6 @@
               <div class="review-compare-row" aria-label="Compare move">
                 <button class="review-compare-button" type="button" id="reviewShowYour" aria-pressed="true">Your Move</button>
                 <button class="review-compare-button" type="button" id="reviewShowBest" aria-pressed="false">Show Best Move</button>
-                <button class="review-compare-button" type="button" id="reviewReplayBest" disabled>Replay Best Line</button>
                 <small>Compare the played move with the engine idea, then replay the line on the board.</small>
               </div>
               <div class="review-graph" id="reviewGraph" aria-label="Move timeline"></div>
@@ -3251,18 +3260,23 @@
                 <button class="button secondary" type="button" id="reviewFlip">Flip</button>
                 <button class="button" type="button" id="reviewMistake">Critical Move</button>
               </div>
-              <div class="review-insight-section-heading">
-                <span>Key moments</span>
-                <small>Jump to a turning point</small>
-              </div>
-              <div class="review-key-row" id="reviewKeyMoments" aria-label="Key review moments"></div>
-              <div class="review-detail-stack" id="reviewCoachCards">
-                <details open>
-                  <summary>Coach explanation</summary>
-                  <p>Pick a move to see the lesson, best continuation, and engine line.</p>
-                </details>
-              </div>
-              <div class="review-summary-grid" id="reviewSummaryGrid"></div>
+              <details class="review-reference-details" id="reviewReferenceDetails" hidden>
+                <summary><span>More review detail</span><small id="reviewReferenceCount"></small></summary>
+                <div class="review-reference-content">
+                  <div class="review-insight-section-heading" id="reviewKeyMomentsHeading">
+                    <span>Key moments</span>
+                    <small>Jump to a turning point</small>
+                  </div>
+                  <div class="review-key-row" id="reviewKeyMoments" aria-label="Key review moments"></div>
+                  <div class="review-detail-stack" id="reviewCoachCards">
+                    <details open>
+                      <summary>Coach explanation</summary>
+                      <p>Pick a move to see the lesson, best continuation, and engine line.</p>
+                    </details>
+                  </div>
+                  <div class="review-summary-grid" id="reviewSummaryGrid"></div>
+                </div>
+              </details>
               <div class="review-move-list" id="reviewMoveList" aria-label="Reviewed moves"></div>
             </div>
             <div class="mini-game-row" id="coachPracticeLinks" hidden aria-label="Recommended practice"></div>
@@ -3297,6 +3311,41 @@
               </div>
             </details>
           </aside>
+          <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" hidden>
+            <div class="post-game-decision-card">
+              <div class="post-game-decision-result">
+                <span class="post-game-decision-icon" id="postGameDecisionIcon" aria-hidden="true">&#127942;</span>
+                <div>
+                  <h2 id="postGameDecisionTitle">Game Finished</h2>
+                  <p class="post-game-decision-summary" id="postGameDecisionSummary" aria-live="polite"></p>
+                </div>
+              </div>
+              <dl class="post-game-decision-stats" aria-label="Game statistics">
+                <div>
+                  <dt>Accuracy</dt>
+                  <dd id="postGameDecisionAccuracy">Pending</dd>
+                </div>
+                <div>
+                  <dt>Moves</dt>
+                  <dd id="postGameDecisionMoves">0</dd>
+                </div>
+                <div>
+                  <dt>Duration</dt>
+                  <dd id="postGameDecisionDuration">0m 00s</dd>
+                </div>
+                <div id="postGameDecisionAcplStat" hidden>
+                  <dt>Avg. CP loss</dt>
+                  <dd id="postGameDecisionAcpl">--</dd>
+                </div>
+              </dl>
+              <div class="post-game-decision-actions">
+                <button class="button" type="button" id="postGameDecisionReview">Review Game</button>
+                <button class="button secondary" type="button" id="postGameDecisionRematch" hidden>Rematch</button>
+                <button class="button secondary" type="button" id="postGameDecisionNew">Play Again</button>
+                <button class="button secondary" type="button" id="postGameDecisionClose">Close</button>
+              </div>
+            </div>
+          </div>
           <section class="play-social-bar cq-panel" aria-label="Friends and game chat">
             <div class="play-social-presence"><span class="play-social-online is-offline" id="playSocialStatus" aria-hidden="true"></span><strong id="playSocialTitle">Friends</strong><small id="playSocialMeta">Connect a friend to play</small></div>
             <div class="play-social-avatars" id="playSocialAvatars" aria-label="Friend presence"></div>
@@ -3311,6 +3360,31 @@
       </div>
     </section>
 
+    <section class="section-dark game-review-page" id="gameReview" aria-label="Game Review">
+      <div class="game-review-page-frame">
+        <section class="game-review-workspace" id="gameReviewWorkspace" aria-label="Game Review" hidden>
+          <div class="game-review-shell">
+            <div class="game-review-header-slot" id="reviewHeaderSlot"></div>
+            <aside class="game-review-left-column" aria-label="Game summary and AI Coach">
+              <div class="game-review-summary-slot" id="reviewSummarySlot"></div>
+              <div class="game-review-coach-slot" id="reviewCoachSlot"></div>
+            </aside>
+            <main class="game-review-analysis-slot" id="reviewAnalysisSlot" aria-label="Game review board and replay">
+              <div class="game-review-board-slot" id="reviewBoardSlot"></div>
+              <div class="game-review-replay-slot" id="reviewReplaySlot"></div>
+              <div class="game-review-chart-slot" id="reviewChartSlot"></div>
+              <div class="game-review-timeline-slot" id="reviewTimelineSlot"></div>
+            </main>
+            <aside class="game-review-right-column" aria-label="Review insights and practice">
+              <div class="game-review-history-slot" id="reviewMoveHistorySlot"></div>
+              <div class="game-review-improvement-slot" id="reviewImprovementSlot"></div>
+              <div class="game-review-learning-slot" id="reviewLearningSlot"></div>
+              <div class="game-review-practice-slot" id="reviewPracticeSlot"></div>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </section>
     <div class="quick-match-overlay" id="quickMatchSetup" role="dialog" aria-modal="true" aria-labelledby="quickMatchSetupTitle" hidden>
       <form class="quick-match-dialog quick-match-setup-dialog" id="quickMatchSetupForm">
         <button class="quick-match-close" type="button" id="quickMatchSetupCancel" aria-label="Close Quick Match setup">×</button>
@@ -4101,6 +4175,6 @@
     </div>
   </aside>
 
-    <script defer src="assets/app.js"></script>
+    <script defer src="assets/app.js?v=review-v57-release-icons"></script>
 </body>
 </html>

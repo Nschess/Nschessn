@@ -11775,7 +11775,7 @@
         0 10px 26px rgba(0, 0, 0, 0.28);
     }
 
-    #play.is-review-mode .review-eval-rail {
+    :is(#play.is-review-mode, #gameReview.is-review-page) .review-eval-rail {
       display: block;
     }
 
@@ -12080,17 +12080,17 @@
       }
     }
 
-    #play.is-review-mode .play-shell {
+    :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
       grid-template-columns: minmax(0, 68fr) minmax(320px, 32fr);
       gap: clamp(14px, 1.8vw, 24px);
       align-items: start;
     }
 
-    #play.is-review-mode .match-board-column {
+    :is(#play.is-review-mode, #gameReview.is-review-page) .match-board-column {
       justify-self: stretch;
     }
 
-    #play.is-review-mode .play-board-wrap {
+    :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
       display: grid;
       grid-template-columns: 26px minmax(0, 1fr);
       align-items: stretch;
@@ -12100,36 +12100,36 @@
       justify-self: center;
     }
 
-    #play.is-review-mode .coach-panel {
+    :is(#play.is-review-mode, #gameReview.is-review-page) .coach-panel {
       max-height: calc(100dvh - 92px);
     }
 
-    #play.is-review-mode .coach-panel > :not(.premium-review):not(.puzzle-meta):not(.engine-panel) {
+    :is(#play.is-review-mode, #gameReview.is-review-page) .coach-panel > :not(.premium-review):not(.puzzle-meta):not(.engine-panel) {
       display: none;
     }
 
     @media (min-width: 1500px) {
-      #play.is-review-mode .play-board-wrap {
+      :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
         width: min(100%, 76dvh, 900px);
       }
     }
 
     @media (max-width: 1180px) {
-      #play.is-review-mode .play-shell {
+      :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
         grid-template-columns: minmax(0, 64fr) minmax(280px, 36fr);
       }
 
-      #play.is-review-mode .play-board-wrap {
+      :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
         width: min(100%, 68dvh, 680px);
       }
     }
 
     @media (max-width: 860px) {
-      #play.is-review-mode .play-shell {
+      :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
         grid-template-columns: 1fr;
       }
 
-      #play.is-review-mode .play-board-wrap {
+      :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
         width: min(100%, 78dvw, 620px);
       }
     }
@@ -16213,7 +16213,7 @@
         padding: 12px;
       }
 
-      #play.is-review-mode .play-shell {
+      :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
         grid-template-columns: minmax(420px, 68%) minmax(270px, 1fr) !important;
       }
 
@@ -16229,7 +16229,7 @@
         margin-inline: auto;
       }
 
-      #play.is-review-mode .play-board-wrap {
+      :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
         width: min(100%, 72dvh, 820px);
       }
 
@@ -16581,7 +16581,7 @@
     body.board-size-large #play { --user-board-size: 820px; }
     body.board-size-xl #play { --user-board-size: 920px; }
 
-    #play.is-review-mode .play-board-wrap {
+    :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
       width: min(100%, 82dvh, calc(var(--user-board-size) + 100px));
     }
 
@@ -29331,6 +29331,20 @@
         font-size: 0.62rem;
       }
 
+
+    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell:has(#playSocialMessageInput:not(:disabled)) {
+    grid-template-areas:
+      "left center"
+      "left social";
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-social-bar:has(#playSocialMessageInput:not(:disabled)) {
+    display: grid !important;
+    grid-area: social;
+    min-width: 0;
+  }
+}
       body:not(.theme-light) #play:not(.is-review-mode) .coach-setup {
         grid-area: setup;
         width: auto;
@@ -29695,25 +29709,8 @@
 
     /* Balanced Arena: fill the desktop game frame without adding noise. */
     @media (min-width: 1000px) {
-      body:not(.theme-light) #play:not(.is-review-mode) {
-        --cq-play-board-max: clamp(420px, calc(100svh - 380px), 620px);
-      }
-
       body:not(.theme-light) #play:not(.is-review-mode) .section-head {
         display: none;
-      }
-
-      body:not(.theme-light) #play:not(.is-review-mode) .play-shell {
-        width: min(100% - 32px, 1240px);
-        grid-template-columns: 50px 180px minmax(420px, 620px) 240px !important;
-        gap: 10px;
-        padding: 9px;
-      }
-
-      body:not(.theme-light) #play:not(.is-review-mode) :is(.play-app-rail, .play-panel, .analysis-panel) {
-        height: calc(100svh - 210px);
-        min-height: 0;
-        max-height: none;
       }
 
       body:not(.theme-light) #play:not(.is-review-mode) .chess-board-area,
@@ -30623,14 +30620,14 @@ body.site-tab-mode main > .site-panel.is-active-panel {
 }
 
 /* Game Review: a dedicated analysis workspace, separate from the live-game board. */
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) {
   --cq-review-board-max: min(760px, max(360px, calc(100svh - 176px)));
   background:
     radial-gradient(circle at 42% 12%, color-mix(in srgb, var(--cq-accent-secondary) 11%, transparent), transparent 32rem),
     linear-gradient(180deg, color-mix(in srgb, var(--cq-surface-panel) 80%, transparent), transparent 29rem);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
   display: grid !important;
   width: min(100% - 28px, 1240px);
   max-width: 1240px;
@@ -30643,11 +30640,11 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   border-radius: 20px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode :is(.play-app-rail, .play-left-sidebar) {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) :is(.play-app-rail, .play-left-sidebar) {
   display: none !important;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .match-board-column {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .match-board-column {
   grid-area: board;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -30659,11 +30656,11 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   justify-self: center;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .match-board-column > :not(.play-board-wrap) {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .match-board-column > :not(.play-board-wrap) {
   display: none !important;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-board-wrap {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
   display: grid;
   grid-area: board;
   grid-template-columns: 26px minmax(0, 1fr);
@@ -30678,13 +30675,13 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: 0 0 0 1px var(--cq-accent-secondary-soft), 0 18px 42px rgba(1, 8, 20, 0.42);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #coachBoard {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #coachBoard {
   width: 100%;
   min-width: 0;
   aspect-ratio: 1;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-right-sidebar {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar {
   grid-area: insights;
   width: min(100%, 390px);
   min-width: 0;
@@ -30696,11 +30693,11 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   justify-self: start;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-right-sidebar > :not(#premiumReview) {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar > :not(#premiumReview) {
   display: none !important;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review {
   width: 100%;
   min-height: min(560px, calc(100svh - 124px));
   margin: 0;
@@ -30709,48 +30706,98 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: var(--cq-inset-highlight), var(--cq-shadow-lg);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-graph:empty,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-row:empty,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-detail-stack:empty,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-move-list:empty {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-graph:empty,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-row:empty,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-detail-stack:empty,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-move-list:empty {
   display: none;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-compare-row {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-compare-row {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-compare-row small {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-compare-row small {
   grid-column: 1 / -1;
   padding: 2px 4px 0;
   color: var(--cq-text-muted);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-controls {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-controls {
+  display: grid;
   position: sticky;
   bottom: 0;
   z-index: 2;
-  padding: 8px;
-  border: 1px solid var(--cq-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--cq-surface-raised) 92%, transparent);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "previous play next"
+    "auto flip critical";
+  gap: 6px;
+  margin-top: auto;
+  padding: 7px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 86%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cq-surface-raised) 94%, transparent);
   box-shadow: 0 -10px 24px color-mix(in srgb, var(--cq-bg-primary) 68%, transparent);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-controls .button {
+  min-width: 0;
+  min-height: 40px;
+  padding-inline: 7px;
+  border-radius: 8px;
+  font-size: 0.67rem;
+  line-height: 1.1;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPrev { grid-area: previous; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPlay {
+  grid-area: play;
+  border-color: color-mix(in srgb, var(--cq-accent-primary) 72%, var(--cq-border));
+  color: var(--cq-text-primary);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-primary) 82%, #4b36b9), color-mix(in srgb, var(--cq-accent-secondary) 36%, var(--cq-accent-primary)));
+  box-shadow: 0 7px 16px color-mix(in srgb, var(--cq-accent-primary) 20%, transparent);
+}
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewNext { grid-area: next; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewAuto { grid-area: auto; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewFlip { grid-area: flip; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewMistake {
+  grid-area: critical;
+  border-color: color-mix(in srgb, #f2b84b 46%, var(--cq-border));
+  color: color-mix(in srgb, #f2b84b 86%, var(--cq-text-primary));
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-controls .button:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--cq-text-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "previous next"
+      "play play"
+      "auto flip"
+      "critical critical";
+  }
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-loading,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-error {
   align-content: start;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading > :not(.premium-review-head),
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error > :not(.premium-review-head) {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-loading > :not(.premium-review-head),
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-error > :not(.premium-review-head) {
   display: none !important;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading::after,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error::after {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-loading::after,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-error::after {
   display: grid;
   min-height: 230px;
   place-items: center;
@@ -30766,12 +30813,12 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   line-height: 1.55;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading::after {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-loading::after {
   content: "Reviewing your moves and finding the clearest lesson…";
   animation: reviewWorkspaceLoad 1.6s ease-in-out infinite;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error::after {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-error::after {
   content: "Analysis could not finish right now. You can start another game or try again shortly.";
 }
 
@@ -30780,66 +30827,66 @@ body.site-tab-mode main > .site-panel.is-active-panel {
 }
 
 @media (max-width: 920px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) {
     --cq-review-board-max: min(100%, 660px);
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
     width: min(100% - 18px, 760px);
     grid-template-areas: "board" "insights";
     grid-template-columns: minmax(0, 1fr) !important;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-right-sidebar {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar {
     width: min(100%, 660px);
     max-height: none;
     overflow: visible;
     justify-self: center;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review {
     min-height: 0;
   }
 }
 
 @media (max-width: 620px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) {
     --cq-review-board-max: min(100%, calc(100dvw - 20px));
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
     width: min(100% - 10px, 560px);
     gap: 10px;
     padding: 6px;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-board-wrap {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
     grid-template-columns: 20px minmax(0, 1fr);
     gap: 6px;
     padding: 3px;
     border-radius: 12px;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-eval-rail {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-eval-rail {
     min-width: 20px;
     width: 20px;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review {
     padding: 12px;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-compare-row {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-compare-row {
     grid-template-columns: 1fr 1fr;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-compare-button:last-of-type {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-compare-button:last-of-type {
     grid-column: 1 / -1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-loading::after {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-loading::after {
     animation: none;
   }
 }
@@ -30848,7 +30895,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   display: none;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) {
   --cq-review-summary-width: clamp(230px, 18vw, 276px);
   --cq-review-insights-width: clamp(310px, 23vw, 370px);
   background:
@@ -30856,7 +30903,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
     linear-gradient(180deg, color-mix(in srgb, var(--cq-bg-primary) 72%, #020713) 0%, var(--cq-bg-primary) 100%);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
   width: min(100% - 28px, 1560px);
   max-width: 1560px;
   grid-template-areas:
@@ -30871,7 +30918,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-header {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-header {
   grid-area: header;
   display: grid;
   grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
@@ -30881,14 +30928,14 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   padding: 2px 2px 8px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-back-button,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-actions {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-back-button,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-back-button {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-back-button {
   width: fit-content;
   min-height: 38px;
   padding: 0 10px;
@@ -30902,18 +30949,18 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   cursor: pointer;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-back-button:hover,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-back-button:focus-visible {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-back-button:hover,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-back-button:focus-visible {
   border-color: var(--cq-accent-secondary);
   color: var(--cq-text-primary);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-title {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-title {
   min-width: 0;
   text-align: center;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-kicker {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-kicker {
   display: block;
   margin-bottom: 2px;
   color: var(--cq-text-muted);
@@ -30923,7 +30970,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   text-transform: uppercase;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-title h2 {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-title h2 {
   margin: 0;
   color: var(--cq-text-primary);
   font-family: "Space Grotesk", var(--font-display, sans-serif);
@@ -30931,17 +30978,17 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   letter-spacing: -0.035em;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-actions {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions {
   justify-content: flex-end;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-actions .button {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions .button {
   min-height: 38px;
   padding-inline: 12px;
   font-size: 0.76rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-left-sidebar {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar {
   grid-area: summary;
   display: grid;
   align-content: start;
@@ -30949,7 +30996,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   min-width: 0;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-left-sidebar > article {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar > article {
   min-width: 0;
   border: 1px solid var(--cq-border);
   border-radius: 14px;
@@ -30957,142 +31004,226 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: var(--cq-inset-highlight), 0 10px 22px rgba(0, 0, 0, 0.14);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-outcome-card {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-card {
   display: grid;
+  position: relative;
+  isolation: isolate;
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
-  padding: 13px;
+  align-items: start;
+  gap: 12px;
+  min-height: 122px;
+  padding: 15px 14px 14px 16px;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 38%, var(--cq-border));
+  background:
+    linear-gradient(112deg, color-mix(in srgb, var(--cq-accent-secondary) 13%, transparent), transparent 52%),
+    linear-gradient(145deg, color-mix(in srgb, var(--cq-surface-raised) 92%, transparent), color-mix(in srgb, var(--cq-surface-panel) 86%, transparent));
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-outcome-icon {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-card::before {
+  content: "";
+  position: absolute;
+  inset: 12px auto 12px 0;
+  z-index: -1;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(180deg, var(--cq-accent-secondary), color-mix(in srgb, var(--cq-accent-primary) 76%, var(--cq-accent-secondary)));
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-card > div {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-icon {
   display: grid;
   width: 42px;
   height: 42px;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--cq-accent-primary) 54%, transparent);
-  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 56%, transparent);
+  border-radius: 12px;
   color: #fff9df;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--cq-accent-primary) 88%, #5535b5), color-mix(in srgb, var(--cq-accent-secondary) 56%, #1b4966));
-  font-size: 1.45rem;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--cq-accent-primary) 22%, transparent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--cq-accent-primary) 78%, #5535b5), color-mix(in srgb, var(--cq-accent-secondary) 62%, #1b4966));
+  font-size: 1.28rem;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--cq-accent-secondary) 18%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-outcome-card :is(.review-outcome-kicker, p) {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-kicker {
   display: block;
   margin: 0;
-  color: var(--cq-text-muted);
-  font-size: 0.71rem;
-  line-height: 1.38;
+  color: var(--cq-accent-secondary);
+  font-size: 0.61rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-outcome-card strong {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-card strong {
   display: block;
-  margin: 3px 0;
+  margin: 0;
   color: var(--cq-text-primary);
-  font-size: 0.92rem;
+  font-size: 0.98rem;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-accuracy-card {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-card p {
+  display: -webkit-box;
+  margin: 1px 0 0;
+  overflow: hidden;
+  color: var(--cq-text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.42;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-accuracy-card {
   display: grid;
-  grid-template-columns: 94px minmax(0, 1fr);
+  position: relative;
+  isolation: isolate;
+  grid-template-columns: 84px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 11px;
+  min-height: 104px;
   padding: 12px;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 30%, var(--cq-border));
+  background:
+    linear-gradient(122deg, color-mix(in srgb, var(--cq-accent-secondary) 8%, transparent), transparent 56%),
+    color-mix(in srgb, var(--cq-surface-raised) 82%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-score-ring {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-accuracy-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: -1;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cq-accent-secondary), transparent 72%);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-score-ring {
   --review-score: 0%;
   display: grid;
-  width: 94px;
-  height: 94px;
+  width: 84px;
+  height: 80px;
   place-content: center;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--cq-surface-raised) 57%, transparent 58%), conic-gradient(var(--cq-accent-secondary) var(--review-score), color-mix(in srgb, var(--cq-border-strong) 65%, transparent) 0);
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 42%, var(--cq-border));
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, var(--cq-accent-secondary) 0 var(--review-score), color-mix(in srgb, var(--cq-border-strong) 74%, transparent) var(--review-score) 100%) center bottom 9px / calc(100% - 18px) 4px no-repeat,
+    linear-gradient(145deg, color-mix(in srgb, var(--cq-accent-secondary) 14%, transparent), color-mix(in srgb, var(--cq-surface-panel) 72%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   text-align: center;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-score-ring strong {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-score-ring strong {
   color: var(--cq-text-primary);
-  font-size: 1.22rem;
-  letter-spacing: -0.05em;
+  font-size: 1.08rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-score-ring small,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-accuracy-compare small {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-score-ring small,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-accuracy-compare small {
   color: var(--cq-text-muted);
-  font-size: 0.6rem;
+  font-size: 0.56rem;
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-accuracy-compare {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-accuracy-compare {
   display: grid;
-  gap: 9px;
+  gap: 6px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-accuracy-compare span {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-accuracy-compare span {
   display: grid;
-  gap: 2px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid color-mix(in srgb, var(--cq-border) 78%, transparent);
+  gap: 3px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 76%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--cq-surface-quiet) 68%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-accuracy-compare span:last-child { border-bottom: 0; padding-bottom: 0; }
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-accuracy-compare strong {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-accuracy-compare strong {
   overflow: hidden;
-  color: var(--cq-text-secondary);
-  font-size: 0.78rem;
+  color: var(--cq-text-primary);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-quality-card { padding: 12px; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-quality-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 24%, var(--cq-border));
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--cq-accent-secondary) 6%, transparent), transparent 58%),
+    color-mix(in srgb, var(--cq-surface-raised) 78%, transparent);
+}
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-card-heading {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-card-heading {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin: 0;
   color: var(--cq-text-primary);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 900;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-card-heading small { color: var(--cq-text-muted); font-size: 0.66rem; font-weight: 700; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-card-heading small { color: var(--cq-text-muted); font-size: 0.6rem; font-weight: 800; letter-spacing: 0.04em; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-quality-breakdown { display: grid; gap: 7px; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-quality-breakdown { display: grid; gap: 6px; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-quality-row {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-quality-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px 18px;
+  grid-template-columns: minmax(0, 1fr) 58px 20px;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  min-height: 20px;
   color: var(--cq-text-secondary);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-quality-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-quality-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-quality-meter {
-  height: 5px;
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-quality-meter {
+  height: 6px;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 70%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--cq-border) 70%, transparent);
+  background: color-mix(in srgb, var(--cq-surface-input) 72%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-quality-meter i {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-quality-meter i {
   display: block;
   width: var(--review-quality-width, 0%);
   height: 100%;
   border-radius: inherit;
   background: var(--review-quality-color, var(--cq-accent-secondary));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--review-quality-color, var(--cq-accent-secondary)) 34%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-quality-row b { color: var(--cq-text-primary); font-size: 0.67rem; text-align: right; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-quality-row b { color: var(--cq-text-primary); font-size: 0.64rem; font-variant-numeric: tabular-nums; text-align: right; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-opening-card {
+@media (max-width: 520px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-quality-row {
+    grid-template-columns: minmax(0, 1fr) minmax(64px, 0.65fr) 20px;
+  }
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-opening-card {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   align-items: center;
@@ -31100,7 +31231,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   padding: 11px 12px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-opening-icon {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-opening-icon {
   display: grid;
   width: 32px;
   height: 32px;
@@ -31111,98 +31242,205 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   font-size: 1.05rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-opening-card small,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-opening-card strong { display: block; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-opening-card small { color: var(--cq-text-muted); font-size: 0.63rem; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-opening-card strong { overflow: hidden; margin-top: 2px; color: var(--cq-text-secondary); font-size: 0.73rem; text-overflow: ellipsis; white-space: nowrap; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-opening-card small,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-opening-card strong { display: block; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-opening-card small { color: var(--cq-text-muted); font-size: 0.63rem; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-opening-card strong { overflow: hidden; margin-top: 2px; color: var(--cq-text-secondary); font-size: 0.73rem; text-overflow: ellipsis; white-space: nowrap; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .match-board-column {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .match-board-column {
   grid-template-areas: "chart" "board" "timeline" "players";
   width: min(100%, 720px);
   max-width: 720px;
   gap: 10px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .match-board-column > :not(.play-board-wrap):not(.review-center-chart):not(.review-center-timeline):not(.review-player-strip) { display: none !important; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .match-board-column > :not(.play-board-wrap):not(.review-center-chart):not(.review-center-timeline):not(.review-player-strip) { display: none !important; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-chart {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-chart {
   grid-area: chart;
   display: grid;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
-  padding: 10px 12px 9px;
-  border: 1px solid var(--cq-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--cq-surface-raised) 78%, transparent);
-  box-shadow: var(--cq-inset-highlight), 0 10px 22px rgba(0, 0, 0, 0.12);
+  min-height: 96px;
+  padding: 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 24%, var(--cq-border));
+  border-radius: 12px;
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--cq-accent-secondary) 7%, transparent), transparent 46%),
+    color-mix(in srgb, var(--cq-surface-raised) 82%, transparent);
+  box-shadow: var(--cq-inset-highlight), 0 10px 20px rgba(0, 0, 0, 0.12);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-chart-head {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-chart-head {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-height: 22px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-chart-head span { display: grid; gap: 2px; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-chart-head small { color: var(--cq-text-muted); font-size: 0.61rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-chart-head strong { color: var(--cq-text-secondary); font-size: 0.76rem; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #reviewCenterEval { color: var(--cq-accent-secondary); font-size: 0.86rem; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-chart-head span { display: grid; gap: 2px; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-chart-head small { color: var(--cq-text-muted); font-size: 0.61rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-chart-head strong { color: var(--cq-text-secondary); font-size: 0.76rem; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewCenterEval { padding: 4px 7px; border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 32%, var(--cq-border)); border-radius: 7px; color: var(--cq-accent-secondary); background: color-mix(in srgb, var(--cq-accent-secondary) 9%, transparent); font-size: 0.76rem; font-variant-numeric: tabular-nums; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-graph {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-graph {
+  position: relative;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(6px, 1fr);
+  grid-auto-columns: minmax(5px, 1fr);
   align-items: stretch;
-  min-height: 62px;
-  max-height: 76px;
-  gap: clamp(2px, 0.35vw, 5px);
-  padding: 7px 2px;
-  border-top: 1px solid color-mix(in srgb, var(--cq-border) 78%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--cq-border) 78%, transparent);
-  background: repeating-linear-gradient(0deg, transparent 0 30px, color-mix(in srgb, var(--cq-border) 50%, transparent) 31px, transparent 32px);
+  min-height: 56px;
+  height: 56px;
+  max-height: 56px;
+  gap: clamp(2px, 0.32vw, 4px);
+  padding: 5px 4px;
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 78%, transparent);
+  border-radius: 9px;
+  background:
+    linear-gradient(180deg, transparent calc(50% - 1px), color-mix(in srgb, var(--cq-text-muted) 28%, transparent) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+    repeating-linear-gradient(90deg, transparent 0 30px, color-mix(in srgb, var(--cq-border) 44%, transparent) 31px, transparent 32px),
+    color-mix(in srgb, var(--cq-surface-input) 64%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review > #reviewGraph { display: none !important; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-graph::before {
+  content: "";
+  position: absolute;
+  inset: 6px 4px;
+  pointer-events: none;
+  border-top: 1px dashed color-mix(in srgb, var(--cq-text-muted) 16%, transparent);
+  border-bottom: 1px dashed color-mix(in srgb, var(--cq-text-muted) 16%, transparent);
+}
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-board-wrap { grid-area: board; width: 100%; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-graph span {
+  z-index: 1;
+  min-width: 5px;
+  border-radius: 999px;
+}
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-timeline {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-graph span::before {
+  min-width: 4px;
+  border-radius: 999px;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 34%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-graph span:focus-visible {
+  z-index: 2;
+  outline: 2px solid var(--cq-text-primary);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  color: var(--cq-text-secondary);
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-graph-legend > span:not(.review-graph-legend-note) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-graph-legend-note {
+  color: var(--cq-text-muted);
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-graph-legend-swatch {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--cq-accent-secondary);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--cq-accent-secondary) 38%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-graph-legend-swatch--turn {
+  background: #e6a530;
+  box-shadow: 0 0 7px color-mix(in srgb, #e6a530 38%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-graph-legend-swatch--costly {
+  background: #e56561;
+  box-shadow: 0 0 7px color-mix(in srgb, #e56561 38%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review > #reviewGraph { display: none !important; }
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap { grid-area: board; width: 100%; }
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-timeline {
   grid-area: timeline;
+  position: relative;
   display: flex;
   min-width: 0;
-  gap: 6px;
+  min-height: 52px;
+  gap: 4px;
   overflow-x: auto;
-  padding: 8px 2px 2px;
+  scroll-padding-inline: 8px;
+  overscroll-behavior-inline: contain;
+  touch-action: pan-x;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 82%, transparent);
+  border-radius: 11px;
+  background:
+    linear-gradient(90deg, transparent 0 12px, color-mix(in srgb, var(--cq-border) 62%, transparent) 12px calc(100% - 12px), transparent calc(100% - 12px)) center / 100% 1px no-repeat,
+    color-mix(in srgb, var(--cq-surface-raised) 78%, transparent);
   scrollbar-width: thin;
+  scroll-snap-type: x proximity;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-timeline-item {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-timeline-item {
   display: inline-flex;
-  min-width: 42px;
-  min-height: 34px;
+  position: relative;
+  flex: 0 0 50px;
+  min-height: 40px;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 0 8px;
-  border: 1px solid var(--cq-border);
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 84%, transparent);
   border-radius: 9px;
   color: var(--cq-text-muted);
-  background: color-mix(in srgb, var(--cq-surface-quiet) 85%, transparent);
+  background: color-mix(in srgb, var(--cq-surface-quiet) 88%, transparent);
   font: inherit;
   font-size: 0.68rem;
   font-weight: 800;
   cursor: pointer;
+  scroll-snap-align: center;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-timeline-item[aria-current="true"] {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-timeline-item[aria-current="true"] {
   border-color: var(--review-marker, var(--cq-accent-secondary));
   color: var(--cq-text-primary);
-  background: color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 18%, var(--cq-surface-raised));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 15%, transparent);
+  background: color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 17%, var(--cq-surface-raised));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 14%, transparent), 0 6px 14px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 12%, transparent);
+  transform: translateY(-1px);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-strip {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-timeline-item:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--cq-text-primary);
+  outline-offset: 2px;
+  color: var(--cq-text-primary);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-strip {
   grid-area: players;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
@@ -31211,7 +31449,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   min-width: 0;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip {
   display: grid;
   grid-template-columns: 31px minmax(0, 1fr) auto;
   align-items: center;
@@ -31223,7 +31461,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   background: color-mix(in srgb, var(--cq-surface-raised) 75%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-avatar {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-avatar {
   display: grid;
   width: 31px;
   height: 31px;
@@ -31236,14 +31474,14 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   font-weight: 900;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip--opponent .review-player-avatar { background: linear-gradient(135deg, #e69b3d, #d84c54); }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip span { display: grid; min-width: 0; gap: 1px; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip small { color: var(--cq-text-muted); font-size: 0.58rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip strong { overflow: hidden; color: var(--cq-text-secondary); font-size: 0.7rem; text-overflow: ellipsis; white-space: nowrap; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip b { color: var(--cq-text-primary); font-size: 0.68rem; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-versus { color: var(--cq-text-muted); font-size: 0.68rem; font-weight: 900; text-align: center; text-transform: uppercase; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip--opponent .review-player-avatar { background: linear-gradient(135deg, #e69b3d, #d84c54); }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip span { display: grid; min-width: 0; gap: 1px; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip small { color: var(--cq-text-muted); font-size: 0.58rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip strong { overflow: hidden; color: var(--cq-text-secondary); font-size: 0.7rem; text-overflow: ellipsis; white-space: nowrap; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip b { color: var(--cq-text-primary); font-size: 0.68rem; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-versus { color: var(--cq-text-muted); font-size: 0.68rem; font-weight: 900; text-align: center; text-transform: uppercase; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-right-sidebar {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar {
   width: min(100%, var(--cq-review-insights-width));
   max-height: calc(100svh - 116px);
   padding: 0;
@@ -31252,24 +31490,142 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: none;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review {
   min-height: 0;
   padding: 14px;
   border-radius: 16px;
   background: linear-gradient(150deg, color-mix(in srgb, var(--cq-surface-raised) 94%, transparent), color-mix(in srgb, var(--cq-surface-panel) 88%, transparent));
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review-head { padding-bottom: 9px; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review-head strong { font-size: 0.98rem; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review-head small { max-width: 240px; font-size: 0.7rem; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-focus-card { padding: 12px; border-radius: 13px; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-one-moment { padding: 11px; border-radius: 13px; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-one-moment-actions { grid-template-columns: 1fr 1fr; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-controls { gap: 6px; padding: 7px; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-controls .button { min-height: 34px; padding-inline: 8px; font-size: 0.68rem; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review-head { padding-bottom: 9px; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review-head strong { font-size: 0.98rem; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review-head small { max-width: 240px; font-size: 0.7rem; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-focus-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--review-accent, var(--cq-accent-secondary)) 42%, var(--cq-border));
+  border-radius: 12px;
+  background:
+    linear-gradient(112deg, color-mix(in srgb, var(--review-accent, var(--cq-accent-secondary)) 10%, transparent), transparent 60%),
+    color-mix(in srgb, var(--cq-surface-quiet) 88%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--review-accent, var(--cq-accent-secondary)) 72%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  animation: reviewFocusIn 180ms ease both;
+}
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-card {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-focus-card::after {
+  display: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-focus-card #reviewWhyText {
+  margin: 0;
+  color: var(--cq-text-primary);
+  font-size: 0.78rem;
+  line-height: 1.48;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-focus-summary {
+  margin: 0;
+  color: var(--cq-text-primary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-focus-details {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-top: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--cq-border) 72%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-focus-details > summary {
+  color: var(--cq-accent-secondary);
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.035em;
+  cursor: pointer;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-focus-details[open] > summary {
+  color: var(--cq-text-primary);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-focus-details #reviewWhyText {
+  color: var(--cq-text-secondary);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.72fr);
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--review-accent, var(--cq-accent-secondary)) 44%, var(--cq-border));
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--review-accent, var(--cq-accent-secondary)) 10%, transparent), transparent 62%),
+    color-mix(in srgb, var(--cq-surface-raised) 84%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment-copy {
+  gap: 5px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment-copy span {
+  color: var(--review-accent, var(--cq-accent-secondary));
+  font-size: 0.58rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment-copy strong {
+  color: var(--cq-text-primary);
+  font-size: 0.82rem;
+  line-height: 1.28;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment-copy p {
+  font-size: 0.68rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment-actions .button {
+  min-height: 34px;
+  padding-inline: 7px;
+  font-size: 0.65rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewOneMomentPractice {
+  grid-column: 1 / -1;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-retry-status {
+  grid-column: 1 / -1;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-detail-stack {
+  gap: 6px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-detail-stack details {
+  border-radius: 10px;
+}
+
+@media (max-width: 520px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment {
+    grid-template-columns: 1fr;
+  }
+}
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-card {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
   align-items: center;
@@ -31282,7 +31638,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
     color-mix(in srgb, var(--cq-surface-raised) 82%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-ring {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-ring {
   --review-performance: 0%;
   display: grid;
   width: 76px;
@@ -31293,15 +31649,15 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   text-align: center;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-ring strong { color: var(--cq-text-primary); font-size: 1.02rem; letter-spacing: -0.04em; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-ring small { color: var(--cq-text-muted); font-size: 0.49rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-ring strong { color: var(--cq-text-primary); font-size: 1.02rem; letter-spacing: -0.04em; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-ring small { color: var(--cq-text-muted); font-size: 0.49rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-copy { display: grid; gap: 3px; min-width: 0; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-copy > span { color: var(--cq-text-muted); font-size: 0.59rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-copy > strong { overflow: hidden; color: var(--cq-text-primary); font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-copy > small { color: var(--cq-text-secondary); font-size: 0.67rem; line-height: 1.35; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-copy { display: grid; gap: 3px; min-width: 0; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-copy > span { color: var(--cq-text-muted); font-size: 0.59rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-copy > strong { overflow: hidden; color: var(--cq-text-primary); font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-copy > small { color: var(--cq-text-secondary); font-size: 0.67rem; line-height: 1.35; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-phase-grid {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-phase-grid {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -31309,7 +31665,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   margin-top: 1px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-phase-grid span {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-phase-grid span {
   display: grid;
   gap: 2px;
   min-width: 0;
@@ -31320,10 +31676,10 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   text-align: center;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-phase-grid small { overflow: hidden; color: var(--cq-text-muted); font-size: 0.53rem; font-weight: 800; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-phase-grid strong { color: var(--cq-text-primary); font-size: 0.76rem; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-phase-grid small { overflow: hidden; color: var(--cq-text-muted); font-size: 0.53rem; font-weight: 800; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-phase-grid strong { color: var(--cq-text-primary); font-size: 0.76rem; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-insight-section-heading {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-insight-section-heading {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -31332,24 +31688,24 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   padding: 2px 2px 0;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-insight-section-heading span {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-insight-section-heading span {
   color: var(--cq-text-primary);
   font-size: 0.74rem;
   font-weight: 900;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-insight-section-heading small {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-insight-section-heading small {
   color: var(--cq-text-muted);
   font-size: 0.62rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-row {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-button {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-button {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) 14px;
   align-items: center;
@@ -31367,14 +31723,14 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   cursor: pointer;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-button:hover,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-button:focus-visible {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-button:hover,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-button:focus-visible {
   border-color: var(--review-chip, var(--cq-accent-secondary));
   background: color-mix(in srgb, var(--review-chip, var(--cq-accent-secondary)) 12%, var(--cq-surface-raised));
   outline: none;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-icon {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-icon {
   display: grid;
   width: 28px;
   height: 28px;
@@ -31386,80 +31742,105 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   font-weight: 900;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-content { display: grid; min-width: 0; gap: 2px; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-content strong { color: var(--cq-text-primary); font-size: 0.7rem; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-content small { overflow: hidden; color: var(--cq-text-muted); font-size: 0.62rem; text-overflow: ellipsis; white-space: nowrap; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-key-chevron { color: var(--cq-text-muted); font-size: 0.8rem; font-weight: 900; text-align: right; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-content { display: grid; min-width: 0; gap: 2px; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-content strong { color: var(--cq-text-primary); font-size: 0.7rem; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-content small { overflow: hidden; color: var(--cq-text-muted); font-size: 0.62rem; text-overflow: ellipsis; white-space: nowrap; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-key-chevron { color: var(--cq-text-muted); font-size: 0.8rem; font-weight: 900; text-align: right; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendations {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendations {
   display: grid;
-  gap: 7px;
+  gap: 9px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-grid {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: 8px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-card {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card {
   --review-recommendation: var(--cq-accent-secondary);
   display: grid;
-  align-content: start;
-  gap: 5px;
+  grid-template-columns: 29px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 8px;
   min-width: 0;
-  min-height: 112px;
-  padding: 9px;
+  min-height: 94px;
+  padding: 10px;
+  overflow: clip;
   border: 1px solid color-mix(in srgb, var(--review-recommendation) 34%, var(--cq-border));
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--cq-text-secondary);
-  background: linear-gradient(145deg, color-mix(in srgb, var(--review-recommendation) 11%, transparent), color-mix(in srgb, var(--cq-surface-quiet) 88%, transparent));
+  background:
+    radial-gradient(64px 64px at 100% 0%, color-mix(in srgb, var(--review-recommendation) 14%, transparent), transparent 72%),
+    linear-gradient(145deg, color-mix(in srgb, var(--review-recommendation) 9%, transparent), color-mix(in srgb, var(--cq-surface-quiet) 90%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   text-decoration: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-card--tactic { --review-recommendation: #41c7d2; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-card--opening { --review-recommendation: #a475f5; }
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-card--plan { --review-recommendation: #edb852; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card--tactic { --review-recommendation: #41c7d2; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card--opening { --review-recommendation: #a475f5; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card--plan { --review-recommendation: #edb852; }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-card:hover,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-card:focus-visible {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card:hover,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card:focus-visible {
   border-color: var(--review-recommendation);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--review-recommendation) 13%, transparent);
-  outline: none;
-  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.065), 0 8px 18px color-mix(in srgb, var(--review-recommendation) 14%, transparent);
+  transform: translateY(-2px);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-icon {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--review-recommendation) 82%, white);
+  outline-offset: 2px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-icon {
   display: grid;
-  width: 27px;
-  height: 27px;
+  width: 29px;
+  height: 29px;
+  grid-row: 1 / span 2;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 8px;
   color: var(--review-recommendation);
   background: color-mix(in srgb, var(--review-recommendation) 16%, transparent);
-  font-size: 0.85rem;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--review-recommendation) 24%, transparent);
+  font-size: 0.82rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-card strong {
-  overflow: hidden;
-  color: var(--cq-text-primary);
-  font-size: 0.64rem;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-recommendation-card small {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card strong {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--cq-text-muted);
-  font-size: 0.56rem;
-  line-height: 1.3;
+  color: var(--cq-text-primary);
+  font-size: 0.67rem;
+  line-height: 1.25;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-@media (max-width: 1320px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--cq-text-muted);
+  font-size: 0.59rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 520px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card {
+    min-height: 64px;
+  }
+}
+
+@media (max-width: 1150px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
     width: min(100% - 22px, 1120px);
     grid-template-areas:
       "header header"
@@ -31468,12 +31849,12 @@ body.site-tab-mode main > .site-panel.is-active-panel {
     grid-template-columns: minmax(0, 1fr) minmax(300px, 350px) !important;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-left-sidebar { width: min(100%, 720px); justify-self: center; grid-template-columns: 1.1fr 1fr; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-outcome-card { grid-column: 1 / -1; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar { width: min(100%, 720px); justify-self: center; grid-template-columns: 1.1fr 1fr; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-card { grid-column: 1 / -1; }
 }
 
 @media (max-width: 920px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
     width: min(100% - 18px, 720px);
     grid-template-areas:
       "header"
@@ -31484,23 +31865,23 @@ body.site-tab-mode main > .site-panel.is-active-panel {
     gap: 12px;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-left-sidebar { width: min(100%, 660px); grid-template-columns: 1fr 1fr; justify-self: center; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-right-sidebar { width: min(100%, 660px); max-height: none; justify-self: center; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar { width: min(100%, 660px); grid-template-columns: 1fr 1fr; justify-self: center; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar { width: min(100%, 660px); max-height: none; justify-self: center; }
 }
 
 @media (max-width: 620px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell { width: min(100% - 10px, 560px); padding: 6px; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-header { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-title { text-align: left; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-actions { grid-column: 1 / -1; justify-content: stretch; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-actions .button { flex: 1; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-back-button span:last-child { display: none; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-left-sidebar { grid-template-columns: 1fr; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-outcome-card { grid-column: auto; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-chart { padding: 9px; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-strip { grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr); gap: 5px; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip { grid-template-columns: 27px minmax(0, 1fr); padding: 6px; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip b { display: none; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell { width: min(100% - 10px, 560px); padding: 6px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-header { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-title { text-align: left; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions { grid-column: 1 / -1; justify-content: stretch; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions .button { flex: 1; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-back-button span:last-child { display: none; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar { grid-template-columns: 1fr; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-card { grid-column: auto; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-chart { padding: 9px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-strip { grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr); gap: 5px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip { grid-template-columns: 27px minmax(0, 1fr); padding: 6px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip b { display: none; }
 }
 /* Post-game flow: engine visibility and action priority. */
 :is(body:not(.theme-light), body.theme-light) #play .engine-panel[hidden] {
@@ -31583,18 +31964,15 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: 0 0 0 1px var(--cq-accent-secondary-soft), var(--cq-shadow-sm);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review,
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .premium-review {
   display: grid;
   align-content: start;
   gap: var(--cq-layout-tight-gap);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review > * {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review > * {
   min-width: 0;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-controls {
-  margin-top: auto;
 }
 
 @media (max-width: 920px) {
@@ -31606,7 +31984,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
     gap: var(--cq-layout-gap);
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-controls {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-controls {
     position: static;
     margin-top: var(--cq-layout-tight-gap);
     box-shadow: var(--cq-layout-surface-shadow);
@@ -31622,13 +32000,13 @@ body.site-tab-mode main > .site-panel.is-active-panel {
     padding: var(--cq-space-2);
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review {
     gap: var(--cq-space-2);
   }
 }
 
 @media (hover: hover) and (pointer: fine) {
-  :is(body:not(.theme-light), body.theme-light) :is(#homeSessionCard, #play:not(.is-review-mode) .play-board-wrap, #play.is-review-mode .premium-review) {
+  :is(body:not(.theme-light), body.theme-light) :is(#homeSessionCard, #play:not(.is-review-mode) .play-board-wrap, :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review) {
     transition: border-color var(--cq-transition-fast) ease, box-shadow var(--cq-transition-standard) var(--cq-ease-premium);
   }
 
@@ -31639,97 +32017,34 @@ body.site-tab-mode main > .site-panel.is-active-panel {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(body:not(.theme-light), body.theme-light) :is(#homeSessionCard, #play:not(.is-review-mode) .play-board-wrap, #play.is-review-mode .premium-review, #play.is-review-mode .review-controls) {
+  :is(body:not(.theme-light), body.theme-light) :is(#homeSessionCard, #play:not(.is-review-mode) .play-board-wrap, :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review, :is(#play.is-review-mode, #gameReview.is-review-page) .review-controls) {
     transition: none;
   }
 }
 
 /* Review reference composition: spacing, graph, move strip, player cards, and summary only. */
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) {
   --cq-review-reference-gap: 8px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
   gap: var(--cq-review-reference-gap) 10px;
   padding: 10px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-workspace-header {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-header {
   padding: 0 2px 4px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode :is(.review-left-sidebar, .match-board-column) {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) :is(.review-left-sidebar, .match-board-column) {
   gap: var(--cq-review-reference-gap);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-left-sidebar > article {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar > article {
   border-radius: 11px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-chart {
-  gap: 4px;
-  padding: 8px 10px 9px;
-  border-radius: 11px;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-chart-head {
-  min-height: 20px;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-graph {
-  min-height: 78px;
-  height: 78px;
-  max-height: 78px;
-  gap: clamp(3px, 0.42vw, 6px);
-  padding: 6px 3px;
-  border-radius: 5px;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-graph::before {
-  inset-inline: 3px;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-graph span {
-  min-width: 7px;
-  border-radius: 999px;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-graph span::before {
-  min-width: 5px;
-  border-radius: 999px;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-timeline {
-  min-height: 52px;
-  gap: 3px;
-  overflow-x: auto;
-  padding: 6px 8px;
-  border: 1px solid var(--cq-border);
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--cq-surface-raised) 82%, transparent);
-  box-shadow: var(--cq-inset-highlight);
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-timeline-item {
-  min-width: 51px;
-  min-height: 38px;
-  padding: 0 7px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-timeline-item + .review-timeline-item {
-  border-left: 1px solid color-mix(in srgb, var(--cq-border) 78%, transparent);
-  border-radius: 0;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-timeline-item[aria-current="true"] {
-  border: 1px solid var(--review-marker, var(--cq-accent-secondary));
-  border-radius: 8px;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-strip {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-strip {
   min-height: 58px;
   gap: 5px;
   padding: 6px 8px;
@@ -31739,7 +32054,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: var(--cq-inset-highlight);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip {
   grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 7px;
   padding: 2px 4px;
@@ -31748,17 +32063,17 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   background: transparent;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-chip + .review-player-chip {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-chip + .review-player-chip {
   border-left: 1px solid color-mix(in srgb, var(--cq-border) 78%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-avatar {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-avatar {
   width: 32px;
   height: 32px;
   border-radius: 9px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-versus {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-versus {
   display: grid;
   width: 29px;
   height: 29px;
@@ -31769,20 +32084,20 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   background: color-mix(in srgb, var(--cq-accent-primary) 9%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .premium-review {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review {
   gap: var(--cq-review-reference-gap);
   padding: 12px;
   border-radius: 12px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-card {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-card {
   grid-template-columns: 84px minmax(0, 1fr);
   gap: 9px;
   padding: 10px;
   border-radius: 11px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-card::before {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-card::before {
   content: "Review summary";
   grid-column: 1 / -1;
   color: var(--cq-text-primary);
@@ -31792,31 +32107,31 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   text-transform: uppercase;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-performance-ring {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-ring {
   width: 84px;
   height: 84px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-phase-grid {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-phase-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-phase-grid span {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-phase-grid span {
   min-height: 54px;
   padding: 6px 4px;
   border-radius: 8px;
 }
 
 @media (max-width: 920px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .play-shell { gap: 10px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell { gap: 10px; }
 }
 
 @media (max-width: 620px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-center-timeline { padding-inline: 5px; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-timeline-item { min-width: 46px; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-player-strip { padding: 5px; }
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-phase-grid { grid-template-columns: 1fr 1fr; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-center-timeline { padding-inline: 5px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-timeline-item { min-width: 46px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-strip { padding: 5px; }
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-phase-grid { grid-template-columns: 1fr 1fr; }
 }
 
 /* Live games stay board-first; detailed evaluation lives in Game Review. */
@@ -31824,11 +32139,16 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   display: none !important;
 }
 
-#play .post-game-decision[hidden] {
+#postGameDecision[hidden] {
   display: none !important;
 }
 
-#play .post-game-decision {
+body.post-game-dialog-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#postGameDecision {
   position: fixed;
   z-index: 1200;
   inset: 0;
@@ -31839,7 +32159,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   backdrop-filter: blur(10px);
 }
 
-#play .post-game-decision-card {
+#postGameDecision .post-game-decision-card {
   display: grid;
   width: min(100%, 420px);
   justify-items: center;
@@ -31855,31 +32175,79 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), var(--cq-inset-highlight);
 }
 
-#play .post-game-decision-mark {
+#postGameDecision .post-game-decision-result {
+  display: grid;
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+}
+
+#postGameDecision .post-game-decision-icon {
   display: grid;
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 50%;
-  color: #08111f;
-  font-size: 1.25rem;
-  font-weight: 900;
-  background: linear-gradient(135deg, #96f2b2, #4ccf84);
-  box-shadow: 0 0 0 6px color-mix(in srgb, #4ccf84 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cq-accent-primary) 40%, var(--cq-border));
+  border-radius: 14px;
+  color: var(--cq-text-primary);
+  font-size: 1.2rem;
+  line-height: 1;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--cq-accent-primary) 25%, transparent), color-mix(in srgb, var(--cq-accent-secondary) 12%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 }
 
-#play .post-game-decision-card h2,
-#play .post-game-decision-card p {
+#postGameDecision .post-game-decision-card h2,
+#postGameDecision .post-game-decision-card p {
   margin: 0;
 }
 
-#play .post-game-decision-card > p:not(.section-kicker) {
-  max-width: 32ch;
+#postGameDecision .post-game-decision-summary {
+  margin-top: 4px !important;
   color: var(--cq-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
   line-height: 1.5;
 }
 
-#play .post-game-decision-actions {
+#postGameDecision .post-game-decision-stats {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 16px 0;
+  border-block: 1px solid color-mix(in srgb, var(--cq-border) 76%, transparent);
+  text-align: left;
+}
+
+#postGameDecision .post-game-decision-stats > div {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+#postGameDecision .post-game-decision-stats dt {
+  color: var(--cq-text-muted);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#postGameDecision .post-game-decision-stats dd {
+  margin: 0;
+  color: var(--cq-text-primary);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+#postGameDecision .post-game-decision-actions {
   display: grid;
   width: 100%;
   grid-template-columns: 1fr 1fr;
@@ -31887,17 +32255,149 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   margin-top: 6px;
 }
 
-#play .post-game-decision-actions .button {
+#postGameDecision .post-game-decision-actions .button {
   min-height: 44px;
 }
 
+#postGameDecision .post-game-decision-actions .button:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
+#postGameDecision .post-game-decision-actions .button:focus-visible {
+  outline: 2px solid var(--cq-accent-secondary);
+  outline-offset: 2px;
+}
+
 @media (max-width: 430px) {
-  #play .post-game-decision-card { padding: 24px 18px; }
-  #play .post-game-decision-actions { grid-template-columns: 1fr; }
+  #postGameDecision .post-game-decision-card { padding: 24px 18px; }
+  #postGameDecision .post-game-decision-actions { grid-template-columns: 1fr; }
+}
+
+@media (min-width: 1280px) {
+  body.post-game-panel-open #playLiveAnalysis > :not(#postGameDecision) {
+    display: none !important;
+  }
+
+  #playLiveAnalysis > #postGameDecision:not([hidden]) {
+    position: static;
+    inset: auto;
+    z-index: 4;
+    display: grid;
+    width: 100%;
+    min-height: 100%;
+    place-items: center;
+    padding: 0;
+    background: transparent;
+    pointer-events: auto;
+    isolation: isolate;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    animation: postGameRailEnter 200ms var(--cq-ease-premium, ease) both;
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-card {
+    width: 100%;
+    min-width: 0;
+    max-width: 380px;
+    position: static;
+    inset: auto;
+    margin: 0;
+    gap: 20px;
+    padding: 24px;
+    border-color: color-mix(in srgb, var(--cq-border) 72%, var(--cq-accent-primary));
+    border-radius: 18px;
+    pointer-events: auto;
+    transform: none;
+    background:
+      linear-gradient(150deg, color-mix(in srgb, var(--cq-surface-raised) 96%, transparent), color-mix(in srgb, var(--cq-surface-panel) 92%, transparent)),
+      radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--cq-accent-primary) 12%, transparent), transparent 48%);
+    box-shadow: var(--cq-inset-highlight), 0 18px 34px rgba(1, 8, 20, 0.3);
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-result { gap: 12px; }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    font-size: 1.3rem;
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-card h2 {
+    font-size: 1.45rem;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-summary {
+    margin: 4px 0 0 !important;
+    color: var(--cq-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.4;
+    text-transform: none;
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-stats {
+    gap: 12px;
+    padding: 16px 0;
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-actions {
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  #playLiveAnalysis > #postGameDecision #postGameDecisionReview {
+    grid-column: 1 / -1;
+  }
+
+  #playLiveAnalysis > #postGameDecision #postGameDecisionClose {
+    color: var(--cq-text-muted);
+    border-color: color-mix(in srgb, var(--cq-border) 76%, transparent);
+    background: transparent;
+  }
+
+  #playLiveAnalysis > #postGameDecision[data-post-game-mode="multiplayer"] #postGameDecisionNew {
+    color: var(--cq-text-muted);
+    border-color: color-mix(in srgb, var(--cq-border) 76%, transparent);
+    background: transparent;
+  }
+
+  #playLiveAnalysis > #postGameDecision #postGameDecisionNew {
+    color: var(--cq-text-secondary);
+    border-color: color-mix(in srgb, var(--cq-border) 82%, transparent);
+    background: color-mix(in srgb, var(--cq-surface-panel) 48%, transparent);
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-actions .button {
+    min-height: 40px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-actions .button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--cq-accent-secondary) 54%, var(--cq-border));
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--cq-bg-primary) 44%, transparent);
+  }
+
+  #playLiveAnalysis > #postGameDecision .post-game-decision-actions .button:active:not(:disabled) { transform: translateY(0) scale(0.985); }
+}
+
+@keyframes postGameRailEnter {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #playLiveAnalysis > #postGameDecision:not([hidden]) { animation: none; }
 }
 
 /* Game Review learning loop: quick-engine confidence and retry-position feedback. */
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-engine-confidence {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-engine-confidence {
   display: block;
   margin-top: 7px;
   color: var(--cq-text-muted);
@@ -31906,16 +32406,12 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   letter-spacing: 0.03em;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-one-moment-actions {
-  flex-wrap: wrap;
-}
-
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-one-moment-actions .button[hidden],
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-retry-status[hidden] {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment-actions .button[hidden],
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-retry-status[hidden] {
   display: none !important;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-retry-status {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-retry-status {
   margin: 0;
   padding: 8px 10px;
   border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 36%, var(--cq-border));
@@ -31926,20 +32422,20 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   line-height: 1.45;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-one-moment:has(.review-retry-status:not([hidden])) {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-one-moment:has(.review-retry-status:not([hidden])) {
   border-color: color-mix(in srgb, var(--cq-accent-secondary) 52%, var(--cq-border));
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode #premiumReview.review-state-error::after {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #premiumReview.review-state-error::after {
   content: "Analysis could not finish right now. Use Try again or Back to game.";
 }
 
 /* Private variation workspace: explore ideas without changing the completed game. */
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis[hidden] {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis[hidden] {
   display: none !important;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -31951,12 +32447,12 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   box-shadow: var(--cq-inset-highlight);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis > div:first-child {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis > div:first-child {
   display: grid;
   gap: 2px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis span {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis span {
   color: var(--cq-accent-secondary);
   font-size: 0.6rem;
   font-weight: 900;
@@ -31964,19 +32460,19 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   text-transform: uppercase;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis strong {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis strong {
   color: var(--cq-text-primary);
   font-size: 0.8rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis p {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis p {
   margin: 0;
   color: var(--cq-text-secondary);
   font-size: 0.7rem;
   line-height: 1.45;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-line {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-line {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
@@ -31987,7 +32483,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   list-style: none;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-line li {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-line li {
   min-width: 0;
   padding: 5px 7px;
   border: 1px solid color-mix(in srgb, var(--cq-border) 82%, transparent);
@@ -31999,7 +32495,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   overflow-wrap: anywhere;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-line {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-engine-line {
   padding: 7px 9px;
   border-left: 2px solid var(--cq-accent-secondary);
   border-radius: 0 8px 8px 0;
@@ -32010,44 +32506,44 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   line-height: 1.45;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-line[hidden] {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-engine-line[hidden] {
   display: none !important;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-actions {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-actions .button {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-actions .button {
   min-height: 38px;
   padding-inline: 8px;
   font-size: 0.66rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-copy {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-copy {
   grid-column: 1 / -1;
 }
 
 @media (max-width: 520px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-line {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-line {
     grid-template-columns: 1fr;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-actions {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-actions {
     grid-template-columns: 1fr;
   }
 }
 
 /* Advanced Game Review tools: compact, optional controls for private analysis. */
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-engine-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls label {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-engine-controls label {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -32062,13 +32558,13 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   font-weight: 800;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls input {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-engine-controls input {
   inline-size: 14px;
   block-size: 14px;
   accent-color: var(--cq-accent-secondary);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls select {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-engine-controls select {
   min-width: 0;
   max-width: 112px;
   border: 0;
@@ -32078,7 +32574,7 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   font: inherit;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-service {
   display: grid;
   gap: 5px;
   padding: 8px 9px;
@@ -32087,55 +32583,1943 @@ body.site-tab-mode main > .site-panel.is-active-panel {
   background: color-mix(in srgb, var(--cq-surface-raised) 58%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service > div {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-service > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service > div span {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-service > div span {
   color: var(--cq-text-primary);
   font-size: 0.62rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service .button {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-service .button {
   min-height: 30px;
   padding-inline: 8px;
   font-size: 0.61rem;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-growth-trail {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-growth-trail {
   display: grid;
-  gap: 5px;
+  gap: 7px;
   padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 31%, var(--cq-border));
+  border: 1px solid color-mix(in srgb, var(--cq-accent-primary) 36%, var(--cq-border));
   border-radius: 12px;
+  overflow: hidden;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-secondary) 10%, transparent), transparent 68%),
-    var(--cq-surface-quiet);
+    linear-gradient(145deg, color-mix(in srgb, var(--cq-accent-primary) 11%, transparent), transparent 64%),
+    color-mix(in srgb, var(--cq-surface-quiet) 90%, transparent);
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-growth-trail > strong {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-growth-trail > strong {
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid var(--cq-accent-primary);
   color: var(--cq-text-primary);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-growth-trail > p,
-:is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-growth-trail > small {
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-growth-trail > p {
   margin: 0;
+  padding-inline-start: 12px;
   color: var(--cq-text-secondary);
   font-size: 0.66rem;
   line-height: 1.42;
 }
 
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-growth-trail > small {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 78%, transparent);
+  border-radius: 7px;
+  color: var(--cq-text-secondary);
+  font-size: 0.61rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 520px) {
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-engine-controls {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-engine-controls {
     grid-template-columns: 1fr;
   }
 
-  :is(body:not(.theme-light), body.theme-light) #play.is-review-mode .review-self-analysis-service > div {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-self-analysis-service > div {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+/* Review workspace: a stable, board-first three-rail dashboard. */
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
+  isolation: isolate;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell > * {
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-header {
+  padding: 2px 4px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cq-border) 72%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar > article,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review {
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar > article {
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar > article:hover {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 48%, var(--cq-border));
+  box-shadow: var(--cq-inset-highlight), 0 14px 28px rgba(0, 0, 0, 0.19);
+  transform: translateY(-1px);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
+  padding: 6px;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 46%, var(--cq-border-strong));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-secondary) 12%, transparent), color-mix(in srgb, var(--cq-surface-panel) 90%, transparent));
+}
+
+@media (min-width: 1151px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar,
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar {
+    position: sticky;
+    top: clamp(10px, 1.25vw, 18px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) :is(.review-left-sidebar > article, .review-recommendation-card, .review-timeline-item) {
+    transition: none;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar > article:hover,
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-recommendation-card:hover,
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-timeline-item[aria-current="true"] {
+    transform: none;
+  }
+}
+
+/* Game Review layout only: keep the live-game workspace out of the review canvas. */
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) {
+  --review-layout-summary: clamp(208px, 17vw, 238px);
+  --review-layout-insights: clamp(292px, 23vw, 340px);
+  --review-layout-gap: clamp(12px, 1.2vw, 18px);
+  background:
+    radial-gradient(760px 420px at 49% 0%, color-mix(in srgb, var(--cq-accent-secondary) 10%, transparent), transparent 72%),
+    linear-gradient(180deg, color-mix(in srgb, var(--cq-bg-primary) 78%, #050a14), var(--cq-bg-primary));
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
+  display: grid !important;
+  width: min(100% - 28px, 1500px);
+  max-width: 1500px;
+  min-height: min(860px, calc(100svh - 86px));
+  grid-template-areas:
+    "header header header"
+    "summary board insights" !important;
+  grid-template-columns: var(--review-layout-summary) minmax(500px, 1fr) var(--review-layout-insights) !important;
+  align-items: start;
+  gap: 12px var(--review-layout-gap);
+  padding: clamp(10px, 1.1vw, 16px);
+  overflow: clip;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) :is(.play-app-rail, .play-left-sidebar, .play-social-bar) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-header {
+  grid-area: header;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(280px, 1fr);
+  min-height: 46px;
+  padding: 0 2px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cq-border) 72%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-title {
+  align-self: center;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions .button {
+  min-height: 34px;
+  padding-inline: 9px;
+  font-size: 0.69rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar {
+  grid-area: summary;
+  width: 100%;
+  gap: 9px;
+  align-content: start;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar > article {
+  padding: 11px;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 22px rgba(0, 0, 0, 0.13);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .match-board-column {
+  grid-area: board;
+  display: grid !important;
+  width: min(100%, 700px);
+  max-width: 700px;
+  min-width: 0;
+  justify-self: center;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "board"
+    "chart"
+    "timeline"
+    "players";
+  gap: 9px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .match-board-column > :is(.coach-setup, .ai-player-card, .match-player-card, .play-bottom-actionbar, .game-options-panel) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
+  grid-area: board;
+  width: 100%;
+  max-width: none;
+  padding: 5px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 7px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cq-accent-secondary) 24%, transparent), 0 18px 36px rgba(0, 0, 0, 0.24);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #coachBoard {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-strip {
+  grid-area: players;
+  padding-top: 1px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar {
+  grid-area: insights;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100svh - 128px);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar > :not(#premiumReview) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .premium-review {
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  padding: 12px;
+  border-radius: 14px;
+  gap: 10px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--cq-surface-raised) 94%, transparent), color-mix(in srgb, var(--cq-surface-panel) 88%, transparent));
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-card {
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 9px;
+  padding: 10px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-performance-ring {
+  width: 70px;
+  height: 70px;
+}
+
+@media (min-width: 1081px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) :is(.review-left-sidebar, .play-right-sidebar) {
+    position: sticky;
+    top: 12px;
+  }
+}
+
+@media (max-width: 1080px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
+    width: min(100% - 22px, 1040px);
+    grid-template-areas:
+      "header header"
+      "board insights"
+      "summary insights" !important;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 330px) !important;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-outcome-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
+    width: min(100% - 16px, 700px);
+    min-height: 0;
+    grid-template-areas:
+      "header"
+      "board"
+      "insights"
+      "summary" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 11px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-right-sidebar,
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar {
+    width: min(100%, 660px);
+    max-height: none;
+    justify-self: center;
+  }
+}
+
+@media (max-width: 600px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-shell {
+    width: min(100% - 10px, 560px);
+    padding: 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 7px;
+    padding: 2px 2px 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-title {
+    text-align: left;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-workspace-actions .button {
+    flex: 1 1 116px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-left-sidebar > :is(.review-quality-card, .review-growth-trail) {
+    padding: 10px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-card-heading {
+    gap: 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .play-board-wrap {
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 5px;
+    padding: 3px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .review-player-strip {
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  }
+}
+
+/* Dedicated Game Review workspace: isolated from the live Play canvas. */
+/* Game Review: a dedicated analysis workspace. Legacy state remains inert now
+   that routing mounts the Review panel as its own page. */
+#play.is-review-mode .play-shell {
+  grid-template-areas: "board insights";
+}
+
+#play.is-review-mode .match-board-column > :not(.play-board-wrap) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.game-review-page {
+  padding: 0;
+  background: var(--cq-bg-primary);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-page-frame {
+  width: 100%;
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #playWorkspace {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-workspace {
+  display: block;
+  min-width: 0;
+  padding: clamp(8px, 1vw, 16px) 0 clamp(18px, 2.2vw, 32px);
+  background:
+    radial-gradient(720px 360px at 50% 0%, color-mix(in srgb, var(--cq-accent-primary) 9%, transparent), transparent 72%),
+    linear-gradient(180deg, color-mix(in srgb, var(--cq-bg-primary) 86%, #050914), var(--cq-bg-primary));
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-workspace[hidden] {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-shell {
+  display: grid;
+  width: min(100% - 28px, 1480px);
+  margin: 0 auto;
+  grid-template-areas:
+    "header header header"
+    "left analysis right";
+  grid-template-columns: clamp(212px, 17vw, 244px) minmax(520px, 704px) clamp(300px, 23vw, 348px);
+  align-items: start;
+  gap: 12px clamp(12px, 1.3vw, 20px);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-shell > *,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-analysis-slot > * {
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-header-slot {
+  grid-area: header;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewHeaderSlot > .review-workspace-header {
+  display: grid;
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cq-border) 74%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewHeaderSlot .review-workspace-title {
+  min-width: 0;
+  text-align: left;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewHeaderSlot .review-workspace-actions {
+  justify-content: flex-end;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-left-column,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-right-column {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 10px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-left-column {
+  grid-area: left;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-right-column {
+  grid-area: right;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewSummarySlot > .review-left-sidebar {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  align-content: start;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewCoachSlot {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewCoachSlot > .review-focus-card {
+  margin: 0;
+  min-height: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-analysis-slot {
+  display: grid;
+  min-width: 0;
+  grid-area: analysis;
+  grid-template-areas:
+    "board"
+    "replay"
+    "chart"
+    "timeline";
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 9px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-board-slot { grid-area: board; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-replay-slot { grid-area: replay; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-chart-slot { grid-area: chart; }
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-timeline-slot { grid-area: timeline; }
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewBoardSlot > .play-board-wrap,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewChartSlot > .review-center-chart,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewTimelineSlot > .review-center-timeline {
+  width: min(100%, 704px);
+  max-width: 704px;
+  margin-inline: auto;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewBoardSlot > .play-board-wrap {
+  padding: 6px;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 48%, var(--cq-border-strong));
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cq-accent-secondary) 16%, transparent), 0 18px 36px rgba(0, 0, 0, 0.24);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewReplaySlot {
+  display: grid;
+  gap: 7px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewReplaySlot > .review-compare-row {
+  order: 1;
+  margin: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewReplaySlot > .review-controls {
+  position: static;
+  order: 2;
+  margin: 0;
+  box-shadow: var(--cq-inset-highlight), 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewMoveHistorySlot > #moveHistoryDrawer {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 88%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cq-surface-raised) 82%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewMoveHistorySlot > #moveHistoryDrawer > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--cq-text-primary);
+  font-size: 0.72rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewMoveHistorySlot .play-rail-drawer-content {
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewMoveHistorySlot #moveHistory {
+  max-height: 196px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot #moveHistory {
+  display: grid;
+  gap: 4px;
+  padding: 2px 0;
+  color: var(--cq-text-secondary);
+  font-size: 0.68rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot #moveHistory .move-pair {
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  min-height: 30px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot #moveHistory .move-pair > strong {
+  color: var(--cq-text-muted);
+  font-size: 0.61rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-move-history-item {
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 6px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--cq-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-move-history-item:hover,
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-move-history-item:focus-visible {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 48%, var(--cq-border));
+  color: var(--cq-text-primary);
+  background: color-mix(in srgb, var(--cq-accent-secondary) 10%, var(--cq-surface-quiet));
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-move-history-item[aria-current="true"] {
+  border-color: var(--review-marker, var(--cq-accent-secondary));
+  color: var(--cq-text-primary);
+  background: color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 16%, var(--cq-surface-raised));
+  box-shadow: inset 2px 0 0 var(--review-marker, var(--cq-accent-secondary));
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewImprovementSlot,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewLearningSlot,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPracticeSlot {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewImprovementSlot > .review-performance-card,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewCoachSlot > .review-performance-card,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewImprovementSlot > :is(.review-quality-card, .review-growth-trail, .review-opening-card),
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewLearningSlot > .review-recommendations,
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPracticeSlot > :is(.review-one-moment, .review-self-analysis, .review-detail-stack, .review-summary-grid) {
+  margin: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) :is(#reviewImprovementSlot, #reviewCoachSlot) > .review-performance-card {
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) :is(#reviewImprovementSlot, #reviewCoachSlot) .review-performance-ring {
+  width: 66px;
+  height: 66px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) :is(#reviewImprovementSlot, #reviewCoachSlot) .review-phase-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewLearningSlot .review-recommendation-grid {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewLearningSlot .review-recommendation-card {
+  min-height: 62px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPracticeSlot > .review-insight-section-heading {
+  margin: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPracticeSlot > #reviewKeyMoments {
+  display: grid;
+  gap: 6px;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPracticeSlot > #reviewKeyMoments .review-key-button {
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPracticeSlot > #coachPracticeLinks:not([hidden]) {
+  display: grid;
+}
+
+:is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #gameReviewWorkspace.review-state-loading :is(.game-review-left-column, .game-review-analysis-slot > :not(.game-review-board-slot)) {
+  opacity: 0.48;
+  pointer-events: none;
+}
+
+@media (max-width: 1180px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-shell {
+    width: min(100% - 22px, 1060px);
+    grid-template-areas:
+      "header header"
+      "left analysis"
+      "right right";
+    grid-template-columns: minmax(216px, 0.6fr) minmax(0, 1.4fr);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-right-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewMoveHistorySlot {
+    grid-column: span 1;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewImprovementSlot,
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewLearningSlot,
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewPracticeSlot {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 840px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-shell {
+    width: min(100% - 18px, 700px);
+    grid-template-areas:
+      "header"
+      "analysis"
+      "left"
+      "right";
+    grid-template-columns: minmax(0, 1fr);
+    gap: 11px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-right-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewSummarySlot > .review-left-sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewSummarySlot > .review-left-sidebar > .review-outcome-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-workspace {
+    padding-top: 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-shell {
+    width: min(100% - 10px, 560px);
+    gap: 9px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewHeaderSlot > .review-workspace-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 7px;
+    padding: 2px 2px 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewHeaderSlot .review-workspace-actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewHeaderSlot .review-workspace-actions .button {
+    flex: 1 1 116px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-right-column,
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) #reviewSummarySlot > .review-left-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-analysis-slot {
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(body:not(.theme-light), body.theme-light) :is(#play.is-review-mode, #gameReview.is-review-page) .game-review-workspace * {
+    scroll-behavior: auto;
+  }
+}
+
+/* Dedicated Game Review: compact desktop dashboard density. */
+@media (min-width: 1181px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-workspace {
+    padding: 8px 0 16px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-shell {
+    width: min(100% - 32px, 1180px);
+    grid-template-columns: 220px minmax(460px, 1fr) 304px;
+    gap: 8px 16px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot > .review-workspace-header {
+    min-height: 40px;
+    gap: 8px;
+    padding: 0 2px 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot .review-workspace-kicker {
+    font-size: 0.61rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot .review-workspace-title h2 {
+    font-size: 1.08rem;
+    line-height: 1.15;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot .review-workspace-actions {
+    align-items: center;
+    gap: 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot :is(.review-back-button, .review-workspace-actions .button) {
+    min-height: 34px;
+    padding-inline: 8px;
+    font-size: 0.65rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot :is(#reviewShare, #reviewSelfAnalysis, #reviewDeepAnalysis) {
+    border-color: color-mix(in srgb, var(--cq-border) 88%, transparent);
+    color: var(--cq-text-secondary);
+    background: color-mix(in srgb, var(--cq-surface-quiet) 68%, transparent);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot .review-play-again-button {
+    min-width: 96px;
+    border-color: color-mix(in srgb, var(--cq-accent-primary) 72%, var(--cq-border));
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--cq-accent-primary) 18%, transparent);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(.game-review-left-column, .game-review-right-column, #reviewSummarySlot > .review-left-sidebar, #reviewCoachSlot) {
+    gap: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-right-column {
+    max-height: calc(100svh - 120px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-inline-end: 2px;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-analysis-slot {
+    grid-template-areas:
+      "board"
+      "chart"
+      "replay"
+      "timeline";
+    gap: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(#reviewBoardSlot > .play-board-wrap, #reviewChartSlot > .review-center-chart, #reviewTimelineSlot > .review-center-timeline) {
+    width: min(100%, 584px);
+    max-width: 584px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot > .play-board-wrap {
+    padding: 4px;
+    border-radius: 12px;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--cq-accent-secondary) 14%, transparent), 0 12px 26px rgba(0, 0, 0, 0.2);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-center-chart {
+    min-height: 96px;
+    gap: 4px;
+    padding: 7px 9px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-center-chart-head {
+    min-height: 18px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-center-graph {
+    min-height: 42px;
+    height: 42px;
+    max-height: 42px;
+    padding-block: 4px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot {
+    gap: 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-compare-row {
+    gap: 5px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-compare-button {
+    min-height: 34px;
+    padding: 5px 6px;
+    font-size: 0.61rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-compare-row small {
+    padding-top: 0;
+    font-size: 0.58rem;
+    line-height: 1.25;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-controls {
+    gap: 4px;
+    padding: 5px;
+    border-radius: 10px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-controls .button {
+    min-height: 34px;
+    padding-inline: 5px;
+    font-size: 0.61rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-center-timeline {
+    min-height: 46px;
+    gap: 3px;
+    padding: 5px 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-timeline-item {
+    flex-basis: 44px;
+    min-height: 34px;
+    padding-inline: 5px;
+    font-size: 0.62rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(#reviewImprovementSlot, #reviewLearningSlot, #reviewPracticeSlot) {
+    gap: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot > #moveHistoryDrawer {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot #moveHistory {
+    max-height: 132px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(#reviewImprovementSlot, #reviewCoachSlot) > .review-performance-card {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 7px;
+    padding: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(#reviewImprovementSlot, #reviewCoachSlot) .review-performance-ring {
+    width: 58px;
+    height: 58px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(#reviewSummarySlot .review-outcome-card, #reviewSummarySlot .review-accuracy-card) {
+    min-height: 0;
+    padding: 9px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-outcome-card {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-outcome-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 1rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-outcome-card p {
+    -webkit-line-clamp: 2;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-accuracy-card {
+    grid-template-columns: 66px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-score-ring {
+    width: 66px;
+    height: 64px;
+    border-radius: 12px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot :is(.review-quality-card, .review-growth-trail, .review-opening-card) {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-quality-breakdown {
+    gap: 4px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-quality-row {
+    min-height: 17px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewLearningSlot .review-recommendation-card {
+    min-height: 52px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-outcome-kicker {
+    font-size: 0.6rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-score-ring strong {
+    font-size: 1.14rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot > #moveHistoryDrawer > summary,
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-insight-section-heading {
+    letter-spacing: 0.02em;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-insight-section-heading {
+    padding: 2px 0 5px;
+    border-bottom: 1px solid color-mix(in srgb, var(--cq-border) 68%, transparent);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(button, a, summary):focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--cq-accent-secondary) 82%, white);
+    outline-offset: 2px;
+  }
+}
+
+/* Dedicated Game Review: preserve the active review position across every control. */
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-center-graph span[aria-current="true"] {
+  position: relative;
+  z-index: 3;
+  opacity: 1;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-center-graph span[aria-current="true"]::before {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 28%, transparent), 0 0 12px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 62%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-center-graph span[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -4px auto -4px 50%;
+  width: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 88%, white);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 54%, transparent);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-timeline-item[aria-current="true"] {
+  font-weight: 900;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 20%, transparent), 0 7px 16px color-mix(in srgb, var(--review-marker, var(--cq-accent-secondary)) 16%, transparent);
+}
+
+@media (min-width: 1181px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot {
+    gap: 0;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--cq-border) 86%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--cq-surface-raised) 72%, transparent);
+    box-shadow: var(--cq-inset-highlight), 0 8px 18px rgba(0, 0, 0, 0.1);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot > .review-compare-row {
+    gap: 5px;
+    padding: 0 0 6px;
+    border-bottom: 1px solid color-mix(in srgb, var(--cq-border) 72%, transparent);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot > .review-controls {
+    padding: 6px 0 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+/* Dedicated Game Review: desktop rail hierarchy and lower-scroll priority. */
+@media (min-width: 1181px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-shell {
+    grid-template-columns: 196px minmax(460px, 1fr) 328px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot > .review-left-sidebar > article {
+    box-shadow: var(--cq-inset-highlight), 0 6px 14px rgba(0, 0, 0, 0.1);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot :is(.review-outcome-card, .review-accuracy-card) {
+    background: color-mix(in srgb, var(--cq-surface-raised) 84%, transparent);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-outcome-card::before {
+    width: 2px;
+    opacity: 0.72;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-accuracy-card::before {
+    height: 1px;
+    opacity: 0.72;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot > .review-focus-card {
+    order: 1;
+    gap: 7px;
+    padding: 10px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot > .review-performance-card {
+    order: 2;
+    grid-template-columns: 50px minmax(0, 1fr);
+    gap: 7px;
+    padding: 7px;
+    border-color: color-mix(in srgb, var(--cq-border) 88%, transparent);
+    background: color-mix(in srgb, var(--cq-surface-quiet) 76%, transparent);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot .review-performance-ring {
+    width: 50px;
+    height: 50px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot .review-performance-ring strong {
+    font-size: 0.9rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot .review-performance-copy > small {
+    font-size: 0.62rem;
+    line-height: 1.3;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot .review-phase-grid {
+    gap: 4px;
+    margin-top: 0;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot .review-phase-grid span {
+    gap: 1px;
+    padding: 4px 3px;
+    border-radius: 7px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot .review-phase-grid small {
+    font-size: 0.49rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot .review-phase-grid strong {
+    font-size: 0.68rem;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot {
+    order: 1;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot {
+    display: contents;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-one-moment {
+    order: 2;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewImprovementSlot {
+    order: 3;
+    gap: 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewLearningSlot {
+    order: 4;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewLearningSlot .review-recommendation-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewLearningSlot .review-recommendation-card {
+    min-height: 56px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewLearningSlot .review-recommendation-card:last-child {
+    grid-column: 1 / -1;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-self-analysis {
+    order: 5;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-insight-section-heading {
+    order: 6;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > #reviewKeyMoments {
+    order: 7;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > :is(.review-detail-stack, .review-summary-grid) {
+    order: 8;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > #coachPracticeLinks {
+    order: 9;
+  }
+}
+
+/* Dedicated Game Review: readable labels, prioritised rails, and compact reference detail. */
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(
+  .review-workspace-kicker,
+  .review-outcome-kicker,
+  .review-score-ring small,
+  .review-accuracy-compare small,
+  .review-center-chart-head small,
+  .review-graph-legend,
+  .review-graph-legend-note,
+  .review-player-chip small,
+  .review-one-moment-copy span,
+  .review-performance-ring small,
+  .review-performance-copy > span,
+  .review-phase-grid small,
+  .review-insight-section-heading small,
+  .review-key-icon,
+  .review-key-content small,
+  .review-recommendation-card small,
+  .review-engine-confidence,
+  .review-self-analysis-service > div span,
+  .review-self-analysis-service .button,
+  .review-growth-trail > small,
+  .review-compare-row small,
+  .review-reference-details small
+) {
+  font-size: 0.625rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(
+  .review-compare-button,
+  .review-controls .button,
+  .review-timeline-item,
+  #reviewMoveHistorySlot #moveHistory .move-pair > strong
+) {
+  font-size: 0.625rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-details[hidden] {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-details {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  overflow: clip;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 84%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cq-surface-quiet) 62%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-details > summary {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  color: var(--cq-text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-details > summary > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--cq-text-primary);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-details > summary > span::after {
+  content: "+";
+  color: var(--cq-accent-secondary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-details[open] > summary > span::after {
+  content: "\2212";
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-details > summary small {
+  overflow: hidden;
+  color: var(--cq-text-muted);
+  font-weight: 750;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-content {
+  display: grid;
+  gap: 8px;
+  padding: 0 8px 8px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-reference-content .review-insight-section-heading {
+  margin: 0;
+  padding: 2px 0 5px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cq-border) 68%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-outcome-card > div {
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-outcome-card strong {
+  overflow-wrap: anywhere;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot .review-outcome-card p {
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+@media (min-width: 841px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-move-history-item {
+    min-height: 34px;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-move-history-item {
+    min-height: 40px;
+  }
+}
+
+/* Play is a live-game workspace. Review-only source DOM stays inert until it is mounted on #gameReview. */
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playWorkspace > :is(.review-workspace-header, #reviewLeftSidebar),
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playWorkspace :is(
+  .review-center-chart,
+  #reviewCenterTimeline,
+  #reviewEvalRail,
+  #premiumReview,
+  #guidedReview,
+  #postGameFlow,
+  #coachPracticeLinks,
+  #moveHistoryDrawer,
+  .captured-row,
+  #gamePgn
+) {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #postGameDecision .post-game-decision-card {
+  width: min(100%, 340px);
+}
+
+/* Live Play keeps only the chess session. Coaching and engine material belongs to the Review workspace. */
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar,
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .game-options-panel {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions {
+  grid-template-columns: minmax(128px, 1.4fr) repeat(2, minmax(88px, 1fr)) auto;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-draw-action {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 52%, var(--cq-border));
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-resign-action {
+  border-color: color-mix(in srgb, #e96872 48%, var(--cq-border));
+}
+
+@media (min-width: 700px) and (max-width: 1180px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "left";
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 699px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "left";
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-start-button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1181px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-shell {
+    grid-template-columns: 204px minmax(460px, 1fr) 320px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-one-moment {
+    order: 1;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot {
+    order: 2;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewImprovementSlot {
+    order: 3;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewLearningSlot {
+    order: 4;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-self-analysis {
+    order: 5;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-reference-details {
+    order: 6;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > #coachPracticeLinks {
+    order: 7;
+  }
+}
+
+@media (max-width: 1180px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot {
+    order: 1;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot {
+    order: 2;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewImprovementSlot {
+    order: 3;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewLearningSlot {
+    order: 4;
+  }
+}
+
+@media (max-width: 840px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-shell {
+    grid-template-areas:
+      "header"
+      "left"
+      "analysis"
+      "right";
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-analysis-slot {
+    grid-template-areas:
+      "board"
+      "chart"
+      "replay"
+      "timeline";
+  }
+}
+
+/* Live Play is a focused game session. Review sources are staged outside #play. */
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-app-rail,
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .coach-setup {
+  display: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playLiveMoveSlot {
+  display: block;
+  grid-area: moves;
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playLiveMoveSlot #moveHistoryDrawer {
+  display: block !important;
+  max-height: 116px;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--cq-border) 82%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cq-surface-raised) 90%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playLiveMoveSlot .play-rail-drawer-content {
+  max-height: 76px;
+  overflow: auto;
+  padding: 6px 10px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playLiveMoveSlot .move-history {
+  max-height: 64px;
+  overflow: auto;
+}
+
+/* Live Play desktop grid: board-first, with real-time guidance in a dedicated rail. */
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis {
+  grid-area: analysis;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-live-coach-slot, .play-live-move-slot, .play-live-captures-slot, .play-live-chat-slot) {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis > :empty {
+  display: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis :is(.engine-panel, .play-rail-drawer, .captured-row) {
+  width: 100%;
+  margin: 0;
+  border-color: color-mix(in srgb, var(--cq-border) 84%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cq-surface-raised) 92%, transparent);
+  box-shadow: 0 10px 24px rgba(1, 8, 20, 0.16);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis .engine-panel {
+  display: grid;
+  min-height: 128px;
+  padding: 14px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis .play-rail-drawer > summary {
+  min-height: 46px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis .play-rail-drawer-content {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis .simple-coach {
+  min-height: 58px;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis .move-history {
+  max-height: 180px;
+  overflow: auto;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .game-options-panel {
+  display: grid !important;
+  max-height: 82px;
+  overflow: auto;
+  padding: 8px 12px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .game-options-panel .game-options-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .game-options-panel .game-options-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 1280px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) {
+    --cq-play-board-max: min(760px, calc(100svh - 320px));
+    min-height: calc(100svh - 76px);
+    overflow: clip;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    width: calc(100% - 32px);
+    max-width: 1600px;
+    grid-template-areas: "left center analysis";
+    grid-template-columns: 220px minmax(0, 1fr) 360px !important;
+    gap: 16px;
+    align-items: start;
+    padding: 16px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-left-sidebar,
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis {
+    max-height: calc(100svh - 110px);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column,
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column[data-board-orientation="black"] {
+    grid-template-areas:
+      "opponent player"
+      "board board"
+      "actions actions"
+      "options options";
+    gap: 8px;
+    width: 100%;
+    max-width: var(--cq-play-board-max);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-primary-actions {
+    grid-template-columns: minmax(148px, 1.5fr) repeat(2, minmax(96px, 1fr)) auto;
+    min-height: 48px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1279px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas:
+      "center analysis"
+      "left analysis";
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px) !important;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis {
+    max-height: calc(100svh - 96px);
+    overflow: auto;
+  }
+}
+
+@media (max-width: 899px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas:
+      "center"
+      "analysis"
+      "left";
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-live-analysis {
+    width: min(100%, 720px);
+    justify-self: center;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .game-options-panel .game-options-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Keep staged live-game widgets visible without reopening Review UI on Play. */
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playLiveCoachSlot #enginePanel:not([hidden]) {
+  display: grid !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playLiveCapturesSlot .captured-row {
+  display: grid !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) #playLiveChatSlot #friendGameChatDrawer:not([hidden]) {
+  display: block !important;
+}
+
+/* Dedicated Game Review: board-first workstation balance. */
+@media (min-width: 1181px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-workspace {
+    --review-board-edge: clamp(400px, calc(100svh - 390px), 640px);
+    padding: 12px 0 20px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-shell {
+    width: min(100% - 40px, 1360px);
+    grid-template-columns: 204px minmax(0, 1fr) 320px;
+    gap: 12px 20px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-analysis-slot {
+    gap: 10px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(#reviewBoardSlot > .play-board-wrap, #reviewChartSlot > .review-center-chart, #reviewTimelineSlot > .review-center-timeline) {
+    width: min(100%, var(--review-board-edge));
+    max-width: var(--review-board-edge);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-right-column {
+    max-height: calc(100svh - 108px);
+    gap: 10px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-one-moment {
+    padding: 12px;
+    border-color: color-mix(in srgb, var(--review-accent, var(--cq-accent-secondary)) 42%, var(--cq-border));
+    background:
+      linear-gradient(145deg, color-mix(in srgb, var(--review-accent, var(--cq-accent-secondary)) 10%, transparent), transparent 62%),
+      color-mix(in srgb, var(--cq-surface-raised) 90%, transparent);
+    box-shadow: var(--cq-inset-highlight), 0 10px 22px rgba(1, 8, 20, 0.16);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-one-moment:focus-within {
+    border-color: var(--review-accent, var(--cq-accent-secondary));
+    box-shadow: var(--cq-inset-highlight), 0 0 0 2px color-mix(in srgb, var(--review-accent, var(--cq-accent-secondary)) 20%, transparent), 0 12px 26px rgba(1, 8, 20, 0.2);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot #moveHistory {
+    max-height: 164px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-one-moment {
+    transition: none;
+  }
+}
+
+/* Dedicated Game Review: mobile reading order stays board-first. */
+@media (max-width: 840px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-shell {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(.game-review-left-column, .game-review-right-column) {
+    display: contents;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-header-slot { order: 0; }
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-analysis-slot { order: 1; }
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewSummarySlot { order: 2; }
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot { order: 3; }
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewCoachSlot { order: 4; }
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot { order: 5; }
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewImprovementSlot { order: 6; }
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewLearningSlot { order: 7; }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(#reviewSummarySlot, #reviewMoveHistorySlot, #reviewCoachSlot, #reviewImprovementSlot, #reviewLearningSlot, #reviewPracticeSlot) {
+    min-width: 0;
+  }
+}
+
+/* Dedicated Game Review: calm header with progressive tools. */
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot > .review-workspace-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot .review-workspace-actions {
+  position: relative;
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu {
+  position: relative;
+  margin: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu > summary {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 86%, transparent);
+  border-radius: 9px;
+  color: var(--cq-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1;
+  list-style: none;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--cq-surface-quiet) 68%, transparent);
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu > summary::after {
+  content: "\25BE";
+  color: var(--cq-accent-secondary);
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: transform 180ms ease;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu[open] > summary {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary) 58%, var(--cq-border));
+  color: var(--cq-text-primary);
+  background: color-mix(in srgb, var(--cq-accent-secondary) 10%, var(--cq-surface-raised));
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu > summary:focus-visible {
+  outline: 2px solid var(--cq-accent-secondary);
+  outline-offset: 2px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu-list {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  width: max-content;
+  min-width: 176px;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 78%, var(--cq-accent-primary));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cq-surface-raised) 96%, transparent);
+  box-shadow: var(--cq-inset-highlight), 0 14px 28px rgba(1, 8, 20, 0.28);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu-list .button {
+  justify-content: flex-start;
+  min-height: 34px;
+  padding-inline: 9px;
+  font-size: 0.6875rem;
+  text-align: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu > summary,
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu > summary::after {
+    transition: none;
+  }
+}
+
+/* Dedicated Game Review: keep the next learning action present in the desktop rail. */
+@media (min-width: 1181px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPracticeSlot > .review-one-moment {
+    position: sticky;
+    z-index: 3;
+    top: 0;
+    align-self: start;
+  }
+}
+
+/* Dedicated Game Review: four-step spacing rhythm. */
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-workspace {
+  --review-space-1: 8px;
+  --review-space-2: 12px;
+  --review-space-3: 16px;
+  --review-space-4: 24px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(
+  .game-review-left-column,
+  .game-review-right-column,
+  #reviewSummarySlot > .review-left-sidebar,
+  #reviewCoachSlot,
+  #reviewImprovementSlot,
+  #reviewLearningSlot,
+  #reviewPracticeSlot
+) {
+  gap: var(--review-space-2);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewHeaderSlot > .review-workspace-header {
+  gap: var(--review-space-2);
+  padding-bottom: var(--review-space-2);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-center-chart {
+  gap: var(--review-space-1);
+  padding: var(--review-space-1) var(--review-space-2);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot {
+  gap: var(--review-space-1);
+  padding: var(--review-space-1);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot > .review-compare-row {
+  gap: var(--review-space-1);
+  padding-bottom: var(--review-space-1);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot > .review-controls {
+  gap: var(--review-space-1);
+  padding-top: var(--review-space-1);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot > #moveHistoryDrawer {
+  gap: var(--review-space-1);
+  padding: var(--review-space-2);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot #moveHistory {
+  gap: var(--review-space-1);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot #moveHistory .move-pair {
+  gap: var(--review-space-1);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-one-moment {
+  gap: var(--review-space-2);
+  padding: var(--review-space-2);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-one-moment-actions,
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-tools-menu-list {
+  gap: var(--review-space-1);
+}
+
+@media (min-width: 1181px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-workspace {
+    padding: var(--review-space-2) 0 var(--review-space-4);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-shell {
+    gap: var(--review-space-2) var(--review-space-3);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-analysis-slot {
+    gap: var(--review-space-2);
+  }
+}
+
+/* Dedicated Game Review: retain desktop density while giving touch controls room to land. */
+@media (pointer: coarse) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(
+    .review-back-button,
+    .review-tools-menu > summary,
+    .review-tools-menu-list .button,
+    .review-compare-button,
+    .review-controls .button,
+    .review-timeline-item,
+    .review-move-history-item,
+    .review-one-moment-actions .button,
+    #reviewMoveHistorySlot > #moveHistoryDrawer > summary
+  ) {
+    min-height: 44px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMoveHistorySlot #moveHistory .move-pair {
+    min-height: 40px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-move-history-item {
+    min-height: 40px;
   }
 }
