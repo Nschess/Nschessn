@@ -8,8 +8,8 @@ if (!fs.existsSync(appCssPath) || !fs.existsSync(appScriptPath)) throw new Error
 const appCss = fs.readFileSync(appCssPath, "utf8");
 const appScript = fs.readFileSync(appScriptPath, "utf8");
 const serviceWorker = fs.readFileSync(serviceWorkerPath, "utf8");
-if (!/<link[^>]+href=["']assets\/app\.css["'][^>]*>/i.test(html)) throw new Error("Missing external application stylesheet link.");
-if (!/<script\b[^>]*\bsrc=["']assets\/app\.js["'][^>]*><\/script>/i.test(html)) throw new Error("Missing external application script link.");
+if (!/<link[^>]+href=["']assets\/app\.css(?:\?[^"']*)?["'][^>]*>/i.test(html)) throw new Error("Missing external application stylesheet link.");
+if (!/<script\b[^>]*\bsrc=["']assets\/app\.js(?:\?[^"']*)?["'][^>]*><\/script>/i.test(html)) throw new Error("Missing external application script link.");
 if (/<script>([\s\S]*?)<\/script>/i.test(html)) throw new Error("The application script must not remain inline.");
 new Function(appScript);
 const regressionSource = `${html}\n${appCss}\n${appScript}\n${serviceWorker}`;
@@ -166,11 +166,12 @@ const requiredRegressionContracts = [
   ["focused onboarding duration", /id="firstVisitSession" name="sessionMinutes"[\s\S]*?sessionMinutes: String\(data\.get\("sessionMinutes"\)/],
   ["one-moment review loop", /id="reviewOneMoment"[\s\S]*?id="reviewOneMomentPractice"[\s\S]*?function practiceReviewOneMoment\(/],
   ["review self-analysis workspace", /id="reviewSelfAnalysis"[\s\S]*?id="reviewSelfAnalysisLine"[\s\S]*?id="reviewSelfAnalysisEngineLine"[\s\S]*?id="reviewSelfAnalyze"[\s\S]*?id="reviewSelfUndo"[\s\S]*?id="reviewSelfCopy"[\s\S]*?function startReviewSelfAnalysis\([\s\S]*?function undoReviewSelfAnalysisMove\([\s\S]*?function getReviewSelfAnalysisPgn\([\s\S]*?function copyReviewSelfAnalysis\([\s\S]*?function formatReviewSelfAnalysisPrincipalVariation\([\s\S]*?function analyzeReviewSelfPosition\([\s\S]*?function makeReviewSelfAnalysisMove\(/],
-  ["dedicated Game Review workspace", /Game Review: a dedicated analysis workspace[\s\S]*?#play\.is-review-mode \.play-shell \{[\s\S]*?grid-template-areas: "board insights";[\s\S]*?\.match-board-column > :not\(\.play-board-wrap\) \{[\s\S]*?display: none !important;/],
+  ["dedicated Game Review workspace", /id="gameReview"[\s\S]*?id="gameReviewWorkspace"[\s\S]*?class="game-review-shell"[\s\S]*?function mountGameReviewWorkspace\([\s\S]*?playWorkspace\?\.setAttribute\("inert", ""\)[\s\S]*?workspace\.removeAttribute\("hidden"\)[\s\S]*?function restoreGameReviewWorkspace\([\s\S]*?workspace\.setAttribute\("hidden", ""\)/],
   ["review analysis states", /review-state-loading::after[\s\S]*?panel\.classList\.remove\("review-state-loading", "review-state-error"\)[\s\S]*?panel\.classList\.add\("review-state-loading"\)[\s\S]*?panel\?\.classList\.add\("review-state-error"\)/],
   ["live engine withheld until review", /id="enginePanel"[\s\S]*?#play #enginePanel\s*\{[\s\S]*?display: none !important;[\s\S]*?function updateEnginePanel\([\s\S]*?panel\.hidden = true;/],
-  ["post-game two-choice decision", /id="postGameDecision"[\s\S]*?id="postGameDecisionNew"[\s\S]*?id="postGameDecisionReview"[\s\S]*?function showPostGameDecision\([\s\S]*?postGameDecisionPgn[\s\S]*?postGameDecisionNew"\)\?\.addEventListener[\s\S]*?postGameDecisionReview"\)\?\.addEventListener/],
-  ["post-game review availability", /id="postGameFlow"[\s\S]*?id="postGameReview"[\s\S]*?function updateCoachPanel\([\s\S]*?const gameFinished = friendFinished \|\| coachDrawAgreed \|\| isMate \|\| isDrawn \|\| Boolean\(matchClockExpiredColor\);[\s\S]*?ensurePostGameReview\(gameFinished\);/],
+  ["post-game review decision", /id="postGameDecision"[\s\S]*?id="postGameDecisionReview"[\s\S]*?id="postGameDecisionNew"[\s\S]*?id="postGameDecisionClose"[\s\S]*?function showPostGameDecision\([\s\S]*?postGameDecisionPgn[\s\S]*?postGameDecisionClose"\)\?\.addEventListener/],
+  ["post-game review terminal flow", /id="postGameDecision"[\s\S]*?id="postGameDecisionReview"[\s\S]*?function completeCoachGame\([\s\S]*?cancelStockfishSearch\("Game ended"\)[\s\S]*?configurePostGameDecisionActions\(outcome\)[\s\S]*?showPostGameDecision\(\)[\s\S]*?function openPostGameReview\([\s\S]*?mountGameReviewWorkspace\(/],
+  ["saved review route recovery", /function activateSiteTab\(config, shouldScroll = true\) \{[\s\S]*?config\.panel === "gameReview"[\s\S]*?const savedReview = matchReviews\.find\(\(review\) => review\?\.moves\?\.length && review\?\.summary\)[\s\S]*?initializeDeferredFeature\("play"\)\.then\(\(\) => \{[\s\S]*?isGameReviewRoute\(\)[\s\S]*?openSavedMatchReview\(savedReview\)/],
   ["configurable review analysis profile", /function getReviewAnalysisConfig\(mode = "quick"\) \{[\s\S]*?const deep = mode === "deep" && !lowPerformance;[\s\S]*?skill: deep \? 18 : lowPerformance \? 6 : 10,[\s\S]*?depth: deep \? 10 : lowPerformance \? 3 : 5,[\s\S]*?reviewMode: deep \? "deep" : "quick"/],
   ["review cancellation and focus return", /function cancelActiveReviewAnalysis\([\s\S]*?cancelStockfishSearch\(reason\)[\s\S]*?function exitGameReview\([\s\S]*?renderPostGameFlow\(true\)[\s\S]*?postGameDecisionReview"\) \|\| returnFocus/],
   ["review growth trail", /id="reviewGrowthTrail"[\s\S]*?id="reviewGrowthHabit"[\s\S]*?function renderReviewGrowthTrail\([\s\S]*?Repair next:/],
@@ -184,14 +185,19 @@ const requiredRegressionContracts = [
   ["next unlock milestone", /id="homeMomentumMilestone"[\s\S]*?id="homeMomentumMilestoneTitle"[\s\S]*?function getNextAchievementMilestone\([\s\S]*?function setPremiumHomeMilestone\(/],
   ["active coach tone", /data-profile-setting="coachTone"[\s\S]*?function getCoachTone\([\s\S]*?function getPremiumSessionVoice\([\s\S]*?function getPremiumMomentumCopy\(/],
   ["premium home reduced motion", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-session-ritual-item[\s\S]*?\.home-momentum-milestone[\s\S]*?\.home-momentum-meter span/],
-  ["cacheable application asset split", /href="assets\/app\.css"[\s\S]*?src="assets\/app\.js"/],
-  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v17";[\s\S]*?"\.\/assets\/app\.css"[\s\S]*?"\.\/assets\/app\.js"/],
+  ["cacheable application asset split", /href="assets\/app\.css(?:\?v=[^"]+)?"[\s\S]*?src="assets\/app\.js(?:\?v=[^"]+)?"/],
+  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v\d+-[^"]+";[\s\S]*?"\.\/assets\/app\.css\?v=review-v\d+-[^"]+"[\s\S]*?"\.\/assets\/app\.js\?v=review-v\d+-[^"]+"[\s\S]*?isReviewShellAsset/],
   ["friend challenge create and join tabs", /id="friendCreateTab"[\s\S]*?aria-controls="friendCreatePanel"[\s\S]*?id="friendJoinTab"[\s\S]*?aria-controls="friendJoinPanel"/],
   ["friend challenge valid default clock", /function normalizeFriendChallengeClock\(value\)[\s\S]*?"5\+0"[\s\S]*?function getFriendInviteLink\([\s\S]*?clock: source\.clock/],
   ["friend challenge quick time controls", /id="friendClockPresets"[\s\S]*?data-friend-clock="3\+2"[\s\S]*?data-friend-clock="5\+0"[\s\S]*?data-friend-clock="10\+0"/],
   ["friend challenge full join code", /id="friendJoinCode" maxlength="10"[\s\S]*?function joinFriendChallengeCode\([\s\S]*?slice\(0, 10\)/],
   ["friend challenge result-first sharing", /const shareReady = Boolean\(state\.remote[\s\S]*?link\.disabled = !shareReady[\s\S]*?primary\.textContent = !state\.remote \? "Create invite"/],
   ["friend challenge accessible panel switcher", /function setFriendChallengeLobbyView\([\s\S]*?createPanel\.hidden[\s\S]*?joinPanel\.hidden[\s\S]*?aria-selected/],
+  ["quick match provider queue methods", /joinMatchmakingQueue:\s*\(options = \{\}\) => callFriendRpc\("join_matchmaking_queue"/],
+  ["quick match provider status methods", /getMatchmakingStatus:\s*\(ticketId\) => callFriendRpc\("get_matchmaking_status"/],
+  ["quick match provider leave methods", /leaveMatchmakingQueue:\s*\(ticketId\) => callFriendRpc\("leave_matchmaking_queue"/],
+  ["quick match online adapter", /function setupOnlineMatchmakingAdapter\([\s\S]*?window\.NschessOnlineMatchmaking = \{[\s\S]*?findMatch\([\s\S]*?getFriendProvider\(\)[\s\S]*?startMatch\([\s\S]*?getFriendChallenge\([\s\S]*?startFriendChallenge\(false\)/],
+  ["quick match auth gate", /function setupQuickMatch\([\s\S]*?canUseOnlineQuickMatch[\s\S]*?Sign in with your Player Pass to use Quick Match/],
   ["global premium design foundation", /Premium redesign: global experience layer[\s\S]*?--cq-content-max:[\s\S]*?--cq-section-space:[\s\S]*?--cq-ease-premium:/],
   ["premium light-mode parity", /body\.theme-light \{[\s\S]*?--cq-bg-primary: #eef3fb;[\s\S]*?--cq-text-primary: #18233d;[\s\S]*?body\.theme-light::before/],
   ["premium cross-page section rhythm", /main > :is\(\.section-dark, \.section-warm\)[\s\S]*?padding-block: var\(--cq-section-space\)[\s\S]*?\.wrap \{[\s\S]*?var\(--cq-content-max\)/],

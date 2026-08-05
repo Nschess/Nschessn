@@ -3899,12 +3899,14 @@
     }
 
     function getPuzzlePattern(puzzle) {
-      if (Array.isArray(puzzle.themes) && puzzle.themes.length) {
-        const planMatch = puzzle.themes.find((theme) => puzzlePatternPlans.includes(theme) || puzzlePatternPlans.includes(`${theme}s`));
+      const source = puzzle && typeof puzzle === "object" ? puzzle : null;
+      if (!source) return "Tactics";
+      if (Array.isArray(source.themes) && source.themes.length) {
+        const planMatch = source.themes.find((theme) => puzzlePatternPlans.includes(theme) || puzzlePatternPlans.includes(`${theme}s`));
         if (planMatch) return puzzlePatternPlans.includes(planMatch) ? planMatch : `${planMatch}s`;
       }
-      if (puzzle.theme) return puzzle.theme;
-      const text = `${puzzle.title} ${puzzle.prompt} ${puzzle.hint}`.toLowerCase();
+      if (source.theme) return source.theme;
+      const text = `${source.title || ""} ${source.prompt || ""} ${source.hint || ""}`.toLowerCase();
       if (text.includes("fork")) return "Forks";
       if (text.includes("pin")) return "Pins";
       if (text.includes("skewer")) return "Skewers";
@@ -3946,7 +3948,9 @@
     }
 
     function getCoachWeakTheme() {
-      return Object.entries(puzzleWeaknesses).sort((a, b) => b[1] - a[1])[0]?.[0] || getPuzzlePattern(puzzles[currentPuzzle]);
+      const weakestRecordedTheme = Object.entries(puzzleWeaknesses).sort((a, b) => b[1] - a[1])[0]?.[0];
+      const activePuzzle = Array.isArray(puzzles) ? puzzles[currentPuzzle] : null;
+      return weakestRecordedTheme || getPuzzlePattern(activePuzzle);
     }
 
     function getCoachNextLesson() {
@@ -8473,7 +8477,9 @@
     }
 
     function getDailyChallengeName() {
+      if (!Array.isArray(puzzles) || !puzzles.length) return "";
       const puzzle = puzzles[getDailyPuzzleIndex()];
+      if (!puzzle) return "";
       const text = `${puzzle.title} ${puzzle.prompt}`.toLowerCase();
       if (text.includes("mate")) return "Win in 2 moves";
       if (text.includes("fork")) return "Spot the fork";
@@ -9482,7 +9488,8 @@
       winRatePill.textContent = `Win rate ${winRate}%`;
       solvedPill.textContent = `Puzzles solved ${solvedPuzzles.size}`;
       bestPill.textContent = `Best streak ${bestPuzzleStreak}`;
-      dailyPill.textContent = completedToday ? "Daily challenge done" : `Daily: ${getDailyChallengeName()}`;
+      const dailyChallengeName = getDailyChallengeName();
+      dailyPill.textContent = completedToday ? "Daily challenge done" : dailyChallengeName ? `Daily: ${dailyChallengeName}` : "Daily challenge unavailable";
       dailyStreakPill.textContent = `Current streak ${dailyHabit.streak}`;
       lessonPill.textContent = `Missions completed ${lessonCount}`;
       const mostReviewedOpening = getMostReviewedOpening();
@@ -9502,8 +9509,9 @@
       dailyReward.textContent = completedToday
         ? `Daily reward unlocked. Weekly ${weeklyXp}/120 XP. Monthly chests ${puzzleChests}.`
         : `Daily mission: solve 1 ${smart.type} puzzle, then open ${nextLesson.label}. Weekly ${weeklyXp}/120 XP.`;
+      const activePuzzle = Array.isArray(puzzles) ? puzzles[currentPuzzle] : null;
       const homeCoachMessage = puzzleAttempts
-        ? `Nice effort. ${activePuzzlePlan === "adaptive" ? `Adaptive is giving you ${smart.level} puzzles. ` : ""}${smart.message} One helpful idea: ${puzzles[currentPuzzle].hint}`
+        ? `Nice effort. ${activePuzzlePlan === "adaptive" ? `Adaptive is giving you ${smart.level} puzzles. ` : ""}${smart.message} One helpful idea: ${activePuzzle?.hint || "scan checks, captures, and threats."}`
         : `You're getting better every day. ${smart.message}`;
       coach.textContent = `${coachMemoryStatus()} ${homeCoachMessage}`;
 
@@ -9566,6 +9574,7 @@
     }
 
     function getDailyPuzzleIndex() {
+      if (!Array.isArray(puzzles) || !puzzles.length) return -1;
       const today = new Date();
       const key = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
       return Math.floor(key / 86400000) % puzzles.length;
@@ -10671,6 +10680,8 @@
     let coachThinking = false;
     let coachBotPaused = false;
     let coachDrawAgreed = false;
+    let coachTerminalOutcome = null;
+    let completedGameSignature = "";
     let coachMessage = "You are White. Select a piece to see legal moves.";
     let coachMoveToken = 0;
     let coachThreatMode = false;
@@ -10799,10 +10810,130 @@
     }
 
     function isCoachGameOver() {
-      return Boolean(matchClockExpiredColor)
+      return Boolean(coachTerminalOutcome)
+        || Boolean(matchClockExpiredColor)
         || coachDrawAgreed
-        || Boolean(friendChallengeState?.remote && (friendChallengeState.status === "completed" || getFriendGameOutcome(friendChallengeState)))
+        || Boolean(friendChallengeState?.active && (friendChallengeState.status === "completed" || getFriendGameOutcome(friendChallengeState)))
         || callCoachRule(coachGame, "isGameOver", "game_over");
+    }
+
+    function getCoachTerminalOutcome() {
+      if (!coachGame) return null;
+      const friendOutcome = friendChallengeState?.active ? getFriendGameOutcome(friendChallengeState) : null;
+      if (friendOutcome) return friendOutcome;
+      if (friendChallengeState?.status === "completed") return { result: "aborted", termination: "game complete" };
+      if (coachTerminalOutcome) return coachTerminalOutcome;
+      if (matchClockExpiredColor) return {
+        result: matchClockExpiredColor === "w" ? "black" : "white",
+        termination: "timeout"
+      };
+      if (coachDrawAgreed) return { result: "draw", termination: "draw agreement" };
+      if (callCoachRule(coachGame, "isCheckmate", "in_checkmate")) return {
+        result: coachGame.turn() === "w" ? "black" : "white",
+        termination: "checkmate"
+      };
+      if (callCoachRule(coachGame, "isStalemate", "in_stalemate")) return { result: "draw", termination: "stalemate" };
+      if (callCoachRule(coachGame, "isThreefoldRepetition", "in_threefold_repetition")) return { result: "draw", termination: "threefold repetition" };
+      if (callCoachRule(coachGame, "isDrawByFiftyMoves", "in_draw_by_fifty_moves")) return { result: "draw", termination: "fifty-move rule" };
+      if (callCoachRule(coachGame, "isInsufficientMaterial", "insufficient_material")) return { result: "draw", termination: "insufficient material" };
+      return null;
+    }
+
+    function isMultiplayerPostGame() {
+      return Boolean(friendChallengeState?.remote);
+    }
+
+    function formatPostGameDuration(milliseconds) {
+      const seconds = Math.max(0, Math.round((Number(milliseconds) || 0) / 1000));
+      return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+    }
+
+    function getPostGameReviewMetrics() {
+      const pgn = coachGame?.pgn() || "";
+      const review = activeMatchReview?.pgn === pgn
+        ? activeMatchReview
+        : (Array.isArray(matchReviews) ? matchReviews.find((item) => item?.pgn === pgn) : null);
+      const playerColor = coachPlayerColor === "b" ? "b" : "w";
+      const accuracy = playerColor === "b" ? review?.blackAccuracy : review?.whiteAccuracy;
+      const losses = (review?.moves || [])
+        .filter((move) => move?.color === playerColor && move?.engineVerified && Number.isFinite(Number(move.cpLoss)))
+        .map((move) => Number(move.cpLoss));
+      return {
+        accuracy: Number.isFinite(Number(accuracy)) ? Math.round(Number(accuracy) * 10) / 10 : null,
+        averageCentipawnLoss: losses.length ? Math.round(losses.reduce((total, loss) => total + loss, 0) / losses.length) : null
+      };
+    }
+
+    function configurePostGameDecisionActions(outcome) {
+      const isMultiplayer = isMultiplayerPostGame();
+      const dialog = document.getElementById("postGameDecision");
+      const review = document.getElementById("postGameDecisionReview");
+      const newGame = document.getElementById("postGameDecisionNew");
+      const rematch = document.getElementById("postGameDecisionRematch");
+      const icon = document.getElementById("postGameDecisionIcon");
+      const title = document.getElementById("postGameDecisionTitle");
+      const summary = document.getElementById("postGameDecisionSummary");
+      const accuracy = document.getElementById("postGameDecisionAccuracy");
+      const movesStat = document.getElementById("postGameDecisionMoves");
+      const duration = document.getElementById("postGameDecisionDuration");
+      const acplStat = document.getElementById("postGameDecisionAcplStat");
+      const acpl = document.getElementById("postGameDecisionAcpl");
+      const playerResult = coachPlayerColor === "b" ? "black" : "white";
+      const resultKey = outcome?.result === "draw" ? "draw" : outcome?.result === playerResult ? "victory" : outcome?.result === "aborted" ? "ended" : "defeat";
+      const result = resultKey === "victory" ? "Victory" : resultKey === "defeat" ? "Defeat" : resultKey === "draw" ? "Draw" : "Game ended";
+      const reason = String(outcome?.termination || "game complete").replace(/_/g, " ");
+      const moves = Math.ceil((coachGame?.history().length || 0) / 2);
+      const metrics = getPostGameReviewMetrics();
+      const reasonText = resultKey === "victory" ? `Won by ${reason}` : resultKey === "defeat" ? `Lost by ${reason}` : resultKey === "draw" ? `Draw by ${reason}` : reason;
+      if (dialog) {
+        dialog.dataset.postGameMode = isMultiplayer ? "multiplayer" : "ai";
+        dialog.dataset.postGameResult = resultKey;
+      }
+      if (icon) icon.textContent = resultKey === "victory" ? String.fromCodePoint(0x1F3C6) : resultKey === "draw" ? "=" : resultKey === "defeat" ? "!" : String.fromCodePoint(0x1F3C1);
+      if (title) title.textContent = result;
+      if (review) review.textContent = "Review Game";
+      if (newGame) newGame.textContent = isMultiplayer ? "New Game" : "Play Again";
+      if (rematch) {
+        rematch.hidden = !isMultiplayer;
+        rematch.disabled = false;
+        rematch.textContent = "Rematch";
+      }
+      if (summary) summary.textContent = reasonText;
+      if (accuracy) accuracy.textContent = metrics.accuracy === null ? "Pending" : `${metrics.accuracy}%`;
+      if (movesStat) movesStat.textContent = String(moves);
+      if (duration) duration.textContent = formatPostGameDuration(matchEndedElapsedMs);
+      if (acplStat) acplStat.hidden = metrics.averageCentipawnLoss === null;
+      if (acpl && metrics.averageCentipawnLoss !== null) acpl.textContent = `${metrics.averageCentipawnLoss} cp`;
+    }
+
+    function completeCoachGame(outcome = getCoachTerminalOutcome()) {
+      if (!coachGame || !outcome) return false;
+      const gameKey = coachGame.pgn() || `session-${coachGameSessionId}-${coachGame.history().length}`;
+      const signature = `${gameKey}:${outcome.result}:${outcome.termination}`;
+      if (completedGameSignature === signature) return true;
+      completedGameSignature = signature;
+      coachMoveToken += 1;
+      coachThinking = false;
+      coachPremove = null;
+      coachSelected = "";
+      coachLegalMoves = [];
+      cancelStockfishSearch("Game ended");
+      if (matchEndedElapsedMs === null) matchEndedElapsedMs = Math.max(0, Date.now() - matchStartedAt);
+      if (matchClockState) {
+        matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
+        updateMatchPlayerTimer();
+      }
+      if (!friendChallengeState?.remote) {
+        const playerResult = coachPlayerColor === "b" ? "black" : "white";
+        recordCoachGameResult(outcome.result === playerResult);
+      }
+      configurePostGameDecisionActions(outcome);
+      ["postGameDecisionReview", "postGameDecisionRematch", "postGameDecisionNew", "postGameDecisionClose"].forEach((id) => {
+        document.getElementById(id)?.removeAttribute("disabled");
+      });
+      showPostGameDecision();
+      ensurePostGameReview(false);
+      return true;
     }
 
     function isCoachCheck() {
@@ -11458,9 +11589,10 @@
       if (matchClockExpiredColor) return;
       matchClockExpiredColor = color === "b" ? "b" : "w";
       if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
-      const outcome = friendChallengeState?.active ? getFriendGameOutcome(friendChallengeState) : null;
+      const outcome = getCoachTerminalOutcome();
       coachMessage = outcome ? formatFriendGameOutcome(outcome) : `${getCoachColorName(matchClockExpiredColor)} ran out of time. The clock is paused.`;
       if (friendChallengeState?.active && outcome) void syncFriendSignal(friendOutcomeSignal(outcome), "completed");
+      completeCoachGame(outcome);
       updateCoachPanel();
       renderCoachBoard();
     }
@@ -12698,6 +12830,7 @@
     }
 
     let activeMatchReview = null;
+    let reviewWorkspaceOrigins = null;
     let reviewReplayIndex = 0;
     let reviewReplayTimer = 0;
     let reviewCompareMode = "your";
@@ -13252,7 +13385,7 @@
       const result = String(review.summary?.result || "Game complete.");
       const won = /^You won/i.test(result);
       const drew = /peacefully|draw/i.test(result);
-      const outcomeIcon = won ? "?" : drew ? "=" : "?";
+      const outcomeIcon = won ? String.fromCodePoint(0x1F3C6) : drew ? "=" : String.fromCodePoint(0x2694);
       const outcomeTitle = won ? "You won!" : drew ? "A balanced finish" : "Game complete";
       const outcomeKicker = won ? "Strong result" : drew ? "Drawn game" : "Ready to learn";
 
@@ -13413,6 +13546,180 @@
       if (stockfishPending?.purpose === "review") cancelStockfishSearch(reason);
     }
 
+    function ensureGameReviewWorkspaceOrigins() {
+      if (reviewWorkspaceOrigins) return reviewWorkspaceOrigins;
+      const entries = [
+        ["header", document.querySelector(".review-workspace-header"), document.getElementById("reviewHeaderSlot")],
+        ["currentMoveStatus", document.getElementById("reviewCurrentMoveStatus"), document.getElementById("reviewHeaderSlot")],
+        ["summary", document.getElementById("reviewLeftSidebar"), document.getElementById("reviewSummarySlot")],
+        ["quality", document.querySelector(".review-quality-card"), document.getElementById("reviewImprovementSlot")],
+        ["growth", document.getElementById("reviewGrowthTrail"), document.getElementById("reviewImprovementSlot")],
+        ["opening", document.querySelector(".review-opening-card"), document.getElementById("reviewImprovementSlot")],
+        ["chart", document.querySelector(".review-center-chart"), document.getElementById("reviewChartSlot")],
+        ["board", document.querySelector(".play-board-wrap"), document.getElementById("reviewBoardSlot")],
+        ["timeline", document.getElementById("reviewCenterTimeline"), document.getElementById("reviewTimelineSlot")],
+        ["performance", document.querySelector(".review-performance-card"), document.getElementById("reviewCoachSlot")],
+        ["focus", document.getElementById("reviewFocusCard"), document.getElementById("reviewCoachSlot")],
+        ["selfAnalysis", document.getElementById("reviewSelfAnalysisPanel"), document.getElementById("reviewPracticeSlot")],
+        ["oneMoment", document.getElementById("reviewOneMoment"), document.getElementById("reviewPracticeSlot")],
+        ["recommendations", document.querySelector(".review-recommendations"), document.getElementById("reviewLearningSlot")],
+        ["comparison", document.querySelector(".review-compare-row"), document.getElementById("reviewReplaySlot")],
+        ["controls", document.querySelector(".review-controls"), document.getElementById("reviewReplaySlot")],
+        ["references", document.getElementById("reviewReferenceDetails"), document.getElementById("reviewPracticeSlot")],
+        ["practiceLinks", document.getElementById("coachPracticeLinks"), document.getElementById("reviewPracticeSlot")],
+        ["moveHistory", document.getElementById("moveHistoryDrawer"), document.getElementById("reviewMoveHistorySlot")],
+        ["evalRail", document.getElementById("reviewEvalRail"), null],
+        ["playerStrip", document.querySelector("#playWorkspace .review-player-strip"), null],
+        ["rightRail", document.querySelector("#playWorkspace .play-right-sidebar"), null],
+        ["enginePanel", document.getElementById("enginePanel"), null],
+        ["coachTools", document.getElementById("coachToolsDrawer"), null],
+        ["captured", document.querySelector("#playWorkspace .captured-row"), null],
+        ["friendChat", document.getElementById("friendGameChatDrawer"), null]
+      ];
+      reviewWorkspaceOrigins = new Map(entries
+        .filter(([, node]) => node)
+        .map(([name, node, slot]) => [name, {
+          node,
+          slot,
+          parent: node.parentNode,
+          next: node.nextSibling,
+          open: node instanceof HTMLDetailsElement ? node.open : null
+        }]));
+      return reviewWorkspaceOrigins;
+    }
+
+    function getGameReviewStaging() {
+      const reviewPage = document.getElementById("gameReview");
+      if (!reviewPage) return null;
+      let staging = document.getElementById("gameReviewStaging");
+      if (!staging) {
+        staging = document.createElement("div");
+        staging.id = "gameReviewStaging";
+        staging.hidden = true;
+        staging.setAttribute("aria-hidden", "true");
+        reviewPage.append(staging);
+      }
+      return staging;
+    }
+
+    function stageReviewSourcesForLivePlay() {
+      const staging = getGameReviewStaging();
+      const origins = ensureGameReviewWorkspaceOrigins();
+      const liveCoachSlot = document.getElementById("playLiveCoachSlot");
+      const liveMoveSlot = document.getElementById("playLiveMoveSlot");
+      const liveCapturesSlot = document.getElementById("playLiveCapturesSlot");
+      const liveChatSlot = document.getElementById("playLiveChatSlot");
+      const playWorkspace = document.getElementById("playWorkspace");
+      if (!staging || !origins?.size || !playWorkspace) return;
+      [
+        ["enginePanel", liveCoachSlot],
+        ["coachTools", liveCoachSlot],
+        ["moveHistory", liveMoveSlot],
+        ["captured", liveCapturesSlot],
+        ["friendChat", liveChatSlot]
+      ].forEach(([name, slot]) => {
+        const node = origins.get(name)?.node;
+        if (!node || !slot) return;
+        slot.append(node);
+        if (node instanceof HTMLDetailsElement && (name === "coachTools" || name === "moveHistory")) node.open = true;
+      });
+      ["header", "summary", "chart", "timeline", "playerStrip", "evalRail", "rightRail"].forEach((name) => {
+        const node = origins.get(name)?.node;
+        if (node) staging.append(node);
+      });
+      const reviewOnlyRoots = [
+        ".review-workspace-header",
+        "#reviewLeftSidebar",
+        ".review-center-chart",
+        "#reviewCenterTimeline",
+        ".review-player-strip",
+        "#reviewEvalRail",
+        ".play-right-sidebar"
+      ];
+      playWorkspace.querySelectorAll(reviewOnlyRoots.join(",")).forEach((node) => staging.append(node));
+      playWorkspace.dataset.reviewIsolated = String(!playWorkspace.querySelector(reviewOnlyRoots.join(",")));
+      document.getElementById("reviewEvalRail")?.setAttribute("hidden", "");
+    }
+
+    stageReviewSourcesForLivePlay();
+
+    function isGameReviewRoute() {
+      return String(window.location.hash || "").replace(/^#/, "").split("?")[0] === "game-review";
+    }
+
+    function navigateToGameReviewPage() {
+      if (!isGameReviewRoute()) window.location.hash = "#game-review";
+    }
+
+    function navigateToPlayPage() {
+      if (String(window.location.hash || "").replace(/^#/, "").split("?")[0] !== "play") {
+        window.location.hash = "#play";
+      }
+    }
+
+    function mountGameReviewWorkspace() {
+      const workspace = document.getElementById("gameReviewWorkspace");
+      const reviewPage = document.getElementById("gameReview");
+      const playWorkspace = document.getElementById("playWorkspace");
+      const origins = ensureGameReviewWorkspaceOrigins();
+      if (!workspace || !reviewPage || !origins?.size) return;
+      const isEnteringReview = !reviewPage.classList.contains("is-review-page");
+      if (isEnteringReview) {
+        document.getElementById("reviewReferenceDetails")?.removeAttribute("open");
+      }
+      ["header", "currentMoveStatus", "summary", "performance", "quality", "growth", "opening", "chart", "board", "timeline", "focus", "selfAnalysis", "oneMoment", "recommendations", "comparison", "controls", "references", "practiceLinks", "moveHistory"].forEach((name) => {
+        const origin = origins.get(name);
+        if (!origin?.node || !origin.slot) return;
+        origin.slot.append(origin.node);
+        if (name === "moveHistory" && origin.node instanceof HTMLDetailsElement) origin.node.open = true;
+      });
+      const evalRail = origins.get("evalRail")?.node;
+      const board = origins.get("board")?.node;
+      if (evalRail && board) board.prepend(evalRail);
+      playWorkspace?.setAttribute("hidden", "");
+      playWorkspace?.setAttribute("inert", "");
+      workspace.removeAttribute("hidden");
+      reviewPage.classList.add("is-review-page");
+      navigateToGameReviewPage();
+    }
+
+    function restoreGameReviewWorkspace() {
+      const workspace = document.getElementById("gameReviewWorkspace");
+      const reviewPage = document.getElementById("gameReview");
+      const playWorkspace = document.getElementById("playWorkspace");
+      const origins = ensureGameReviewWorkspaceOrigins();
+      if (!workspace || !origins?.size) return;
+      ["references", "controls", "comparison", "recommendations", "oneMoment", "selfAnalysis", "focus", "performance", "practiceLinks", "opening", "growth", "quality", "timeline", "board", "chart", "summary", "currentMoveStatus", "header"].forEach((name) => {
+        const origin = origins.get(name);
+        if (!origin?.node || !origin.parent) return;
+        if (origin.next?.parentNode === origin.parent) origin.parent.insertBefore(origin.node, origin.next);
+        else origin.parent.append(origin.node);
+        if (origin.open !== null && origin.node instanceof HTMLDetailsElement) origin.node.open = origin.open;
+      });
+      stageReviewSourcesForLivePlay();
+      workspace.setAttribute("hidden", "");
+      playWorkspace?.removeAttribute("hidden");
+      playWorkspace?.removeAttribute("inert");
+      reviewPage?.classList.remove("is-review-page");
+    }
+
+    function suspendGameReviewWorkspaceForNavigation() {
+      const reviewPage = document.getElementById("gameReview");
+      if (!reviewPage?.classList.contains("is-review-page") || isGameReviewRoute()) return;
+      window.clearInterval(reviewReplayTimer);
+      reviewReplayTimer = 0;
+      stopReviewBestLineReplay();
+      reviewRetryState = null;
+      reviewSelfAnalysisState = null;
+      reviewRequestedPgn = "";
+      document.getElementById("premiumReview")?.setAttribute("hidden", "");
+      document.getElementById("reviewRetry")?.setAttribute("hidden", "");
+      restoreGameReviewWorkspace();
+      document.getElementById("reviewEvalRail")?.setAttribute("hidden", "");
+      renderPostGameFlow(true);
+      renderCoachBoard();
+    }
+
     function exitGameReview() {
       const returnFocus = reviewReturnFocus;
       reviewReturnFocus = null;
@@ -13425,12 +13732,13 @@
       reviewSelfAnalysisState = null;
       document.getElementById("premiumReview")?.setAttribute("hidden", "");
       document.getElementById("reviewRetry")?.setAttribute("hidden", "");
-      document.getElementById("play")?.classList.remove("is-review-mode");
+      restoreGameReviewWorkspace();
       document.getElementById("reviewEvalRail")?.setAttribute("hidden", "");
       activeMatchReview = null;
       postGameDecisionPgn = "";
       renderPostGameFlow(true);
       renderCoachBoard();
+      navigateToPlayPage();
       window.requestAnimationFrame(() => {
         const fallback = document.getElementById("postGameDecisionReview") || returnFocus;
         if (fallback?.isConnected) fallback.focus({ preventScroll: true });
@@ -13442,10 +13750,11 @@
       if (!panel || !review) return;
       activeMatchReview = review;
       panel.classList.remove("review-state-loading", "review-state-error");
+      document.getElementById("gameReviewWorkspace")?.classList.remove("review-state-loading", "review-state-error");
       document.getElementById("reviewRetry")?.setAttribute("hidden", "");
       panel.removeAttribute("aria-busy");
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
-      document.getElementById("play")?.classList.add("is-review-mode");
+      mountGameReviewWorkspace();
       const active = review.moves[reviewReplayIndex] || review.moves[0];
       const oneMoment = getReviewOneMoment(review);
       const oneMomentMove = oneMoment.move;
@@ -13474,6 +13783,7 @@
       if (!active?.engineVerified) reviewCompareMode = "your";
       const meta = getReviewQualityMeta(active?.label);
       panel.style.setProperty("--review-accent", meta.color);
+      document.getElementById("gameReviewWorkspace")?.style.setProperty("--review-accent", meta.color);
       panel.hidden = false;
       const focusCard = document.getElementById("reviewFocusCard");
       if (focusCard && active) {
@@ -13505,6 +13815,11 @@
       if (evalBadge && active) evalBadge.textContent = active.cpLoss ? `Eval change: -${active.cpLoss} cp` : "Eval steady";
       const focusMove = document.getElementById("reviewFocusMove");
       if (focusMove && active) focusMove.textContent = `${active.ply}. ${active.san}`;
+      const focusSummary = document.getElementById("reviewFocusSummary");
+      if (focusSummary && active) {
+        const focusTheme = active.tactic || "position awareness";
+        focusSummary.textContent = `${active.label}: ${focusTheme}.`;
+      }
       const focusMeta = document.getElementById("reviewFocusMeta");
       if (focusMeta && active) {
         const chips = [
@@ -13599,6 +13914,22 @@
           });
           details.append(summary, grid);
           summaryGrid.appendChild(details);
+        }
+      }
+      const referenceDetails = document.getElementById("reviewReferenceDetails");
+      const referenceCount = document.getElementById("reviewReferenceCount");
+      if (referenceDetails) {
+        const keyMomentCount = keyRow?.children.length || 0;
+        const hasAfterReviewNotes = Boolean(summaryGrid && !summaryGrid.hidden && summaryGrid.children.length);
+        const hasCoachNotes = Boolean(document.getElementById("reviewCoachCards")?.children.length);
+        const hasReferenceContent = keyMomentCount > 0 || hasAfterReviewNotes || hasCoachNotes;
+
+        referenceDetails.hidden = !hasReferenceContent;
+        if (referenceCount) {
+          const labels = [];
+          if (keyMomentCount) labels.push(`${keyMomentCount} moment${keyMomentCount === 1 ? "" : "s"}`);
+          if (hasAfterReviewNotes) labels.push("notes");
+          referenceCount.textContent = labels.join(" ? ") || "Coach notes";
         }
       }
       const list = document.getElementById("reviewMoveList");
@@ -14274,7 +14605,7 @@
       const target = getReviewRetryTarget(review);
       action.hidden = false;
       action.disabled = !target.canRetry;
-      action.textContent = target.canRetry ? "Retry position" : "Explore move";
+      action.textContent = target.canRetry ? "Retry this move" : "Explore move";
       action.title = target.canRetry ? "Try to find the engine's stronger move from this position." : "Open the most useful moment in the review.";
       hint.hidden = true;
       returnButton.hidden = true;
@@ -14366,52 +14697,56 @@
       renderCoachBoard();
     }
 
-    function hidePostGameDecision() {
-      document.getElementById("postGameDecision")?.setAttribute("hidden", "");
+    function usesPostGameSidePanel() {
+      return window.matchMedia("(min-width: 1280px)").matches && Boolean(document.getElementById("playLiveAnalysis"));
     }
 
-    function showPostGameDecision(title, copy) {
+    function getPostGameDecisionDialog() {
       const dialog = document.getElementById("postGameDecision");
+      const host = usesPostGameSidePanel() ? document.getElementById("playLiveAnalysis") : document.body;
+      if (dialog && host && dialog.parentElement !== host) host.appendChild(dialog);
+      return dialog;
+    }
+
+    function setPostGameDecisionModalState(isOpen) {
+      const playWorkspace = document.getElementById("playWorkspace");
+      const boardColumn = document.querySelector("#play:not(.is-review-mode) .match-board-column");
+      const useSidePanel = isOpen && usesPostGameSidePanel();
+      document.body.classList.toggle("post-game-panel-open", useSidePanel);
+      document.body.classList.toggle("post-game-dialog-open", isOpen && !useSidePanel);
+      if (useSidePanel) {
+        playWorkspace?.removeAttribute("inert");
+        boardColumn?.setAttribute("inert", "");
+        return;
+      }
+      boardColumn?.removeAttribute("inert");
+      if (isOpen) playWorkspace?.setAttribute("inert", "");
+      else playWorkspace?.removeAttribute("inert");
+    }
+
+    function hidePostGameDecision() {
+      const dialog = getPostGameDecisionDialog();
+      dialog?.setAttribute("hidden", "");
+      setPostGameDecisionModalState(false);
+    }
+
+    function showPostGameDecision() {
+      const dialog = getPostGameDecisionDialog();
       if (!dialog || !coachGame) return;
       const pgn = coachGame.pgn();
       const alreadyShown = Boolean(pgn) && postGameDecisionPgn === pgn;
       if (pgn) postGameDecisionPgn = pgn;
-      const titleNode = document.getElementById("postGameDecisionTitle");
-      const copyNode = document.getElementById("postGameDecisionCopy");
-      if (titleNode) titleNode.textContent = title;
-      if (copyNode) copyNode.textContent = copy;
       if (alreadyShown) return;
       dialog.hidden = false;
+      setPostGameDecisionModalState(true);
       window.requestAnimationFrame(() => {
         document.getElementById("postGameDecisionReview")?.focus({ preventScroll: true });
       });
     }
 
-    function renderPostGameFlow(show = Boolean(coachGame && (isCoachGameOver() || coachDrawAgreed))) {
-      const flow = document.getElementById("postGameFlow");
-      if (!flow) return;
-      const isOver = Boolean(coachGame && (isCoachGameOver() || coachDrawAgreed));
-      const inReview = document.getElementById("play")?.classList.contains("is-review-mode");
-      const shouldShow = Boolean(show && isOver && !inReview);
-      flow.hidden = !shouldShow;
-      if (!shouldShow) return;
-      document.getElementById("guidedReview")?.setAttribute("hidden", "");
-      const isMate = callCoachRule(coachGame, "isCheckmate", "in_checkmate");
-      const playerWon = isMate && coachGame.turn() === getCoachBotColor();
-      const title = document.getElementById("postGameTitle");
-      const note = document.getElementById("postGameNote");
-      const pgn = coachGame.pgn();
-      const ready = activeMatchReview?.pgn === pgn || matchReviews.some((review) => review.pgn === pgn);
-      if (title) title.textContent = playerWon ? "You finished strong" : isMate ? "A useful game" : "A thoughtful finish";
-      if (note) note.textContent = ready
-        ? "Your quick review is ready whenever you want it."
-        : "Your quick review is preparing in the background.";
-      showPostGameDecision(
-        playerWon ? "You won!" : "Game complete",
-        ready ? "Your review is ready. Start another game or see what decided this one." : "Start another game or review the key moments while analysis finishes."
-      );
+    function renderPostGameFlow() {
+      document.getElementById("postGameFlow")?.setAttribute("hidden", "");
     }
-
     function openSavedMatchReview(review) {
       if (!review?.moves?.length || !CoachChess) return;
       reviewRequestedPgn = review.pgn || "";
@@ -14419,6 +14754,7 @@
       activeMatchReview = review;
       reviewCompareMode = "your";
       reviewReplayIndex = Math.max(0, review.moves.length - 1);
+      mountGameReviewWorkspace();
       showReviewPly(reviewReplayIndex);
       window.requestAnimationFrame(() => document.getElementById("reviewExit")?.focus({ preventScroll: true }));
     }
@@ -14499,12 +14835,15 @@
       if (cached && !force && (cached.analysis?.mode || "Quick engine") === requestedLabel) return openSavedMatchReview(cached);
       const panel = document.getElementById("premiumReview");
       if (panel) {
+        mountGameReviewWorkspace();
+        const workspace = document.getElementById("gameReviewWorkspace");
         panel.hidden = false;
         panel.classList.remove("review-state-error");
+        workspace?.classList.remove("review-state-error");
         document.getElementById("reviewRetry")?.setAttribute("hidden", "");
         panel.classList.add("review-state-loading");
+        workspace?.classList.add("review-state-loading");
         panel.setAttribute("aria-busy", "true");
-        document.getElementById("play")?.classList.add("is-review-mode");
         document.getElementById("reviewSummaryLine").textContent = `${getReviewAnalysisModeLabel(mode)} is preparing your review...`;
         document.getElementById("reviewAccuracyBadge").textContent = mode === "deep" ? "Deep analysis" : "Analyzing";
       }
@@ -14562,8 +14901,11 @@
         .catch(() => {
           if (reviewAnalysisToken !== token || reviewRequestedPgn !== pgn) return;
           const panel = document.getElementById("premiumReview");
+          const workspace = document.getElementById("gameReviewWorkspace");
           panel?.classList.remove("review-state-loading");
           panel?.classList.add("review-state-error");
+          workspace?.classList.remove("review-state-loading");
+          workspace?.classList.add("review-state-error");
           panel?.removeAttribute("aria-busy");
           document.getElementById("reviewRetry")?.removeAttribute("hidden");
           const summary = document.getElementById("reviewSummaryLine");
@@ -14648,7 +14990,7 @@
     }
 
     function recordCoachGameResult(playerWon) {
-      if (coachGameRecorded || !coachGame?.history().length) return;
+      if (coachGameRecorded) return;
       coachGameRecorded = true;
       if (friendChallengeState?.tournamentPairingId) void reportTournamentResultFromBoard();
       const history = coachGame.history({ verbose: true });
@@ -14682,7 +15024,9 @@
         showCelebration("Nice practice!", `+${coachCurrentHanging === 0 ? 18 : 10} XP`, beginnerBotResult?.line || (coachCurrentHanging === 0 ? "No Hanging Pieces progress!" : "You learned one idea."));
       }
       const opponent = getAiHeaderProfile();
-      const draw = coachDrawAgreed
+      const terminalOutcome = getCoachTerminalOutcome();
+      const draw = terminalOutcome?.result === "draw"
+        || coachDrawAgreed
         || callCoachRule(coachGame, "isDraw", "in_draw")
         || callCoachRule(coachGame, "isStalemate", "in_stalemate");
       const checkmate = callCoachRule(coachGame, "isCheckmate", "in_checkmate");
@@ -14696,7 +15040,7 @@
         result: draw ? "draw" : playerWon ? "win" : "loss",
         side: getCoachColorName(coachPlayerColor),
         moves: Math.ceil(history.length / 2),
-        termination: matchClockExpiredColor ? "Timeout" : checkmate ? "Checkmate" : draw ? "Draw" : "Game complete"
+        termination: terminalOutcome?.termination || (matchClockExpiredColor ? "Timeout" : checkmate ? "Checkmate" : draw ? "Draw" : "Game complete")
       });
       if (beginnerBotResult?.line) coachMessage = `${beginnerBotResult.line} ${buildCoachSummary()}`;
       savePuzzleState();
@@ -14726,9 +15070,58 @@
       blackCapturedNode.textContent = blackCaptured.join(" ") || "None";
     }
 
-    function renderCoachHistory() {
-      const history = coachGame.history({ verbose: true });
+    function renderReviewMoveHistory(review = activeMatchReview) {
       const list = document.getElementById("moveHistory");
+      const moves = review?.moves || [];
+      if (!list) return;
+      const activeIndex = clampNumber(reviewReplayIndex, 0, Math.max(0, moves.length - 1));
+      const historyKey = `${review?.id || review?.pgn || "review"}:${activeIndex}:${moves.map((move) => move.san).join("|")}`;
+      if (list.dataset.historyKey === historyKey) return;
+      list.dataset.historyKey = historyKey;
+      list.replaceChildren();
+      if (!moves.length) {
+        list.textContent = "No reviewed moves available.";
+        return;
+      }
+
+      let activeItem = null;
+      for (let index = 0; index < moves.length; index += 2) {
+        const row = document.createElement("div");
+        row.className = "move-pair";
+        row.append(createBookText("strong", "", `${Math.floor(index / 2) + 1}.`));
+        [index, index + 1].forEach((moveIndex) => {
+          const move = moves[moveIndex];
+          if (!move) {
+            row.append(createBookText("span", "review-move-history-empty", ""));
+            return;
+          }
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "review-move-history-item";
+          button.textContent = move.san;
+          const moveMeta = getReviewQualityMeta(move.label);
+          button.style.setProperty("--review-marker", moveMeta.color);
+          button.title = `${move.ply}. ${move.san} ? ${move.label}`;
+          button.setAttribute("aria-label", `Move ${move.ply}: ${move.san}, ${move.label}`);
+          button.setAttribute("aria-current", String(moveIndex === activeIndex));
+          button.addEventListener("click", () => showReviewPly(moveIndex));
+          if (moveIndex === activeIndex) activeItem = button;
+          row.append(button);
+        });
+        list.append(row);
+      }
+      activeItem?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+
+    function renderCoachHistory() {
+      const list = document.getElementById("moveHistory");
+      if (!list) return;
+      const reviewActive = Boolean(activeMatchReview?.moves?.length && document.getElementById("gameReview")?.classList.contains("is-review-page"));
+      if (reviewActive) {
+        renderReviewMoveHistory(activeMatchReview);
+        return;
+      }
+      const history = coachGame.history({ verbose: true });
       const historyKey = history.map((move) => move.san).join("|");
       if (list.dataset.historyKey === historyKey) return;
       list.dataset.historyKey = historyKey;
@@ -14785,7 +15178,7 @@
       coachEndSoundPlayed = true;
       const playerResult = coachPlayerColor === "w" ? "white" : "black";
       const outcome = friendChallengeState?.active ? getFriendGameOutcome(friendChallengeState) : null;
-      const result = outcome?.result || (matchClockExpiredColor ? (matchClockExpiredColor === "w" ? "black" : "white") : "");
+      const result = outcome?.result || getCoachTerminalOutcome()?.result || (matchClockExpiredColor ? (matchClockExpiredColor === "w" ? "black" : "white") : "");
       if (isMate) {
         const playerWon = coachGame.turn() === getCoachBotColor();
         playAudioCue("checkmate");
@@ -14812,16 +15205,15 @@
               : "";
       const isMate = callCoachRule(coachGame, "isCheckmate", "in_checkmate");
       const isDrawn = Boolean(drawReason) || callCoachRule(coachGame, "isDraw", "in_draw");
+      const terminalOutcome = getCoachTerminalOutcome();
       const friendOutcome = friendChallengeState?.remote ? getFriendGameOutcome(friendChallengeState) : null;
       const friendFinished = Boolean(friendOutcome) || friendChallengeState?.status === "completed";
-      const gameFinished = friendFinished || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
+      const gameFinished = Boolean(terminalOutcome);
 
       statusBadge.classList.remove("status-skeleton");
       coach.classList.remove("coach-skeleton");
 
-      if (!friendChallengeState?.remote && (coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor)) {
-        recordCoachGameResult(isMate && coachGame.turn() === getCoachBotColor());
-      }
+
       if (friendFinished && friendChallengeState?.tournamentPairingId && !friendChallengeState.tournamentResultReported) void reportTournamentResultFromBoard();
 
       if (bossBadge) {
@@ -14835,6 +15227,9 @@
       } else if (matchClockExpiredColor) {
         statusBadge.textContent = `${getCoachColorName(matchClockExpiredColor)} flagged`;
         coach.textContent = `${getCoachColorName(matchClockExpiredColor)} ran out of time. The board is paused.`;
+      } else if (coachTerminalOutcome?.termination === "resignation") {
+        statusBadge.textContent = "Resignation";
+        coach.textContent = coachMessage;
       } else if (coachDrawAgreed) {
         statusBadge.textContent = "Draw agreed";
         coach.textContent = `Draw agreed. ${buildCoachSummary()}`;
@@ -14849,8 +15244,8 @@
         coach.textContent = coachMessage;
       }
       coach.textContent = coachMemoryLine(coach.textContent);
-      if (friendFinished || coachDrawAgreed || isMate || isDrawn || matchClockExpiredColor) playCoachEndSound(isMate, Boolean(friendOutcome?.result === "draw" || isDrawn));
-      setAudioScene(friendFinished || isDrawn || coachDrawAgreed || matchClockExpiredColor ? "menu" : isMate ? (coachGame.turn() === getCoachBotColor() ? "victory" : "defeat") : "game");
+      if (gameFinished) playCoachEndSound(isMate, Boolean(terminalOutcome?.result === "draw" || isDrawn));
+      setAudioScene(gameFinished ? "menu" : "game");
 
       renderCoachCaptured();
       renderCoachHistory();
@@ -14858,7 +15253,8 @@
       renderOpeningCompass();
       renderCoachPracticeLinks(gameFinished);
       renderGuidedGameReview(gameFinished);
-      ensurePostGameReview(gameFinished);
+      if (gameFinished) completeCoachGame(terminalOutcome);
+      else ensurePostGameReview(false);
       document.getElementById("undoGame").disabled = coachThinking || !coachGame.history().length;
       document.getElementById("replayMistake").disabled = coachThinking || !coachReplayFen;
       document.getElementById("showThreats").setAttribute("aria-pressed", String(coachThreatMode));
@@ -14882,7 +15278,7 @@
         abortGame.disabled = !isBeforeMoveTwo() || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
       }
       if (resignGame) {
-        resignGame.hidden = !friendChallengeState?.active;
+        resignGame.hidden = false;
         resignGame.disabled = coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
       }
       if (returnLobby) returnLobby.hidden = !friendChallengeState?.remote && !friendChallengeState?.active;
@@ -15289,6 +15685,7 @@
         ? explainLearnerMove(move, bestMove, betterGap)
         : `You played ${move.san}. Nice work - now look for the coach's threat.`;
       if (!hasScoredMoves) coachWhyText = `${move.san} was legal and updated immediately. Check the coach's next threat before choosing again.`;
+      if (completeCoachGame()) return true;
       if (!coachBotPaused && !isCoachGameOver() && coachGame.turn() === getCoachBotColor()) {
         queueCoachReply();
       } else {
@@ -15394,6 +15791,7 @@
           scheduleEnginePanelUpdate();
         }
         coachThinking = false;
+        if (completeCoachGame()) return;
         scheduleCoachBoardRender();
         scheduleEnginePanelUpdate();
         scheduleCoachPanelUpdate();
@@ -15402,6 +15800,7 @@
 
     function restartCoachGame() {
       if (!CoachChess) return;
+      stageReviewSourcesForLivePlay();
       coachMoveToken += 1;
       window.clearInterval(reviewReplayTimer);
       reviewSelfAnalysisState = null;
@@ -15415,7 +15814,7 @@
       activeMatchReview = null;
       document.getElementById("premiumReview")?.setAttribute("hidden", "");
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
-      document.getElementById("play")?.classList.remove("is-review-mode");
+      restoreGameReviewWorkspace();
       const reviewRail = document.getElementById("reviewEvalRail");
       if (reviewRail) reviewRail.hidden = true;
       coachGame = new CoachChess();
@@ -15428,6 +15827,8 @@
       coachThinking = false;
       coachBotPaused = false;
       coachDrawAgreed = false;
+      coachTerminalOutcome = null;
+      completedGameSignature = "";
       coachThreatMode = false;
       coachReplayFen = "";
       coachGameRecorded = false;
@@ -15713,6 +16114,22 @@
       const next = normalizeFriendChallengeState(toFriendChallengeState(remote));
       if (boardNeedsRestore) next.historyBasePly = remote.moves.filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)).length;
       friendChallengeState = next;
+      if (remote.status === "active" && (previous?.status === "completed" || Boolean(completedGameSignature || coachTerminalOutcome || coachDrawAgreed || matchClockExpiredColor))) {
+        coachMoveToken += 1;
+        coachBotPaused = true;
+        coachThinking = false;
+        coachSelected = "";
+        coachLegalMoves = [];
+        coachPremove = null;
+        coachLastMove = null;
+        coachDrawAgreed = false;
+        coachTerminalOutcome = null;
+        completedGameSignature = "";
+        coachGameRecorded = false;
+        coachEndSoundPlayed = false;
+        postGameDecisionPgn = "";
+        hidePostGameDecision();
+      }
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
       if (remote.status === "active") {
         coachPlayerColor = next.color;
@@ -15775,6 +16192,7 @@
       }
       if (remote.status === "completed") {
         stopRealtimeMatchLifecycle();
+        completeCoachGame(getFriendGameOutcome(next));
         renderCoachBoard();
         updateCoachPanel();
         void refreshServerAuthoritativeProfile();
@@ -16344,8 +16762,7 @@
         return;
       }
       if (rematch) {
-        void sendFriendChallenge({ id: state.targetId, name: state.targetName });
-        return;
+        return sendFriendChallenge({ id: state.targetId, name: state.targetName });
       }
       if (state.status === "pending") {
         setFriendChallengeStatus(state.incoming ? "Accept this challenge before starting." : "Waiting for your friend to accept.");
@@ -16367,6 +16784,8 @@
       coachPremove = null;
       coachLastMove = null;
       coachDrawAgreed = false;
+      coachTerminalOutcome = null;
+      completedGameSignature = "";
       coachGameRecorded = false;
       coachEndSoundPlayed = false;
       coachMessage = `${rematch ? "Rematch ready" : "Friend challenge ready"}. Pass the board or share the invite. White moves first.`;
@@ -16381,6 +16800,34 @@
       renderCoachBoard();
       updateCoachPanel();
       powerOnCoachBoard();
+    }
+
+    function requestFriendRematch() {
+      if (!isMultiplayerPostGame()) return;
+      const rematch = document.getElementById("postGameDecisionRematch");
+      if (rematch?.disabled) return;
+      if (rematch) {
+        rematch.disabled = true;
+        rematch.textContent = "Waiting for opponent?";
+      }
+      const request = startFriendChallenge(true);
+      if (!request) {
+        if (rematch) {
+          rematch.disabled = false;
+          rematch.textContent = "Rematch";
+        }
+        return;
+      }
+      void Promise.resolve(request).then(() => {
+        if (friendChallengeState?.status === "pending") {
+          setFriendChallengeStatus("Rematch requested. Waiting for opponent?");
+          return;
+        }
+        if (rematch) {
+          rematch.disabled = false;
+          rematch.textContent = "Rematch";
+        }
+      });
     }
 
     function reconnectFriendChallenge() {
@@ -16514,6 +16961,7 @@
         friendChallengeState = { ...friendChallengeState, active: true, status: "active", terminalPending: Boolean(outcome), moves: nextMoves };
         saveFriendChallengeState(friendChallengeState);
       }
+      completeCoachGame(outcome);
       if (signal) void syncFriendSignal(signal, "completed");
       renderCoachBoard();
       updateCoachPanel();
@@ -16522,7 +16970,8 @@
     function offerFriendDraw() {
       if (!friendChallengeState?.active) {
         coachDrawAgreed = true;
-        coachMessage = buildCoachSummary();
+        coachMessage = `Draw agreed. ${buildCoachSummary()}`;
+        completeCoachGame({ result: "draw", termination: "draw agreement" });
         renderCoachBoard();
         return;
       }
@@ -16545,8 +16994,18 @@
 
     function resignCoachGame() {
       if (!coachGame || isCoachGameOver() || coachDrawAgreed) return;
-      if (!window.confirm("Resign this game?")) return;
-      finishFriendGame(`${getCoachColorName(coachPlayerColor)} resigned.`, `__resign:${coachPlayerColor}`);
+      if (friendChallengeState?.active) {
+        finishFriendGame(`${getCoachColorName(coachPlayerColor)} resigned.`, `__resign:${coachPlayerColor}`);
+        return;
+      }
+      coachTerminalOutcome = {
+        result: coachPlayerColor === "w" ? "black" : "white",
+        termination: "resignation"
+      };
+      coachMessage = `${getCoachColorName(coachPlayerColor)} resigned.`;
+      completeCoachGame(coachTerminalOutcome);
+      renderCoachBoard();
+      updateCoachPanel();
     }
 
     function abortFriendGame() {
@@ -18980,9 +19439,17 @@
       document.getElementById("restartGame").addEventListener("click", startSoloCoachGame);
       document.getElementById("postGameAgain")?.addEventListener("click", startSoloCoachGame);
       document.getElementById("postGameDecisionNew")?.addEventListener("click", () => {
+        if (isMultiplayerPostGame()) {
+          hidePostGameDecision();
+          returnFriendLobby();
+          window.requestAnimationFrame(() => document.querySelector('[data-play-mode="quick"]')?.click());
+          return;
+        }
         hidePostGameDecision();
         startSoloCoachGame();
       });
+      document.getElementById("postGameDecisionClose")?.addEventListener("click", hidePostGameDecision);
+      document.getElementById("postGameDecisionRematch")?.addEventListener("click", requestFriendRematch);
       document.getElementById("postGameDecisionReview")?.addEventListener("click", () => {
         hidePostGameDecision();
         openPostGameReview();
@@ -19027,6 +19494,7 @@
       document.getElementById("resignGame")?.addEventListener("click", resignCoachGame);
       document.getElementById("returnLobby")?.addEventListener("click", returnFriendLobby);
       document.getElementById("exportPgn").addEventListener("click", exportCoachPgn);
+      document.getElementById("reviewExportPgn")?.addEventListener("click", exportCoachPgn);
       document.getElementById("importPgn")?.addEventListener("click", importCoachPgn);
       document.getElementById("reviewPrev")?.addEventListener("click", () => stepReview(-1));
       document.getElementById("reviewNext")?.addEventListener("click", () => stepReview(1));
@@ -19059,7 +19527,7 @@
         const play = document.getElementById("play");
         const activeElement = document.activeElement;
         const isTextField = activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement || activeElement instanceof HTMLSelectElement || activeElement?.isContentEditable;
-        if (!play?.classList.contains("is-review-mode") || isTextField || event.altKey || event.ctrlKey || event.metaKey) return;
+        if (!document.getElementById("gameReview")?.classList.contains("is-review-page") || isTextField || event.altKey || event.ctrlKey || event.metaKey) return;
         if (event.key === "ArrowLeft") {
           event.preventDefault();
           stepReview(-1);
@@ -19399,6 +19867,7 @@
         openings: ["openings"],
         books: ["books"],
         videos: ["videos"],
+        gameReview: ["play"],
         plan: ["plan"],
         leaderboards: ["leaderboards"]
       }[panel] || [];
@@ -19409,7 +19878,7 @@
     function setupSiteTabs() {
       if (setupSiteTabs.ready) return;
       setupSiteTabs.ready = true;
-      const panelIds = ["login", "settings", "store", "admin", "tutorial", "academy", "paths", "adventures", "rules", "openings", "videos", "books", "notation", "bots", "play", "leaderboards", "puzzles", "plan"];
+      const panelIds = ["login", "settings", "store", "admin", "tutorial", "academy", "paths", "adventures", "rules", "openings", "videos", "books", "notation", "bots", "play", "gameReview", "leaderboards", "puzzles", "plan"];
       const links = [...document.querySelectorAll("[data-site-tab]")];
       const tabLinks = [...document.querySelectorAll("[data-site-tab], [data-home-link]")];
       const hashLinks = [...document.querySelectorAll('a[href^="#"]')];
@@ -19438,6 +19907,7 @@
         const cleanHash = rawHash.split("?")[0];
         if (!cleanHash || cleanHash === "top") return null;
         if (cleanHash === "admin") return { tab: "admin", panel: "admin", focus: "admin" };
+        if (cleanHash === "game-review") return { tab: "gameReview", panel: "gameReview", focus: "gameReview" };
         if (cleanHash === "tournaments" || /(^|[?&])(mode=tournament|tournament=)/.test(rawHash)) {
           return { tab: "tournaments", panel: "play", focus: "tournamentLobby" };
         }
@@ -19498,6 +19968,7 @@
           books: "page-learn",
           bots: "page-play",
           play: "page-play",
+          gameReview: "page-play",
           tournaments: "page-play",
           leaderboards: "page-profile",
           puzzles: "page-puzzles",
@@ -19523,6 +19994,7 @@
       });
 
       function showHome(shouldScroll = false) {
+        suspendGameReviewWorkspaceForNavigation();
         if (panelInitFrame) {
           window.cancelAnimationFrame(panelInitFrame);
           panelInitFrame = 0;
@@ -19551,6 +20023,20 @@
         if (!config) {
           showHome(shouldScroll);
           return;
+        }
+
+        if (config.panel !== "gameReview") suspendGameReviewWorkspaceForNavigation();
+        if (config.panel === "gameReview" && !document.getElementById("gameReview")?.classList.contains("is-review-page")) {
+          if (activeMatchReview) {
+            mountGameReviewWorkspace();
+          } else {
+            const savedReview = matchReviews.find((review) => review?.moves?.length && review?.summary);
+            if (savedReview) {
+              void initializeDeferredFeature("play").then(() => {
+                if (isGameReviewRoute() && !document.getElementById("gameReview")?.classList.contains("is-review-page")) openSavedMatchReview(savedReview);
+              });
+            }
+          }
         }
 
         const panel = document.getElementById(config.panel);
@@ -20474,6 +20960,14 @@
           return callFriendRpc("save_game_challenge_position", { ...payload, p_move_applied: Boolean(challenge?.moveApplied) });
         },
         listFriendChallenges: () => callFriendRpc("list_game_challenges"),
+        joinMatchmakingQueue: (options = {}) => callFriendRpc("join_matchmaking_queue", {
+          p_queue: String(options.queue || "quick"),
+          p_clock: String(options.timeControl || options.clock || "5+0"),
+          p_game_type: String(options.gameType || "casual"),
+          p_preferred_color: String(options.preferredColor || "random")
+        }),
+        getMatchmakingStatus: (ticketId) => callFriendRpc("get_matchmaking_status", { p_ticket_id: ticketId }),
+        leaveMatchmakingQueue: (ticketId) => callFriendRpc("leave_matchmaking_queue", { p_ticket_id: ticketId }),
         sendFriendMessage: (code, body) => callFriendRpc("send_game_challenge_message", { p_code: String(code || ""), p_body: String(body || "") }),
         subscribeFriendChallenges: async (callback) => {
           const supabase = await getSupabaseClient();
@@ -25252,6 +25746,80 @@
         if (event.key === "Escape" && !dialog.hidden) closeDialog();
       });
     }
+    function setupOnlineMatchmakingAdapter() {
+      const waitFor = (ms, signal) => new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+          reject(new DOMException("Aborted", "AbortError"));
+          return;
+        }
+        const timer = window.setTimeout(resolve, ms);
+        signal?.addEventListener("abort", () => {
+          window.clearTimeout(timer);
+          reject(new DOMException("Aborted", "AbortError"));
+        }, { once: true });
+      });
+      const normalizeMatchmakingTicket = (payload) => {
+        const source = payload && typeof payload === "object" ? payload : {};
+        return {
+          status: String(source.status || ""),
+          ticketId: source.ticketId || source.ticket_id || null,
+          challengeCode: String(source.challengeCode || source.challenge_code || "").toUpperCase()
+        };
+      };
+
+      window.NschessOnlineMatchmaking = {
+        async findMatch(options = {}) {
+          const provider = getFriendProvider();
+          if (!provider?.joinMatchmakingQueue || !provider?.getMatchmakingStatus) {
+            throw new Error("Online matchmaking is unavailable.");
+          }
+          if (!provider.getCachedAccount?.()?.publicId) {
+            throw new Error("Sign in to use Quick Match.");
+          }
+          const signal = options.signal;
+          let ticketId = null;
+          const leaveQueue = () => {
+            if (ticketId) void provider.leaveMatchmakingQueue?.(ticketId).catch(() => {});
+          };
+          if (signal?.aborted) return null;
+          try {
+            const joined = normalizeMatchmakingTicket(await provider.joinMatchmakingQueue(options));
+            ticketId = joined.ticketId;
+            if (joined.status === "matched" && joined.challengeCode) {
+              return { challengeCode: joined.challengeCode, ticketId };
+            }
+            while (!signal?.aborted && ticketId) {
+              await waitFor(2000, signal);
+              const status = normalizeMatchmakingTicket(await provider.getMatchmakingStatus(ticketId));
+              if (status.status === "matched" && status.challengeCode) {
+                return { challengeCode: status.challengeCode, ticketId };
+              }
+              if (status.status === "expired" || status.status === "left") break;
+            }
+            leaveQueue();
+            return null;
+          } catch (error) {
+            if (signal?.aborted || error?.name === "AbortError") return null;
+            leaveQueue();
+            throw error;
+          } finally {
+            if (signal?.aborted) leaveQueue();
+          }
+        },
+        async startMatch(match) {
+          const provider = getFriendProvider();
+          if (!provider?.getFriendChallenge) throw new Error("Online match is unavailable.");
+          if (!match?.challengeCode) throw new Error("Matched game code is missing.");
+          await initializeDeferredFeature("play");
+          const remote = await provider.getFriendChallenge(match.challengeCode);
+          if (!remote) throw new Error("Matched game could not be loaded.");
+          applyRemoteFriendChallenge(remote, true);
+          startFriendChallenge(false);
+          if (location.hash !== "#play") location.hash = "#play";
+        }
+      };
+    }
+
     function setupQuickMatch() {
       const setup = document.getElementById("quickMatchSetup");
       const setupForm = document.getElementById("quickMatchSetupForm");
@@ -25268,6 +25836,22 @@
       const metaType = document.getElementById("quickMatchMetaType");
       const metaTime = document.getElementById("quickMatchMetaTime");
       const metaColor = document.getElementById("quickMatchMetaColor");
+      const canUseOnlineQuickMatch = () => {
+        const provider = getFriendProvider();
+        return Boolean(provider?.joinMatchmakingQueue && provider.getCachedAccount?.()?.publicId);
+      };
+      const showAuthRequired = () => {
+        let notice = setupForm.querySelector(".quick-match-auth-notice");
+        if (!notice) {
+          notice = document.createElement("p");
+          notice.className = "quick-match-auth-notice";
+          notice.setAttribute("role", "status");
+          setupForm.querySelector(".quick-match-setup-actions")?.before(notice);
+        }
+        notice.textContent = "Sign in with your Player Pass to use Quick Match.";
+        notice.hidden = false;
+        notice.focus?.({ preventScroll: true });
+      };
       if (!setup || !setupForm || !timeControl || !gameType || !color || !remember || !overlay || !status || overlay.dataset.ready) return;
       overlay.dataset.ready = "true";
 
@@ -25400,11 +25984,12 @@
         state.controller = new AbortController();
         const startedAt = Date.now();
         state.ticker = window.setInterval(() => {
-          const seconds = Math.min(7, Math.floor((Date.now() - startedAt) / 1000));
+          const seconds = Math.floor((Date.now() - startedAt) / 1000);
           status.textContent = `Searching the online pool… ${seconds}s`;
         }, 1000);
+        const searchTimeoutMs = canUseOnlineQuickMatch() ? 90000 : 7000;
         const fallback = new Promise((resolve) => {
-          state.fallbackTimer = window.setTimeout(() => resolve(null), 7000);
+          state.fallbackTimer = window.setTimeout(() => resolve(null), searchTimeoutMs);
         });
         void Promise.race([waitForOnlineMatch(state.controller.signal), fallback]).then(async (result) => {
           if (token !== state.token) return;
@@ -25438,6 +26023,11 @@
 
       setupForm.addEventListener("submit", (event) => {
         event.preventDefault();
+        setupForm.querySelector(".quick-match-auth-notice")?.remove();
+        if (!canUseOnlineQuickMatch()) {
+          showAuthRequired();
+          return;
+        }
         state.options = { ...defaults, ...selectedOptions() };
         try {
           if (remember.checked) window.localStorage.setItem(storageKey, JSON.stringify(state.options));
@@ -25484,6 +26074,7 @@
     setupSiteSearch();
     setupSiteNotifications();
     setupSafetyReport();
+    setupOnlineMatchmakingAdapter();
     setupQuickMatch();
     setupMatchHistory();
     setupFirstVisitSetup();
