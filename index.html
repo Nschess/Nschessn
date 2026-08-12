@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-    <link rel="stylesheet" href="assets/app.css?v=review-v57-release-icons" />
+  <link rel="stylesheet" href="assets/app.css?v=review-v73-social-activity" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -36,7 +36,7 @@
         <a class="cq-navigation-item" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-icon" data-lucide="puzzle" aria-hidden="true">&#9671;</span><span>Puzzles</span></a>
         <a class="cq-navigation-item" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-icon" data-lucide="graduation-cap" aria-hidden="true">&#8961;</span><span>Learn</span></a>
         <a class="cq-navigation-item" href="#videos" data-site-tab="videos" data-site-panel="videos"><span class="nav-icon" data-lucide="play-square" aria-hidden="true">&#9654;</span><span>Videos</span></a>
-        <a class="cq-navigation-item" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge"><span class="nav-icon" data-lucide="users" aria-hidden="true">&#9673;</span><span>Friends</span></a>
+        <a class="cq-navigation-item" href="#friends" data-site-tab="friends" data-site-panel="friends"><span class="nav-icon" data-lucide="users" aria-hidden="true">&#9673;</span><span>Friends</span><span class="friends-nav-badge" id="friendsNavBadge" hidden>0</span></a>
         <a class="cq-navigation-item" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span><span>Tournaments</span></a>
         <a class="cq-navigation-item" href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
         <a class="cq-navigation-item" href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span><span>Store</span></a>
@@ -120,12 +120,12 @@
     <a href="#play" data-site-tab="play" data-site-panel="play"><span data-lucide="swords" aria-hidden="true">♞</span><small>Play</small></a>
     <a href="#bots" data-site-tab="bots" data-site-panel="bots"><span data-lucide="bot" aria-hidden="true">♟</span><small>Bots</small></a>
     <a href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span data-lucide="graduation-cap" aria-hidden="true">⌘</span><small>Learn</small></a>
-    <a href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge"><span data-lucide="users" aria-hidden="true">♙</span><small>Friends</small></a>
+    <a href="#friends" data-site-tab="friends" data-site-panel="friends"><span data-lucide="users" aria-hidden="true">♙</span><small>Friends</small><b class="friends-nav-badge" id="friendsMobileBadge" hidden>0</b></a>
     <a href="#login" data-site-tab="login" data-site-panel="login"><span data-lucide="circle-user-round" aria-hidden="true">●</span><small>Profile</small></a>
   </nav>
 
   <main id="top" tabindex="-1">
-    <section class="hero hero-command-center" aria-labelledby="hero-title">
+    <section class="hero hero-command-center home-command-deck" aria-labelledby="hero-title">
       <div class="hero-ambient" aria-hidden="true">
         <span class="hero-float hero-float-knight">&#9816;</span>
         <span class="hero-float hero-float-queen">&#9819;</span>
@@ -147,6 +147,11 @@
               <span class="home-stat hero-stat cq-stat-chip"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
               <span class="home-stat hero-stat is-highlight cq-stat-chip"><strong id="homeStreak">0 days</strong><small>Day streak</small></span>
             </div>
+            <div class="hero-player-card hero-player-card--you home-command-rank" aria-label="Your player card">
+              <span class="hero-player-avatar hero-player-avatar--you">Y</span>
+              <span><strong data-profile-field="name">You</strong><small data-profile-field="title">Ready to play</small></span>
+              <b data-profile-field="gameRating">600</b>
+            </div>
           </div>
 
           <div class="hero-stage" aria-label="Chess board preview">
@@ -159,14 +164,21 @@
               <span><strong>Nova Rookie</strong><small>Friendly chess coach</small></span>
               <b>1050</b>
             </div>
-            <div class="hero-player-card hero-player-card--you" aria-label="Your player card">
-              <span class="hero-player-avatar hero-player-avatar--you">Y</span>
-              <span><strong data-profile-field="name">You</strong><small data-profile-field="title">Ready to play</small></span>
-              <b data-profile-field="gameRating">600</b>
-            </div>
           </div>
 
+          <section class="home-session-card home-command-session" id="homeSessionCard" aria-live="polite">
+            <div class="home-session-copy"><span class="home-session-kicker">Your daily session</span><strong id="homeSessionTitle">One calm move forward</strong><p id="homeSessionCopy">Your personal next step will appear here.</p><span class="home-session-meta" id="homeSessionMeta">Private plan · stored on this device</span></div>
+            <a class="button" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Continue Daily Session</a>
+            <div class="home-session-ritual" id="homeSessionRitual" aria-label="Today's three-step ritual"></div>
+            <div class="home-session-reward" id="homeSessionReward" hidden>
+              <div><span class="home-session-reward-kicker">Daily ritual complete</span><strong id="homeSessionRewardText">Your 50 coin reward is ready.</strong></div>
+              <button class="button" type="button" id="homeSessionClaim" data-home-action="claim-daily-ritual">Claim +50</button>
+            </div>
+            <details><summary>Why this session?</summary><p id="homeSessionWhy">Small, deliberate practice builds lasting confidence.</p></details>
+          </section>
+
           <aside class="home-dashboard hero-dashboard" aria-label="Quick chess actions">
+            <div class="home-today-heading"><span>Today</span><h2>Choose your next move</h2><p>Three clear ways to keep momentum.</p></div>
             <a class="hero-quick-card hero-quick-card--play" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick">
               <span class="hero-quick-icon">Play</span>
               <span><strong>Quick Play</strong><small>Start a focused game</small></span>
@@ -175,6 +187,11 @@
             <a class="hero-quick-card" href="#puzzles" data-home-action="daily-puzzle">
               <span class="hero-quick-icon">Daily</span>
               <span><strong>Daily Puzzle</strong><small>One tactic, one reward</small></span>
+              <b aria-hidden="true">&gt;</b>
+            </a>
+            <a class="hero-quick-card hero-quick-card--learn" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">
+              <span class="hero-quick-icon">Learn</span>
+              <span><strong>Learn</strong><small>Build one reliable skill</small></span>
               <b aria-hidden="true">&gt;</b>
             </a>
             <section class="hero-progress-card" aria-label="Progress">
@@ -190,17 +207,6 @@
               <span><strong id="homeContinueTitle">Choose an AI bot</strong><small id="homeContinueNote">Start a focused game</small></span>
               <b aria-hidden="true">&gt;</b>
             </a>
-            <section class="home-session-card" id="homeSessionCard" aria-live="polite">
-              <div class="home-session-copy"><span class="home-session-kicker">Your daily session</span><strong id="homeSessionTitle">One calm move forward</strong><p id="homeSessionCopy">Your personal next step will appear here.</p><span class="home-session-meta" id="homeSessionMeta">Private plan · stored on this device</span></div>
-              <a class="button" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Start focus</a>
-              <div class="home-session-ritual" id="homeSessionRitual" aria-label="Today’s three-step ritual"></div>
-              <div class="home-session-reward" id="homeSessionReward" hidden>
-                <div><span class="home-session-reward-kicker">Daily ritual complete</span><strong id="homeSessionRewardText">Your 50 coin reward is ready.</strong></div>
-                <button class="button" type="button" id="homeSessionClaim" data-home-action="claim-daily-ritual">Claim +50</button>
-              </div>
-              <details><summary>Why this session?</summary><p id="homeSessionWhy">Small, deliberate practice builds lasting confidence.</p></details>
-            </section>
-
             <div class="hero-logic-cache" aria-hidden="true">
               <div class="next-step-card"><span id="homeNextReason">Solve one puzzle, then stop while it still feels fun.</span><a href="#puzzles" id="homeNextAction">Start 3-minute quest</a></div>
               <div class="daily-goals-card" id="homeDailyGoals"><span id="dailyGoalsProgress">0/3</span><ul id="dailyGoalsList"></ul><span id="dailyGoalsReward">Reward: +50 Coins</span><button type="button" id="claimDailyGoals" disabled>Claim</button></div>
@@ -281,16 +287,13 @@
 
       </div>
     </section>
-    <section class="home-dna-section" aria-labelledby="homeDnaTitle">
-      <div class="wrap"><article class="home-dna-card">
+    <section class="home-command-secondary" aria-label="Recent progress and recommended next step">
+      <div class="wrap home-command-secondary-grid"><article class="home-dna-card">
         <div class="home-dna-heading"><span>Your Chess DNA</span><h2 id="homeDnaTitle">A clearer picture of your game</h2><p id="homeDnaSummary">Your daily focus will appear here.</p></div>
         <div class="home-dna-skills" id="homeDnaSkills" aria-live="polite"></div>
         <a class="button" id="homeDnaAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Build my focus</a>
-      </article></div>
-    </section>
-
-    <section class="home-momentum-section" aria-labelledby="homeMomentumTitle">
-      <div class="wrap"><article class="home-momentum-card">
+      </article>
+      <article class="home-momentum-card" aria-labelledby="homeMomentumTitle">
         <div class="home-momentum-copy"><span>Weekly momentum</span><h2 id="homeMomentumTitle">A week that adds up</h2><p id="homeMomentumCopy">Your next focused session is the first mark on this week's runway.</p></div>
         <div class="home-momentum-progress">
           <div class="home-momentum-progress-head"><strong id="homeMomentumProgress">0 / 120 XP</strong><span id="homeMomentumStatus">One small session starts your rhythm.</span></div>
@@ -887,14 +890,17 @@
                   <h4>Visibility</h4>
                   <label class="settings-field">Privacy Settings <select data-profile-setting="privacy"><option value="friends">Friends only</option><option value="public">Public</option><option value="private">Private</option></select></label>
                   <label class="settings-field">Friend Requests <select data-profile-setting="friendRequests"><option value="on">Allow</option><option value="friends">Friends of friends</option><option value="off">Off</option></select></label>
+                  <label class="settings-field">Direct Messages <select data-profile-setting="allowMessages"><option value="on">Everyone</option><option value="friends">Friends only</option><option value="off">Off</option></select></label>
+                  <label class="settings-field">Spectating <select data-profile-setting="allowSpectating"><option value="on">Everyone</option><option value="friends">Friends only</option><option value="off">Off</option></select></label>
                   <label class="settings-field">Online Status <select data-profile-setting="onlineStatus"><option value="show">Show online</option><option value="friends">Friends only</option><option value="hide">Hide</option></select></label>
                   <label class="settings-field">Match History Visibility <select data-profile-setting="matchHistoryVisibility"><option value="friends">Friends only</option><option value="public">Public</option><option value="private">Private</option></select></label>
+                  <label class="settings-field">Activity Feed <select data-profile-setting="activityVisibility"><option value="friends">Friends only</option><option value="public">Public</option><option value="private">Private</option></select></label>
                 </div>
                 <div class="settings-card settings-danger">
                   <h4>Account Controls</h4>
                   <label class="settings-field">Email <input type="email" data-profile-setting="email" placeholder="you@example.com" /></label>
                   <label class="settings-field">Password <input type="password" data-profile-setting="passwordNote" placeholder="Managed by secure account provider" disabled /></label>
-                  <label class="settings-field">Blocked Players <textarea data-profile-setting="blockedUsers" placeholder="One username per line"></textarea></label><small>Blocked players are hidden from social surfaces on this device. Remove a name to unblock them.</small>
+                  <label class="settings-field">Blocked Players <textarea data-profile-setting="blockedUsers" placeholder="One username per line"></textarea></label><small>Blocks are synced to your account and enforced on every social action. Remove a name to unblock them.</small>
                   <div class="settings-actions">
                     <button class="button secondary danger" type="button" id="settingsDeleteAccount">Clear local profile</button>
                     <button class="button secondary danger" type="button" id="settingsDeleteOnlineAccount">Delete online account</button>
@@ -1066,6 +1072,22 @@
           <div class="game-reward-row" id="storeInventory" aria-label="Equipped rewards"></div>
           <div class="store-showcase" id="storeShowcase" aria-label="Featured store collections"></div>
           <div class="store-category-tabs" id="storeCategoryTabs" role="list" aria-label="Store categories"></div>
+          <section class="store-gift-panel" id="storeGiftPanel" aria-labelledby="storeGiftTitle">
+            <div class="store-gift-copy">
+              <p class="section-kicker">Cosmetic gifting</p>
+              <h3 id="storeGiftTitle">Send a little style</h3>
+              <p>Gift cosmetic Store items only. Coins, XP, ratings, and achievements can never be transferred.</p>
+            </div>
+            <form class="store-gift-form" id="storeGiftForm">
+              <label>Recipient ID or username<input id="storeGiftRecipient" required maxlength="80" autocomplete="off" placeholder="Paste a registered player ID or username" /></label>
+              <label>Cosmetic item ID<input id="storeGiftItem" required maxlength="96" autocomplete="off" placeholder="Choose Gift on an owned item" readonly /></label>
+              <label>Optional note<input id="storeGiftMessage" maxlength="240" autocomplete="off" placeholder="A short note" /></label>
+              <button class="button" type="submit">Send cosmetic gift</button>
+            </form>
+            <p class="store-status" id="storeGiftStatus" aria-live="polite">Choose Gift on a purchasable cosmetic to prepare it.</p>
+            <div class="store-gift-inbox-head"><strong>Gift inbox</strong><button class="button secondary" type="button" id="storeGiftRefresh">Refresh</button></div>
+            <div class="store-gift-inbox" id="storeGiftInbox" aria-live="polite"></div>
+          </section>
           <div class="board-theme-designer" id="boardThemeDesigner" aria-label="Board theme designer" hidden>
             <div class="board-theme-preview-panel">
               <div>
@@ -2624,6 +2646,65 @@
       </div>
     </section>
 
+    <section id="friends" class="section-dark friends-hub-page" aria-labelledby="friends-title">
+      <div class="wrap friends-hub">
+        <header class="friends-hub-header">
+          <div>
+            <p class="section-kicker">Social hub</p>
+            <h2 id="friends-title">Friends</h2>
+            <p>Find your people, see who is online, and start a private game without leaving your social space.</p>
+          </div>
+          <div class="friends-hub-header-actions">
+            <span class="friends-hub-live" id="friendsHubLiveStatus"><span class="friend-status-dot"></span> Live</span>
+            <a class="button" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Open challenge board</a>
+          </div>
+        </header>
+
+        <div class="friends-hub-layout">
+          <aside class="friends-hub-nav cq-panel" aria-label="Friends sections">
+            <div class="friends-hub-nav-head"><strong>Your network</strong><small id="friendsHubNetworkSummary">0 friends</small></div>
+            <div class="friends-hub-nav-list" role="tablist" aria-label="Friend views">
+              <button type="button" role="tab" class="is-active" aria-selected="true" data-friend-hub-view="online"><span>Online now</span><b id="friendsHubOnlineBadge">0</b></button>
+              <button type="button" role="tab" aria-selected="false" data-friend-hub-view="all"><span>All friends</span><b id="friendsHubAllBadge">0</b></button>
+              <button type="button" role="tab" aria-selected="false" data-friend-hub-view="requests"><span>Friend requests</span><b id="friendsHubRequestsBadge" hidden>0</b></button>
+              <button type="button" role="tab" aria-selected="false" data-friend-hub-view="sent"><span>Sent requests</span><b id="friendsHubSentBadge" hidden>0</b></button>
+              <button type="button" role="tab" aria-selected="false" data-friend-hub-view="favorites"><span>Favorites</span><b id="friendsHubFavoritesBadge">0</b></button>
+              <button type="button" role="tab" aria-selected="false" data-friend-hub-view="recent"><span>Recent players</span><b id="friendsHubRecentBadge">0</b></button>
+              <button type="button" role="tab" aria-selected="false" data-friend-hub-view="notifications"><span>Notifications</span><b id="friendsHubNotificationsBadge" hidden>0</b></button>
+              <button type="button" role="tab" aria-selected="false" data-friend-hub-view="activity"><span>Activity feed</span><b id="friendsHubActivityBadge" hidden>0</b></button>
+              <button type="button" role="tab" aria-selected="false" data-friend-hub-view="messages"><span>Messages</span><b id="friendsHubMessagesBadge" hidden>0</b></button>
+            </div>
+            <div class="friends-hub-nav-foot"><span class="friend-status-dot is-offline" id="friendsHubPresenceDot"></span><small id="friendsHubPresenceText">Sign in to see live presence.</small></div>
+          </aside>
+
+          <section class="friends-hub-main cq-panel" aria-labelledby="friendsHubViewTitle">
+            <div class="friends-hub-main-head">
+              <div><p class="section-kicker" id="friendsHubViewKicker">Online now</p><h3 id="friendsHubViewTitle">Friends ready to play</h3></div>
+              <label class="friends-hub-search"><span class="sr-only">Search players</span><input id="friendHubSearchInput" type="search" autocomplete="off" placeholder="Search players" /><button type="button" id="friendHubSearchButton" aria-label="Search players">⌕</button></label>
+            </div>
+            <div class="friends-hub-status" id="friendsHubStatus" aria-live="polite">Connect your account to load friends.</div>
+            <div class="friends-hub-list" id="friendsHubList" role="tabpanel" aria-live="polite"></div>
+            <section class="friends-hub-conversation" id="friendsHubConversation" aria-label="Direct messages" hidden>
+              <header class="friends-hub-conversation-head"><div><span class="section-kicker">Conversation</span><strong id="friendsHubConversationTitle">Select a conversation</strong><small id="friendsHubConversationMeta">Messages are independent from active games.</small></div><button class="button secondary" type="button" id="friendsHubConversationMute">Mute</button></header>
+              <div class="friends-hub-conversation-messages" id="friendsHubConversationMessages" aria-live="polite"></div>
+              <div class="friends-hub-typing" id="friendsHubTyping" aria-live="polite"></div>
+              <form class="friends-hub-message-form" id="friendsHubMessageForm"><input id="friendsHubMessageInput" maxlength="1000" autocomplete="off" placeholder="Write a message" aria-label="Direct message" disabled /><button class="button" type="submit" disabled id="friendsHubMessageSend">Send</button></form>
+            </section>
+          </section>
+
+          <aside class="friends-hub-profile cq-panel" id="friendsHubProfile" aria-labelledby="friendsHubProfileTitle">
+            <div class="friends-hub-profile-empty" id="friendsHubProfileEmpty"><span class="friends-profile-glyph" aria-hidden="true">♞</span><strong id="friendsHubProfileTitle">Friend profile</strong><p>Select a player to see their profile, presence, and quick actions.</p></div>
+            <div class="friends-hub-profile-content" id="friendsHubProfileContent" hidden>
+              <div class="friends-hub-profile-top"><span class="friend-result-avatar" id="friendsHubProfileAvatar">P</span><span><small id="friendsHubProfileStatus">Offline</small><strong id="friendsHubProfileName">Player</strong><span id="friendsHubProfileMeta">Chess Player · 450 Elo</span></span></div>
+              <p id="friendsHubProfileBio">Ready for a focused game?</p>
+              <div class="friends-hub-profile-actions"><button class="button" type="button" id="friendsHubProfileChallenge">Challenge</button><button class="button secondary" type="button" id="friendsHubProfileMessage">Message</button><button class="button secondary" type="button" id="friendsHubProfileFavorite">☆ Favorite</button></div>
+              <button class="friends-hub-profile-close" type="button" id="friendsHubProfileClose">Clear profile</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
     <section id="play" class="section-dark" aria-labelledby="play-title">
       <div class="wrap">
         <div class="section-head cq-section-header">
@@ -3311,41 +3392,6 @@
               </div>
             </details>
           </aside>
-          <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" hidden>
-            <div class="post-game-decision-card">
-              <div class="post-game-decision-result">
-                <span class="post-game-decision-icon" id="postGameDecisionIcon" aria-hidden="true">&#127942;</span>
-                <div>
-                  <h2 id="postGameDecisionTitle">Game Finished</h2>
-                  <p class="post-game-decision-summary" id="postGameDecisionSummary" aria-live="polite"></p>
-                </div>
-              </div>
-              <dl class="post-game-decision-stats" aria-label="Game statistics">
-                <div>
-                  <dt>Accuracy</dt>
-                  <dd id="postGameDecisionAccuracy">Pending</dd>
-                </div>
-                <div>
-                  <dt>Moves</dt>
-                  <dd id="postGameDecisionMoves">0</dd>
-                </div>
-                <div>
-                  <dt>Duration</dt>
-                  <dd id="postGameDecisionDuration">0m 00s</dd>
-                </div>
-                <div id="postGameDecisionAcplStat" hidden>
-                  <dt>Avg. CP loss</dt>
-                  <dd id="postGameDecisionAcpl">--</dd>
-                </div>
-              </dl>
-              <div class="post-game-decision-actions">
-                <button class="button" type="button" id="postGameDecisionReview">Review Game</button>
-                <button class="button secondary" type="button" id="postGameDecisionRematch" hidden>Rematch</button>
-                <button class="button secondary" type="button" id="postGameDecisionNew">Play Again</button>
-                <button class="button secondary" type="button" id="postGameDecisionClose">Close</button>
-              </div>
-            </div>
-          </div>
           <section class="play-social-bar cq-panel" aria-label="Friends and game chat">
             <div class="play-social-presence"><span class="play-social-online is-offline" id="playSocialStatus" aria-hidden="true"></span><strong id="playSocialTitle">Friends</strong><small id="playSocialMeta">Connect a friend to play</small></div>
             <div class="play-social-avatars" id="playSocialAvatars" aria-label="Friend presence"></div>
@@ -3360,27 +3406,81 @@
       </div>
     </section>
 
+    <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" hidden>
+      <div class="post-game-decision-card">
+        <div class="post-game-decision-result">
+          <span class="post-game-decision-icon" id="postGameDecisionIcon" aria-hidden="true">&#127942;</span>
+          <div>
+            <h2 id="postGameDecisionTitle">Game Finished</h2>
+            <p class="post-game-decision-summary" id="postGameDecisionSummary" aria-live="polite"></p>
+          </div>
+        </div>
+        <dl class="post-game-decision-stats" aria-label="Game statistics">
+          <div>
+            <dt>Accuracy</dt>
+            <dd id="postGameDecisionAccuracy">Pending</dd>
+          </div>
+          <div>
+            <dt>Moves</dt>
+            <dd id="postGameDecisionMoves">0</dd>
+          </div>
+          <div>
+            <dt>Duration</dt>
+            <dd id="postGameDecisionDuration">0m 00s</dd>
+          </div>
+          <div id="postGameDecisionAcplStat" hidden>
+            <dt>Avg. CP loss</dt>
+            <dd id="postGameDecisionAcpl">--</dd>
+          </div>
+        </dl>
+        <div class="post-game-decision-actions">
+          <button class="button" type="button" id="postGameDecisionReview">Review Game</button>
+          <button class="button secondary" type="button" id="postGameDecisionRematch" hidden>Rematch</button>
+          <button class="button secondary" type="button" id="postGameDecisionNew">Play Again</button>
+          <button class="button secondary" type="button" id="postGameDecisionClose">Close</button>
+        </div>
+      </div>
+    </div>
+
     <section class="section-dark game-review-page" id="gameReview" aria-label="Game Review">
       <div class="game-review-page-frame">
         <section class="game-review-workspace" id="gameReviewWorkspace" aria-label="Game Review" hidden>
           <div class="game-review-shell">
             <div class="game-review-header-slot" id="reviewHeaderSlot"></div>
-            <aside class="game-review-left-column" aria-label="Game summary and AI Coach">
-              <div class="game-review-summary-slot" id="reviewSummarySlot"></div>
-              <div class="game-review-coach-slot" id="reviewCoachSlot"></div>
-            </aside>
-            <main class="game-review-analysis-slot" id="reviewAnalysisSlot" aria-label="Game review board and replay">
-              <div class="game-review-board-slot" id="reviewBoardSlot"></div>
-              <div class="game-review-replay-slot" id="reviewReplaySlot"></div>
-              <div class="game-review-chart-slot" id="reviewChartSlot"></div>
-              <div class="game-review-timeline-slot" id="reviewTimelineSlot"></div>
-            </main>
-            <aside class="game-review-right-column" aria-label="Review insights and practice">
-              <div class="game-review-history-slot" id="reviewMoveHistorySlot"></div>
-              <div class="game-review-improvement-slot" id="reviewImprovementSlot"></div>
-              <div class="game-review-learning-slot" id="reviewLearningSlot"></div>
-              <div class="game-review-practice-slot" id="reviewPracticeSlot"></div>
-            </aside>
+            <section class="game-review-overview-slot" id="reviewSummarySlot" aria-label="Review summary"></section>
+            <section class="game-review-command-center" aria-label="Game analysis workspace">
+              <main class="game-review-analysis-slot" id="reviewAnalysisSlot" aria-label="Game review board">
+                <div class="game-review-board-slot" id="reviewBoardSlot"></div>
+              </main>
+              <aside class="game-review-current-column" aria-label="Current move analysis">
+                <div class="game-review-coach-slot" id="reviewCoachSlot"></div>
+              </aside>
+              <div class="game-review-replay-slot" id="reviewReplaySlot" aria-label="Replay controls"></div>
+            </section>
+            <section class="game-review-dock" id="reviewDock" aria-label="Review analysis dock">
+              <div class="game-review-dock-tabs" role="tablist" aria-label="Review analysis views">
+                <button class="game-review-dock-tab" id="reviewDockTimelineTab" type="button" role="tab" aria-selected="true" aria-controls="reviewDockTimeline" tabindex="0" data-review-dock-tab="timeline">Timeline</button>
+                <button class="game-review-dock-tab" id="reviewDockMovesTab" type="button" role="tab" aria-selected="false" aria-controls="reviewDockMoves" tabindex="-1" data-review-dock-tab="moves">Moves</button>
+                <button class="game-review-dock-tab" id="reviewDockGraphTab" type="button" role="tab" aria-selected="false" aria-controls="reviewDockGraph" tabindex="-1" data-review-dock-tab="graph">Graph</button>
+                <button class="game-review-dock-tab" id="reviewDockInsightsTab" type="button" role="tab" aria-selected="false" aria-controls="reviewDockInsights" tabindex="-1" data-review-dock-tab="insights">Insights</button>
+              </div>
+              <div class="game-review-dock-panels">
+                <section class="game-review-dock-panel game-review-dock-panel--timeline" id="reviewDockTimeline" role="tabpanel" aria-labelledby="reviewDockTimelineTab" data-review-dock-panel="timeline">
+                  <div class="game-review-timeline-slot" id="reviewTimelineSlot"></div>
+                </section>
+                <section class="game-review-dock-panel game-review-dock-panel--moves" id="reviewDockMoves" role="tabpanel" aria-labelledby="reviewDockMovesTab" data-review-dock-panel="moves" hidden>
+                  <div class="game-review-history-slot" id="reviewMoveHistorySlot"></div>
+                </section>
+                <section class="game-review-dock-panel game-review-dock-panel--graph" id="reviewDockGraph" role="tabpanel" aria-labelledby="reviewDockGraphTab" data-review-dock-panel="graph" hidden>
+                  <div class="game-review-chart-slot" id="reviewChartSlot"></div>
+                </section>
+                <section class="game-review-dock-panel game-review-dock-panel--insights" id="reviewDockInsights" role="tabpanel" aria-labelledby="reviewDockInsightsTab" data-review-dock-panel="insights" hidden>
+                  <div class="game-review-improvement-slot" id="reviewImprovementSlot"></div>
+                  <div class="game-review-learning-slot" id="reviewLearningSlot"></div>
+                  <div class="game-review-practice-slot" id="reviewPracticeSlot"></div>
+                </section>
+              </div>
+            </section>
           </div>
         </section>
       </div>
@@ -4175,6 +4275,6 @@
     </div>
   </aside>
 
-    <script defer src="assets/app.js?v=review-v57-release-icons"></script>
+  <script defer src="assets/app.js?v=review-v73-social-activity"></script>
 </body>
 </html>

@@ -1,13 +1,13 @@
 // Bump this name whenever the shipped shell changes. The review workspace
 // depends on its HTML, CSS, and JavaScript being from the same release.
-const CACHE_NAME = "nschess-shell-v57-release-icons";
+const CACHE_NAME = "nschess-shell-v73-social-activity";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v57-release-icons",
-  "./assets/app.js?v=review-v57-release-icons",
+  "./assets/app.css?v=review-v73-social-activity",
+  "./assets/app.js?v=review-v73-social-activity",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"

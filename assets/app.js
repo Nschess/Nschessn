@@ -2299,6 +2299,128 @@
       { id: "trail-stars", type: "trail", value: "stars", name: "Star Confetti Trail", cost: 30, tag: "Celebration", description: "Make lesson and puzzle celebrations sparkle.", previewText: "Star burst" },
       { id: "trail-sparks", type: "trail", value: "sparks", name: "Boss Spark Trail", cost: 45, tag: "Celebration", description: "A sharper victory effect for boss clears.", previewText: "Boss sparks" }
     ];
+    const storeBundles = Object.freeze([
+      {
+        id: "bundle-royal-court",
+        name: "Royal Court Collection",
+        rarity: "Legendary",
+        discount: 0.20,
+        itemIds: ["board-royalCourt", "background-royal", "skin-maestro", "name-gold"],
+        description: "A warm royal identity for milestone games, polished profiles, and confident calculation."
+      },
+      {
+        id: "bundle-forest-focus",
+        name: "Forest Defender Collection",
+        rarity: "Rare",
+        discount: 0.15,
+        itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald", "music-nature"],
+        description: "A calm woodland setup for daily puzzles, relaxed games, and steady improvement."
+      },
+      {
+        id: "bundle-cosmic-study",
+        name: "Space Explorer Collection",
+        rarity: "Mythic",
+        discount: 0.20,
+        itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy", "music-space"],
+        description: "Deep-space contrast, starlit highlights, and focused music for long study sessions."
+      },
+      {
+        id: "bundle-tournament-focus",
+        name: "Tournament Focus Collection",
+        rarity: "Epic",
+        discount: 0.15,
+        itemIds: ["board-tournament", "background-neon", "skin-cburnett", "lastmove-electric", "sfx-modern"],
+        description: "A clean competition-ready kit with crisp squares and restrained tactical feedback."
+      }
+    ]);
+    const storeUnlockMetadata = Object.freeze({
+      "title-cm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2000 Elo AI", awardOnly: true },
+      "title-nm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2100 Elo AI", awardOnly: true },
+      "title-fm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2200 Elo AI", awardOnly: true },
+      "title-im": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2300 Elo AI", awardOnly: true },
+      "title-gm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2500 Elo AI", awardOnly: true },
+      "avatar-legendary": { unlockMethod: "Achievement", unlockLabel: "Clear the Chess Master campaign", awardOnly: true },
+      "border-legendary": { unlockMethod: "Achievement", unlockLabel: "Clear the Chess Master campaign", awardOnly: true },
+      "title-champion": { unlockMethod: "Achievement", unlockLabel: "Clear the full Stockfish campaign", awardOnly: true },
+      "flex-master": { unlockMethod: "Achievement", unlockLabel: "Clear the Chess Master campaign", awardOnly: true },
+      "background-halloween": { unlockMethod: "Season", unlockLabel: "Halloween season", awardOnly: true },
+      "background-christmas": { unlockMethod: "Season", unlockLabel: "Winter season", awardOnly: true },
+      "avatar-winter-crown": { unlockMethod: "Season", unlockLabel: "Winter season", awardOnly: true },
+      "music-halloween": { unlockMethod: "Season", unlockLabel: "Halloween season", awardOnly: true },
+      "music-christmas": { unlockMethod: "Season", unlockLabel: "Winter season", awardOnly: true }
+    });
+    const storeRarityOrder = Object.freeze(["Common", "Rare", "Epic", "Legendary", "Mythic", "Divine"]);
+    const storeRarityRank = Object.freeze(Object.fromEntries(storeRarityOrder.map((rarity, index) => [rarity, index])));
+    const storeRarityAliases = Object.freeze({ Free: "Common", Uncommon: "Common", "Legendary+": "Legendary", Immortal: "Mythic", Celestial: "Divine", Eternal: "Divine" });
+    function getStoreRarityFloor(cost = 0) {
+      const value = Math.max(0, Number(cost) || 0);
+      if (value >= 1200) return "Divine";
+      if (value >= 800) return "Mythic";
+      if (value >= 400) return "Legendary";
+      if (value >= 180) return "Epic";
+      if (value >= 80) return "Rare";
+      return "Common";
+    }
+    function normalizeStoreRarity(item = {}) {
+      const explicit = storeRarityAliases[String(item.rarity || "").trim()] || String(item.rarity || "").trim();
+      const explicitRank = Number.isInteger(storeRarityRank[explicit]) ? storeRarityRank[explicit] : 0;
+      const floor = getStoreRarityFloor(item.cost);
+      return storeRarityOrder[Math.max(explicitRank, storeRarityRank[floor] || 0)] || "Common";
+    }
+    function getStoreSurfaceLabel(item = {}) {
+      if (item.type === "board") return "Board · Play, Puzzles & Game Review";
+      if (item.type === "boardBorder") return "Board frame · Play, Puzzles & Game Review";
+      if (item.type === "skin" || item.type === "pieceFinish") return "Pieces · Play, Puzzles & Game Review";
+      if (item.type === "backgroundTheme") return "Background · Home, Play & Review";
+      if (item.type === "nameStyle" || item.type === "title") return "Name · Profile, matches & chat";
+      if (item.type === "lastMove") return "Highlight · Play, Puzzles & Review";
+      if (["avatar", "frame", "avatarEffect", "flexBadge"].includes(item.type)) return "Profile · matches & leaderboards";
+      if (item.type === "musicPack") return "Audio · menus, games & review";
+      if (item.type === "sfxPack") return "Audio · moves, captures & puzzles";
+      if (item.type === "archetype") return "Coach style · board & training";
+      if (item.type === "trail") return "Celebrations · wins & puzzles";
+      return item.tag || "Profile";
+    }
+    function getStoreUnlockMethodLabel(item = {}) {
+      return getStoreUnlockMethod(item) === "Season" ? "Seasonal" : getStoreUnlockMethod(item);
+    }
+    function getStoreEstimatedDays(item = {}) {
+      if (getStoreUnlockMethod(item) !== "Coins") return "";
+      const cost = getStoreServerCost(item);
+      if (!cost) return "Free · ready now";
+      const balance = Math.max(0, Number(serverStoreState?.coins ?? puzzleCoins) || 0);
+      if (balance >= cost) return `Ready now · ${formatProfileNumber(cost)}/${formatProfileNumber(cost)} coins`;
+      // Puzzles and daily missions currently average about 60 coins/day for a steady learner.
+      const days = Math.max(1, Math.ceil((cost - balance) / 60));
+      return `≈ ${days} day${days === 1 ? "" : "s"} · ${formatProfileNumber(balance)}/${formatProfileNumber(cost)} coins`;
+      return `≈ ${days} day${days === 1 ? "" : "s"} at a steady pace`;
+    }
+    function getStoreCollection(item = {}) {
+      return storeCollectionByItem?.get(item.id) || null;
+    }
+    storeItems.forEach((item) => {
+      Object.assign(item, storeUnlockMetadata[item.id] || {});
+      item.unlockMethod = item.unlockMethod || (item.awardOnly ? "Achievement" : "Coins");
+      item.rarity = normalizeStoreRarity(item);
+    });
+
+    // Themed collections keep discovery intentional while remaining cosmetic-only.
+    // IDs are resolved against the catalog so a missing optional item never breaks Store rendering.
+    const storeCollectionDefinitions = Object.freeze([
+      { id: "royal-court", name: "Royal Court", description: "Warm royal finishes for milestone games.", itemIds: ["board-royalCourt", "background-royal", "skin-maestro", "name-gold", "avatar-royal-lion", "frame-crown"] },
+      { id: "forest-defender", name: "Forest Defender", description: "Calm woodland color for patient, steady improvement.", itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald", "music-nature", "avatar-bat"] },
+      { id: "samurai", name: "Samurai", description: "Disciplined red-gold accents for tactical battles.", itemIds: ["board-dragon", "background-volcano", "skin-samurai", "lastmove-fire", "music-samurai", "avatar-samurai-mask", "frame-samurai"] },
+      { id: "space-explorer", name: "Space Explorer", description: "Deep-space contrast for long study sessions.", itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy", "music-space", "avatar-galaxy-star", "frame-galaxy"] }
+    ]);
+    const storeCollectionByItem = new Map();
+    storeCollectionDefinitions.forEach((collection) => {
+      collection.itemIds.forEach((itemId) => storeCollectionByItem.set(itemId, collection));
+    });
+    storeItems.forEach((item) => {
+      const collection = storeCollectionByItem.get(item.id);
+      if (collection) item.collection = collection.name;
+      item.surface = item.surface || getStoreSurfaceLabel(item);
+    });
     const learnerLevels = [
       ["Level 1 Explorer", 0],
       ["Level 5 Adventurer", 80],
@@ -2537,6 +2659,12 @@
     const savedPuzzleState = readPuzzleState();
     const puzzleStateMatchesBank = savedPuzzleState.bankVersion === puzzleBankVersion;
     let storeState = normalizeStoreState(savedPuzzleState.store);
+    let serverStoreState = null;
+    let serverStoreCatalog = new Map();
+    let serverStoreReady = false;
+    let serverStoreRefreshPromise = null;
+    let giftInboxState = [];
+    let selectedGiftItemId = "";
     let flexBadgeState = null;
     let currentPuzzle = puzzleStateMatchesBank ? Math.max(0, Math.min(puzzles.length - 1, Number(savedPuzzleState.currentPuzzle) || 0)) : 0;
     let activePuzzlePlan = puzzleStateMatchesBank && puzzlePlanOptions.includes(savedPuzzleState.activePlan) ? savedPuzzleState.activePlan : "main";
@@ -2624,7 +2752,20 @@
     let puzzleXp = Math.max(0, Number(savedPuzzleState.xp) || 0);
     let puzzleCoins = Math.max(0, Number(savedPuzzleState.coins) || 0);
     const localCoinGrantKey = "checkmateQuest.localCoinGrant.50000.v1";
-    if (!readJsonStorage(localCoinGrantKey, null)) {
+    const storeDevelopmentMode = (() => {
+      try {
+        const host = String(window.location.hostname || "").toLowerCase();
+        const isLocalDevelopmentHost = window.location.protocol === "file:"
+          || ["localhost", "127.0.0.1", "::1"].includes(host);
+        const params = new URLSearchParams(window.location.search);
+        return isLocalDevelopmentHost && (params.get("debug") === "true"
+          || params.get("dev") === "true"
+          || window.localStorage.getItem("checkmateQuest.debug") === "true");
+      } catch {
+        return false;
+      }
+    })();
+    if (storeDevelopmentMode && !readJsonStorage(localCoinGrantKey, null)) {
       puzzleCoins += 50000;
       savedPuzzleState.coins = puzzleCoins;
       writeJsonStorage(puzzleStorageKey, { ...savedPuzzleState, coins: puzzleCoins });
@@ -2780,6 +2921,8 @@
     const dragonProfileStorageKey = "checkmateQuest.dragonProfile.v1";
     const friendChallengeStorageKey = "checkmateQuest.friendChallenge.v1";
     const friendDirectoryStorageKey = "checkmateQuest.friends.v1";
+    const friendHubStorageKey = "checkmateQuest.friendHub.v1";
+    const friendRecentPlayersStorageKey = "checkmateQuest.friendRecent.v1";
     const tournamentStorageKey = "checkmateQuest.tournaments.v1";
     const reviewAnalysisCacheStorageKey = "checkmateQuest.reviewAnalysis.v1";
     flexBadgeState = normalizeFlexBadgeState(savedPuzzleState.flexBadges, savedPuzzleState.store, readJsonStorage(learnerPrefsStorageKey, {}));
@@ -3083,7 +3226,7 @@
       const unlockedRewards = rewardItems.map(unlockBossRewardItem).filter(Boolean);
       if (boss.finalBoss) equipBossRewardItems(rewardItems);
       const xpResult = addPuzzleXp(boss.reward.xp);
-      addPuzzleCoins(boss.reward.coins);
+      addPuzzleCoins(boss.reward.coins, "achievement reward");
       addExtraRewards(boss.reward);
       activeAdventureBoss = "";
       bossBattleState = { ...bossBattleState, active: "", cleared, world: activeAdventureWorld };
@@ -3537,13 +3680,14 @@
       if (firstClear && !rewarded.has(lesson.id)) {
         rewarded.add(lesson.id);
         addPuzzleXp(lesson.reward.xp);
-        addPuzzleCoins(lesson.reward.coins);
+        addPuzzleCoins(lesson.reward.coins, "lesson reward");
         savePuzzleState();
         renderPlayerProfile();
         renderHomeDashboard();
         showCelebration("Lesson complete!", `+${lesson.reward.xp} XP +${lesson.reward.coins} coins`, lesson.achievement || "New skill unlocked");
       }
       saveBeginnerTutorialState({ completed: [...completed], rewarded: [...rewarded], achievements: [...achievements] });
+      publishLearningActivity("lesson_completed", `lesson:${lesson.id}`, { lessonId: lesson.id, title: lesson.title || "Chess lesson", achievement: lesson.achievement || "" });
       renderBeginnerTutorial(false);
     }
 
@@ -4955,6 +5099,153 @@
       return storeItems.find((item) => item.id === id);
     }
 
+    function storeServerIsActive() {
+      return Boolean(serverStoreReady && getAuthProvider()?.getStoreState && getFriendCurrentUserId?.());
+    }
+
+    function storeServerRequiresAuthority() {
+      return Boolean(getAuthProvider()?.getStoreState && getFriendCurrentUserId?.());
+    }
+
+    function getStoreServerCost(item = {}) {
+      const row = serverStoreCatalog.get(item.id);
+      return row ? Math.max(0, Number(row.cost_coins ?? row.costCoins) || 0) : Math.max(0, Number(item.cost) || 0);
+    }
+
+    function createStoreIdempotencyKey(prefix = "store") {
+      const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      return `${prefix}:${random}`;
+    }
+
+    async function refreshServerStoreState({ rerender = true } = {}) {
+      const provider = getAuthProvider();
+      if (!provider?.getStoreState || !getFriendCurrentUserId?.()) return null;
+      if (serverStoreRefreshPromise) return serverStoreRefreshPromise;
+      serverStoreRefreshPromise = provider.getStoreState().then((state) => {
+        const source = state && typeof state === "object" ? state : {};
+        const catalog = Array.isArray(source.catalog) ? source.catalog : [];
+        serverStoreCatalog = new Map(catalog.map((item) => [String(item.item_id || item.itemId || ""), item]).filter(([id]) => id));
+        const inventory = Array.isArray(source.inventory) ? source.inventory : [];
+        // In authenticated mode the RPC inventory is the source of truth. Do
+        // not merge browser defaults or legacy local ownership into it.
+        const owned = [...new Set(inventory.map((item) => String(item.item_id || item.itemId || "")).filter(Boolean))];
+        const equipped = Object.fromEntries(inventory.filter((item) => item.equipped).map((item) => {
+          const catalogItem = getStoreItem(String(item.item_id || item.itemId || ""));
+          return [catalogItem?.type || String(item.item_type || ""), String(item.item_id || item.itemId || "")];
+        }).filter(([type, id]) => type && id));
+        serverStoreState = { ...source, coins: Math.max(0, Number(source.coins) || 0), inventory, catalog };
+        serverStoreReady = true;
+        puzzleCoins = serverStoreState.coins;
+        storeState = { ...storeState, owned, equipped };
+        savePuzzleState();
+        if (rerender) {
+          renderStore();
+          renderBeginnerProgress();
+          renderPlayerProfile();
+        }
+        return serverStoreState;
+      }).catch((error) => {
+        serverStoreReady = false;
+        throw error;
+      }).finally(() => { serverStoreRefreshPromise = null; });
+      return serverStoreRefreshPromise;
+    }
+
+    function clearServerStoreState() {
+      serverStoreState = null;
+      serverStoreCatalog = new Map();
+      serverStoreReady = false;
+      serverStoreRefreshPromise = null;
+      giftInboxState = [];
+      selectedGiftItemId = "";
+    }
+
+    function prepareStoreGift(itemId) {
+      selectedGiftItemId = String(itemId || "");
+      const itemField = document.getElementById("storeGiftItem");
+      const status = document.getElementById("storeGiftStatus");
+      if (itemField) itemField.value = selectedGiftItemId;
+      if (status) status.textContent = selectedGiftItemId ? `Ready to gift ${getStoreItem(selectedGiftItemId)?.name || selectedGiftItemId}.` : "Choose Gift on a purchasable cosmetic to prepare it.";
+      document.getElementById("storeGiftPanel")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+
+    function renderStoreGiftInbox() {
+      const inbox = document.getElementById("storeGiftInbox");
+      if (!inbox) return;
+      if (!giftInboxState.length) {
+        inbox.replaceChildren(createBookText("p", "store-gift-empty", "No gifts waiting."));
+        return;
+      }
+      inbox.replaceChildren(...giftInboxState.map((gift) => {
+        const row = document.createElement("article");
+        row.className = "store-gift-row";
+        const copy = document.createElement("div");
+        copy.append(createBookText("strong", "", gift.item_name || gift.itemName || gift.item_id || "Cosmetic gift"), createBookText("small", "", `From ${gift.sender_username || gift.senderUsername || "Chess player"}${gift.message ? ` · ${gift.message}` : ""}`));
+        const actions = document.createElement("div");
+        actions.className = "store-gift-actions";
+        if (gift.status === "pending") {
+          const claim = createBookText("button", "button", "Claim");
+          claim.type = "button";
+          claim.addEventListener("click", async () => {
+            try { await getAuthProvider()?.claimCosmeticGift?.(gift.id); await refreshServerStoreState({ rerender: false }); await refreshStoreGiftInbox(); } catch (error) { const status = document.getElementById("storeGiftStatus"); if (status) status.textContent = error?.message || "Gift could not be claimed."; await refreshStoreGiftInbox(); }
+          });
+          const decline = createBookText("button", "button secondary", "Decline");
+          decline.type = "button";
+          decline.addEventListener("click", async () => {
+            try { await getAuthProvider()?.declineCosmeticGift?.(gift.id); await refreshServerStoreState({ rerender: false }); await refreshStoreGiftInbox(); } catch (error) { const status = document.getElementById("storeGiftStatus"); if (status) status.textContent = error?.message || "Gift could not be declined."; await refreshStoreGiftInbox(); }
+          });
+          actions.append(claim, decline);
+        } else actions.append(createBookText("small", "", gift.status));
+        row.append(copy, actions);
+        return row;
+      }));
+    }
+
+    async function refreshStoreGiftInbox() {
+      const provider = getAuthProvider();
+      if (!provider?.listGiftInbox || !getFriendCurrentUserId?.()) {
+        giftInboxState = [];
+        renderStoreGiftInbox();
+        return [];
+      }
+      try {
+        const rows = await provider.listGiftInbox(40);
+        giftInboxState = Array.isArray(rows) ? rows : [];
+      } catch {
+        giftInboxState = [];
+      }
+      renderStoreGiftInbox();
+      return giftInboxState;
+    }
+
+    function setupStoreGifting() {
+      const form = document.getElementById("storeGiftForm");
+      if (!form || form.dataset.ready) return;
+      form.dataset.ready = "true";
+      document.getElementById("storeGiftItem")?.addEventListener("click", () => prepareStoreGift(selectedGiftItemId));
+      document.getElementById("storeGiftRefresh")?.addEventListener("click", () => void refreshStoreGiftInbox());
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const recipient = String(document.getElementById("storeGiftRecipient")?.value || "").trim();
+        const itemId = String(document.getElementById("storeGiftItem")?.value || selectedGiftItemId).trim();
+        const message = String(document.getElementById("storeGiftMessage")?.value || "").trim();
+        const status = document.getElementById("storeGiftStatus");
+        if (!recipient || !itemId) { if (status) status.textContent = "Choose a recipient and a cosmetic first."; return; }
+        if (!storeServerIsActive()) { if (status) status.textContent = "Sign in to send a server-verified cosmetic gift."; return; }
+        try {
+          await getAuthProvider().createCosmeticGift(recipient, itemId, message, createStoreIdempotencyKey("gift"));
+          await refreshServerStoreState({ rerender: false });
+          form.reset();
+          selectedGiftItemId = "";
+          if (status) status.textContent = "Gift sent. The recipient has been notified.";
+          renderStore();
+        } catch (error) {
+          if (status) status.textContent = error?.message || "Gift could not be sent.";
+        }
+      });
+      void refreshStoreGiftInbox();
+    }
+
     function getArchetypeTheme(value) {
       return archetypeThemes[value] || archetypeThemes.balanced;
     }
@@ -5233,7 +5524,10 @@
       });
     }
 
+    const storePreviewCache = new Map();
     function buildStorePreview(item) {
+      const cacheKey = item?.id || "";
+      if (cacheKey && storePreviewCache.has(cacheKey)) return storePreviewCache.get(cacheKey).cloneNode(true);
       const preview = document.createElement("div");
       preview.className = "store-preview";
       if (item.inlineSvg) {
@@ -5241,6 +5535,7 @@
         art.className = "store-preview-inline-svg";
         art.innerHTML = item.inlineSvg;
         preview.appendChild(art);
+        if (cacheKey) storePreviewCache.set(cacheKey, preview.cloneNode(true));
         return preview;
       }
       if (item.type === "board") {
@@ -5315,6 +5610,7 @@
       } else {
         preview.appendChild(createBookText("span", "store-preview-flair", item.previewText || item.name));
       }
+      if (cacheKey) storePreviewCache.set(cacheKey, preview.cloneNode(true));
       return preview;
     }
 
@@ -5335,13 +5631,29 @@
       renderInGamePlayerCard();
     }
 
-    function equipStoreItem(item) {
+    async function equipStoreItem(item) {
+      if (!storeServerIsActive() && storeServerRequiresAuthority()) {
+        const status = document.getElementById("storeStatus");
+        if (status) status.textContent = "Store is still syncing. Try again in a moment.";
+        void refreshServerStoreState().catch(() => {});
+        return false;
+      }
+      if (storeServerIsActive() && serverStoreCatalog.has(item?.id)) {
+        try {
+          await getAuthProvider().equipCosmetic(item.id);
+          await refreshServerStoreState({ rerender: false });
+        } catch (error) {
+          const status = document.getElementById("storeStatus");
+          if (status) status.textContent = error?.message || "Cosmetic could not be equipped.";
+          return false;
+        }
+      }
       if (item.type === "flexBadge") {
-        if (!userOwnsFlexBadge(item.value)) return;
+        if (!userOwnsFlexBadge(item.value)) return false;
         equipFlexBadge(item.value);
         refreshPurchasedCosmetics();
         playAudioCue("equip");
-        return;
+        return true;
       }
       const prefs = readLearnerPrefs();
       const nextPrefs = { ...prefs };
@@ -5382,34 +5694,60 @@
       if (item.type === "musicPack" && audioRuntime.playing) startAudioMusic(inferAudioScene(), item.value);
       else syncAudioSystem(nextPrefs.audio);
       playAudioCue("equip");
+      return true;
     }
 
-    function buyOrEquipStoreItem(itemId) {
+    async function buyOrEquipStoreItem(itemId) {
       const item = getStoreItem(itemId);
       if (!item) return;
+      if (!storeServerIsActive() && storeServerRequiresAuthority()) {
+        const status = document.getElementById("storeStatus");
+        if (status) status.textContent = "Store is still syncing. Try again in a moment.";
+        void refreshServerStoreState().catch(() => {});
+        return;
+      }
       const owned = new Set(storeState.owned);
       const status = document.getElementById("storeStatus");
       const isFlexBadge = item.type === "flexBadge";
+      const unlockMethod = getStoreUnlockMethod(item);
+      const unlockMethodLabel = getStoreUnlockMethodLabel(item);
       const alreadyOwned = isFlexBadge ? userOwnsFlexBadge(item.value) : owned.has(item.id);
       if (!alreadyOwned) {
-        if (item.awardOnly) {
-          if (status) status.textContent = `${item.name} is earned by defeating the matching AI rating.`;
+        if (storeServerIsActive() && !serverStoreCatalog.has(item.id)) {
+          if (status) status.textContent = "This cosmetic is not available in the synchronized Store catalog yet.";
           return;
         }
-        if (puzzleCoins < item.cost) {
+        if (unlockMethod !== "Coins") {
+          if (status) status.textContent = `${item.name}: ${unlockMethodLabel} — ${getStoreUnlockLabel(item)}.`;
+          return;
+          if (status) status.textContent = `${item.name}: ${unlockMethod} — ${getStoreUnlockLabel(item)}.`;
+          return;
+        }
+        const price = storeServerIsActive() ? getStoreServerCost(item) : item.cost;
+        if (puzzleCoins < price) {
           if (status) status.textContent = `Need ${formatProfileNumber(item.cost - puzzleCoins)} more coins for ${item.name}.`;
           return;
         }
-        puzzleCoins -= item.cost;
-        if (isFlexBadge) unlockFlexBadge(item.value);
-        else {
-          owned.add(item.id);
-          storeState.owned = [...owned];
+        if (storeServerIsActive()) {
+          try {
+            await getAuthProvider().purchaseCosmetic(item.id, createStoreIdempotencyKey("purchase"));
+            await refreshServerStoreState({ rerender: false });
+          } catch (error) {
+            if (status) status.textContent = error?.message || "Purchase could not be completed.";
+            return;
+          }
+        } else {
+          puzzleCoins -= price;
+          if (isFlexBadge) unlockFlexBadge(item.value);
+          else {
+            owned.add(item.id);
+            storeState.owned = [...owned];
+          }
         }
         playAudioCue("purchase");
         showCelebration("Reward unlocked!", `-${item.cost} coins`, item.name);
       }
-      equipStoreItem(item);
+      if (!await equipStoreItem(item)) return;
       savePuzzleState();
       renderStore();
       renderBeginnerProgress();
@@ -5955,40 +6293,314 @@
         : item.type === "archetype" ? "Style"
         : item.type === "flexBadge" ? "Flex Badges"
         : item.type === "nameStyle" ? "Name Styles"
-        : ["musicPack", "sfxPack"].includes(item.type) ? "Hidden"
+        : ["musicPack", "sfxPack"].includes(item.type) ? "Music"
         : item.type === "board" ? "Boards"
           : ["lastMove", "boardBorder"].includes(item.type) ? "Highlights"
             : "Profile";
     }
 
     function getStoreDisplayRarity(item = {}) {
-      const explicit = String(item.rarity || "").trim();
-      if (explicit) return explicit;
-      const descriptor = `${item.name || ""} ${item.tag || ""}`.toLowerCase();
-      if (descriptor.includes("divine")) return "Divine";
-      if (descriptor.includes("mythic")) return "Mythic";
-      if (descriptor.includes("legendary")) return "Legendary";
-      return "";
+      return normalizeStoreRarity(item);
+    }
+
+    const storeUnlockMethods = Object.freeze(["Coins", "Achievement", "Season", "Event"]);
+    function getStoreUnlockMethod(item = {}) {
+      const requested = String(item.unlockMethod || "").trim();
+      if (storeUnlockMethods.includes(requested)) return requested;
+      return item.awardOnly ? "Achievement" : "Coins";
+    }
+
+    function getStoreUnlockLabel(item = {}) {
+      const method = getStoreUnlockMethod(item);
+      if (method === "Coins") return Number(item.cost) > 0 ? `${formatProfileNumber(item.cost)} coins` : "Free";
+      return item.unlockLabel || `${method} unlock`;
+    }
+
+    let storeCatalogUi = { ownership: "all", wishlistOnly: false, collection: "all" };
+    function isStoreItemOwned(item, owned = new Set(storeState.owned)) {
+      return item?.type === "flexBadge" ? userOwnsFlexBadge(item.value) : Boolean(item?.id && owned.has(item.id));
+    }
+    function isStoreItemEquipped(item) {
+      return Boolean(item?.id && getEquippedStoreId(item.type) === item.id);
+    }
+    function isStoreItemWishlisted(item, prefs = readLearnerPrefs()) {
+      const favorites = (key) => Array.isArray(prefs?.[key]) ? prefs[key] : [];
+      if (item?.type === "skin") return favorites("pieceFavorites").includes(item.value);
+      if (item?.type === "board") return favorites("boardFavorites").includes(item.value);
+      if (item?.type === "backgroundTheme") return favorites("backgroundFavorites").includes(item.value);
+      if (["avatar", "frame", "avatarEffect"].includes(item?.type)) return favorites("avatarFavorites").includes(`${item.type}:${item.value}`);
+      if (item?.type === "nameStyle") return favorites("nameStyleFavorites").includes(item.value);
+      if (item?.type === "lastMove") return favorites("lastMoveFavorites").includes(item.value);
+      if (["musicPack", "sfxPack"].includes(item?.type)) {
+        const list = favorites("musicFavorites");
+        return list.includes(`${item.type}:${item.value}`) || list.includes(item.value);
+      }
+      return false;
+    }
+    function matchesStoreCatalogFilters(item, prefs, owned) {
+      if (storeCatalogUi.ownership === "owned" && !isStoreItemOwned(item, owned)) return false;
+      if (storeCatalogUi.ownership === "equipped" && !isStoreItemEquipped(item)) return false;
+      if (storeCatalogUi.wishlistOnly && !isStoreItemWishlisted(item, prefs)) return false;
+      if (storeCatalogUi.collection !== "all" && item.collection !== storeCatalogUi.collection) return false;
+      return true;
+    }
+    function getStoreCollectionProgress(collection, prefs = readLearnerPrefs(), owned = new Set(storeState.owned)) {
+      const items = (collection?.itemIds || []).map(getStoreItem).filter(Boolean);
+      const ownedCount = items.filter((item) => isStoreItemOwned(item, owned)).length;
+      const bundle = storeBundles.find((entry) => entry.name.toLowerCase().startsWith(String(collection?.name || "").toLowerCase()));
+      return {
+        total: items.length,
+        owned: ownedCount,
+        remaining: Math.max(0, items.length - ownedCount),
+        percent: items.length ? Math.round((ownedCount / items.length) * 100) : 0,
+        bundleAvailable: Boolean(bundle),
+        bundleId: bundle?.id || ""
+      };
+    }
+    function getFeaturedStoreItems() {
+      const cosmeticTypes = new Set(["backgroundTheme", "board", "skin", "avatar", "frame", "avatarEffect", "nameStyle", "lastMove", "musicPack", "sfxPack"]);
+      const pool = storeItems.filter((item) => cosmeticTypes.has(item.type) && getStoreUnlockMethod(item) === "Coins");
+      const selected = [];
+      const rotation = Math.floor(Date.now() / 86400000);
+      const add = (predicate) => {
+        const candidates = pool.filter((item) => !selected.includes(item) && predicate(item)).sort((a, b) => a.id.localeCompare(b.id));
+        const candidate = candidates.length ? candidates[(rotation + selected.length) % candidates.length] : null;
+        if (candidate) selected.push(candidate);
+      };
+      add((item) => Number(item.cost) <= 95);
+      add((item) => Number(item.cost) > 95 && Number(item.cost) < 400);
+      add((item) => Number(item.cost) >= 400);
+      add((item) => item.collection === "Royal Court");
+      add((item) => item.collection === "Forest Defender");
+      add((item) => item.collection === "Space Explorer");
+      const rankedPool = pool.slice().sort((a, b) => (storeRarityRank[getStoreDisplayRarity(b)] || 0) - (storeRarityRank[getStoreDisplayRarity(a)] || 0) || a.id.localeCompare(b.id));
+      rankedPool.slice(rotation % Math.max(1, rankedPool.length)).concat(rankedPool.slice(0, rotation % Math.max(1, rankedPool.length))).forEach((item) => {
+        if (selected.length < 8 && !selected.includes(item)) selected.push(item);
+      });
+      const achievementPool = storeItems.filter((item) => getStoreUnlockMethod(item) === "Achievement").sort((a, b) => a.id.localeCompare(b.id));
+      const achievement = achievementPool.length ? achievementPool[rotation % achievementPool.length] : null;
+      const bundle = storeBundles.length ? storeBundles[rotation % storeBundles.length] : null;
+      return [...selected.slice(0, 8), ...(achievement ? [achievement] : []), ...(bundle ? [{ isStoreBundle: true, bundle }] : [])];
     }
 
     function getStoreItemsForCategory(category) {
-      const categoryItems = storeItems.filter((item) => getStoreCategory(item) === category);
+      const categoryItems = category === "Achievements"
+        ? storeItems.filter((item) => getStoreUnlockMethod(item) === "Achievement")
+        : storeItems.filter((item) => getStoreCategory(item) === category && (category !== "Profile" || getStoreUnlockMethod(item) !== "Achievement"));
       const cosmeticTypes = new Set(["backgroundTheme", "board", "skin", "avatar", "frame", "avatarEffect"]);
-      const rarityRank = { Divine: 6, Mythic: 5, Legendary: 4, Epic: 3, Rare: 2, Common: 1 };
       if (category === "Featured") {
-        return storeItems
-          .filter((item) => cosmeticTypes.has(item.type))
-          .slice()
-          .sort((first, second) => (rarityRank[getStoreDisplayRarity(second)] || 0) - (rarityRank[getStoreDisplayRarity(first)] || 0))
-          .slice(0, 12);
+        return getFeaturedStoreItems();
       }
       if (category === "Bundles") {
-        return storeItems
-          .filter((item) => cosmeticTypes.has(item.type) && (rarityRank[getStoreDisplayRarity(item)] || 0) >= rarityRank.Epic)
-          .slice()
-          .sort((first, second) => (rarityRank[getStoreDisplayRarity(second)] || 0) - (rarityRank[getStoreDisplayRarity(first)] || 0));
+        return storeBundles;
       }
       return categoryItems;
+    }
+
+    function getStoreBundleDetails(bundle, owned = new Set(storeState.owned)) {
+      const items = (bundle?.itemIds || []).map(getStoreItem).filter(Boolean);
+      const ownedItems = items.filter((item) => item.type === "flexBadge" ? userOwnsFlexBadge(item.value) : owned.has(item.id));
+      const missingItems = items.filter((item) => !ownedItems.includes(item));
+      const totalValue = items.reduce((sum, item) => sum + getStoreServerCost(item), 0);
+      const remainingValue = missingItems.reduce((sum, item) => sum + getStoreServerCost(item), 0);
+      const bundlePrice = Math.max(0, Math.round(remainingValue * (1 - Number(bundle.discount || 0))));
+      return {
+        bundle,
+        items,
+        ownedItems,
+        missingItems,
+        totalValue,
+        remainingValue,
+        bundlePrice,
+        savings: Math.max(0, remainingValue - bundlePrice),
+        percent: Math.round(Number(bundle.discount || 0) * 100),
+        completion: items.length ? Math.round((ownedItems.length / items.length) * 100) : 0
+      };
+    }
+
+    function buildStoreBundlePreview(items = []) {
+      const preview = createBookText("div", "store-bundle-preview", "");
+      items.slice(0, 5).forEach((item) => {
+        const slot = createBookText("div", "store-bundle-preview-item", "");
+        slot.append(buildStorePreview(item), createBookText("span", "", item.name.replace(/\s+(Theme|Board|Background|Music|Sound Pack|Title)$/i, "")));
+        preview.appendChild(slot);
+      });
+      return preview;
+    }
+
+    async function buyOrEquipStoreBundle(bundleId) {
+      const bundle = storeBundles.find((entry) => entry.id === bundleId);
+      if (!bundle) return;
+      if (!storeServerIsActive() && storeServerRequiresAuthority()) {
+        const status = document.getElementById("storeStatus");
+        if (status) status.textContent = "Store is still syncing. Try again in a moment.";
+        void refreshServerStoreState().catch(() => {});
+        return;
+      }
+      const status = document.getElementById("storeStatus");
+      const details = getStoreBundleDetails(bundle);
+      if (!details.items.length) return;
+      if (!details.missingItems.length) {
+        await Promise.all(details.items.map((item) => equipStoreItem(item)));
+        savePuzzleState();
+        renderStore();
+        if (status) status.textContent = `${bundle.name} equipped. Every included cosmetic is ready.`;
+        return;
+      }
+      if (storeServerIsActive() && details.items.some((item) => !serverStoreCatalog.has(item.id))) {
+        if (status) status.textContent = "This bundle is not available in the synchronized Store catalog yet.";
+        return;
+      }
+      const bundlePrice = storeServerIsActive()
+        ? Math.max(0, Math.round(details.missingItems.reduce((sum, item) => sum + getStoreServerCost(item), 0) * (1 - Number(bundle.discount || 0))))
+        : details.bundlePrice;
+      if (puzzleCoins < bundlePrice) {
+        if (status) status.textContent = `Need ${formatProfileNumber(bundlePrice - puzzleCoins)} more coins for ${bundle.name}.`;
+        return;
+      }
+      if (storeServerIsActive()) {
+        try {
+          await getAuthProvider().purchaseCosmeticBundle(bundle.itemIds, bundle.discount, createStoreIdempotencyKey("bundle"));
+          await refreshServerStoreState({ rerender: false });
+        } catch (error) {
+          if (status) status.textContent = error?.message || "Bundle purchase could not be completed.";
+          return;
+        }
+      } else {
+        puzzleCoins -= bundlePrice;
+        const owned = new Set(storeState.owned);
+        details.missingItems.forEach((item) => {
+          if (item.type === "flexBadge") unlockFlexBadge(item.value);
+          else owned.add(item.id);
+        });
+        storeState = { ...storeState, owned: [...owned] };
+      }
+      savePuzzleState();
+      await Promise.all(details.items.map((item) => equipStoreItem(item)));
+      playAudioCue("purchase");
+      showCelebration("Bundle unlocked!", `-${formatProfileNumber(bundlePrice)} coins · Save ${formatProfileNumber(details.savings)}`, bundle.name);
+      renderStore();
+      renderBeginnerProgress();
+      if (status) status.textContent = `${bundle.name} unlocked and equipped. You saved ${formatProfileNumber(details.savings)} coins.`;
+    }
+
+    function buildStoreBundleCard(bundle, owned = new Set(storeState.owned)) {
+      const details = getStoreBundleDetails(bundle, owned);
+      const card = document.createElement("article");
+      card.className = `store-card store-bundle-card${details.missingItems.length ? "" : " is-owned"}`;
+      card.dataset.rarity = bundle.rarity || "Epic";
+      card.append(
+        buildStoreBundlePreview(details.items),
+        createBookText("h3", "", bundle.name),
+        createBookText("p", "", bundle.description),
+        createBookText("p", "store-bundle-completion", `${details.completion}% complete · ${details.ownedItems.length} owned · ${details.missingItems.length} remaining${details.missingItems.length ? " · Bundle available" : " · Ready to equip"}`)
+      );
+      const included = createBookText("ul", "store-bundle-items", "");
+      included.setAttribute("aria-label", "Included bundle items");
+      details.items.forEach((item) => {
+        const isOwned = details.ownedItems.includes(item);
+        const row = createBookText("li", isOwned ? "is-owned" : "", "");
+        row.setAttribute("aria-label", `${item.name}, ${isOwned ? "owned" : "not owned"}`);
+        row.append(
+          createBookText("span", "store-bundle-item-marker", isOwned ? "✓" : "＋"),
+          createBookText("span", "", item.name),
+          createBookText("small", "", isOwned ? "Owned" : `${formatProfileNumber(item.cost)} coins`),
+          createBookText("small", "store-surface", getStoreSurfaceLabel(item))
+        );
+        included.appendChild(row);
+      });
+      const pricing = createBookText("div", "store-bundle-pricing", "");
+      pricing.append(
+        createBookText("span", "", `Value ${formatProfileNumber(details.totalValue)}`),
+        createBookText("strong", "", details.missingItems.length ? `${formatProfileNumber(details.bundlePrice)} coins` : "Complete"),
+        createBookText("small", "", details.missingItems.length ? `${details.percent}% bundle discount · Save ${formatProfileNumber(details.savings)}` : "All items owned")
+      );
+      if (details.missingItems.length) {
+        pricing.append(createBookText("small", "store-earn-time", getStoreEstimatedDays({ cost: details.bundlePrice, unlockMethod: "Coins" })));
+      }
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = details.missingItems.length ? "button" : "button secondary";
+      action.textContent = details.missingItems.length ? `Buy bundle · ${formatProfileNumber(details.bundlePrice)}` : "Equip bundle";
+      action.setAttribute("aria-label", `${details.missingItems.length ? "Buy" : "Equip"} ${bundle.name}`);
+      action.addEventListener("click", () => buyOrEquipStoreBundle(bundle.id));
+      card.append(included, pricing, action);
+      return card;
+    }
+
+    function buildStoreCatalogTools(prefs, owned) {
+      const panel = document.createElement("section");
+      panel.className = "store-catalog-tools";
+      panel.setAttribute("aria-label", "Store filters and collection progress");
+      const heading = document.createElement("div");
+      heading.className = "store-catalog-tools-heading";
+      heading.append(
+        createBookText("strong", "", "Refine your collection"),
+        createBookText("span", "", "Cosmetics only · no gameplay advantages")
+      );
+      const filters = document.createElement("div");
+      filters.className = "store-filter-row";
+      const ownershipOptions = [["all", "All"], ["owned", "Owned"], ["equipped", "Equipped"]];
+      ownershipOptions.forEach(([value, label]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "store-filter-button";
+        button.textContent = label;
+        button.setAttribute("aria-pressed", String(storeCatalogUi.ownership === value));
+        if (storeCatalogUi.ownership === value) button.classList.add("is-active");
+        button.addEventListener("click", () => {
+          storeCatalogUi = { ...storeCatalogUi, ownership: value };
+          renderStore();
+        });
+        filters.appendChild(button);
+      });
+      const wishlistButton = document.createElement("button");
+      wishlistButton.type = "button";
+      wishlistButton.className = `store-filter-button${storeCatalogUi.wishlistOnly ? " is-active" : ""}`;
+      wishlistButton.textContent = "Wishlist";
+      wishlistButton.setAttribute("aria-pressed", String(storeCatalogUi.wishlistOnly));
+      wishlistButton.addEventListener("click", () => {
+        storeCatalogUi = { ...storeCatalogUi, wishlistOnly: !storeCatalogUi.wishlistOnly };
+        renderStore();
+      });
+      filters.appendChild(wishlistButton);
+      const selectLabel = createBookText("label", "store-collection-select-label", "Collection");
+      const select = document.createElement("select");
+      select.className = "store-collection-select";
+      selectLabel.htmlFor = "storeCollectionFilter";
+      select.id = "storeCollectionFilter";
+      [["all", "All collections"], ...storeCollectionDefinitions.map((collection) => [collection.name, collection.name])].forEach(([value, label]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        option.selected = storeCatalogUi.collection === value;
+        select.appendChild(option);
+      });
+      select.addEventListener("change", () => {
+        storeCatalogUi = { ...storeCatalogUi, collection: select.value };
+        renderStore();
+      });
+      filters.append(selectLabel, select);
+      const progress = document.createElement("div");
+      progress.className = "store-collection-progress";
+      storeCollectionDefinitions.forEach((collection) => {
+        const stats = getStoreCollectionProgress(collection, prefs, owned);
+        const item = document.createElement("div");
+        item.className = "store-collection-progress-item";
+        item.title = collection.description;
+        const label = document.createElement("span");
+        label.append(createBookText("strong", "", collection.name), createBookText("small", "", `${stats.percent}% · ${stats.owned}/${stats.total}`));
+        const track = document.createElement("span");
+        track.className = "store-progress-track";
+        const fill = document.createElement("span");
+        fill.className = "store-progress-fill";
+        fill.style.width = `${stats.percent}%`;
+        track.appendChild(fill);
+        item.append(label, track, createBookText("small", "store-collection-subline", `${stats.owned} owned · ${stats.remaining} remaining · ${stats.bundleAvailable ? "Bundle available" : "No bundle"}`));
+        progress.appendChild(item);
+      });
+      panel.append(heading, filters, progress);
+      return panel;
     }
 
     function renderStoreShowcase(prefs) {
@@ -6000,16 +6612,17 @@
         { label: "Piece Sets", category: "Chess Pieces", item: storeItems.find((item) => item.type === "skin" && /classic|royal|dragon/i.test(item.name)) },
         { label: "Themes", category: "Backgrounds", item: storeItems.find((item) => item.type === "backgroundTheme" && /forest|sakura|ocean|sunset/i.test(item.name)) },
         { label: "Avatars", category: "Avatars", item: storeItems.find((item) => ["avatar", "avatarEffect"].includes(item.type) && /divine|galaxy|phoenix/i.test(item.name)) },
-        { label: "Bundles", category: "Bundles", item: storeItems.find((item) => item.type === "nameStyle" && /divine|phoenix|holographic/i.test(item.name)) }
-      ].filter((pick) => pick.item);
-      showcase.replaceChildren(...picks.map(({ label, category, item }) => {
+        { label: "Bundles", category: "Bundles", bundle: storeBundles[0] }
+      ].filter((pick) => pick.item || pick.bundle);
+      showcase.replaceChildren(...picks.map(({ label, category, item, bundle }) => {
         const card = document.createElement("button");
-        const rarity = getStoreDisplayRarity(item) || "Common";
+        const showcaseItem = item || getStoreItem(bundle?.itemIds?.[0]);
+        const rarity = bundle?.rarity || getStoreDisplayRarity(showcaseItem) || "Common";
         card.type = "button";
         card.className = "store-showcase-card";
         card.dataset.rarity = rarity;
         card.style.setProperty("--rarity-color", rarity === "Divine" ? "#fff2b8" : rarity === "Mythic" ? "#ff7adf" : rarity === "Legendary" ? "#ffd36b" : rarity === "Epic" ? "#ae87ff" : rarity === "Rare" ? "#6fa8dc" : "rgba(255,248,237,.34)");
-        card.append(createBookText("strong", "", label), createBookText("span", "", item.name));
+        card.append(createBookText("strong", "", label), createBookText("span", "", bundle?.name || item.name));
         card.addEventListener("click", () => {
           activeStoreCategory = category;
           renderStore();
@@ -6058,11 +6671,13 @@
         Backgrounds: "Premium site backdrops for every page. Boards stay clear and readable.",
         "Chess Pieces": "Choose your style. Play in your legend. Premium themes stay readable on every board.",
         Style: "Choose the personality shown on your board. One archetype equips at a time.",
+        Music: "Preview original music and sound packs, then equip the atmosphere that fits your next game.",
+        Achievements: "Prestige rewards earned through milestones, campaign clears, and seasonal challenges. They are never sold for coins.",
         "Flex Badges": "Own many badges, equip one flex badge for games, matchmaking, and leaderboards.",
         "Name Styles": "Cosmetic username effects only. They never change gameplay.",
         Boards: "Live board themes with readable squares, premium glow previews, and cosmetic-only animations.",
         Avatars: "Premium avatars, pet companions, frames, and lightweight visual effects.",
-        Bundles: "Curated high-tier collections. Every cosmetic still equips independently.",
+        Bundles: "Complete themed collections with an itemized preview, ownership tracking, and 15–20% savings.",
         Currency: "Your live coin wallet and the fastest ways to earn more rewards.",
         Profile: "Titles and celebrations.",
         Highlights: "Last-move colors and board borders. Highlights stay transparent so pieces remain clear."
@@ -6071,12 +6686,15 @@
         Featured: "Featured",
         Backgrounds: "Themes",
         "Chess Pieces": "Piece Sets",
+        Style: "Style",
+        Music: "Music",
+        Achievements: "Achievements",
         Avatars: "Avatars",
         Boards: "Boards",
         Bundles: "Bundles",
         Currency: "Currency"
       };
-      const categoryOrder = ["Featured", "Boards", "Chess Pieces", "Backgrounds", "Avatars", "Bundles", "Currency", "Flex Badges", "Name Styles", "Highlights", "Profile"];
+      const categoryOrder = ["Featured", "Boards", "Chess Pieces", "Backgrounds", "Style", "Avatars", "Bundles", "Currency", "Flex Badges", "Name Styles", "Highlights", "Music", "Profile", "Achievements"];
       if (!categoryOrder.includes(activeStoreCategory)) activeStoreCategory = "Featured";
       if (tabs) {
         tabs.replaceChildren(...categoryOrder.map((category) => {
@@ -6097,6 +6715,7 @@
       renderLastMoveDesigner(prefs);
       renderBoardThemeDesigner(prefs);
       const nodes = [];
+      if (activeStoreCategory !== "Currency") nodes.push(buildStoreCatalogTools(prefs, owned));
       categoryOrder.filter((category) => category === activeStoreCategory).forEach((category) => {
         if (category === "Currency") {
           const currencyCard = document.createElement("article");
@@ -6117,6 +6736,16 @@
           return;
         }
         const categoryItems = getStoreItemsForCategory(category);
+        if (category === "Bundles") {
+          const header = document.createElement("article");
+          header.className = "store-category-header";
+          header.append(
+            createBookText("h3", "", categoryLabels[category] || category),
+            createBookText("p", "", categoryNotes[category] || "")
+          );
+          nodes.push(header, ...categoryItems.map((bundle) => buildStoreBundleCard(bundle, owned)));
+          return;
+        }
         const items = category === "Name Styles"
           ? getFilteredNameStyleItems(categoryItems)
           : category === "Boards"
@@ -6128,6 +6757,7 @@
             : category === "Music"
               ? getFilteredMusicItems(categoryItems, prefs)
               : categoryItems;
+        const filteredItems = items.filter((item) => matchesStoreCatalogFilters(item, prefs, owned));
         const header = document.createElement("article");
         header.className = "store-category-header";
         header.append(
@@ -6137,13 +6767,22 @@
         nodes.push(header);
         if (category === "Avatars") nodes.push(buildAvatarStoreTools(prefs));
         if (category === "Music") nodes.push(buildMusicStoreTools(prefs));
-        if (!items.length) {
+        if (!filteredItems.length) {
           nodes.push(createBookText("article", "store-card", category === "Boards" ? "No board themes match those filters yet." : category === "Music" ? "No music packs match this filter yet." : "No name styles match those filters yet."));
           return;
         }
-        items.forEach((item) => {
+        filteredItems.forEach((item) => {
+          if (item.isStoreBundle) {
+            nodes.push(buildStoreBundleCard(item.bundle, owned));
+            return;
+          }
           const displayRarity = getStoreDisplayRarity(item);
           const hasPremiumTier = ["Legendary", "Mythic", "Divine"].includes(displayRarity);
+          const unlockMethod = getStoreUnlockMethod(item);
+          const unlockMethodLabel = getStoreUnlockMethodLabel(item);
+          const unlockLabel = getStoreUnlockLabel(item);
+          const surfaceLabel = getStoreSurfaceLabel(item);
+          const earningLabel = getStoreEstimatedDays(item);
           const isOwned = item.type === "flexBadge" ? userOwnsFlexBadge(item.value) : owned.has(item.id);
           const isEquipped = getEquippedStoreId(item.type) === item.id;
           const card = document.createElement("article");
@@ -6162,6 +6801,7 @@
                 : ["musicPack", "sfxPack"].includes(item.type) && ((prefs.musicFavorites || []).includes(`${item.type}:${item.value}`) || (prefs.musicFavorites || []).includes(item.value));
           card.className = `store-card${isOwned ? " is-owned" : ""}${isEquipped ? " is-equipped" : ""}${item.type === "board" ? " is-board-theme" : ""}${["skin", "pieceFinish"].includes(item.type) ? " is-piece-set" : ""}${item.type === "backgroundTheme" ? " is-background-theme" : ""}${item.type === "nameStyle" ? " is-name-style" : ""}${["avatar", "frame", "avatarEffect"].includes(item.type) ? " is-avatar-cosmetic" : ""}${item.petAvatar ? " is-pet-avatar" : ""}${item.type === "lastMove" ? " is-highlight" : ""}${["musicPack", "sfxPack"].includes(item.type) ? " is-music-pack" : ""}${isFavorite ? " is-favorite" : ""}`;
           card.dataset.rarity = displayRarity;
+          card.dataset.unlockMethod = unlockMethod;
           if (hasPremiumTier) card.dataset.premiumTier = "true";
           if (item.petAvatar) card.dataset.petId = item.id;
           if (item.type === "board") card.style.setProperty("--board-preview-glow", getBoardTheme(item.value).glow);
@@ -6171,9 +6811,13 @@
           const meta = document.createElement("div");
           meta.className = "store-meta";
           meta.append(
-            createBookText("span", "", displayRarity || item.tag),
-            createBookText("span", isOwned ? "" : "store-lock", isOwned ? isFavorite ? "Owned | Favorite" : "Owned" : item.awardOnly ? `\uD83C\uDFC6 Win vs ${item.cost}` : `\uD83D\uDD12 ${item.cost} coins`)
+            createBookText("span", "", displayRarity),
+            createBookText("span", isOwned ? "" : "store-lock", isOwned ? `${isFavorite ? "Owned | Favorite" : "Owned"} · ${unlockMethod}` : `Unlock: ${unlockMethod} · ${unlockLabel}`)
           );
+          meta.append(createBookText("span", "store-surface", `Appears in ${surfaceLabel}`));
+          if (earningLabel) meta.append(createBookText("span", "store-earn-time", earningLabel));
+          const unlockMeta = meta.querySelectorAll("span")[1];
+          if (unlockMeta) unlockMeta.textContent = isOwned ? `${isFavorite ? "Owned | Favorite" : "Owned"} · ${unlockMethodLabel}` : `Unlock: ${unlockMethodLabel} · ${unlockLabel}`;
           if (hasPremiumTier) {
             const tierSignal = createBookText("span", "store-tier-signal", "\u2726");
             tierSignal.setAttribute("role", "img");
@@ -6182,35 +6826,36 @@
           }
           const button = document.createElement("button");
           button.type = "button";
-          button.className = isOwned ? "button secondary" : "button";
+          button.className = isOwned || unlockMethod !== "Coins" ? "button secondary" : "button";
           if (item.type === "nameStyle") {
-            button.textContent = isEquipped && item.value !== "classic" ? "Unequip" : isEquipped ? "Default" : isOwned ? "Equip" : `Buy ${item.cost}`;
+            button.textContent = isEquipped && item.value !== "classic" ? "Unequip" : isEquipped ? "Default" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${item.cost}` : unlockLabel;
             button.disabled = isEquipped && item.value === "classic";
             button.addEventListener("click", () => {
               if (isEquipped && item.value !== "classic") resetNameStyle();
               else buyOrEquipStoreItem(item.id);
             });
           } else if (item.type === "lastMove") {
-            button.textContent = isEquipped && item.value !== "classic" ? "Unequip" : isEquipped ? "Default" : isOwned ? "Equip" : `Buy ${item.cost}`;
+            button.textContent = isEquipped && item.value !== "classic" ? "Unequip" : isEquipped ? "Default" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${item.cost}` : unlockLabel;
             button.disabled = isEquipped && item.value === "classic";
             button.addEventListener("click", () => {
               if (isEquipped && item.value !== "classic") resetLastMoveHighlight();
               else buyOrEquipStoreItem(item.id);
             });
           } else if (["musicPack", "sfxPack"].includes(item.type)) {
-            button.textContent = isEquipped ? "Equipped" : isOwned ? "Equip" : `Buy ${item.cost}`;
+            button.textContent = isEquipped ? "Equipped" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${item.cost}` : unlockLabel;
             button.disabled = isEquipped;
             button.addEventListener("click", () => buyOrEquipStoreItem(item.id));
           } else {
-            button.textContent = isEquipped ? "Equipped" : isOwned ? "Equip" : item.awardOnly ? `Win vs ${item.cost}` : ["skin", "musicPack"].includes(item.type) ? `Buy ${item.cost}` : `Unlock ${item.cost}`;
+            button.textContent = isEquipped ? "Equipped" : isOwned ? "Equip" : unlockMethod !== "Coins" ? unlockLabel : ["skin", "musicPack"].includes(item.type) ? `Buy ${item.cost}` : `Unlock ${item.cost}`;
             button.disabled = isEquipped;
             button.addEventListener("click", () => buyOrEquipStoreItem(item.id));
           }
           const preview = buildStorePreview(item);
+          const previewUnlockLabel = isOwned ? `\u2713 Owned · ${unlockMethodLabel}` : `Unlock: ${unlockMethodLabel}`;
           preview.appendChild(createBookText(
             "span",
             `store-preview-badge ${isEquipped ? "is-equipped" : isOwned ? "is-owned" : "is-locked"}`,
-            isEquipped ? "\u2713 Equipped" : isOwned ? "\u2713 Owned" : item.awardOnly ? `\uD83C\uDFC6 Defeat ${item.cost}` : ["nameStyle", "lastMove", "musicPack", "sfxPack"].includes(item.type) ? `\uD83D\uDD12 ${item.cost} coins` : "\uD83D\uDD12 Locked"
+            isEquipped ? "\u2713 Equipped" : previewUnlockLabel
           ));
           if (item.type === "nameStyle") {
             card.addEventListener("mouseenter", () => setNameStylePreview(item.value));
@@ -6300,6 +6945,17 @@
             favoriteButton.addEventListener("click", () => toggleBackgroundThemeFavorite(item.value));
             actions.append(previewButton, favoriteButton);
           }
+          if (item.type === "skin") {
+            const previewButton = document.createElement("button");
+            previewButton.type = "button";
+            previewButton.className = "button secondary";
+            previewButton.textContent = "Preview set";
+            previewButton.addEventListener("click", () => {
+              renderPieceDesigner(item.value);
+              document.getElementById("pieceDesigner")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+            actions.append(previewButton);
+          }
           if (["avatar", "frame", "avatarEffect"].includes(item.type)) {
             const favoriteButton = document.createElement("button");
             favoriteButton.type = "button";
@@ -6309,13 +6965,21 @@
             favoriteButton.addEventListener("click", () => toggleAvatarFavorite(item));
             actions.append(favoriteButton);
           }
+          if (storeServerIsActive() && unlockMethod === "Coins" && !["flexBadge"].includes(item.type)) {
+            const giftButton = document.createElement("button");
+            giftButton.type = "button";
+            giftButton.className = "button secondary";
+            giftButton.textContent = "Gift";
+            giftButton.addEventListener("click", () => prepareStoreGift(item.id));
+            actions.append(giftButton);
+          }
           actions.append(button);
           card.append(
             preview,
             createBookText("h3", "", item.name),
             createBookText("p", "", item.description),
             meta,
-            ["backgroundTheme", "board", "nameStyle", "lastMove", "musicPack", "sfxPack", "avatar", "frame", "avatarEffect"].includes(item.type) ? actions : button
+            ["backgroundTheme", "board", "skin", "nameStyle", "lastMove", "musicPack", "sfxPack", "avatar", "frame", "avatarEffect"].includes(item.type) ? actions : button
           );
           nodes.push(card);
         });
@@ -6327,7 +6991,9 @@
     }
 
     function setupStore() {
+      setupStoreGifting();
       renderStore();
+      void refreshServerStoreState().catch(() => {});
     }
 
     const audioCueProfiles = Object.freeze({
@@ -7092,8 +7758,23 @@
       return { levelUp };
     }
 
-    function addPuzzleCoins(amount) {
-      puzzleCoins += Math.max(0, amount);
+    function addPuzzleCoins(amount, reason = "gameplay reward") {
+      const earned = Math.max(0, Number(amount) || 0);
+      if (earned > 0 && storeServerRequiresAuthority()) {
+        void getAuthProvider().creditStoreReward(earned, reason, createStoreIdempotencyKey("reward"))
+          .then((result) => {
+            if (Number.isFinite(Number(result?.coins))) puzzleCoins = Math.max(0, Number(result.coins));
+            serverStoreState = serverStoreState ? { ...serverStoreState, coins: puzzleCoins } : serverStoreState;
+            renderStore();
+            renderBeginnerProgress();
+            renderPlayerProfile();
+          })
+          .catch(() => {});
+      } else {
+        // Guest mode keeps the existing local progression path. Authenticated
+        // wallets are updated only by the server RPC above.
+        puzzleCoins += earned;
+      }
       return puzzleCoins;
     }
 
@@ -7105,7 +7786,7 @@
       if (watched.has(videoId)) return false;
       watched.add(videoId);
       videoRewardState = { ...videoRewardState, [bucket]: [...watched] };
-      addPuzzleCoins(amount);
+      addPuzzleCoins(amount, "video reward");
       addExtraRewards({ coins: amount });
       savePuzzleState();
       renderBeginnerProgress();
@@ -8969,7 +9650,7 @@
           const nextState = readAcademyState();
           if (nextState.quizDate !== today) {
             addPuzzleXp(12);
-            addPuzzleCoins(6);
+            addPuzzleCoins(6, "daily reward");
             addExtraRewards({ coins: 6 });
             nextState.quizDate = today;
             nextState.answered = [...new Set([...(nextState.answered || []), quiz.id])];
@@ -9112,7 +9793,7 @@
       const state = getDailyGoalsProgress();
       if (!state.complete || state.claimed) return;
       dailyGoals = { ...dailyGoals, claimed: true };
-      addPuzzleCoins(50);
+      addPuzzleCoins(50, "daily reward");
       savePuzzleState();
       renderBeginnerProgress();
       renderHomeDashboard();
@@ -9994,8 +10675,8 @@
       playAudioCue(puzzleCueMap[type] || type);
     }
 
-    function flashPuzzleBoard(className) {
-      const wrap = document.querySelector("#puzzleBoard")?.closest(".puzzle-board-wrap");
+    function flashPuzzleBoard(className, boardId = "puzzleBoard") {
+      const wrap = document.getElementById(boardId)?.closest(".puzzle-board-wrap");
       if (!wrap) return;
       wrap.classList.remove("is-correct", "is-wrong");
       void wrap.offsetWidth;
@@ -10104,10 +10785,11 @@
           rememberCoachTheme(true);
           const reward = firstSolve ? getPuzzleReward(puzzle) : { xp: 5, coins: 1, stars: 0, keys: 0 };
           const xpResult = addPuzzleXp(reward.xp);
-          addPuzzleCoins(reward.coins);
+          addPuzzleCoins(reward.coins, "puzzle reward");
           addExtraRewards(reward);
           recordPuzzleSolveStats();
           trackProductSignal("puzzle_solved", { source: "board", plan: activePuzzlePlan });
+          publishLearningActivity("puzzle_solved", `puzzle:${currentPuzzle}`, { puzzleId: currentPuzzle, theme: puzzle.theme || puzzle.mode || "", rating: puzzle.rating || null });
           document.getElementById("feedback").textContent = `Solved! ${formatRewardText(reward)}${habitReward ? " +10 daily reward" : ""}. ${puzzle.feedback}`;
           showPuzzleComplete();
           scheduleNextPuzzle();
@@ -10123,7 +10805,7 @@
         scheduleSpacedReview(false);
         rememberCoachTheme(false);
         addPuzzleXp(2);
-        addPuzzleCoins(1);
+        addPuzzleCoins(1, "puzzle reward");
         addExtraRewards({ coins: 1 });
         document.getElementById("feedback").textContent = `Nice try! ${move.san} is legal, but the tactic slips away. Look for ${formatExpectedPuzzleMove(expected)}: ${puzzle.hint} ${getAdaptiveNudge()}`;
         document.getElementById("puzzleMistakes").textContent = `${puzzleMistakeCount} mistake${puzzleMistakeCount === 1 ? "" : "s"}`;
@@ -10288,7 +10970,7 @@
       puzzleFailed += 1;
       puzzleMistakeCount += 1;
       addPuzzleXp(1);
-      addPuzzleCoins(1);
+      addPuzzleCoins(1, "puzzle reward");
       addExtraRewards({ coins: 1 });
       scheduleSpacedReview(false);
       rememberCoachTheme(false);
@@ -10315,7 +10997,7 @@
       document.getElementById("hintPuzzle").textContent = puzzleHintStep >= 3 ? "Hint shown" : "Next Hint";
       if (puzzleHintStep <= 3) {
         addPuzzleXp(1);
-        addPuzzleCoins(1);
+        addPuzzleCoins(1, "puzzle reward");
         addExtraRewards({ coins: 1 });
         document.getElementById("feedback").textContent = `Helpful hint unlocked. +1 XP, +1 coin. ${getAdaptiveNudge()}`;
         updatePuzzleStats();
@@ -10436,10 +11118,11 @@
         rememberCoachTheme(true);
         const reward = firstSolve ? getPuzzleReward(puzzle) : { xp: 5, coins: 1, stars: 0, keys: 0 };
         const xpResult = addPuzzleXp(reward.xp);
-        addPuzzleCoins(reward.coins);
+        addPuzzleCoins(reward.coins, "puzzle reward");
         addExtraRewards(reward);
         recordPuzzleSolveStats();
         trackProductSignal("puzzle_solved", { source: "answer", plan: activePuzzlePlan });
+        publishLearningActivity("puzzle_solved", `puzzle:${currentPuzzle}`, { puzzleId: currentPuzzle, theme: puzzle.theme || puzzle.mode || "", rating: puzzle.rating || null });
         document.getElementById("feedback").textContent = `Great move! ${formatRewardText(reward)}. You improved because you found the idea: ${puzzle.feedback}`;
         flashPuzzleBoard("is-correct");
         playPuzzleTone("correct");
@@ -10453,7 +11136,7 @@
         scheduleSpacedReview(false);
         rememberCoachTheme(false);
         addPuzzleXp(2);
-        addPuzzleCoins(1);
+        addPuzzleCoins(1, "puzzle reward");
         addExtraRewards({ coins: 1 });
         document.getElementById("feedback").textContent = `Great Try! +2 XP, +1 coin for practicing. Tip: ${puzzle.hint} ${getAdaptiveNudge()}`;
         document.getElementById("puzzleMistakes").textContent = `${puzzleMistakeCount} mistake${puzzleMistakeCount === 1 ? "" : "s"}`;
@@ -10704,6 +11387,15 @@
     let matchClockExpiredColor = "";
     let friendChallengeState = null;
     let friendNetworkState = { directory: [], search: [], challenges: [] };
+    let friendHubState = { view: "online", selectedId: "", search: "" };
+    let friendHubReady = false;
+    let friendHubSearchTimer = 0;
+    let friendRealtimeReady = false;
+    let messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false };
+    let messagingRealtimeUnsubscribe = null;
+    let messagingRealtimeSubscribing = false;
+    let messagingRefreshPromise = null;
+    let messagingTypingTimer = 0;
     let friendNetworkTimer = 0;
     let friendSearchTimer = 0;
     let friendSearchRequest = 0;
@@ -10720,6 +11412,16 @@
     let friendPresenceTimer = 0;
     let friendPresenceInFlight = false;
     let friendPresenceVisibilityHandler = null;
+    let socialNotificationState = [];
+    let socialNotificationRefreshPromise = null;
+    let socialNotificationUnsubscribe = null;
+    let socialNotificationSubscribing = false;
+    let socialActivityState = [];
+    let socialActivityRefreshPromise = null;
+    let socialActivityUnsubscribe = null;
+    let socialActivitySubscribing = false;
+    let serverPrivacyHydratedFor = "";
+    let serverBlockedUserIds = new Set();
     let friendChallengeSyncEpoch = 0;
     let friendChallengeSyncQueue = Promise.resolve();
     let friendChallengeLastPositionSignature = "";
@@ -12229,19 +12931,23 @@
 
     function getReviewAnalysisConfig(mode = "quick") {
       const lowPerformance = document.body.classList.contains("perf-lite") || document.body.classList.contains("low-performance");
-      const deep = mode === "deep" && !lowPerformance;
+      // A requested deep review must stay a deep Stockfish pass even on a
+      // constrained device. Use a lighter deep profile there instead of
+      // silently downgrading it to the quick profile while the UI says
+      // "Deep engine".
+      const deep = mode === "deep";
       const config = normalizeStockfishConfig({
-        skill: deep ? 18 : lowPerformance ? 6 : 10,
-        depth: deep ? 10 : lowPerformance ? 3 : 5,
-        movetime: deep ? 520 : lowPerformance ? 60 : 110,
-        nodes: deep ? 14000 : lowPerformance ? 700 : 1600,
+        skill: deep ? (lowPerformance ? 14 : 18) : lowPerformance ? 6 : 10,
+        depth: deep ? (lowPerformance ? 7 : 10) : lowPerformance ? 3 : 5,
+        movetime: deep ? (lowPerformance ? 280 : 520) : lowPerformance ? 60 : 110,
+        nodes: deep ? (lowPerformance ? 6000 : 14000) : lowPerformance ? 700 : 1600,
         multipv: 1,
-        hash: deep ? 24 : 8,
+        hash: deep ? (lowPerformance ? 16 : 24) : 8,
         threads: 1,
         moveOverhead: 8,
         limitStrength: !deep,
-        uciElo: deep ? 2400 : 1600,
-        elo: deep ? 2400 : 1600
+        uciElo: deep ? (lowPerformance ? 2200 : 2400) : 1600,
+        elo: deep ? (lowPerformance ? 2200 : 2400) : 1600
       });
       return { ...config, reviewMode: deep ? "deep" : "quick" };
     }
@@ -12270,7 +12976,9 @@
         configureStockfish(worker, config);
         sendStockfishCommand(worker, "isready");
       });
-      if (analysis) {
+      // Do not persist an interrupted/no-result search. Caching it would make
+      // a later retry return the same empty result without asking Stockfish.
+      if (analysis?.bestMove && Number(analysis.depth) > 0) {
         cache[cacheKey] = analysis;
         writeReviewAnalysisCache(cache);
       }
@@ -12843,6 +13551,8 @@
     let reviewAnalysisToken = 0;
     let reviewAnalysisMode = "quick";
     let reviewReturnFocus = null;
+    let reviewEntryScrollY = 0;
+    let reviewDockTab = "timeline";
     let lastReviewSoundKey = "";
     let reviewRetryState = null;
     let postGameDecisionPgn = "";
@@ -13182,12 +13892,38 @@
       return seconds >= 60 ? `about ${Math.ceil(seconds / 60)} min left` : `about ${seconds}s left`;
     }
 
-    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}) {
-      if (!coachGame || !CoachChess) return null;
-      const moves = coachGame.history({ verbose: true });
+    function getReviewAnalysisTimeoutMs(config, moveCount) {
+      // Includes the first WASM boot plus a bounded response window for each
+      // position. This is intentionally an operation-level guard: a worker
+      // can fail between its own command-level timeouts.
+      const searches = Math.max(2, Number(moveCount || 0) + 1);
+      const perSearch = Math.max(1200, Number(config?.movetime || 0) + 1000);
+      return Math.min(300000, Math.max(18000, 8000 + searches * perSearch));
+    }
+
+    function showReviewAnalysisError(token, message) {
+      if (reviewAnalysisToken !== token) return;
+      if (stockfishPending?.purpose === "review") cancelStockfishSearch("Review engine timed out", true);
+      reviewAnalysisToken += 1;
+      activeReviewAnalysisPgn = "";
+      const panel = document.getElementById("premiumReview");
+      const workspace = document.getElementById("gameReviewWorkspace");
+      panel?.classList.remove("review-state-loading");
+      panel?.classList.add("review-state-error");
+      workspace?.classList.remove("review-state-loading");
+      workspace?.classList.add("review-state-error");
+      panel?.removeAttribute("aria-busy");
+      document.getElementById("reviewRetry")?.removeAttribute("hidden");
+      const summary = document.getElementById("reviewSummaryLine");
+      if (summary) summary.textContent = message;
+    }
+
+    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}, sourceGame = coachGame) {
+      if (!sourceGame || !CoachChess) return null;
+      const moves = sourceGame.history({ verbose: true });
       if (!moves.length) return null;
-      const finalFen = coachGame.fen();
-      const finalPgn = coachGame.pgn();
+      const finalFen = sourceGame.fen();
+      const finalPgn = sourceGame.pgn();
       const opening = getReviewOpeningName(moves.map((move) => move.san));
       const whiteLosses = [];
       const blackLosses = [];
@@ -13287,9 +14023,9 @@
       const averageDepth = analysisDepths.length
         ? Math.round(analysisDepths.reduce((sum, depth) => sum + depth, 0) / analysisDepths.length)
         : 0;
-      const result = callCoachRule(coachGame, "isCheckmate", "in_checkmate")
-        ? (coachGame.turn() === getCoachBotColor() ? "You won by checkmate." : "The coach won by checkmate.")
-        : callCoachRule(coachGame, "isDraw", "in_draw") || coachDrawAgreed ? "The game ended peacefully." : "Game finished.";
+      const result = callCoachRule(sourceGame, "isCheckmate", "in_checkmate")
+        ? (sourceGame.turn() === getCoachBotColor() ? "You won by checkmate." : "The coach won by checkmate.")
+        : callCoachRule(sourceGame, "isDraw", "in_draw") || coachDrawAgreed ? "The game ended peacefully." : "Game finished.";
       return {
         id: `review-${Date.now()}`,
         date: new Date().toISOString(),
@@ -13546,6 +14282,35 @@
       if (stockfishPending?.purpose === "review") cancelStockfishSearch(reason);
     }
 
+    function setReviewDockTab(nextTab, focusTab = false) {
+      const tabs = ["timeline", "moves", "graph", "insights"];
+      if (!tabs.includes(nextTab)) return;
+      reviewDockTab = nextTab;
+      document.querySelectorAll("[data-review-dock-tab]").forEach((tab) => {
+        const selected = tab.dataset.reviewDockTab === nextTab;
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+        if (selected && focusTab) tab.focus({ preventScroll: true });
+      });
+      document.querySelectorAll("[data-review-dock-panel]").forEach((panel) => {
+        panel.toggleAttribute("hidden", panel.dataset.reviewDockPanel !== nextTab);
+      });
+    }
+
+    function bindReviewDockTabs() {
+      const tabs = Array.from(document.querySelectorAll("[data-review-dock-tab]"));
+      tabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => setReviewDockTab(tab.dataset.reviewDockTab, true));
+        tab.addEventListener("keydown", (event) => {
+          const isArrow = event.key === "ArrowRight" || event.key === "ArrowLeft";
+          if (!isArrow && event.key !== "Home" && event.key !== "End") return;
+          event.preventDefault();
+          const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+          setReviewDockTab(tabs[nextIndex].dataset.reviewDockTab, true);
+        });
+      });
+    }
+
     function ensureGameReviewWorkspaceOrigins() {
       if (reviewWorkspaceOrigins) return reviewWorkspaceOrigins;
       const entries = [
@@ -13554,7 +14319,7 @@
         ["summary", document.getElementById("reviewLeftSidebar"), document.getElementById("reviewSummarySlot")],
         ["quality", document.querySelector(".review-quality-card"), document.getElementById("reviewImprovementSlot")],
         ["growth", document.getElementById("reviewGrowthTrail"), document.getElementById("reviewImprovementSlot")],
-        ["opening", document.querySelector(".review-opening-card"), document.getElementById("reviewImprovementSlot")],
+        ["opening", document.querySelector(".review-opening-card"), document.getElementById("reviewSummarySlot")],
         ["chart", document.querySelector(".review-center-chart"), document.getElementById("reviewChartSlot")],
         ["board", document.querySelector(".play-board-wrap"), document.getElementById("reviewBoardSlot")],
         ["timeline", document.getElementById("reviewCenterTimeline"), document.getElementById("reviewTimelineSlot")],
@@ -13583,65 +14348,11 @@
           slot,
           parent: node.parentNode,
           next: node.nextSibling,
-          open: node instanceof HTMLDetailsElement ? node.open : null
+          open: node instanceof HTMLDetailsElement ? node.open : null,
+          scrollTop: node instanceof HTMLElement ? node.scrollTop : 0
         }]));
       return reviewWorkspaceOrigins;
     }
-
-    function getGameReviewStaging() {
-      const reviewPage = document.getElementById("gameReview");
-      if (!reviewPage) return null;
-      let staging = document.getElementById("gameReviewStaging");
-      if (!staging) {
-        staging = document.createElement("div");
-        staging.id = "gameReviewStaging";
-        staging.hidden = true;
-        staging.setAttribute("aria-hidden", "true");
-        reviewPage.append(staging);
-      }
-      return staging;
-    }
-
-    function stageReviewSourcesForLivePlay() {
-      const staging = getGameReviewStaging();
-      const origins = ensureGameReviewWorkspaceOrigins();
-      const liveCoachSlot = document.getElementById("playLiveCoachSlot");
-      const liveMoveSlot = document.getElementById("playLiveMoveSlot");
-      const liveCapturesSlot = document.getElementById("playLiveCapturesSlot");
-      const liveChatSlot = document.getElementById("playLiveChatSlot");
-      const playWorkspace = document.getElementById("playWorkspace");
-      if (!staging || !origins?.size || !playWorkspace) return;
-      [
-        ["enginePanel", liveCoachSlot],
-        ["coachTools", liveCoachSlot],
-        ["moveHistory", liveMoveSlot],
-        ["captured", liveCapturesSlot],
-        ["friendChat", liveChatSlot]
-      ].forEach(([name, slot]) => {
-        const node = origins.get(name)?.node;
-        if (!node || !slot) return;
-        slot.append(node);
-        if (node instanceof HTMLDetailsElement && (name === "coachTools" || name === "moveHistory")) node.open = true;
-      });
-      ["header", "summary", "chart", "timeline", "playerStrip", "evalRail", "rightRail"].forEach((name) => {
-        const node = origins.get(name)?.node;
-        if (node) staging.append(node);
-      });
-      const reviewOnlyRoots = [
-        ".review-workspace-header",
-        "#reviewLeftSidebar",
-        ".review-center-chart",
-        "#reviewCenterTimeline",
-        ".review-player-strip",
-        "#reviewEvalRail",
-        ".play-right-sidebar"
-      ];
-      playWorkspace.querySelectorAll(reviewOnlyRoots.join(",")).forEach((node) => staging.append(node));
-      playWorkspace.dataset.reviewIsolated = String(!playWorkspace.querySelector(reviewOnlyRoots.join(",")));
-      document.getElementById("reviewEvalRail")?.setAttribute("hidden", "");
-    }
-
-    stageReviewSourcesForLivePlay();
 
     function isGameReviewRoute() {
       return String(window.location.hash || "").replace(/^#/, "").split("?")[0] === "game-review";
@@ -13665,6 +14376,7 @@
       if (!workspace || !reviewPage || !origins?.size) return;
       const isEnteringReview = !reviewPage.classList.contains("is-review-page");
       if (isEnteringReview) {
+        reviewEntryScrollY = window.scrollY;
         document.getElementById("reviewReferenceDetails")?.removeAttribute("open");
       }
       ["header", "currentMoveStatus", "summary", "performance", "quality", "growth", "opening", "chart", "board", "timeline", "focus", "selfAnalysis", "oneMoment", "recommendations", "comparison", "controls", "references", "practiceLinks", "moveHistory"].forEach((name) => {
@@ -13679,8 +14391,17 @@
       playWorkspace?.setAttribute("hidden", "");
       playWorkspace?.setAttribute("inert", "");
       workspace.removeAttribute("hidden");
+      document.body.classList.add("is-game-review-active");
       reviewPage.classList.add("is-review-page");
+      setReviewDockTab(reviewDockTab);
       navigateToGameReviewPage();
+      if (isEnteringReview) {
+        // Hash routing schedules its own panel scroll. Run after that work so a
+        // newly opened Review never inherits the Play page's document position.
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+        });
+      }
     }
 
     function restoreGameReviewWorkspace() {
@@ -13689,17 +14410,20 @@
       const playWorkspace = document.getElementById("playWorkspace");
       const origins = ensureGameReviewWorkspaceOrigins();
       if (!workspace || !origins?.size) return;
-      ["references", "controls", "comparison", "recommendations", "oneMoment", "selfAnalysis", "focus", "performance", "practiceLinks", "opening", "growth", "quality", "timeline", "board", "chart", "summary", "currentMoveStatus", "header"].forEach((name) => {
-        const origin = origins.get(name);
-        if (!origin?.node || !origin.parent) return;
+      [...origins.values()].reverse().forEach((origin) => {
+        if (!origin?.node || !origin.parent || origin.node.parentNode === origin.parent) return;
         if (origin.next?.parentNode === origin.parent) origin.parent.insertBefore(origin.node, origin.next);
         else origin.parent.append(origin.node);
         if (origin.open !== null && origin.node instanceof HTMLDetailsElement) origin.node.open = origin.open;
+        if (origin.node instanceof HTMLElement) origin.node.scrollTop = origin.scrollTop;
       });
-      stageReviewSourcesForLivePlay();
       workspace.setAttribute("hidden", "");
+      workspace.classList.remove("review-state-loading", "review-state-error");
+      workspace.style.removeProperty("--review-accent");
       playWorkspace?.removeAttribute("hidden");
       playWorkspace?.removeAttribute("inert");
+      document.body.classList.remove("is-game-review-active");
+      document.getElementById("play")?.classList.remove("is-review-mode");
       reviewPage?.classList.remove("is-review-page");
     }
 
@@ -13722,6 +14446,7 @@
 
     function exitGameReview() {
       const returnFocus = reviewReturnFocus;
+      const returnScrollY = reviewEntryScrollY;
       reviewReturnFocus = null;
       cancelActiveReviewAnalysis();
       window.clearInterval(reviewReplayTimer);
@@ -13740,6 +14465,8 @@
       renderCoachBoard();
       navigateToPlayPage();
       window.requestAnimationFrame(() => {
+        window.scrollTo({ top: returnScrollY, behavior: "auto" });
+        reviewEntryScrollY = 0;
         const fallback = document.getElementById("postGameDecisionReview") || returnFocus;
         if (fallback?.isConnected) fallback.focus({ preventScroll: true });
       });
@@ -13963,6 +14690,7 @@
       if (replayBestButton) replayBestButton.disabled = !active?.engineVerified || !(active?.pvUci || (active?.bestFrom && active?.bestTo));
       renderReviewDashboard(review, active);
       renderReviewGrowthTrail(review);
+      renderReviewMoveHistory(review);
     }
 
     function stopReviewBestLineReplay() {
@@ -14697,28 +15425,15 @@
       renderCoachBoard();
     }
 
-    function usesPostGameSidePanel() {
-      return window.matchMedia("(min-width: 1280px)").matches && Boolean(document.getElementById("playLiveAnalysis"));
-    }
-
     function getPostGameDecisionDialog() {
-      const dialog = document.getElementById("postGameDecision");
-      const host = usesPostGameSidePanel() ? document.getElementById("playLiveAnalysis") : document.body;
-      if (dialog && host && dialog.parentElement !== host) host.appendChild(dialog);
-      return dialog;
+      return document.getElementById("postGameDecision");
     }
 
     function setPostGameDecisionModalState(isOpen) {
       const playWorkspace = document.getElementById("playWorkspace");
       const boardColumn = document.querySelector("#play:not(.is-review-mode) .match-board-column");
-      const useSidePanel = isOpen && usesPostGameSidePanel();
-      document.body.classList.toggle("post-game-panel-open", useSidePanel);
-      document.body.classList.toggle("post-game-dialog-open", isOpen && !useSidePanel);
-      if (useSidePanel) {
-        playWorkspace?.removeAttribute("inert");
-        boardColumn?.setAttribute("inert", "");
-        return;
-      }
+      document.body.classList.remove("post-game-panel-open");
+      document.body.classList.toggle("post-game-dialog-open", isOpen);
       boardColumn?.removeAttribute("inert");
       if (isOpen) playWorkspace?.setAttribute("inert", "");
       else playWorkspace?.removeAttribute("inert");
@@ -14821,14 +15536,41 @@
       }
     }
 
+    function getReviewAnalysisSnapshot() {
+      if (coachGame && (isCoachGameOver() || coachDrawAgreed)) {
+        return { game: coachGame, pgn: coachGame.pgn() };
+      }
+      const savedReview = activeMatchReview;
+      const pgn = String(savedReview?.pgn || "").trim();
+      if (!pgn || !CoachChess) return null;
+      try {
+        const moves = Array.isArray(savedReview?.moves) ? savedReview.moves : [];
+        if (moves.length) {
+          const game = new CoachChess();
+          for (const move of moves) {
+            const applied = game.move({ from: move.from, to: move.to, ...(move.promotion ? { promotion: move.promotion } : {}) });
+            if (!applied) return null;
+          }
+          if (game.history().length === moves.length) return { game, pgn };
+        }
+        const game = new CoachChess();
+        const loaded = typeof game.loadPgn === "function" ? game.loadPgn(pgn) : game.load_pgn?.(pgn);
+        if (loaded === false || !game.history().length) return null;
+        return { game, pgn: game.pgn() };
+      } catch {
+        return null;
+      }
+    }
+
     function openPostGameReview(options = {}) {
-      if (!coachGame || (!isCoachGameOver() && !coachDrawAgreed)) return;
+      const analysisSnapshot = getReviewAnalysisSnapshot();
+      if (!analysisSnapshot) return;
       const mode = options?.mode === "deep" ? "deep" : "quick";
       const force = Boolean(options?.force);
       reviewAnalysisMode = mode;
       if (!force && document.activeElement instanceof HTMLElement) reviewReturnFocus = document.activeElement;
       hidePostGameDecision();
-      const pgn = coachGame.pgn();
+      const pgn = analysisSnapshot.pgn;
       reviewRequestedPgn = pgn;
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
       const requestedLabel = getReviewAnalysisModeLabel(mode);
@@ -14847,7 +15589,7 @@
         document.getElementById("reviewSummaryLine").textContent = `${getReviewAnalysisModeLabel(mode)} is preparing your review...`;
         document.getElementById("reviewAccuracyBadge").textContent = mode === "deep" ? "Deep analysis" : "Analyzing";
       }
-      ensurePostGameReview(true, { force, mode });
+      ensurePostGameReview(true, { force, mode, analysisSnapshot });
     }
 
     function startDeepGameReview() {
@@ -14855,7 +15597,8 @@
     }
 
     function ensurePostGameReview(shouldAnalyze = false, options = {}) {
-      if (!coachGame || (!isCoachGameOver() && !coachDrawAgreed)) {
+      const analysisSnapshot = options?.analysisSnapshot || getReviewAnalysisSnapshot();
+      if (!analysisSnapshot) {
         renderPostGameFlow(false);
         return;
       }
@@ -14864,7 +15607,7 @@
       const mode = options?.mode === "deep" ? "deep" : reviewAnalysisMode;
       const force = Boolean(options?.force);
       const requestedLabel = getReviewAnalysisModeLabel(mode);
-      const pgn = coachGame.pgn();
+      const pgn = analysisSnapshot.pgn;
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
       if (cached && !force && (cached.analysis?.mode || "Quick engine") === requestedLabel) {
         if (reviewRequestedPgn === pgn) openSavedMatchReview(cached);
@@ -14873,8 +15616,10 @@
       if (activeReviewAnalysisPgn === pgn && !force) return;
       if (force) cancelActiveReviewAnalysis("Starting a new review pass");
       const token = ++reviewAnalysisToken;
-      const gameAtAnalysis = coachGame;
+      const gameAtAnalysis = analysisSnapshot.game;
       const analysisConfig = getReviewAnalysisConfig(mode);
+      const analysisTimeoutMs = getReviewAnalysisTimeoutMs(analysisConfig, gameAtAnalysis.history().length);
+      let reviewWatchdog = 0;
       const updateAnalysisProgress = (progress = {}) => {
         if (reviewAnalysisToken !== token || reviewRequestedPgn !== pgn) return;
         const totalMoves = Math.max(1, Number(progress.totalMoves) || gameAtAnalysis.history().length || 1);
@@ -14889,29 +15634,32 @@
       };
       activeReviewAnalysisPgn = pgn;
       updateAnalysisProgress({ percentage: 0, completedMoves: 0, totalMoves: gameAtAnalysis.history().length, remainingMs: (Number(analysisConfig.movetime) + 180) * (gameAtAnalysis.history().length + 1) });
-      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && coachGame === gameAtAnalysis && coachGame?.pgn() === pgn, updateAnalysisProgress)
+      reviewWatchdog = window.setTimeout(() => {
+        const label = mode === "deep" ? "Deep Review" : "Game Review";
+        showReviewAnalysisError(token, `${label} stopped waiting for Stockfish. Try again to restart the engine.`);
+      }, analysisTimeoutMs);
+      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && reviewRequestedPgn === pgn, updateAnalysisProgress, gameAtAnalysis)
         .then((review) => {
+          window.clearTimeout(reviewWatchdog);
           if (!review || reviewAnalysisToken !== token || review.pgn !== pgn) return;
+          if (mode === "deep" && !review.analysis?.verifiedMoves) {
+            showReviewAnalysisError(token, "Deep Review could not get a response from Stockfish. Try again to restart the engine.");
+            return;
+          }
           activeMatchReview = review;
           reviewReplayIndex = Math.max(0, review.moves.length - 1);
           saveActiveMatchReview(review);
-          if (reviewRequestedPgn === pgn && coachGame?.pgn() === pgn) openSavedMatchReview(review);
+          if (reviewRequestedPgn === pgn) openSavedMatchReview(review);
           else renderPostGameFlow(true);
         })
         .catch(() => {
+          window.clearTimeout(reviewWatchdog);
           if (reviewAnalysisToken !== token || reviewRequestedPgn !== pgn) return;
-          const panel = document.getElementById("premiumReview");
-          const workspace = document.getElementById("gameReviewWorkspace");
-          panel?.classList.remove("review-state-loading");
-          panel?.classList.add("review-state-error");
-          workspace?.classList.remove("review-state-loading");
-          workspace?.classList.add("review-state-error");
-          panel?.removeAttribute("aria-busy");
-          document.getElementById("reviewRetry")?.removeAttribute("hidden");
-          const summary = document.getElementById("reviewSummaryLine");
-          if (summary) summary.textContent = "Review could not load right now. Start another game or try again shortly.";
+          const label = mode === "deep" ? "Deep Review" : "Game Review";
+          showReviewAnalysisError(token, `${label} could not load right now. Try again to restart the engine.`);
         })
         .finally(() => {
+          window.clearTimeout(reviewWatchdog);
           if (reviewAnalysisToken === token) activeReviewAnalysisPgn = "";
         });
     }
@@ -15800,7 +16548,6 @@
 
     function restartCoachGame() {
       if (!CoachChess) return;
-      stageReviewSourcesForLivePlay();
       coachMoveToken += 1;
       window.clearInterval(reviewReplayTimer);
       reviewSelfAnalysisState = null;
@@ -16365,6 +17112,7 @@
         friendNetworkState.challenges = (Array.isArray(challenges) ? challenges : []).map(normalizeRemoteFriendChallenge).filter(Boolean);
         friendNetworkLastRefresh = Date.now();
         renderPlaySocialBar();
+        renderFriendsHub();
         const state = friendChallengeState || readFriendChallengeState();
         const matching = state.remote ? friendNetworkState.challenges.find((challenge) => challenge.code === state.code) : null;
         const incoming = friendNetworkState.challenges.find((challenge) => challenge.status === "pending" && challenge.opponentId === getFriendCurrentUserId());
@@ -16414,6 +17162,7 @@
         try { friendNetworkUnsubscribe?.(); } catch {}
         friendNetworkUnsubscribe = null;
         friendNetworkSubscribing = false;
+        friendRealtimeReady = false;
         ensureFriendRealtime();
         queueFriendNetworkRefresh();
       }, delay);
@@ -16423,9 +17172,11 @@
       if (generation !== friendNetworkSubscriptionGeneration) return;
       if (event?.type === "status") {
         if (event.status === "SUBSCRIBED") {
+          friendRealtimeReady = true;
           friendRealtimeReconnectAttempts = 0;
           queueFriendNetworkRefresh();
         } else if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(event.status)) {
+          friendRealtimeReady = false;
           scheduleFriendRealtimeReconnect(generation);
         }
         return;
@@ -16437,6 +17188,7 @@
       if (friendNetworkUnsubscribe || friendNetworkSubscribing || !provider?.subscribeFriendChallenges) return;
       const generation = friendNetworkSubscriptionGeneration;
       friendNetworkSubscribing = true;
+      friendRealtimeReady = false;
       Promise.resolve(provider.subscribeFriendChallenges((event) => handleFriendRealtimeEvent(event, generation)))
         .then((unsubscribe) => {
           if (generation !== friendNetworkSubscriptionGeneration) {
@@ -16677,6 +17429,7 @@
         setFriendChallengeStatus("Unblock this player in Privacy settings before sending a challenge.");
         return;
       }
+      if (target) rememberRecentFriendPlayer(target);
       return runFriendAction(`challenge:create:${target?.id || "invite"}`, () => createFriendChallengeRequest(target));
     }
 
@@ -17644,6 +18397,7 @@
       try { friendNetworkUnsubscribe?.(); } catch {}
       friendNetworkUnsubscribe = null;
       friendNetworkSubscribing = false;
+      friendRealtimeReady = false;
     }
 
     async function syncFriendPresence(connected = !document.hidden) {
@@ -17750,8 +18504,12 @@
     function startFriendNetworkSync() {
       if (!getFriendProvider()) return;
       ensureFriendRealtime();
+      ensureSocialNotificationRealtime();
       void refreshFriendNetwork(true);
-      if (!friendNetworkTimer) friendNetworkTimer = window.setInterval(() => void refreshFriendNetwork(), 5000);
+      void refreshSocialNotifications();
+      if (!friendNetworkTimer) friendNetworkTimer = window.setInterval(() => {
+        if (!friendRealtimeReady) void refreshFriendNetwork(true);
+      }, 30000);
     }
 
     function setFriendChallengeLobbyView(view = "create") {
@@ -18931,7 +19689,6 @@
       bindRealPuzzleBoardEvents(board);
       const legalByTarget = new Map(realPuzzleLegalMoves.map((move) => [move.to, move]));
       const lastSquares = realPuzzleLastMove ? [realPuzzleLastMove.from, realPuzzleLastMove.to] : [];
-      const displayPositionKey = realPuzzleGame?.fen?.() || realPuzzleBank[realPuzzleIndex]?.fen || "";
       const checkedKing = realPuzzleGame && callCoachRule(realPuzzleGame, "isCheck", "in_check")
         ? getRealPuzzleSquares().find((square) => realPuzzleGame.get(square)?.type === "k" && realPuzzleGame.get(square)?.color === realPuzzleGame.turn()) || ""
         : "";
@@ -18948,9 +19705,13 @@
         if (legalMove) square.classList.add(legalMove.captured || legalMove.flags.includes("e") ? "capture" : "legal");
         if (lastSquares.includes(squareNameValue)) square.classList.add("last-move");
         if (squareNameValue === checkedKing) square.classList.add("in-check");
+        // Squares own their piece nodes. A full-position key forced all 64
+        // squares to repaint after every legal move, causing the visible dark
+        // flash between frames. Only repaint this square when its own piece or
+        // the selected piece assets have changed.
         const pieceKey = piece
-          ? `${displayPositionKey}:${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}`
-          : `${displayPositionKey}:empty`;
+          ? `${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}`
+          : "empty";
         if (square.dataset.pieceKey !== pieceKey) {
           renderPieceOnSquare(square, piece, activePieceSvgSet, false);
           square.dataset.pieceKey = pieceKey;
@@ -19095,7 +19856,7 @@
           realPuzzleSolved.add(puzzle.id);
           const reward = getRealPuzzleReward(puzzle, seconds);
           const xpResult = addPuzzleXp(reward.xp);
-          addPuzzleCoins(reward.coins);
+          addPuzzleCoins(reward.coins, "puzzle reward");
           addExtraRewards(reward);
           realPuzzleCoinsEarned += reward.coins;
           if (!realPuzzleBestSeconds || seconds < realPuzzleBestSeconds) realPuzzleBestSeconds = seconds;
@@ -19103,6 +19864,7 @@
           renderStore();
           renderPlayerProfile();
           playPuzzleTone("milestone");
+          publishLearningActivity("puzzle_solved", `real-puzzle:${puzzle.id}`, { puzzleId: puzzle.id, theme: puzzle.theme || "", rating: puzzle.rating || null });
           showCelebration("Real puzzle solved!", formatRewardText(reward), xpResult.levelUp ? "New level!" : puzzle.theme);
         }
         completionMessage = `Solved in ${formatPuzzleTime(seconds * 1000)}. Line: ${realPuzzleMoveSans.join(" ")}. ${puzzle.note}`;
@@ -19149,6 +19911,7 @@
         realPuzzleLegalMoves = [];
         document.getElementById("realPuzzleFeedback").textContent = "Nice try. Look for a forcing check, capture, or threat, then try again.";
         playPuzzleTone("wrong");
+        flashPuzzleBoard("is-wrong", "realPuzzleBoard");
         setRealPuzzlePhase("PlayerTurn");
         renderRealPuzzleBoard();
         saveRealPuzzleState();
@@ -19167,6 +19930,7 @@
       realPuzzleLastMove = played;
       realPuzzleMoveSans.push(played.san);
       playPuzzleTone("correct");
+      flashPuzzleBoard("is-correct", "realPuzzleBoard");
       document.getElementById("realPuzzleMoves").textContent = realPuzzleMoveSans.join(" ");
       if (realPuzzleStep >= realPuzzleLine.length) {
         setRealPuzzlePhase("Success");
@@ -19464,7 +20228,8 @@
       document.getElementById("postGameHistory")?.addEventListener("click", togglePostGameHistory);
       document.getElementById("postGameHome")?.addEventListener("click", () => { window.location.hash = "#top"; });
       document.getElementById("reviewExit")?.addEventListener("click", exitGameReview);
-      document.getElementById("reviewRetry")?.addEventListener("click", openPostGameReview);
+      bindReviewDockTabs();
+      document.getElementById("reviewRetry")?.addEventListener("click", () => openPostGameReview({ force: true, mode: reviewAnalysisMode }));
       document.getElementById("reviewSelfAnalysis")?.addEventListener("click", () => {
         if (isReviewSelfAnalysisActive()) exitReviewSelfAnalysis(); else startReviewSelfAnalysis();
       });
@@ -19820,6 +20585,7 @@
         setupVideoTheater();
       },
       plan: setupDailyTraining,
+      friends: setupFriendsHub,
       leaderboards: renderLeaderboards,
       hero: () => {
         buildHeroBoard();
@@ -19869,6 +20635,7 @@
         videos: ["videos"],
         gameReview: ["play"],
         plan: ["plan"],
+        friends: ["friends"],
         leaderboards: ["leaderboards"]
       }[panel] || [];
       if (featureNames.length) featureNames.unshift("persistence");
@@ -19878,7 +20645,7 @@
     function setupSiteTabs() {
       if (setupSiteTabs.ready) return;
       setupSiteTabs.ready = true;
-      const panelIds = ["login", "settings", "store", "admin", "tutorial", "academy", "paths", "adventures", "rules", "openings", "videos", "books", "notation", "bots", "play", "gameReview", "leaderboards", "puzzles", "plan"];
+      const panelIds = ["login", "settings", "store", "admin", "tutorial", "academy", "paths", "adventures", "rules", "openings", "videos", "books", "notation", "bots", "play", "friends", "gameReview", "leaderboards", "puzzles", "plan"];
       const links = [...document.querySelectorAll("[data-site-tab]")];
       const tabLinks = [...document.querySelectorAll("[data-site-tab], [data-home-link]")];
       const hashLinks = [...document.querySelectorAll('a[href^="#"]')];
@@ -19907,6 +20674,7 @@
         const cleanHash = rawHash.split("?")[0];
         if (!cleanHash || cleanHash === "top") return null;
         if (cleanHash === "admin") return { tab: "admin", panel: "admin", focus: "admin" };
+        if (cleanHash === "friends") return { tab: "friends", panel: "friends", focus: "friends" };
         if (cleanHash === "game-review") return { tab: "gameReview", panel: "gameReview", focus: "gameReview" };
         if (cleanHash === "tournaments" || /(^|[?&])(mode=tournament|tournament=)/.test(rawHash)) {
           return { tab: "tournaments", panel: "play", focus: "tournamentLobby" };
@@ -19968,6 +20736,7 @@
           books: "page-learn",
           bots: "page-play",
           play: "page-play",
+          friends: "page-profile",
           gameReview: "page-play",
           tournaments: "page-play",
           leaderboards: "page-profile",
@@ -20065,6 +20834,13 @@
         panelInitFrame = window.requestAnimationFrame(() => {
           panelInitFrame = 0;
           initializePanelFeatures(config.panel);
+          if (config.panel === "store") {
+            // The wallet/inventory is server-authoritative. Refresh on every
+            // Store visit so a purchase, gift claim, or reward made elsewhere
+            // cannot leave the client showing stale local state.
+            void refreshServerStoreState().catch(() => {});
+            void refreshStoreGiftInbox();
+          }
         });
 
         clearActiveTabs();
@@ -20442,7 +21218,7 @@
       const fallback = {
         name: "", level: "New Explorer", goal: "Learn one easy idea", joinDate: "", lastLogin: "",
         countryFlag: "", bio: "", favoriteTheme: "Tactics", privacy: "friends", friendRequests: "on",
-        onlineStatus: "show", matchHistoryVisibility: "friends", blockedUsers: "", email: "",
+        onlineStatus: "show", matchHistoryVisibility: "friends", activityVisibility: "friends", allowMessages: "friends", allowSpectating: "friends", blockedUsers: "", email: "",
         language: "en", notifications: true, dailyReminder: true, soundAlerts: true,
         coachTone: "friendly", weeklySummary: "on", preferredTimeControl: "5+0", sessionMinutes: "10"
       };
@@ -20553,6 +21329,8 @@
       renderFriendDirectory();
       renderFriendGameChat();
       renderPlaySocialBar();
+      const provider = getFriendProvider();
+      if (id && provider?.blockUser) void provider.blockUser(id).catch(() => {});
       return true;
     }
 
@@ -20563,6 +21341,88 @@
     function getAuthProvider() {
       const provider = window.CheckmateQuestAuthProvider;
       return provider && typeof provider === "object" ? provider : null;
+    }
+
+    function syncServerPrivacySettings() {
+      const provider = getFriendProvider();
+      if (!provider?.updateUserPrivacySettings) return;
+      const profile = readLearnerProfile();
+      const payload = {
+        profileVisibility: ["public", "friends", "private"].includes(profile.privacy) ? profile.privacy : "friends",
+        allowFriendRequests: ["on", "friends", "off"].includes(profile.friendRequests) ? profile.friendRequests : "on",
+        // Keep challenge defaults compatible with the existing challenge flow;
+        // messages and spectating are now explicit controls in Settings.
+        allowChallenges: "on",
+        allowMessages: ["on", "friends", "off"].includes(profile.allowMessages) ? profile.allowMessages : "friends",
+        allowSpectating: ["on", "friends", "off"].includes(profile.allowSpectating) ? profile.allowSpectating : "friends",
+        onlineStatus: ["show", "friends", "hide"].includes(profile.onlineStatus) ? profile.onlineStatus : "show",
+        matchHistoryVisibility: ["public", "friends", "private"].includes(profile.matchHistoryVisibility) ? profile.matchHistoryVisibility : "friends",
+        activityVisibility: ["public", "friends", "private"].includes(profile.activityVisibility) ? profile.activityVisibility : "friends"
+      };
+      const save = provider.updateUserPrivacySettingsV2
+        ? provider.updateUserPrivacySettingsV2(payload).catch(() => provider.updateUserPrivacySettings(payload))
+        : provider.updateUserPrivacySettings(payload);
+      void Promise.resolve(save).catch(() => {});
+      if (provider.updateActivityVisibility) void provider.updateActivityVisibility(payload.activityVisibility).catch(() => {});
+    }
+
+    function hydrateServerPrivacySettings() {
+      const provider = getFriendProvider();
+      const userId = getFriendCurrentUserId();
+      if (!provider?.getUserPrivacySettings || !userId || serverPrivacyHydratedFor === userId) return;
+      serverPrivacyHydratedFor = userId;
+      void provider.getUserPrivacySettings().then((settings) => {
+        if (!settings || typeof settings !== "object") return;
+        const current = readLearnerProfile();
+        writeJsonStorage(learnerProfileStorageKey, {
+          ...current,
+          privacy: settings.profile_visibility || current.privacy,
+          friendRequests: settings.allow_friend_requests || current.friendRequests,
+          allowMessages: settings.allow_messages || current.allowMessages,
+          allowSpectating: settings.allow_spectating || current.allowSpectating,
+          onlineStatus: settings.online_status || current.onlineStatus,
+          matchHistoryVisibility: settings.match_history_visibility || current.matchHistoryVisibility,
+          activityVisibility: settings.activity_visibility || current.activityVisibility,
+          updatedAt: new Date().toISOString()
+        });
+        syncSettingsProfileFields();
+      }).catch(() => { serverPrivacyHydratedFor = ""; });
+    }
+
+    function syncServerBlockedUsers({ allowUnblock = false } = {}) {
+      const provider = getFriendProvider();
+      if (!provider?.listUserBlocks) return;
+      const local = getBlockedUserKeys();
+      void provider.listUserBlocks().then((rows) => {
+        const server = new Map((Array.isArray(rows) ? rows : []).map((row) => [normalizeBlockedUserKey(row?.blocked_id || row?.blockedId), row]));
+        if (!allowUnblock && server.size) {
+          const merged = new Set(local);
+          server.forEach((row, key) => { if (key) merged.add(key); });
+          if (merged.size !== local.size) {
+            const profile = readLearnerProfile();
+            writeJsonStorage(learnerProfileStorageKey, { ...profile, blockedUsers: [...merged].join("\n"), updatedAt: new Date().toISOString() });
+            syncSettingsProfileFields();
+          }
+        }
+        if (allowUnblock) serverBlockedUserIds.forEach((id) => {
+          if (!local.has(id)) void provider.unblockUser?.(id)?.catch(() => {});
+        });
+        local.forEach((key) => {
+          if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(key)) {
+            if (!server.has(key)) void provider.blockUser?.(key)?.catch(() => {});
+            return;
+          }
+          // The settings field historically accepted usernames. Resolve an
+          // exact match once, then enforce the block by immutable user id.
+          const lookup = provider.searchRegisteredPlayers?.(key);
+          if (!lookup?.then) return;
+          void lookup.then((matches) => {
+            const match = (Array.isArray(matches) ? matches : []).find((row) => normalizeBlockedUserKey(row?.username) === key);
+            if (match?.public_id) void provider.blockUser?.(match.public_id)?.catch(() => {});
+          }).catch(() => {});
+        });
+        serverBlockedUserIds = new Set(server.keys());
+      }).catch(() => {});
     }
 
     function createVercelLeaderboardProvider() {
@@ -20923,6 +21783,71 @@
         getLeaderboard: getSharedLeaderboard,
         upsertLeaderboardEntry: saveSharedLeaderboard,
         getCachedAccount: () => cachedAccount,
+        getUserPrivacySettings: () => callFriendRpc("get_user_privacy_settings"),
+        updateUserPrivacySettings: (settings = {}) => callFriendRpc("update_user_privacy_settings", {
+          p_profile_visibility: String(settings.profileVisibility || "friends"),
+          p_allow_friend_requests: String(settings.allowFriendRequests || "on"),
+          p_allow_challenges: String(settings.allowChallenges || "on"),
+          p_allow_messages: String(settings.allowMessages || "friends"),
+          p_online_status: String(settings.onlineStatus || "show"),
+          p_match_history_visibility: String(settings.matchHistoryVisibility || "friends")
+        }),
+        updateUserPrivacySettingsV2: (settings = {}) => callFriendRpc("update_user_privacy_settings_v2", {
+          p_profile_visibility: String(settings.profileVisibility || "friends"),
+          p_allow_friend_requests: String(settings.allowFriendRequests || "on"),
+          p_allow_challenges: String(settings.allowChallenges || "on"),
+          p_allow_messages: String(settings.allowMessages || "friends"),
+          p_allow_spectating: String(settings.allowSpectating || "friends"),
+          p_online_status: String(settings.onlineStatus || "show"),
+          p_match_history_visibility: String(settings.matchHistoryVisibility || "friends")
+        }),
+        blockUser: (targetId) => callFriendRpc("block_user", { p_target_user: targetId }),
+        unblockUser: (targetId) => callFriendRpc("unblock_user", { p_target_user: targetId }),
+        listUserBlocks: () => callFriendRpc("list_user_blocks"),
+        getSocialNotifications: (limit = 40) => callFriendRpc("get_social_notifications", { p_limit: Math.max(1, Math.min(100, Number(limit) || 40)) }),
+        markSocialNotificationsRead: (ids = null) => callFriendRpc("mark_social_notifications_read", {
+          p_ids: Array.isArray(ids) && ids.length ? ids : null
+        }),
+        getSocialActivityFeed: (limit = 40, before = null) => callFriendRpc("get_social_activity_feed", {
+          p_limit: Math.max(1, Math.min(100, Number(limit) || 40)),
+          p_before: before || null
+        }),
+        publishLearningActivity: (activityType, dedupeKey, payload = {}) => callFriendRpc("publish_learning_activity", {
+          p_activity_type: String(activityType || ""),
+          p_dedupe_key: String(dedupeKey || ""),
+          p_payload: payload && typeof payload === "object" ? payload : {}
+        }),
+        updateActivityVisibility: (visibility) => callFriendRpc("update_activity_visibility", {
+          p_visibility: String(visibility || "friends")
+        }),
+        getStoreState: () => callFriendRpc("get_store_state"),
+        creditStoreReward: (amount, reason, idempotencyKey) => callFriendRpc("credit_store_reward", {
+          p_amount: Math.max(1, Math.min(5000, Number(amount) || 0)),
+          p_reason: String(reason || "gameplay reward"),
+          p_idempotency_key: String(idempotencyKey || "")
+        }),
+        purchaseCosmetic: (itemId, idempotencyKey) => callFriendRpc("purchase_cosmetic", {
+          p_item_id: String(itemId || ""), p_idempotency_key: String(idempotencyKey || "")
+        }),
+        purchaseCosmeticBundle: (itemIds, discount, idempotencyKey) => callFriendRpc("purchase_cosmetic_bundle", {
+          p_item_ids: Array.isArray(itemIds) ? itemIds.map((item) => String(item || "")).filter(Boolean) : [],
+          p_discount: Number(discount) || 0.15, p_idempotency_key: String(idempotencyKey || "")
+        }),
+        equipCosmetic: (itemId) => callFriendRpc("equip_cosmetic", { p_item_id: String(itemId || "") }),
+        listGiftInbox: (limit = 40) => callFriendRpc("list_gift_inbox", { p_limit: Math.max(1, Math.min(100, Number(limit) || 40)) }),
+        createCosmeticGift: (recipientId, itemId, message, idempotencyKey) => callFriendRpc("create_cosmetic_gift", {
+          p_recipient_id: recipientId, p_item_id: String(itemId || ""), p_message: String(message || ""), p_idempotency_key: String(idempotencyKey || "")
+        }),
+        claimCosmeticGift: (giftId) => callFriendRpc("claim_cosmetic_gift", { p_gift_id: giftId }),
+        declineCosmeticGift: (giftId) => callFriendRpc("decline_cosmetic_gift", { p_gift_id: giftId }),
+        getOrCreateConversation: (targetId) => callFriendRpc("get_or_create_conversation", { p_target_user: targetId }),
+        listConversations: (limit = 40) => callFriendRpc("list_conversations", { p_limit: Math.max(1, Math.min(100, Number(limit) || 40)) }),
+        getConversationMessages: (conversationId, before = null, limit = 50) => callFriendRpc("get_conversation_messages", { p_conversation_id: conversationId, p_before: before, p_limit: Math.max(1, Math.min(100, Number(limit) || 50)) }),
+        sendDirectMessage: (conversationId, body) => callFriendRpc("send_direct_message", { p_conversation_id: conversationId, p_body: String(body || "") }),
+        markConversationRead: (conversationId) => callFriendRpc("set_conversation_read", { p_conversation_id: conversationId }),
+        muteConversation: (conversationId, muted) => callFriendRpc("set_conversation_muted", { p_conversation_id: conversationId, p_muted: Boolean(muted) }),
+        setConversationTyping: (conversationId, isTyping) => callFriendRpc("set_conversation_typing", { p_conversation_id: conversationId, p_is_typing: Boolean(isTyping) }),
+        getConversationTyping: (conversationId) => callFriendRpc("get_conversation_typing", { p_conversation_id: conversationId }),
         searchRegisteredPlayers: (query) => callFriendRpc("search_registered_players", { p_query: String(query || "") }),
         getFriendDirectory: () => callFriendRpc("get_friend_directory"),
         touchFriendPresence: (connected = true) => callFriendRpc("touch_friend_presence", { p_connected: Boolean(connected) }),
@@ -20976,6 +21901,43 @@
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenges" }, (payload) => notify({ type: "change", table: "game_challenges", payload }))
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_messages" }, (payload) => notify({ type: "change", table: "game_challenge_messages", payload }))
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_presence" }, (payload) => notify({ type: "change", table: "game_challenge_presence", payload }))
+            .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests" }, (payload) => notify({ type: "change", table: "friend_requests", payload }))
+            .on("postgres_changes", { event: "*", schema: "public", table: "friend_presence" }, (payload) => notify({ type: "change", table: "friend_presence", payload }))
+            .subscribe((status) => notify({ type: "status", status }));
+          return () => { try { supabase.removeChannel(channel); } catch {} };
+        },
+        subscribeSocialNotifications: async (callback) => {
+          const supabase = await getSupabaseClient();
+          const userId = cachedAccount?.publicId || "";
+          if (!userId) return () => {};
+          const notify = (event) => { if (typeof callback === "function") callback(event); };
+          const channel = supabase.channel("checkmate-social-notifications")
+            .on("postgres_changes", {
+              event: "INSERT", schema: "public", table: "social_notifications",
+              filter: `recipient_id=eq.${userId}`
+            }, (payload) => notify({ type: "notification", payload }))
+            .subscribe((status) => notify({ type: "status", status }));
+          return () => { try { supabase.removeChannel(channel); } catch {} };
+        },
+        subscribeSocialActivity: async (callback) => {
+          const supabase = await getSupabaseClient();
+          const userId = cachedAccount?.publicId || "";
+          if (!userId) return () => {};
+          const notify = (event) => { if (typeof callback === "function") callback(event); };
+          const channel = supabase.channel("checkmate-social-activity")
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "social_activity" }, (payload) => notify({ type: "activity", payload }))
+            .subscribe((status) => notify({ type: "status", status }));
+          return () => { try { supabase.removeChannel(channel); } catch {} };
+        },
+        subscribeMessaging: async (callback) => {
+          const supabase = await getSupabaseClient();
+          const userId = cachedAccount?.publicId || "";
+          if (!userId) return () => {};
+          const notify = (event) => { if (typeof callback === "function") callback(event); };
+          const channel = supabase.channel("checkmate-direct-messages")
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages" }, (payload) => notify({ type: "message", payload }))
+            .on("postgres_changes", { event: "*", schema: "public", table: "conversation_participants", filter: `user_id=eq.${userId}` }, (payload) => notify({ type: "participant", payload }))
+            .on("postgres_changes", { event: "*", schema: "public", table: "conversation_typing" }, (payload) => notify({ type: "typing", payload }))
             .subscribe((status) => notify({ type: "status", status }));
           return () => { try { supabase.removeChannel(channel); } catch {} };
         },
@@ -21021,7 +21983,6 @@
             avatar: String(profileData.avatar || "auto").slice(0, 64),
             country_flag: normalizeCountryFlagValue(profileData.countryFlag || ""),
             rating: Math.max(400, Math.min(3000, Number(profileData.rating) || 450)),
-            coins: Math.max(0, Number(profileData.coins) || 0),
             xp: Math.max(0, Number(profileData.xp) || 0),
             wins: Math.max(0, Number(profileData.wins) || 0),
             losses: Math.max(0, Number(profileData.losses) || 0),
@@ -21031,6 +21992,7 @@
             last_login_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
+          if (Object.prototype.hasOwnProperty.call(profileData, "coins")) row.coins = Math.max(0, Number(profileData.coins) || 0);
           const profilePath = `profiles?id=eq.${encodeURIComponent(account.publicId)}&select=public_id,username,avatar,country_flag,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at`;
           const legacyProfilePath = `profiles?id=eq.${encodeURIComponent(account.publicId)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at`;
           const requestOptions = { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Prefer: "return=representation" } };
@@ -21460,6 +22422,12 @@
     function applyAuthenticatedAccount(account) {
       if (!account?.username) {
         cloudProfileReady = false;
+        serverPrivacyHydratedFor = "";
+        serverBlockedUserIds = new Set();
+        stopSocialNotificationRealtime();
+        stopSocialActivityRealtime();
+        stopMessagingRealtime();
+        clearServerStoreState();
         stopFriendPresence();
         stopFriendNetworkSync();
         stopTournamentNetworkSync();
@@ -21467,8 +22435,14 @@
         return;
       }
       activateSupabaseProfile(account);
+      void refreshServerStoreState().catch(() => {});
+      void refreshStoreGiftInbox();
       startFriendPresence();
       startFriendNetworkSync();
+      void refreshSocialActivity();
+      ensureSocialActivityRealtime();
+      hydrateServerPrivacySettings();
+      syncServerBlockedUsers();
       const now = new Date().toISOString();
       const currentProfile = readLearnerProfile();
       writeJsonStorage(learnerProfileStorageKey, {
@@ -21890,7 +22864,6 @@
         avatar: readLearnerPrefs().avatar || account.avatar.icon || "auto",
         countryFlag: normalizeCountryFlagValue(readLearnerProfile().countryFlag),
         rating: account.gameRating,
-        coins: puzzleCoins,
         xp: puzzleXp,
         wins: gameStats.wins,
         losses,
@@ -22349,6 +23322,8 @@
           writeJsonStorage(learnerProfileStorageKey, next);
           renderLearnerProfile();
           renderHomeDashboard();
+          if (["privacy", "friendRequests", "allowMessages", "allowSpectating", "onlineStatus", "matchHistoryVisibility", "activityVisibility"].includes(profileKey)) syncServerPrivacySettings();
+          if (profileKey === "blockedUsers") syncServerBlockedUsers({ allowUnblock: true });
           setSettingsStatus("Saved");
         }
       });
@@ -22374,6 +23349,8 @@
           writeJsonStorage(learnerProfileStorageKey, next);
           renderLearnerProfile();
           renderHomeDashboard();
+          if (["privacy", "friendRequests", "allowMessages", "allowSpectating", "onlineStatus", "matchHistoryVisibility", "activityVisibility"].includes(profileKey)) syncServerPrivacySettings();
+          if (profileKey === "blockedUsers") syncServerBlockedUsers({ allowUnblock: true });
           setSettingsStatus("Saved");
         }
       });
@@ -22464,6 +23441,8 @@
 
       syncSettingsAudioFields(readLearnerPrefs().audio);
       syncSettingsProfileFields();
+      hydrateServerPrivacySettings();
+      syncServerBlockedUsers();
     }
 
     function slugify(value) {
@@ -25585,6 +26564,574 @@
       render();
     }
 
+    function socialNotificationLabel(notification = {}) {
+      const isDirectMessage = notification.type === "message_received" && !String(notification.entityCode || notification.entity_code || "").trim();
+      const labels = {
+        friend_request: ["New friend request", "Open Friends to respond."],
+        friend_accepted: ["Friend request accepted", "You can now challenge this player."],
+        friend_declined: ["Friend request declined", "You can keep exploring the directory."],
+        challenge_received: ["New challenge", "Open Friends to accept or decline."],
+        challenge_accepted: ["Challenge accepted", "Your private game is ready."],
+        challenge_declined: ["Challenge declined", "The challenge is no longer waiting."],
+        message_received: isDirectMessage ? ["New direct message", "Open Friends to continue the conversation."] : ["New game message", "Open the private game chat."],
+        gift_received: ["You received a gift", "Open the Store to see your cosmetic."],
+      };
+      const fallback = labels[notification.type] || ["Social update", "Open Friends to see the latest activity."];
+      return {
+        title: notification.actorUsername ? `${fallback[0]} from ${notification.actorUsername}` : fallback[0],
+        detail: fallback[1]
+      };
+    }
+
+    function normalizeSocialActivity(row = {}) {
+      return {
+        id: String(row.id || ""),
+        actorId: String(row.actor_id || row.actorId || ""),
+        actorUsername: String(row.actor_username || row.actorUsername || "Chess player"),
+        actorAvatar: String(row.actor_avatar || row.actorAvatar || "auto"),
+        type: String(row.activity_type || row.activityType || ""),
+        payload: row.payload && typeof row.payload === "object" ? row.payload : {},
+        createdAt: String(row.created_at || row.createdAt || "")
+      };
+    }
+
+    function socialActivityLabel(activity = {}) {
+      const actor = activity.actorUsername || "Chess player";
+      const payload = activity.payload || {};
+      const labels = {
+        game_started: [`${actor} started a game`, `${payload.gameType || "Chess"}${payload.clock ? ` - ${payload.clock}` : ""}`],
+        rating_reached: [`${actor} reached ${Number(payload.threshold || payload.rating || 0) || "a new"} rating`, "A new milestone on the leaderboard."],
+        puzzle_solved: [`${actor} solved a puzzle`, payload.theme ? `Theme: ${payload.theme}` : "A tactical win for the day."],
+        lesson_completed: [`${actor} completed a lesson`, payload.title ? String(payload.title) : "A new training idea is ready."],
+        achievement_earned: [`${actor} earned an achievement`, payload.achievementKey ? String(payload.achievementKey) : "A new badge was unlocked."]
+      };
+      const copy = labels[activity.type] || [`${actor} made progress`, "A new chess activity update."];
+      return { title: copy[0], detail: copy[1] };
+    }
+
+    function formatSocialActivityTime(value) {
+      const timestamp = Date.parse(value || "");
+      if (!Number.isFinite(timestamp)) return "Recently";
+      const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+      if (minutes < 1) return "Just now";
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      return `${days}d ago`;
+    }
+
+    function createSocialActivityCard(activity) {
+      const copy = socialActivityLabel(activity);
+      const card = createBookText("button", "friends-hub-notification social-activity-card", "");
+      card.type = "button";
+      const avatar = activity.actorAvatar && activity.actorAvatar !== "auto" ? activity.actorAvatar.slice(0, 2) : activity.actorUsername.slice(0, 1).toUpperCase();
+      card.append(
+        createBookText("span", "friend-result-avatar", avatar),
+        createBookText("span", "social-activity-card__copy", ""),
+        createBookText("time", "social-activity-card__time", formatSocialActivityTime(activity.createdAt))
+      );
+      const copyNode = card.querySelector(".social-activity-card__copy");
+      copyNode?.append(createBookText("strong", "", copy.title), createBookText("small", "", copy.detail));
+      card.addEventListener("click", () => {
+        if (activity.actorId) {
+          const friend = (friendNetworkState.directory || []).find((item) => item.id === activity.actorId);
+          if (friend) setFriendHubProfile(friend);
+        }
+      });
+      return card;
+    }
+
+    async function refreshSocialActivity({ rerender = true } = {}) {
+      const provider = getFriendProvider();
+      if (!provider?.getSocialActivityFeed) return [];
+      if (socialActivityRefreshPromise) return socialActivityRefreshPromise;
+      socialActivityRefreshPromise = provider.getSocialActivityFeed(40)
+        .then((rows) => {
+          socialActivityState = (Array.isArray(rows) ? rows : []).map(normalizeSocialActivity).filter((row) => row.id && row.type);
+          if (rerender) window.refreshSiteNotifications?.({ skipServer: true });
+          renderFriendsHub();
+          return socialActivityState;
+        })
+        .catch(() => [])
+        .finally(() => { socialActivityRefreshPromise = null; });
+      return socialActivityRefreshPromise;
+    }
+
+    function publishLearningActivity(activityType, dedupeKey, payload = {}) {
+      const provider = getFriendProvider();
+      if (!provider?.publishLearningActivity || !getFriendCurrentUserId()) return;
+      void provider.publishLearningActivity(activityType, dedupeKey, payload)
+        .then(() => refreshSocialActivity({ rerender: false }))
+        .catch(() => {});
+    }
+
+    async function ensureSocialActivityRealtime() {
+      const provider = getFriendProvider();
+      if (!provider?.subscribeSocialActivity || socialActivityUnsubscribe || socialActivitySubscribing) return;
+      socialActivitySubscribing = true;
+      try {
+        socialActivityUnsubscribe = await provider.subscribeSocialActivity(() => { void refreshSocialActivity(); });
+      } catch {
+        socialActivityUnsubscribe = null;
+      } finally {
+        socialActivitySubscribing = false;
+      }
+    }
+
+    async function refreshSocialNotifications({ rerender = true } = {}) {
+      const provider = getFriendProvider();
+      if (!provider?.getSocialNotifications) return [];
+      if (socialNotificationRefreshPromise) return socialNotificationRefreshPromise;
+      socialNotificationRefreshPromise = provider.getSocialNotifications(40)
+        .then((rows) => {
+          socialNotificationState = (Array.isArray(rows) ? rows : []).map((row) => ({
+            id: String(row?.id || ""),
+            type: String(row?.type || ""),
+            actorId: String(row?.actor_id || row?.actorId || ""),
+            actorUsername: String(row?.actor_username || row?.actorUsername || ""),
+            entityId: String(row?.entity_id || row?.entityId || ""),
+            entityCode: String(row?.entity_code || row?.entityCode || ""),
+            payload: row?.payload && typeof row.payload === "object" ? row.payload : {},
+            createdAt: row?.created_at || row?.createdAt || "",
+            readAt: row?.read_at || row?.readAt || ""
+          })).filter((row) => row.id);
+          if (rerender) window.refreshSiteNotifications?.({ skipServer: true });
+          renderFriendsHub();
+          return socialNotificationState;
+        })
+        .catch(() => [])
+        .finally(() => { socialNotificationRefreshPromise = null; });
+      return socialNotificationRefreshPromise;
+    }
+
+    async function markSocialNotificationsRead(ids = null) {
+      const normalized = Array.isArray(ids) ? ids.map((id) => String(id || "")).filter(Boolean) : null;
+      socialNotificationState = socialNotificationState.map((row) => (!normalized || normalized.includes(row.id) ? { ...row, readAt: row.readAt || new Date().toISOString() } : row));
+      const provider = getFriendProvider();
+      try { await provider?.markSocialNotificationsRead?.(normalized); } catch {}
+      window.refreshSiteNotifications?.({ skipServer: true });
+    }
+
+    async function ensureSocialNotificationRealtime() {
+      const provider = getFriendProvider();
+      if (!provider?.subscribeSocialNotifications || socialNotificationUnsubscribe || socialNotificationSubscribing) return;
+      socialNotificationSubscribing = true;
+      try {
+        socialNotificationUnsubscribe = await provider.subscribeSocialNotifications(() => { void refreshSocialNotifications(); });
+      } catch {
+        socialNotificationUnsubscribe = null;
+      } finally {
+        socialNotificationSubscribing = false;
+      }
+    }
+
+    function readFriendHubState() {
+      const saved = readJsonStorage(friendHubStorageKey, {});
+      return {
+        view: ["online", "all", "requests", "sent", "favorites", "recent", "notifications", "activity", "messages"].includes(saved?.view) ? saved.view : "online",
+        selectedId: String(saved?.selectedId || ""),
+        search: String(saved?.search || "")
+      };
+    }
+
+    function readFriendHubFavorites() {
+      const saved = readJsonStorage(friendHubStorageKey, {});
+      return new Set(Array.isArray(saved?.favorites) ? saved.favorites.map((id) => String(id || "")).filter(Boolean) : []);
+    }
+
+    function saveFriendHubState(next = {}) {
+      const current = { ...friendHubState, ...next };
+      const saved = readJsonStorage(friendHubStorageKey, {});
+      friendHubState = current;
+      writeJsonStorage(friendHubStorageKey, { ...saved, ...current, favorites: [...readFriendHubFavorites()] });
+    }
+
+    function rememberRecentFriendPlayer(friend) {
+      if (!friend?.id) return;
+      const current = readJsonStorage(friendRecentPlayersStorageKey, []);
+      const next = [friend, ...(Array.isArray(current) ? current : [])].filter((item, index, list) => item?.id && list.findIndex((candidate) => candidate?.id === item.id) === index).slice(0, 12);
+      writeJsonStorage(friendRecentPlayersStorageKey, next);
+    }
+
+    function openFriendChallengeForPlayer(friend) {
+      if (!friend?.id) return;
+      rememberRecentFriendPlayer(friend);
+      const link = [...document.querySelectorAll('[data-site-tab="friendChallenge"]')].find((item) => item.dataset.sitePanel === "play")
+        || document.querySelector('[data-site-tab="play"]');
+      if (link) {
+        link.click();
+        window.setTimeout(() => void sendFriendChallenge(friend), 90);
+      } else {
+        window.location.hash = "play?mode=friend";
+        window.setTimeout(() => void sendFriendChallenge(friend), 140);
+      }
+    }
+
+    function setFriendHubProfile(friend = null) {
+      const empty = document.getElementById("friendsHubProfileEmpty");
+      const content = document.getElementById("friendsHubProfileContent");
+      if (!empty || !content) return;
+      if (!friend) {
+        empty.hidden = false;
+        content.hidden = true;
+        saveFriendHubState({ selectedId: "" });
+        return;
+      }
+      const avatar = document.getElementById("friendsHubProfileAvatar");
+      const status = document.getElementById("friendsHubProfileStatus");
+      const name = document.getElementById("friendsHubProfileName");
+      const meta = document.getElementById("friendsHubProfileMeta");
+      const bio = document.getElementById("friendsHubProfileBio");
+      const favorite = document.getElementById("friendsHubProfileFavorite");
+      const favorites = readFriendHubFavorites();
+      if (avatar) avatar.textContent = friend.avatar && friend.avatar !== "auto" ? friend.avatar.slice(0, 2) : friend.name.slice(0, 1).toUpperCase();
+      if (status) status.textContent = friend.online ? "Online" : "Offline";
+      if (name) name.textContent = friend.name;
+      if (meta) meta.textContent = `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo`;
+      if (bio) bio.textContent = friend.online ? "Ready for a focused game?" : "Invite them when they are back online.";
+      if (favorite) {
+        favorite.textContent = favorites.has(friend.id) ? "★ Favorited" : "☆ Favorite";
+        favorite.classList.toggle("is-active", favorites.has(friend.id));
+        favorite.onclick = () => {
+          const next = readFriendHubFavorites();
+          if (next.has(friend.id)) next.delete(friend.id); else next.add(friend.id);
+          const saved = readJsonStorage(friendHubStorageKey, {});
+          writeJsonStorage(friendHubStorageKey, { ...saved, favorites: [...next] });
+          setFriendHubProfile(friend);
+          renderFriendsHub();
+        };
+      }
+      const challenge = document.getElementById("friendsHubProfileChallenge");
+      if (challenge) challenge.onclick = () => openFriendChallengeForPlayer(friend);
+      const message = document.getElementById("friendsHubProfileMessage");
+      if (message) message.onclick = async () => {
+        try {
+          const conversationId = await getFriendProvider()?.getOrCreateConversation?.(friend.id);
+          if (!conversationId) throw new Error("Messaging is unavailable.");
+          await refreshMessaging();
+          const conversation = messagingHubState.conversations.find((item) => item.id === conversationId) || { id: conversationId, participantId: friend.id, participantName: friend.name, participantAvatar: friend.avatar, participantOnline: friend.online, unread: 0 };
+          if (!messagingHubState.conversations.some((item) => item.id === conversationId)) messagingHubState.conversations.unshift(conversation);
+          saveFriendHubState({ view: "messages", selectedId: friend.id, search: "" });
+          await selectMessagingConversation(conversation, { open: false });
+          ensureMessagingRealtime();
+        } catch (error) {
+          document.getElementById("friendsHubStatus").textContent = error?.message || "Messaging is unavailable.";
+        }
+      };
+      empty.hidden = true;
+      content.hidden = false;
+      saveFriendHubState({ selectedId: friend.id });
+    }
+
+    function createFriendsHubCard(friend, mode = "friend") {
+      const card = document.createElement("article");
+      card.className = "friends-hub-card";
+      const main = document.createElement("button");
+      main.type = "button";
+      main.className = "friends-hub-card-main";
+      main.addEventListener("click", () => { rememberRecentFriendPlayer(friend); setFriendHubProfile(friend); });
+      const avatar = createBookText("span", "friend-result-avatar", friend.avatar && friend.avatar !== "auto" ? friend.avatar.slice(0, 2) : friend.name.slice(0, 1).toUpperCase());
+      const copy = document.createElement("span");
+      copy.className = "friends-hub-card-copy";
+      copy.append(createBookText("strong", "", friend.name), createBookText("small", "", `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo · ${friend.online ? "Online" : "Offline"}`));
+      const dot = createBookText("span", `friend-status-dot${friend.online ? "" : " is-offline"}`, "");
+      dot.setAttribute("aria-label", friend.online ? "Online" : "Offline");
+      main.append(avatar, copy, dot);
+      const actions = document.createElement("span");
+      actions.className = "friends-hub-card-actions";
+      const favorites = readFriendHubFavorites();
+      const favorite = createBookText("button", `button secondary friends-hub-favorite${favorites.has(friend.id) ? " is-active" : ""}`, favorites.has(friend.id) ? "★" : "☆");
+      favorite.type = "button";
+      favorite.title = favorites.has(friend.id) ? "Remove favorite" : "Add favorite";
+      favorite.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const next = readFriendHubFavorites();
+        if (next.has(friend.id)) next.delete(friend.id); else next.add(friend.id);
+        const saved = readJsonStorage(friendHubStorageKey, {});
+        writeJsonStorage(friendHubStorageKey, { ...saved, favorites: [...next] });
+        renderFriendsHub();
+      });
+      actions.append(favorite);
+      if (mode === "incoming") {
+        const accept = createBookText("button", "button", "Accept");
+        accept.type = "button";
+        accept.addEventListener("click", () => void setFriendRequest(friend, "accept"));
+        const decline = createBookText("button", "button secondary", "Decline");
+        decline.type = "button";
+        decline.addEventListener("click", () => void setFriendRequest(friend, "decline"));
+        actions.append(accept, decline);
+      } else if (mode === "outgoing") {
+        actions.append(createBookText("span", "badge", "Pending"));
+        const cancel = createBookText("button", "button secondary", "Cancel");
+        cancel.type = "button";
+        cancel.addEventListener("click", () => void setFriendRequest(friend, "cancel"));
+        actions.append(cancel);
+      } else if (mode === "search" || mode === "friend") {
+        const challenge = createBookText("button", "button", "Challenge");
+        challenge.type = "button";
+        challenge.addEventListener("click", () => openFriendChallengeForPlayer(friend));
+        actions.append(challenge);
+      }
+      card.append(main, actions);
+      return card;
+    }
+
+    function normalizeConversation(row = {}) {
+      return {
+        id: String(row.conversation_id || row.conversationId || row.id || ""),
+        participantId: String(row.participant_id || row.participantId || ""),
+        participantName: String(row.participant_username || row.participantUsername || "Chess player"),
+        participantAvatar: String(row.participant_avatar || row.participantAvatar || "auto"),
+        participantOnline: Boolean(row.participant_online ?? row.participantOnline),
+        muted: Boolean(row.muted),
+        unread: Number(row.unread_count || row.unreadCount || 0),
+        lastBody: String(row.last_body || row.lastBody || ""),
+        lastSenderId: String(row.last_sender_id || row.lastSenderId || ""),
+        lastMessageAt: String(row.last_message_at || row.lastMessageAt || "")
+      };
+    }
+
+    async function refreshMessaging({ selectFirst = false } = {}) {
+      const provider = getFriendProvider();
+      if (!provider?.listConversations) return [];
+      if (messagingRefreshPromise) return messagingRefreshPromise;
+      messagingRefreshPromise = provider.listConversations(40).then(async (rows) => {
+        messagingHubState.conversations = (Array.isArray(rows) ? rows : []).map(normalizeConversation).filter((item) => item.id && item.participantId);
+        if (selectFirst && !messagingHubState.conversationId) messagingHubState.conversationId = messagingHubState.conversations[0]?.id || "";
+        renderFriendsHub();
+        const selected = messagingHubState.conversations.find((item) => item.id === messagingHubState.conversationId);
+        if (selectFirst && selected) await selectMessagingConversation(selected, { open: false });
+        return messagingHubState.conversations;
+      }).catch(() => []).finally(() => { messagingRefreshPromise = null; });
+      return messagingRefreshPromise;
+    }
+
+    async function selectMessagingConversation(conversation, { open = true } = {}) {
+      if (!conversation?.id) return;
+      messagingHubState.conversationId = conversation.id;
+      messagingHubState.muted = Boolean(conversation.muted);
+      messagingHubState.typing = [];
+      if (open) saveFriendHubState({ view: "messages", selectedId: conversation.participantId, search: "" });
+      const provider = getFriendProvider();
+      if (!provider?.getConversationMessages) return renderFriendsHub();
+      try {
+        const rows = await provider.getConversationMessages(conversation.id, null, 80);
+        messagingHubState.messages = (Array.isArray(rows) ? rows : []).reverse();
+        await provider.markConversationRead?.(conversation.id);
+        messagingHubState.conversations = messagingHubState.conversations.map((item) => item.id === conversation.id ? { ...item, unread: 0 } : item);
+      } catch {
+        messagingHubState.messages = [];
+      }
+      try {
+        const typingRows = await provider.getConversationTyping?.(conversation.id);
+        messagingHubState.typing = (Array.isArray(typingRows) ? typingRows : []).filter((row) => row?.is_typing && Date.now() - Date.parse(row.updated_at || "") < 12000);
+      } catch {
+        messagingHubState.typing = [];
+      }
+      renderFriendsHub();
+    }
+
+    function renderMessagingPanel() {
+      const list = document.getElementById("friendsHubList");
+      const conversationPanel = document.getElementById("friendsHubConversation");
+      if (!list || !conversationPanel) return;
+      const query = String(friendHubState.search || "").trim().toLowerCase();
+      const conversations = (messagingHubState.conversations || []).filter((conversation) => !query || conversation.participantName.toLowerCase().includes(query) || conversation.lastBody.toLowerCase().includes(query));
+      list.replaceChildren(...(conversations.length ? conversations.map((conversation) => {
+        const card = document.createElement("article");
+        card.className = `friends-hub-card friends-hub-message-card${conversation.id === messagingHubState.conversationId ? " is-selected" : ""}`;
+        const main = document.createElement("button");
+        main.type = "button";
+        main.className = "friends-hub-card-main";
+        main.addEventListener("click", () => void selectMessagingConversation(conversation));
+        const avatar = createBookText("span", "friend-result-avatar", conversation.participantAvatar !== "auto" ? conversation.participantAvatar.slice(0, 2) : conversation.participantName.slice(0, 1).toUpperCase());
+        const copy = document.createElement("span");
+        copy.className = "friends-hub-card-copy";
+        copy.append(createBookText("strong", "", conversation.participantName), createBookText("small", "", conversation.lastBody || "No messages yet"));
+        main.append(avatar, copy);
+        const actions = document.createElement("span");
+        actions.className = "friends-hub-card-actions";
+        if (conversation.unread) actions.append(createBookText("span", "badge", String(conversation.unread)));
+        const mute = createBookText("button", "button secondary friends-hub-favorite", conversation.muted ? "🔇" : "🔔");
+        mute.type = "button";
+        mute.title = conversation.muted ? "Unmute conversation" : "Mute conversation";
+        mute.addEventListener("click", async (event) => { event.stopPropagation(); try { await getFriendProvider()?.muteConversation?.(conversation.id, !conversation.muted); await refreshMessaging(); } catch {} });
+        actions.append(mute);
+        card.append(main, actions);
+        return card;
+      }) : [(() => { const empty = document.createElement("div"); empty.className = "friends-hub-empty"; empty.append(createBookText("strong", "", "No conversations yet"), createBookText("span", "", "Open a friend profile and choose Message to start one.")); return empty; })()]));
+      conversationPanel.hidden = false;
+      const active = conversations.find((item) => item.id === messagingHubState.conversationId);
+      document.getElementById("friendsHubConversationTitle").textContent = active?.participantName || "Select a conversation";
+      document.getElementById("friendsHubConversationMeta").textContent = active ? `${active.participantOnline ? "Online" : "Offline"} · independent from active games` : "Messages are independent from active games.";
+      const muteButton = document.getElementById("friendsHubConversationMute");
+      if (muteButton) { muteButton.disabled = !active; muteButton.textContent = active?.muted ? "Unmute" : "Mute"; muteButton.onclick = active ? async () => { try { await getFriendProvider()?.muteConversation?.(active.id, !active.muted); await refreshMessaging(); } catch {} } : null; }
+      const messageList = document.getElementById("friendsHubConversationMessages");
+      if (messageList) messageList.replaceChildren(...(messagingHubState.messages.length ? messagingHubState.messages.map((message) => { const line = document.createElement("div"); line.className = `friends-hub-conversation-message${message.sender_id === getFriendCurrentUserId() || message.senderId === getFriendCurrentUserId() ? " is-self" : ""}`; line.append(createBookText("small", "", message.sender_username || message.senderUsername || "Player"), document.createTextNode(String(message.body || ""))); return line; }) : [createBookText("p", "friends-hub-empty", active ? "No messages yet. Say hello." : "Choose a conversation to read messages.")]));
+      const input = document.getElementById("friendsHubMessageInput");
+      const send = document.getElementById("friendsHubMessageSend");
+      // Muting suppresses notifications only; it must not prevent either
+      // participant from continuing the conversation.
+      if (input) input.disabled = !active;
+      if (send) send.disabled = !active;
+      const typing = document.getElementById("friendsHubTyping");
+      if (typing) typing.textContent = messagingHubState.typing.length ? `${active?.participantName || "Friend"} is typing…` : "";
+    }
+
+    async function ensureMessagingRealtime() {
+      const provider = getFriendProvider();
+      if (!provider?.subscribeMessaging || messagingRealtimeUnsubscribe || messagingRealtimeSubscribing) return;
+      messagingRealtimeSubscribing = true;
+      try {
+        messagingRealtimeUnsubscribe = await provider.subscribeMessaging(async (event) => {
+          if (event?.type === "typing" && event.payload?.new?.conversation_id === messagingHubState.conversationId) {
+            const row = event.payload.new;
+            messagingHubState.typing = row.is_typing && Date.now() - Date.parse(row.updated_at || "") < 12000 ? [row] : [];
+            renderMessagingPanel();
+            return;
+          }
+          await refreshMessaging();
+          const conversationId = event?.payload?.new?.conversation_id;
+          if (conversationId && conversationId === messagingHubState.conversationId) await selectMessagingConversation(messagingHubState.conversations.find((item) => item.id === conversationId), { open: false });
+        });
+      } catch {
+        messagingRealtimeUnsubscribe = null;
+      } finally {
+        messagingRealtimeSubscribing = false;
+      }
+    }
+
+    function stopMessagingRealtime() {
+      try { messagingRealtimeUnsubscribe?.(); } catch {}
+      messagingRealtimeUnsubscribe = null;
+      messagingRealtimeSubscribing = false;
+      messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false };
+    }
+
+    function setupFriendsHubMessaging() {
+      const form = document.getElementById("friendsHubMessageForm");
+      const input = document.getElementById("friendsHubMessageInput");
+      if (!form || form.dataset.ready) return;
+      form.dataset.ready = "true";
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = String(input?.value || "").trim();
+        if (!text || !messagingHubState.conversationId) return;
+        try { await getFriendProvider()?.sendDirectMessage?.(messagingHubState.conversationId, text); input.value = ""; await selectMessagingConversation(messagingHubState.conversations.find((item) => item.id === messagingHubState.conversationId), { open: false }); } catch (error) { document.getElementById("friendsHubStatus").textContent = error?.message || "Message could not be sent."; }
+      });
+      input?.addEventListener("input", () => {
+        window.clearTimeout(messagingTypingTimer);
+        const conversationId = messagingHubState.conversationId;
+        if (!conversationId) return;
+        const provider = getFriendProvider();
+        const typingRequest = provider?.setConversationTyping?.(conversationId, true);
+        if (typingRequest?.catch) void typingRequest.catch(() => {});
+        messagingTypingTimer = window.setTimeout(() => {
+          const stopRequest = provider?.setConversationTyping?.(conversationId, false);
+          if (stopRequest?.catch) void stopRequest.catch(() => {});
+        }, 1000);
+      });
+    }
+
+    function renderFriendsHub() {
+      const root = document.getElementById("friends");
+      const list = document.getElementById("friendsHubList");
+      if (!root || !list) return;
+      const conversationPanel = document.getElementById("friendsHubConversation");
+      if (conversationPanel) conversationPanel.hidden = friendHubState.view !== "messages";
+      const directory = (friendNetworkState.directory || []).filter((friend) => !isNschessUserBlocked(friend.id, friend.name));
+      const accepted = directory.filter((friend) => friend.requestStatus === "accepted");
+      const incoming = directory.filter((friend) => friend.requestStatus === "pending" && friend.requestDirection === "incoming");
+      const outgoing = directory.filter((friend) => friend.requestStatus === "pending" && friend.requestDirection === "outgoing");
+      const favorites = readFriendHubFavorites();
+      const recentSaved = readJsonStorage(friendRecentPlayersStorageKey, []);
+      const recent = (Array.isArray(recentSaved) ? recentSaved : []).map(normalizeFriendRecord).filter((friend) => !isNschessUserBlocked(friend.id, friend.name));
+      const query = String(friendHubState.search || "").trim().toLowerCase();
+      const searchResults = query ? (friendNetworkState.search || []).filter((friend) => !isNschessUserBlocked(friend.id, friend.name)) : [];
+      let records = friendHubState.view === "online" ? accepted.filter((friend) => friend.online)
+        : friendHubState.view === "all" ? accepted
+          : friendHubState.view === "requests" ? incoming
+            : friendHubState.view === "sent" ? outgoing
+              : friendHubState.view === "favorites" ? accepted.filter((friend) => favorites.has(friend.id))
+                : friendHubState.view === "recent" ? recent
+                  : [];
+      let mode = friendHubState.view === "requests" ? "incoming" : friendHubState.view === "sent" ? "outgoing" : "friend";
+      if (query) { records = searchResults; mode = "search"; }
+      const viewCopy = {
+        online: ["Online now", "Friends ready to play"], all: ["All friends", "Your chess network"], requests: ["Friend requests", "People waiting for your reply"], sent: ["Sent requests", "Invitations on their way"], favorites: ["Favorites", "Your closest training partners"], recent: ["Recent players", "Players you recently challenged"], notifications: ["Notifications", "Social updates"], activity: ["Activity feed", "What your friends are doing"], messages: ["Messages", "Private conversations"]
+      }[friendHubState.view] || ["Online now", "Friends ready to play"];
+      document.getElementById("friendsHubViewKicker").textContent = query ? "Search" : viewCopy[0];
+      document.getElementById("friendsHubViewTitle").textContent = query ? `${friendHubState.view === "messages" ? "Conversations" : "Players"} matching “${friendHubState.search}”` : viewCopy[1];
+      const searchInput = document.getElementById("friendHubSearchInput");
+      if (searchInput) searchInput.placeholder = friendHubState.view === "messages" ? "Search conversations" : "Search players";
+      document.getElementById("friendsHubNetworkSummary").textContent = `${accepted.length} ${accepted.length === 1 ? "friend" : "friends"}`;
+      document.getElementById("friendsHubOnlineBadge").textContent = accepted.filter((friend) => friend.online).length;
+      document.getElementById("friendsHubAllBadge").textContent = accepted.length;
+      document.getElementById("friendsHubFavoritesBadge").textContent = accepted.filter((friend) => favorites.has(friend.id)).length;
+      document.getElementById("friendsHubRecentBadge").textContent = recent.length;
+      const unreadMessages = messagingHubState.conversations.reduce((total, conversation) => total + (conversation.unread || 0), 0);
+      [["friendsHubRequestsBadge", incoming.length], ["friendsHubSentBadge", outgoing.length], ["friendsHubNotificationsBadge", socialNotificationState.filter((note) => !note.readAt).length], ["friendsHubActivityBadge", socialActivityState.length], ["friendsHubMessagesBadge", unreadMessages]].forEach(([id, count]) => { const el = document.getElementById(id); if (el) { el.textContent = count; el.hidden = !count; } });
+      const navBadge = document.getElementById("friendsNavBadge");
+      const mobileBadge = document.getElementById("friendsMobileBadge");
+      const unread = incoming.length + socialNotificationState.filter((note) => !note.readAt).length + unreadMessages;
+      [navBadge, mobileBadge].forEach((el) => { if (el) { el.textContent = unread; el.hidden = !unread; } });
+      root.querySelectorAll("[data-friend-hub-view]").forEach((button) => { const selected = button.dataset.friendHubView === friendHubState.view; button.classList.toggle("is-active", selected); button.setAttribute("aria-selected", String(selected)); });
+      const status = document.getElementById("friendsHubStatus");
+      if (status) status.textContent = getFriendProvider() ? `${accepted.filter((friend) => friend.online).length} online · updates arrive live` : "Sign in to connect your Friends network.";
+      if (friendHubState.view === "messages") {
+        renderMessagingPanel();
+        return;
+      }
+      if (friendHubState.view === "activity" && !query) {
+        list.replaceChildren(...(socialActivityState.length ? socialActivityState.map(createSocialActivityCard) : [createBookText("div", "friends-hub-empty", "No activity yet. Solve a puzzle, complete a lesson, or start a game to build your feed.")]));
+      } else if (friendHubState.view === "notifications" && !query) {
+        const notes = socialNotificationState;
+          list.replaceChildren(...(notes.length ? notes.map((note) => { const copy = socialNotificationLabel(note); const button = createBookText("button", `friends-hub-notification${note.readAt ? " is-read" : ""}`, ""); button.type = "button"; button.append(createBookText("strong", "", copy.title), createBookText("small", "", copy.detail)); button.addEventListener("click", () => { void markSocialNotificationsRead([note.id]); if (note.type === "message_received" && !String(note.entityCode || "").trim()) { saveFriendHubState({ view: "messages", search: "" }); void refreshMessaging().then(() => { const conversation = messagingHubState.conversations.find((item) => item.id === note.entityId); if (conversation) void selectMessagingConversation(conversation, { open: false }); }); } else if (note.type === "message_received") { openTab("friendChallenge", "#play?mode=friend"); } }); return button; }) : [createBookText("div", "friends-hub-empty", "No notifications yet.")]));
+      } else {
+        list.replaceChildren(...(records.length ? records.map((friend) => createFriendsHubCard(friend, mode)) : [(() => { const empty = document.createElement("div"); empty.className = "friends-hub-empty"; empty.append(createBookText("strong", "", query ? "No players found" : friendHubState.view === "online" ? "No friends are online" : "Nothing here yet"), createBookText("span", "", query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")); return empty; })()]));
+      }
+      const selected = [...directory, ...searchResults, ...recent].find((friend) => friend.id === friendHubState.selectedId);
+      if (selected) setFriendHubProfile(selected);
+    }
+
+    function setupFriendsHub() {
+      const root = document.getElementById("friends");
+      if (!root || friendHubReady) { renderFriendsHub(); return; }
+      friendHubReady = true;
+      friendHubState = readFriendHubState();
+      setupFriendsHubMessaging();
+      const input = document.getElementById("friendHubSearchInput");
+      if (input) input.value = friendHubState.search;
+      root.querySelectorAll("[data-friend-hub-view]").forEach((button) => button.addEventListener("click", () => { saveFriendHubState({ view: button.dataset.friendHubView, search: "" }); if (input) input.value = ""; renderFriendsHub(); if (button.dataset.friendHubView === "messages") { void refreshMessaging({ selectFirst: true }); ensureMessagingRealtime(); } if (button.dataset.friendHubView === "activity") { void refreshSocialActivity(); ensureSocialActivityRealtime(); } }));
+      input?.addEventListener("input", () => { window.clearTimeout(friendHubSearchTimer); saveFriendHubState({ search: input.value }); if (friendHubState.view === "messages") { renderFriendsHub(); return; } friendHubSearchTimer = window.setTimeout(() => void searchFriendPlayers(input.value).then(renderFriendsHub), 220); renderFriendsHub(); });
+      document.getElementById("friendHubSearchButton")?.addEventListener("click", () => friendHubState.view === "messages" ? renderFriendsHub() : void searchFriendPlayers(input?.value || "").then(renderFriendsHub));
+      document.getElementById("friendsHubProfileClose")?.addEventListener("click", () => setFriendHubProfile(null));
+      renderFriendsHub();
+      void refreshFriendNetwork(true).then(renderFriendsHub);
+      void refreshSocialNotifications().then(renderFriendsHub);
+      void refreshSocialActivity().then(renderFriendsHub);
+      void refreshMessaging({ selectFirst: true });
+      ensureFriendRealtime();
+      ensureSocialNotificationRealtime();
+      ensureSocialActivityRealtime();
+      ensureMessagingRealtime();
+    }
+
+    function stopSocialNotificationRealtime() {
+      try { socialNotificationUnsubscribe?.(); } catch {}
+      socialNotificationUnsubscribe = null;
+      socialNotificationSubscribing = false;
+      socialNotificationState = [];
+    }
+
+    function stopSocialActivityRealtime() {
+      try { socialActivityUnsubscribe?.(); } catch {}
+      socialActivityUnsubscribe = null;
+      socialActivitySubscribing = false;
+      socialActivityState = [];
+    }
+
     function setupSiteNotifications() {
       const dialog = document.getElementById("siteNotificationsDialog");
       const open = document.getElementById("siteNotificationsOpen");
@@ -25606,7 +27153,7 @@
         if (link) link.click();
         else window.location.hash = href;
       };
-      const render = () => {
+      const render = (options = {}) => {
         const daily = getDailyGoalsProgress();
         const nextGoal = daily.goals.find((goal) => !goal.done);
         const latestReview = [...matchReviews].reverse().find((review) => review?.moves?.length && review?.summary);
@@ -25633,9 +27180,36 @@
           detail: `${weekly.games} ${weekly.games === 1 ? "game" : "games"} this week. Focus next on ${weekly.focus}.`,
           run: () => openMatchHistory(null)
         });
+        socialNotificationState.filter((notification) => !notification.readAt).slice(0, 12).forEach((notification) => {
+          const copy = socialNotificationLabel(notification);
+          entries.push({
+            title: copy.title,
+            detail: copy.detail,
+            run: () => {
+              void markSocialNotificationsRead([notification.id]);
+              if (notification.type === "gift_received") openTab("store", "#store");
+              else if (notification.type === "message_received" && !String(notification.entityCode || "").trim()) {
+                openTab("friends", "#friends");
+                window.setTimeout(() => { saveFriendHubState({ view: "messages", search: "" }); void refreshMessaging().then(() => { const conversation = messagingHubState.conversations.find((item) => item.id === notification.entityId); if (conversation) void selectMessagingConversation(conversation, { open: false }); }); }, 120);
+              } else if (notification.type === "message_received") openTab("friendChallenge", "#play?mode=friend");
+              else openTab("friendChallenge", "#play?mode=friend");
+            }
+          });
+        });
+        socialActivityState.slice(0, 8).forEach((activity) => {
+          const copy = socialActivityLabel(activity);
+          entries.push({
+            title: copy.title,
+            detail: `${copy.detail} ${formatSocialActivityTime(activity.createdAt)}.`,
+            run: () => {
+              openTab("friends", "#friends");
+              window.setTimeout(() => { saveFriendHubState({ view: "activity", search: "" }); void refreshSocialActivity().then(renderFriendsHub); }, 120);
+            }
+          });
+        });
         dot.hidden = !entries.length;
         status.textContent = entries.length
-          ? `${entries.length} ${entries.length === 1 ? "update" : "updates"} based on activity saved on this device.`
+          ? `${entries.length} ${entries.length === 1 ? "update" : "updates"} from your activity and social account.`
           : "You are all caught up. Play a game or solve a puzzle to build your next update.";
         if (!entries.length) {
           list.replaceChildren(createBookText("p", "site-search-empty", "No new activity right now."));
@@ -25656,6 +27230,8 @@
       open.addEventListener("click", () => {
         returnFocus = open;
         render();
+        void refreshSocialNotifications();
+        void refreshSocialActivity();
         dialog.hidden = false;
         close.focus({ preventScroll: true });
       });
@@ -25665,8 +27241,16 @@
         if (!dialog.hidden && trapDialogFocus(event, dialog)) return;
         if (event.key === "Escape" && !dialog.hidden) closeNotifications();
       });
-      window.refreshSiteNotifications = render;
+      window.refreshSiteNotifications = (options = {}) => {
+        render(options);
+        if (!options.skipServer) void refreshSocialNotifications();
+        if (!options.skipServer) void refreshSocialActivity();
+      };
       render();
+      void refreshSocialNotifications();
+      void refreshSocialActivity();
+      void ensureSocialNotificationRealtime();
+      void ensureSocialActivityRealtime();
     }
 
     function setupSafetyReport() {

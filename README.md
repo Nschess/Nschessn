@@ -29,6 +29,50 @@ Apply `supabase/auth.sql` and then `supabase/leaderboard.sql` in the Supabase SQ
 
 For friend requests, private challenges, and live friend status, apply `supabase/friends.sql` after `supabase/auth.sql`.
 
+The standalone Friends hub is available at `#friends`; the original Play
+challenge workspace remains at `#play?mode=friend` for uninterrupted games.
+
+For production social security and realtime friend updates, apply the latest migration
+`supabase/migrations/20260812_strengthen_friend_security.sql` after `friends.sql`
+and `moderation.sql`. It creates server-owned privacy, block, rate-limit, and
+notification records and adds validation around friend requests, challenges,
+and challenge chat. Do not bypass these RPCs with direct table writes.
+
+Apply `supabase/migrations/20260812_messaging_privacy.sql` after that migration
+to enable persistent direct conversations, message history, unread state,
+typing indicators, mute controls, realtime delivery, and server-side
+spectating/match-history privacy checks.
+
+Apply the `20260812_store_authority_gifting.sql` migration after the messaging
+and privacy migration to enable
+server-owned Store catalog, wallets, inventory, transactions, purchase history,
+and cosmetic gifting. Seed the catalog through the service-role-only
+`admin_upsert_store_catalog(jsonb)` RPC from the deployment's reviewed Store catalog export;
+clients cannot define prices, unlock methods, or giftable items. Wallet reward claims are
+also server-bounded by source, idempotency, rate limits, and a daily budget; direct profile
+wallet updates are not granted to authenticated clients.
+
+Apply `supabase/migrations/20260812_activity_feed.sql` after the Store migration
+to enable the server-owned realtime activity feed. It adds `social_activity`,
+activity privacy, idempotent learning-event publishing, and server triggers for
+games, rating milestones, and achievements. It also normalizes the final
+`user_privacy_settings` shape by adding any missing `allow_spectating` and
+`activity_visibility` columns before replacing the composite-returning privacy
+RPCs. The client can publish only puzzle/lesson events; visibility, blocks,
+expiry, and feed reads are enforced by Supabase RLS/RPCs.
+
+If an existing database already hit a privacy composite mismatch while applying
+the Activity Feed migration, run
+`supabase/migrations/20260812_social_privacy_schema_repair.sql` first, then
+rerun the Activity Feed migration. The repair migration is idempotent and
+preserves existing privacy rows.
+
+The social architecture keeps the existing challenge/move RPCs as the protected
+realtime chess engine. Friends Hub presence, notifications, messaging, activity,
+privacy, Store, and gifts use separate server-authoritative tables and RPCs.
+Future social features should add bounded RPCs or event types rather than writing
+these tables from the client.
+
 For private in-app player reports, apply `supabase/moderation.sql` after `supabase/friends.sql`.
 
 ## Verification
@@ -50,7 +94,7 @@ The repository now includes a Trusted Web Activity Android project. An upload ke
 
 1. Host the production app over HTTPS and use that production domain in the Android wrapper.
 2. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and the server-only `SUPABASE_SERVICE_ROLE_KEY` in the Vercel environment. Never expose the service-role key in browser code.
-3. Apply `supabase/auth.sql`, `supabase/leaderboard.sql`, `supabase/friends.sql`, `supabase/tournaments.sql` when tournaments are enabled, and `supabase/moderation.sql` for private player reports.
+3. Apply `supabase/auth.sql`, `supabase/leaderboard.sql`, `supabase/friends.sql`, `supabase/tournaments.sql` when tournaments are enabled, `supabase/moderation.sql` for private player reports, then the social-security, messaging, and Store-authority migrations under `supabase/migrations/`.
 4. Verify the public URLs for `privacy.html`, `terms.html`, and `account-deletion.html` on the production domain. Replace the support email in those pages if your production support address differs.
 5. Use the checked-in TWA project in `android/` (`com.nschess.game`) and follow [android/README.md](android/README.md) to create an ignored upload keystore, publish Digital Asset Links, and build the signed `.aab`.
 6. Complete Play Console Data Safety, content rating, target audience, ads declaration, app access/reviewer instructions, store listing assets, and testing requirements before production rollout.

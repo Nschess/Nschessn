@@ -8,6 +8,7 @@ if (!fs.existsSync(appCssPath) || !fs.existsSync(appScriptPath)) throw new Error
 const appCss = fs.readFileSync(appCssPath, "utf8");
 const appScript = fs.readFileSync(appScriptPath, "utf8");
 const serviceWorker = fs.readFileSync(serviceWorkerPath, "utf8");
+if (/#play\.is-review-mode/.test(appCss)) throw new Error("Game Review CSS must not target the shared Play workspace.");
 if (!/<link[^>]+href=["']assets\/app\.css(?:\?[^"']*)?["'][^>]*>/i.test(html)) throw new Error("Missing external application stylesheet link.");
 if (!/<script\b[^>]*\bsrc=["']assets\/app\.js(?:\?[^"']*)?["'][^>]*><\/script>/i.test(html)) throw new Error("Missing external application script link.");
 if (/<script>([\s\S]*?)<\/script>/i.test(html)) throw new Error("The application script must not remain inline.");
@@ -162,17 +163,22 @@ const requiredRegressionContracts = [
   ["player pass compact breakpoint", /@media \(max-width: 760px\) \{[\s\S]*?#login \.login-shell \{ grid-template-columns: minmax\(0, 1fr\); grid-template-rows: none; \}/],
   ["profile stats first", /grid-template-areas:\s*\n\s*"overview"\s*\n\s*"stats"\s*\n\s*"ratings"\s*\n\s*"progress"/],
   ["premium daily session", /id="homeSessionCard"[\s\S]*?id="homeSessionAction"[\s\S]*?id="homeSessionWhy"/],
+  ["homepage daily command deck", /class="hero hero-command-center home-command-deck"[\s\S]*?home-command-session[\s\S]*?hero-quick-card--learn[\s\S]*?class="home-command-secondary"[\s\S]*?home-command-secondary-grid/],
   ["Chess DNA dashboard", /id="homeDnaTitle"[\s\S]*?id="homeDnaSkills"[\s\S]*?id="homeDnaAction"/],
   ["focused onboarding duration", /id="firstVisitSession" name="sessionMinutes"[\s\S]*?sessionMinutes: String\(data\.get\("sessionMinutes"\)/],
   ["one-moment review loop", /id="reviewOneMoment"[\s\S]*?id="reviewOneMomentPractice"[\s\S]*?function practiceReviewOneMoment\(/],
   ["review self-analysis workspace", /id="reviewSelfAnalysis"[\s\S]*?id="reviewSelfAnalysisLine"[\s\S]*?id="reviewSelfAnalysisEngineLine"[\s\S]*?id="reviewSelfAnalyze"[\s\S]*?id="reviewSelfUndo"[\s\S]*?id="reviewSelfCopy"[\s\S]*?function startReviewSelfAnalysis\([\s\S]*?function undoReviewSelfAnalysisMove\([\s\S]*?function getReviewSelfAnalysisPgn\([\s\S]*?function copyReviewSelfAnalysis\([\s\S]*?function formatReviewSelfAnalysisPrincipalVariation\([\s\S]*?function analyzeReviewSelfPosition\([\s\S]*?function makeReviewSelfAnalysisMove\(/],
   ["dedicated Game Review workspace", /id="gameReview"[\s\S]*?id="gameReviewWorkspace"[\s\S]*?class="game-review-shell"[\s\S]*?function mountGameReviewWorkspace\([\s\S]*?playWorkspace\?\.setAttribute\("inert", ""\)[\s\S]*?workspace\.removeAttribute\("hidden"\)[\s\S]*?function restoreGameReviewWorkspace\([\s\S]*?workspace\.setAttribute\("hidden", ""\)/],
-  ["review analysis states", /review-state-loading::after[\s\S]*?panel\.classList\.remove\("review-state-loading", "review-state-error"\)[\s\S]*?panel\.classList\.add\("review-state-loading"\)[\s\S]*?panel\?\.classList\.add\("review-state-error"\)/],
+  ["board-first review command center structure", /id="reviewHeaderSlot"[\s\S]*?id="reviewSummarySlot"[\s\S]*?class="game-review-command-center"[\s\S]*?class="game-review-analysis-slot"[\s\S]*?id="reviewCoachSlot"[\s\S]*?id="reviewDock"[\s\S]*?data-review-dock-tab="timeline"[\s\S]*?id="reviewMoveHistorySlot"[\s\S]*?id="reviewImprovementSlot"/],
+  ["review workspace isolation", /#top:has\(> #gameReview\.is-review-page\) > :not\(#gameReview\)[\s\S]*?document\.body\.classList\.add\("is-game-review-active"\)[\s\S]*?document\.body\.classList\.remove\("is-game-review-active"\)/],
+  ["review dashboard responsive bounds", /grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)[\s\S]*?#reviewMoveHistorySlot #moveHistory \{\s*max-height: 154px;[\s\S]*?@media \(max-width: 840px\)[\s\S]*?@media \(max-width: 520px\)[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/],
+  ["review analysis states", /review-state-loading::after[\s\S]*?review-state-error/],
   ["live engine withheld until review", /id="enginePanel"[\s\S]*?#play #enginePanel\s*\{[\s\S]*?display: none !important;[\s\S]*?function updateEnginePanel\([\s\S]*?panel\.hidden = true;/],
   ["post-game review decision", /id="postGameDecision"[\s\S]*?id="postGameDecisionReview"[\s\S]*?id="postGameDecisionNew"[\s\S]*?id="postGameDecisionClose"[\s\S]*?function showPostGameDecision\([\s\S]*?postGameDecisionPgn[\s\S]*?postGameDecisionClose"\)\?\.addEventListener/],
   ["post-game review terminal flow", /id="postGameDecision"[\s\S]*?id="postGameDecisionReview"[\s\S]*?function completeCoachGame\([\s\S]*?cancelStockfishSearch\("Game ended"\)[\s\S]*?configurePostGameDecisionActions\(outcome\)[\s\S]*?showPostGameDecision\(\)[\s\S]*?function openPostGameReview\([\s\S]*?mountGameReviewWorkspace\(/],
   ["saved review route recovery", /function activateSiteTab\(config, shouldScroll = true\) \{[\s\S]*?config\.panel === "gameReview"[\s\S]*?const savedReview = matchReviews\.find\(\(review\) => review\?\.moves\?\.length && review\?\.summary\)[\s\S]*?initializeDeferredFeature\("play"\)\.then\(\(\) => \{[\s\S]*?isGameReviewRoute\(\)[\s\S]*?openSavedMatchReview\(savedReview\)/],
-  ["configurable review analysis profile", /function getReviewAnalysisConfig\(mode = "quick"\) \{[\s\S]*?const deep = mode === "deep" && !lowPerformance;[\s\S]*?skill: deep \? 18 : lowPerformance \? 6 : 10,[\s\S]*?depth: deep \? 10 : lowPerformance \? 3 : 5,[\s\S]*?reviewMode: deep \? "deep" : "quick"/],
+  ["configurable review analysis profile", /function getReviewAnalysisConfig\(mode = "quick"\) \{[\s\S]*?const deep = mode === "deep";[\s\S]*?skill: deep \? \(lowPerformance \? 14 : 18\) : lowPerformance \? 6 : 10,[\s\S]*?depth: deep \? \(lowPerformance \? 7 : 10\) : lowPerformance \? 3 : 5,[\s\S]*?reviewMode: deep \? "deep" : "quick"/],
+  ["deep review timeout recovery", /function getReviewAnalysisTimeoutMs\([\s\S]*?function showReviewAnalysisError\([\s\S]*?panel\?\.removeAttribute\("aria-busy"\)[\s\S]*?showReviewAnalysisError\(token, `\$\{label\} stopped waiting for Stockfish\. Try again to restart the engine\.`\)/],
   ["review cancellation and focus return", /function cancelActiveReviewAnalysis\([\s\S]*?cancelStockfishSearch\(reason\)[\s\S]*?function exitGameReview\([\s\S]*?renderPostGameFlow\(true\)[\s\S]*?postGameDecisionReview"\) \|\| returnFocus/],
   ["review growth trail", /id="reviewGrowthTrail"[\s\S]*?id="reviewGrowthHabit"[\s\S]*?function renderReviewGrowthTrail\([\s\S]*?Repair next:/],
   ["advanced self-analysis tools", /id="reviewSelfEngineEnabled"[\s\S]*?id="reviewSelfEngineMode"[\s\S]*?id="reviewSelfOpeningRefresh"[\s\S]*?id="reviewSelfTablebaseCheck"[\s\S]*?function lookupReviewSelfOpening\([\s\S]*?explorer\.lichess\.org[\s\S]*?function lookupReviewSelfTablebase\([\s\S]*?tablebase\.lichess\.ovh/],
@@ -201,15 +207,28 @@ const requiredRegressionContracts = [
   ["global premium design foundation", /Premium redesign: global experience layer[\s\S]*?--cq-content-max:[\s\S]*?--cq-section-space:[\s\S]*?--cq-ease-premium:/],
   ["premium light-mode parity", /body\.theme-light \{[\s\S]*?--cq-bg-primary: #eef3fb;[\s\S]*?--cq-text-primary: #18233d;[\s\S]*?body\.theme-light::before/],
   ["premium cross-page section rhythm", /main > :is\(\.section-dark, \.section-warm\)[\s\S]*?padding-block: var\(--cq-section-space\)[\s\S]*?\.wrap \{[\s\S]*?var\(--cq-content-max\)/],
-  ["cross-page layout cohesion", /Cohesive layout refinement:[\s\S]*?\.home-main-grid[\s\S]*?#play:not\(\.is-review-mode\) \.play-shell[\s\S]*?#play\.is-review-mode \.premium-review[\s\S]*?@media \(max-width: 920px\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],
+  ["cross-page layout cohesion", /Cohesive layout refinement:[\s\S]*?\.home-main-grid[\s\S]*?#play:not\(\.is-review-mode\) \.play-shell[\s\S]*?#gameReview\.is-review-page \.premium-review[\s\S]*?@media \(max-width: 920px\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],
   ["premium navigation shell", /Premium redesign: persistent navigation and workspace shell finish[\s\S]*?\.mobile-bottom-nav[\s\S]*?var\(--cq-surface-glass-strong\)/],
   ["premium motion and accessibility safeguards", /Premium redesign: interaction quality, accessibility, and motion restraint[\s\S]*?@media \(prefers-contrast: more\)[\s\S]*?@media \(forced-colors: active\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],
   ["deferred video embeds", /<iframe loading="lazy" data-src="https:\/\/www\.youtube-nocookie\.com\/embed\/[\s\S]*?function setupVideoTheater\([\s\S]*?iframe\.dataset\.src \|\| iframe\.getAttribute\("src"\)[\s\S]*?if \(!src\) return;/],
   ["video modal watch fallback", /id="videoOpenExternal"[\s\S]*?function buildVideoWatchUrl\([\s\S]*?externalLink\.href = watchUrl/],
   ["AI roster strength mapping", /beginnerBots\.forEach\(\(bot, index\) => \{[\s\S]*?bot\.skill = Math\.max\(0, Math\.min\(20, Math\.round\(\(bot\.elo - 200\) \/ 130\)\)\);[\s\S]*?bot\.depth = Math\.max\(1, Math\.min\(15, Math\.ceil\(\(bot\.elo - 100\) \/ 200\)\)\);[\s\S]*?bot\.movetime = Math\.max\(45, Math\.min\(3000, 45 \+ Math\.round\(\(bot\.elo - 200\) \* 1\.1\)\)\);[\s\S]*?function setCoachDifficulty\(level\) \{[\s\S]*?stockfishLevels\[level\] \|\| getBeginnerBot\(level\)[\s\S]*?function getCoachConfig\(level = coachDifficulty\) \{[\s\S]*?const bot = getBeginnerBot\(level\);[\s\S]*?label: bot\.name \+ " engine",[\s\S]*?uciElo: elo/],
   ["AI roster high-strength fallback boundary", /function getCoachSkill\(\) \{\s*return Number\(getCoachConfig\(\)\.skill\) \|\| 0;[\s\S]*?function usesHighStrengthCoachFallback\(config = getCoachConfig\(\)\) \{[\s\S]*?getBeginnerBot\(coachDifficulty\)[\s\S]*?Number\(config\.elo\) >= 2400[\s\S]*?function getReliableCoachFallback\([\s\S]*?usesHighStrengthCoachFallback\(config\)[\s\S]*?chooseStrongCoachMove\(moves\)[\s\S]*?: chooseResponsiveCoachFallback\(moves\)/],
-  ["narrow video modal action bar", /\.video-modal-title \{[\s\S]*?min-width: 0;[\s\S]*?text-overflow: ellipsis;[\s\S]*?\.video-modal-actions \{[\s\S]*?flex: 0 0 auto;[\s\S]*?@media \(max-width: 420px\) \{[\s\S]*?\.video-modal \{[\s\S]*?padding: 12px;/],  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/]
+  ["narrow video modal action bar", /\.video-modal-title \{[\s\S]*?min-width: 0;[\s\S]*?text-overflow: ellipsis;[\s\S]*?\.video-modal-actions \{[\s\S]*?flex: 0 0 auto;[\s\S]*?@media \(max-width: 420px\) \{[\s\S]*?\.video-modal \{[\s\S]*?padding: 12px;/],
+  ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/],
+  ["Game Review restores every mounted source", /function restoreGameReviewWorkspace\([\s\S]*?\[\.\.\.origins\.values\(\)\]\.reverse\(\)\.forEach/],
+  ["stable real-puzzle square rendering", /const pieceKey = piece[\s\S]*?\$\{pieceSvgRenderVersion\}:\$\{activePieceSvgSet\}:\$\{piece\.color\}\$\{piece\.type\}/],
+  ["post-game decision remains an overlay", /function getPostGameDecisionDialog\(\) \{\s*return document\.getElementById\("postGameDecision"\);\s*\}/]
 ];
+
+const prohibitedReviewLeaks = [
+  ["eager Game Review DOM staging", /stageReviewSourcesForLivePlay|gameReviewStaging/],
+  ["review-owned normal Play layout override", /Review sources are staged outside #play|Live Play keeps only the chess session/]
+];
+
+for (const [label, pattern] of prohibitedReviewLeaks) {
+  if (pattern.test(regressionSource)) throw new Error(`Forbidden Game Review leak: ${label}.`);
+}
 
 for (const [label, pattern] of requiredRegressionContracts) {
   if (!pattern.test(regressionSource)) throw new Error(`Missing regression contract: ${label}.`);
