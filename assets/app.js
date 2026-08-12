@@ -11425,6 +11425,8 @@
     let friendChallengeSyncEpoch = 0;
     let friendChallengeSyncQueue = Promise.resolve();
     let friendChallengeLastPositionSignature = "";
+    let friendChallengePendingMove = null;
+    let friendChallengeRefreshPromise = null;
     let networkVisibilityHandler = null;
     let realtimeMatchHeartbeatTimer = 0;
     let realtimeMatchHeartbeatInFlight = false;
@@ -12248,6 +12250,96 @@
       const historyBasePly = Math.max(0, Number(state?.historyBasePly) || 0);
       if (historyBasePly > 0) return [...storedMoves.slice(0, historyBasePly), ...localMoves];
       return localMoves.length ? localMoves : storedMoves;
+    }
+
+    function getFriendBoardMoveList(state = friendChallengeState || readFriendChallengeState()) {
+      return (Array.isArray(state?.moves) ? state.moves : [])
+        .map(String)
+        .filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move));
+    }
+
+    function getFriendMoveCount(state = friendChallengeState || readFriendChallengeState()) {
+      return getFriendBoardMoveList(state).length;
+    }
+
+    function applyFriendUciMove(game, uci) {
+      const match = String(uci || "").match(/^([a-h][1-8])([a-h][1-8])([qrbn])?$/i);
+      if (!game || !match) return null;
+      const input = { from: match[1].toLowerCase(), to: match[2].toLowerCase() };
+      if (match[3]) input.promotion = match[3].toLowerCase();
+      try {
+        return game.move(input);
+      } catch {
+        return null;
+      }
+    }
+
+    function buildFriendChallengeGameFromMoveList(moves = []) {
+      if (!CoachChess) return null;
+      const game = new CoachChess();
+      for (const uci of moves) {
+        if (!applyFriendUciMove(game, uci)) return null;
+      }
+      return game.history().length === moves.length ? game : null;
+    }
+
+    function buildFriendChallengeGameFromMoves(state = friendChallengeState || readFriendChallengeState()) {
+      return buildFriendChallengeGameFromMoveList(getFriendBoardMoveList(state));
+    }
+
+    function getFriendPgnResult(outcome = getFriendGameOutcome()) {
+      if (!outcome) return "*";
+      if (outcome.result === "white") return "1-0";
+      if (outcome.result === "black") return "0-1";
+      if (outcome.result === "draw") return "1/2-1/2";
+      return "*";
+    }
+
+    function applyFriendPgnHeaders(game, state = friendChallengeState || readFriendChallengeState(), outcome = getFriendGameOutcome(state)) {
+      if (!game || typeof game.header !== "function") return game;
+      const creator = normalizeFriendMatchProfile(state.creatorProfile, { id: state.creatorId, name: state.creatorName });
+      const opponent = normalizeFriendMatchProfile(state.opponentProfile, { id: state.opponentId, name: state.opponentName || "Friend" });
+      const white = state.creatorColor === "w" ? creator : opponent;
+      const black = state.creatorColor === "w" ? opponent : creator;
+      const result = getFriendPgnResult(outcome);
+      try {
+        game.header(
+          "Event", state.gameType === "rated" ? "Nschess Rated Friend Challenge" : "Nschess Friend Challenge",
+          "Site", "Nschess",
+          "White", white?.displayName || "White",
+          "Black", black?.displayName || "Black",
+          "Result", result,
+          "Termination", outcome?.termination || state.termination || "game complete",
+          "TimeControl", state.clock || "none"
+        );
+      } catch {}
+      return game;
+    }
+
+    function getFriendCanonicalReviewSnapshot(state = friendChallengeState || readFriendChallengeState()) {
+      if (!state?.remote || !CoachChess) return null;
+      const localStateActive = Boolean(friendChallengeState?.remote && state.code === friendChallengeState.code && coachGame);
+      const storedMoves = getFriendBoardMoveList(state);
+      const localMoves = localStateActive ? getFriendBoardMoves() : [];
+      const moves = localMoves.length >= storedMoves.length ? localMoves : storedMoves;
+      if (!moves.length) return null;
+      const game = buildFriendChallengeGameFromMoveList(moves);
+      if (!game) return null;
+      applyFriendPgnHeaders(game, state, getFriendGameOutcome(state));
+      return {
+        game,
+        pgn: game.pgn(),
+        moves,
+        finalFen: game.fen(),
+        result: getFriendGameOutcome(state),
+        metadata: {
+          code: state.code || "",
+          gameType: state.gameType || "casual",
+          clock: state.clock || "none",
+          serverRevision: state.serverRevision || 0,
+          completedAt: state.remoteUpdatedAt || state.updatedAt || new Date().toISOString()
+        }
+      };
     }
 
     function getSyncedFriendMoves(extraSignals = []) {
@@ -15537,6 +15629,12 @@
     }
 
     function getReviewAnalysisSnapshot() {
+      if (friendChallengeState?.remote) {
+        const friendSnapshot = getFriendCanonicalReviewSnapshot(friendChallengeState);
+        if (friendSnapshot && (friendChallengeState.status === "completed" || getFriendGameOutcome(friendChallengeState))) {
+          return { game: friendSnapshot.game, pgn: friendSnapshot.pgn, metadata: friendSnapshot.metadata };
+        }
+      }
       if (coachGame && (isCoachGameOver() || coachDrawAgreed)) {
         return { game: coachGame, pgn: coachGame.pgn() };
       }
@@ -16404,13 +16502,14 @@
       coachLastMove = move;
       advanceMatchClock(move.color);
       coachLearnerMoveScores = { fen: "", scored: [], pending: false };
+      if (friendChallengeState?.active) markFriendLocalMovePending(move, coachGame.fen(), getSyncedFriendMoves());
       scheduleCoachBoardRender();
       scheduleCoachPanelUpdate();
       if (friendChallengeState?.active) {
         const gameAtMove = coachGame;
         window.setTimeout(() => {
           if (coachGame !== gameAtMove || !friendChallengeState?.active) return;
-          saveFriendChallengeState({ ...friendChallengeState, active: true });
+          saveFriendChallengeState({ ...friendChallengeState, active: true }, { render: false });
           const outcome = getFriendGameOutcome(friendChallengeState);
           void syncFriendChallengePosition(true).then((synced) => {
             if (synced && outcome && friendChallengeState?.active) void syncFriendSignal(friendOutcomeSignal(outcome), "completed");
@@ -16631,12 +16730,14 @@
       return normalizeFriendChallengeState({ ...fallback, ...(saved && typeof saved === "object" ? saved : {}) });
     }
 
-    function saveFriendChallengeState(next = friendChallengeState) {
+    function saveFriendChallengeState(next = friendChallengeState, options = {}) {
       friendChallengeState = normalizeFriendChallengeState({ ...(next || readFriendChallengeState()), updatedAt: Date.now() });
       if (coachGame && friendChallengeState.active) friendChallengeState.fen = coachGame.fen();
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
-      renderFriendChallengeLobby();
-      renderPlaySocialBar();
+      if (options?.render !== false) {
+        renderFriendChallengeLobby();
+        renderPlaySocialBar();
+      }
     }
     function setFriendChallengeStatus(message) {
       const status = document.getElementById("friendChallengeStatus");
@@ -16847,11 +16948,58 @@
       return [remote?.id || "", remote?.revision || 0, remote?.updatedAt || "", remote?.status || "", remote?.fen || "", moves.length, lastMove, creatorOnline, opponentOnline].join("\u001f");
     }
 
+    function markFriendLocalMovePending(move, fen, moves) {
+      if (!friendChallengeState?.remote || !move) return;
+      friendChallengePendingMove = {
+        code: friendChallengeState.code || "",
+        remoteId: friendChallengeState.remoteId || "",
+        expectedRevision: Number(friendChallengeState.serverRevision) || 0,
+        uci: `${move.from}${move.to}${move.promotion || ""}`,
+        fen: String(fen || ""),
+        boardCount: (Array.isArray(moves) ? moves : []).filter((item) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(String(item))).length,
+        createdAt: Date.now()
+      };
+    }
+
+    function remoteMatchesPendingFriendMove(remote) {
+      const pending = friendChallengePendingMove;
+      if (!pending || !remote) return false;
+      if (pending.remoteId && remote.id && pending.remoteId !== remote.id) return false;
+      if (pending.code && remote.code && pending.code !== remote.code) return false;
+      const boardMoves = getFriendBoardMoveList(remote);
+      return boardMoves.length >= pending.boardCount && boardMoves.includes(pending.uci);
+    }
+
+    function shouldDeferRemoteForPendingFriendMove(remote) {
+      const pending = friendChallengePendingMove;
+      if (!pending || !remote) return false;
+      if (pending.remoteId && remote.id && pending.remoteId !== remote.id) return false;
+      if (pending.code && remote.code && pending.code !== remote.code) return false;
+      if (remoteMatchesPendingFriendMove(remote)) return false;
+      const boardCount = getFriendMoveCount(remote);
+      const revision = Number(remote.revision) || 0;
+      return boardCount < pending.boardCount || revision <= pending.expectedRevision;
+    }
+
+    function clearPendingFriendMove(remote = null) {
+      if (!friendChallengePendingMove) return;
+      if (!remote || remoteMatchesPendingFriendMove(remote)) friendChallengePendingMove = null;
+    }
+
+    function isExplicitFriendSyncRejection(error) {
+      const message = String(error?.message || error || "");
+      const code = String(error?.code || error?.details || "");
+      return code === "40001"
+        || /not your turn|game changed|history changed|history must advance|invalid|cannot be changed|not ready|not in this game|expired|only a legal board move|did not contain a new action/i.test(message);
+    }
+
     function applyRemoteFriendChallenge(raw, restoreBoard = false) {
       const remote = normalizeRemoteFriendChallenge(raw);
       if (!remote) return false;
       const previous = friendChallengeState || readFriendChallengeState();
       if (previous?.remoteId && previous.remoteId !== remote.id) invalidateFriendChallengeSync();
+      if (remoteMatchesPendingFriendMove(remote)) clearPendingFriendMove(remote);
+      else if (shouldDeferRemoteForPendingFriendMove(remote)) return true;
       if (previous?.remoteId === remote.id && Number(remote.revision) < Number(previous.serverRevision || 0)) return true;
       const boardNeedsRestore = Boolean(restoreBoard && ["active", "completed"].includes(remote.status) && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen));
       const messageStamp = remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|");
@@ -16916,7 +17064,7 @@
       }
       if (boardNeedsRestore) {
         try {
-          coachGame = new CoachChess(remote.fen);
+          coachGame = buildFriendChallengeGameFromMoves(next) || new CoachChess(remote.fen);
           coachPlayerColor = next.color;
           coachFlipped = next.color === "b";
           coachBotPaused = true;
@@ -17152,6 +17300,34 @@
       }, 90);
     }
 
+    async function refreshActiveFriendChallenge(code = friendChallengeState?.code, restoreBoard = true) {
+      const provider = getFriendProvider();
+      const challengeCode = String(code || "").toUpperCase();
+      if (!provider?.getFriendChallenge || !challengeCode) return false;
+      if (friendChallengeRefreshPromise) return friendChallengeRefreshPromise;
+      friendChallengeRefreshPromise = (async () => {
+        try {
+          const remote = await provider.getFriendChallenge(challengeCode);
+          if (remote && friendChallengeState?.code === challengeCode) return applyRemoteFriendChallenge(remote, restoreBoard);
+          return false;
+        } catch {
+          return false;
+        } finally {
+          friendChallengeRefreshPromise = null;
+        }
+      })();
+      return friendChallengeRefreshPromise;
+    }
+
+    function realtimeEventMatchesActiveChallenge(event) {
+      const state = friendChallengeState || readFriendChallengeState();
+      if (!state?.remote) return false;
+      const row = event?.payload?.new || event?.payload?.old || {};
+      const code = String(row.code || "").toUpperCase();
+      const challengeId = String(row.challenge_id || row.id || "");
+      return Boolean((code && code === state.code) || (challengeId && challengeId === state.remoteId));
+    }
+
     function scheduleFriendRealtimeReconnect(generation) {
       if (generation !== friendNetworkSubscriptionGeneration || friendRealtimeReconnectTimer || friendRealtimeReconnectAttempts >= 4) return;
       const delay = Math.min(500 * (2 ** friendRealtimeReconnectAttempts), 5000);
@@ -17179,6 +17355,14 @@
           friendRealtimeReady = false;
           scheduleFriendRealtimeReconnect(generation);
         }
+        return;
+      }
+      if (event?.table === "game_challenges" && realtimeEventMatchesActiveChallenge(event)) {
+        void refreshActiveFriendChallenge(friendChallengeState?.code, true);
+        return;
+      }
+      if (["game_challenge_messages", "game_challenge_presence"].includes(event?.table) && realtimeEventMatchesActiveChallenge(event)) {
+        void refreshActiveFriendChallenge(friendChallengeState?.code, true);
         return;
       }
       queueFriendNetworkRefresh();
@@ -17527,7 +17711,7 @@
       }
       const color = state.color;
       coachMoveToken += 1;
-      coachGame = state.fen ? new CoachChess(state.fen) : new CoachChess();
+      coachGame = buildFriendChallengeGameFromMoves(state) || (state.fen ? new CoachChess(state.fen) : new CoachChess());
       coachPlayerColor = color;
       coachFlipped = color === "b";
       coachBotPaused = true;
@@ -17642,6 +17826,8 @@
       friendChallengeSyncEpoch += 1;
       friendChallengeSyncQueue = Promise.resolve();
       friendChallengeLastPositionSignature = "";
+      friendChallengePendingMove = null;
+      friendChallengeRefreshPromise = null;
     }
 
     function queueFriendChallengeSync(task) {
@@ -17664,13 +17850,20 @@
           const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active", moveApplied });
           if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) {
             friendChallengeLastPositionSignature = signature;
+            if (normalizeRemoteFriendChallenge(remote)?.status === "completed") clearPendingFriendMove();
             applyRemoteFriendChallenge(remote, false);
           }
           return true;
         } catch (error) {
           if (epoch === friendChallengeSyncEpoch) {
-            setFriendChallengeStatus(error?.message || "Move saved locally. Reconnect to retry syncing it.");
-            window.setTimeout(() => void reconnectFriendChallenge(), 700);
+            if (isExplicitFriendSyncRejection(error)) {
+              clearPendingFriendMove();
+              setFriendChallengeStatus(error?.message || "Server rejected this move. Reconnecting the board.");
+              window.setTimeout(() => void reconnectFriendChallenge(), 700);
+            } else {
+              setFriendChallengeStatus(error?.message || "Move saved locally. Retrying sync...");
+              window.setTimeout(() => void syncFriendChallengePosition(moveApplied), 900);
+            }
           }
           return false;
         }
