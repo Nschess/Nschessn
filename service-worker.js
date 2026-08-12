@@ -1,13 +1,13 @@
 // Bump this name whenever the shipped shell changes. The review workspace
 // depends on its HTML, CSS, and JavaScript being from the same release.
-const CACHE_NAME = "nschess-shell-v73-social-activity";
+const CACHE_NAME = "nschess-shell-v74-piece-assets";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v73-social-activity",
-  "./assets/app.js?v=review-v73-social-activity",
+  "./assets/app.css?v=review-v74-piece-assets",
+  "./assets/app.js?v=review-v74-piece-assets",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
@@ -30,8 +30,9 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || url.pathname.includes("/api/")) return;
 
+  const isPieceAsset = url.pathname.includes("/assets/pieces/");
   const isReviewShellAsset = ["/index.html", "/assets/app.css", "/assets/app.js"].some((path) => url.pathname.endsWith(path));
-  if (request.mode === "navigate" || isReviewShellAsset) {
+  if (request.mode === "navigate" || isReviewShellAsset || isPieceAsset) {
     event.respondWith(fetch(request)
       .then((response) => {
         const copy = response.clone();
