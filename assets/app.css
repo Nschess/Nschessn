@@ -29284,19 +29284,6 @@
         font-size: 0.62rem;
       }
 
-
-    :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell:has(#playSocialMessageInput:not(:disabled)) {
-    grid-template-areas:
-      "left center"
-      "left social";
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-
-  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-social-bar:has(#playSocialMessageInput:not(:disabled)) {
-    display: grid !important;
-    grid-area: social;
-    min-width: 0;
-  }
 }
       body:not(.theme-light) #play:not(.is-review-mode) .coach-setup {
         grid-area: setup;
