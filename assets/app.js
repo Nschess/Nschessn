@@ -11387,11 +11387,11 @@
     let matchClockExpiredColor = "";
     let friendChallengeState = null;
     let friendNetworkState = { directory: [], search: [], challenges: [] };
-    let friendHubState = { view: "online", selectedId: "", search: "" };
+    let friendHubState = { view: "online", selectedId: "", search: "", minRating: "", maxRating: "" };
     let friendHubReady = false;
     let friendHubSearchTimer = 0;
     let friendRealtimeReady = false;
-    let messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false };
+    let messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false };
     let messagingRealtimeUnsubscribe = null;
     let messagingRealtimeSubscribing = false;
     let messagingRefreshPromise = null;
@@ -11413,7 +11413,14 @@
     let friendConnectionState = { state: "idle", message: "" };
     let friendPresenceTimer = 0;
     let friendPresenceInFlight = false;
+    let friendPresencePending = null;
     let friendPresenceVisibilityHandler = null;
+    let friendPresencePagehideHandler = null;
+    let socialPresenceUnsubscribe = null;
+    let socialPresenceSignature = "";
+    let socialPresenceSubscribing = false;
+    const friendProfileCache = new Map();
+    let friendProfileRequest = 0;
     let socialNotificationState = [];
     let socialNotificationRefreshPromise = null;
     let socialNotificationUnsubscribe = null;
@@ -16861,7 +16868,8 @@
     }
 
     function getFriendCurrentUserId() {
-      return String(getFriendProvider()?.getCachedAccount?.()?.publicId || "");
+      const account = getFriendProvider()?.getCachedAccount?.() || {};
+      return String(account.authUserId || account.publicId || "");
     }
 
     function dismissFriendChallengeNotice() {
@@ -17315,13 +17323,24 @@
     function normalizeFriendRecord(row = {}) {
       const lastLogin = String(row.last_login_at || row.lastLoginAt || "");
       const hasLivePresence = typeof row.online === "boolean";
+      const rawStatus = String(row.presence_status || row.presenceStatus || row.status || "").toLowerCase();
+      const presenceStatus = ["online", "in_game", "looking", "idle", "offline"].includes(rawStatus)
+        ? rawStatus
+        : (hasLivePresence ? (row.online ? "online" : "offline") : (lastLogin && Date.now() - Date.parse(lastLogin) < 5 * 60 * 1000 ? "online" : "offline"));
       return {
         id: String(row.public_id || row.id || row.user_id || ""),
-        name: String(row.username || row.name || "Player"),
+        name: String(row.display_name || row.displayName || row.username || row.name || "Player"),
+        username: String(row.username || row.display_name || row.displayName || row.name || "Player"),
         title: String(row.title || "Chess Player"),
         rating: Number(row.rating) || 450,
         avatar: String(row.avatar || "auto"),
-        online: hasLivePresence ? row.online : Boolean(lastLogin && Date.now() - Date.parse(lastLogin) < 5 * 60 * 1000),
+        country: String(row.country_flag || row.country || ""),
+        online: hasLivePresence ? Boolean(row.online) && presenceStatus !== "offline" : presenceStatus !== "offline" && Boolean(lastLogin && Date.now() - Date.parse(lastLogin) < 5 * 60 * 1000),
+        presenceStatus,
+        lastSeenAt: String(row.last_seen_at || row.lastSeenAt || ""),
+        mutualFriendsCount: Number(row.mutual_friends_count || row.mutualFriendsCount || 0) || 0,
+        inGame: presenceStatus === "in_game",
+        looking: presenceStatus === "looking",
         requestId: String(row.request_id || row.requestId || ""),
         requestStatus: String(row.request_status || row.requestStatus || ""),
         requestDirection: String(row.request_direction || row.requestDirection || "")
@@ -17399,6 +17418,7 @@
         friendNetworkState.directory = (Array.isArray(directory) ? directory : []).map(normalizeFriendRecord).filter((friend) => friend.id);
         friendNetworkState.challenges = (Array.isArray(challenges) ? challenges : []).map(normalizeRemoteFriendChallenge).filter(Boolean);
         friendNetworkLastRefresh = Date.now();
+        ensureSocialPresenceRealtime(provider);
         renderPlaySocialBar();
         renderFriendsHub();
         const state = friendChallengeState || readFriendChallengeState();
@@ -17517,6 +17537,10 @@
         void refreshActiveFriendChallenge(friendChallengeState?.code, true);
         return;
       }
+      if (event?.table === "friend_presence") {
+        applySocialPresenceEvent(event);
+        return;
+      }
       if (event?.table === "matchmaking_queue") {
         window.dispatchEvent(new CustomEvent("nschess:matchmaking", { detail: event }));
         return;
@@ -17527,7 +17551,8 @@
     function ensureFriendRealtime(provider = getFriendProvider()) {
       if (friendNetworkUnsubscribe || friendNetworkSubscribing || !provider?.subscribeFriendChallenges) return;
       const generation = friendNetworkSubscriptionGeneration;
-      friendNetworkSubscriptionUserId = provider.getCachedAccount?.()?.publicId || "";
+      const account = provider.getCachedAccount?.() || {};
+      friendNetworkSubscriptionUserId = account.authUserId || account.publicId || "";
       friendNetworkSubscribing = true;
       friendRealtimeReady = false;
       Promise.resolve(provider.subscribeFriendChallenges((event) => handleFriendRealtimeEvent(event, generation)))
@@ -17548,7 +17573,7 @@
         });
     }
 
-    async function searchFriendPlayers(query = document.getElementById("friendSearchInput")?.value || "") {
+    async function searchFriendPlayers(query = document.getElementById("friendHubSearchInput")?.value || "", options = {}) {
       const provider = getFriendProvider();
       const text = String(query || "").trim();
       const requestId = ++friendSearchRequest;
@@ -17558,7 +17583,9 @@
         return;
       }
       try {
-        const rows = await provider.searchRegisteredPlayers(text);
+        const minRating = options.minRating ?? friendHubState.minRating;
+        const maxRating = options.maxRating ?? friendHubState.maxRating;
+        const rows = await provider.searchRegisteredPlayers(text, minRating, maxRating);
         if (requestId !== friendSearchRequest) return;
         friendNetworkState.search = (Array.isArray(rows) ? rows : []).map(normalizeFriendRecord).filter((friend) => friend.id);
       } catch (error) {
@@ -18779,19 +18806,65 @@
       friendNetworkUnsubscribe = null;
       friendNetworkSubscribing = false;
       friendRealtimeReady = false;
+      stopSocialPresenceRealtime();
+      try { void getFriendProvider()?.stopSocialPresence?.(); } catch {}
+      stopMessagingRealtime();
+      stopSocialNotificationRealtime();
+      stopSocialActivityRealtime();
+    }
+
+    function stopSocialPresenceRealtime() {
+      try { socialPresenceUnsubscribe?.(); } catch {}
+      socialPresenceUnsubscribe = null;
+      socialPresenceSignature = "";
+      socialPresenceSubscribing = false;
+    }
+
+    function desiredSocialPresence() {
+      if (!getFriendCurrentUserId()) return "offline";
+      if (document.hidden) return "idle";
+      if (isRealtimeMatchActive()) return "in_game";
+      if (document.body.classList.contains("quick-match-searching")) return "looking";
+      return "online";
+    }
+
+    function ensureSocialPresenceRealtime(provider = getFriendProvider()) {
+      if (!provider?.subscribeSocialPresence || !getFriendCurrentUserId()) return;
+      const friendIds = getSocialFriends().map((friend) => friend.id).filter(Boolean).sort();
+      const signature = friendIds.join(",");
+      if (signature === socialPresenceSignature || socialPresenceSubscribing) return;
+      socialPresenceSubscribing = true;
+      stopSocialPresenceRealtime();
+      socialPresenceSignature = signature;
+      Promise.resolve(provider.subscribeSocialPresence(friendIds, (event) => {
+        if (event?.type === "presence") applySocialPresenceEvent(event);
+      })).then((unsubscribe) => {
+        if (signature !== socialPresenceSignature) { try { unsubscribe?.(); } catch {} return; }
+        socialPresenceUnsubscribe = typeof unsubscribe === "function" ? unsubscribe : null;
+      }).catch(() => { if (signature === socialPresenceSignature) socialPresenceSignature = ""; }).finally(() => { socialPresenceSubscribing = false; });
     }
 
     async function syncFriendPresence(connected = !document.hidden) {
-      if (friendPresenceInFlight) return;
+      if (friendPresenceInFlight) { friendPresencePending = connected; return; }
       const provider = getFriendProvider();
-      if (!provider?.touchFriendPresence || !getFriendCurrentUserId()) return;
+      if (!provider || !getFriendCurrentUserId()) return;
       friendPresenceInFlight = true;
       try {
-        await provider.touchFriendPresence(connected);
+        const status = connected ? desiredSocialPresence() : "offline";
+        if (provider.setFriendPresenceStatus) await provider.setFriendPresenceStatus(status, connected);
+        else if (provider.touchFriendPresence) await provider.touchFriendPresence(connected);
+        try { await provider.trackSocialPresence?.(status, connected); } catch {}
       } catch {
         // Presence is best-effort and is retried by the next heartbeat.
       } finally {
         friendPresenceInFlight = false;
+        if (friendPresencePending !== null && friendPresencePending !== connected) {
+          const pending = friendPresencePending;
+          friendPresencePending = null;
+          void syncFriendPresence(pending);
+        } else {
+          friendPresencePending = null;
+        }
       }
     }
 
@@ -18800,11 +18873,13 @@
       friendPresenceTimer = 0;
       if (friendPresenceVisibilityHandler) document.removeEventListener("visibilitychange", friendPresenceVisibilityHandler);
       friendPresenceVisibilityHandler = null;
+      if (friendPresencePagehideHandler) window.removeEventListener("pagehide", friendPresencePagehideHandler);
+      friendPresencePagehideHandler = null;
     }
 
     function startFriendPresence() {
       const provider = getFriendProvider();
-      if (!provider?.touchFriendPresence || !getFriendCurrentUserId()) return;
+      if (!provider || !getFriendCurrentUserId()) return;
       stopFriendPresence();
       void syncFriendPresence(!document.hidden);
       friendPresenceTimer = window.setInterval(() => void syncFriendPresence(!document.hidden), 25000);
@@ -18813,6 +18888,13 @@
         if (!document.hidden) void refreshFriendNetwork(true);
       };
       document.addEventListener("visibilitychange", friendPresenceVisibilityHandler);
+      friendPresencePagehideHandler = () => {
+        const currentProvider = getFriendProvider();
+        void currentProvider?.setFriendPresenceStatus?.("offline", false);
+        void currentProvider?.trackSocialPresence?.("offline", false);
+      };
+      window.addEventListener("pagehide", friendPresencePagehideHandler, { once: true });
+      ensureSocialPresenceRealtime(provider);
     }
 
     async function syncRealtimeMatchPresence(connected = !document.hidden) {
@@ -18840,12 +18922,14 @@
       realtimeMatchHeartbeatTimer = 0;
       if (realtimeMatchVisibilityHandler) document.removeEventListener("visibilitychange", realtimeMatchVisibilityHandler);
       realtimeMatchVisibilityHandler = null;
+      void syncFriendPresence(!document.hidden);
     }
 
     function startRealtimeMatchLifecycle() {
       if (!isRealtimeMatchActive()) return;
       stopRealtimeMatchLifecycle();
       void syncRealtimeMatchPresence(true);
+      void syncFriendPresence(true);
       realtimeMatchHeartbeatTimer = window.setInterval(() => void syncRealtimeMatchPresence(!document.hidden), 12000);
       realtimeMatchVisibilityHandler = () => void syncRealtimeMatchPresence(!document.hidden);
       document.addEventListener("visibilitychange", realtimeMatchVisibilityHandler);
@@ -18886,9 +18970,11 @@
     function startFriendNetworkSync() {
       const provider = getFriendProvider();
       if (!provider) return;
-      const activeUserId = provider.getCachedAccount?.()?.publicId || "";
+      const account = provider.getCachedAccount?.() || {};
+      const activeUserId = account.authUserId || account.publicId || "";
       if (friendNetworkUnsubscribe && activeUserId && friendNetworkSubscriptionUserId !== activeUserId) stopFriendNetworkSync();
       ensureFriendRealtime();
+      ensureSocialPresenceRealtime(provider);
       ensureSocialNotificationRealtime();
       void refreshFriendNetwork(true);
       void refreshSocialNotifications();
@@ -21866,6 +21952,8 @@
       let cachedAccount = null;
       let supabaseClientPromise = null;
       let supabaseLibraryPromise = null;
+      let socialPresenceOwnChannel = null;
+      let socialPresenceSubscriptions = new Map();
 
       const authDebug = (message, detail = {}) => {
         try {
@@ -22021,6 +22109,7 @@
 
       const getProfile = async (user, accessToken = "") => {
         const fallback = {
+          authUserId: String(user?.id || ""),
           publicId: String(user?.id || ""),
           username: normalizeAuthUsername(user?.user_metadata?.username) || `player_${String(user?.id || "").replace(/-/g, "").slice(0, 12)}`,
           email: normalizeAuthEmail(user?.email),
@@ -22040,6 +22129,7 @@
           const profile = Array.isArray(rows) ? rows[0] : null;
           return profile ? {
             ...fallback,
+            authUserId: String(user.id),
             publicId: String(profile.public_id || fallback.publicId),
             username: normalizeAuthUsername(profile.username) || fallback.username,
             joinDate: profile.created_at || fallback.joinDate,
@@ -22245,9 +22335,25 @@
         muteConversation: (conversationId, muted) => callFriendRpc("set_conversation_muted", { p_conversation_id: conversationId, p_muted: Boolean(muted) }),
         setConversationTyping: (conversationId, isTyping) => callFriendRpc("set_conversation_typing", { p_conversation_id: conversationId, p_is_typing: Boolean(isTyping) }),
         getConversationTyping: (conversationId) => callFriendRpc("get_conversation_typing", { p_conversation_id: conversationId }),
-        searchRegisteredPlayers: (query) => callFriendRpc("search_registered_players", { p_query: String(query || "") }),
+        searchRegisteredPlayers: async (query, minRating = null, maxRating = null) => {
+          const text = String(query || "");
+          const min = minRating === null || minRating === "" ? 400 : Math.max(400, Math.min(3000, Number(minRating) || 400));
+          const max = maxRating === null || maxRating === "" ? 3000 : Math.max(400, Math.min(3000, Number(maxRating) || 3000));
+          try {
+            return await callFriendRpc("search_registered_players", { p_query: text, p_min_rating: min, p_max_rating: max });
+          } catch (error) {
+            // Older staging databases expose the original one-argument RPC.
+            if (/function .*search_registered_players|p_min_rating|does not exist|42883/i.test(String(error?.message || error?.code || ""))) {
+              return callFriendRpc("search_registered_players", { p_query: text });
+            }
+            throw error;
+          }
+        },
         getFriendDirectory: () => callFriendRpc("get_friend_directory"),
         touchFriendPresence: (connected = true) => callFriendRpc("touch_friend_presence", { p_connected: Boolean(connected) }),
+        setFriendPresenceStatus: (status = "online", connected = true) => callFriendRpc("set_social_presence", { p_status: String(status || "online"), p_connected: Boolean(connected) }),
+        getSocialPlayerProfile: (targetId) => callFriendRpc("get_public_player_profile", { p_target_user: targetId }),
+        getActiveFriendGame: (targetId) => callFriendRpc("get_active_friend_game", { p_target_user: targetId }),
         sendFriendRequest: (targetId) => callFriendRpc("send_friend_request", { target_user: targetId }),
         respondFriendRequest: (requestId, accept) => callFriendRpc("respond_to_friend_request", { request_id: requestId, accept_request: Boolean(accept) }),
         cancelFriendRequest: (requestId) => callFriendRpc("cancel_friend_request", { request_id: requestId }),
@@ -22306,7 +22412,7 @@
         sendFriendMessage: (code, body) => callFriendRpc("send_game_challenge_message", { p_code: String(code || ""), p_body: String(body || "") }),
         subscribeFriendChallenges: async (callback) => {
           const supabase = await getSupabaseClient();
-          const userId = cachedAccount?.publicId || "";
+          const userId = cachedAccount?.authUserId || cachedAccount?.publicId || "";
           const notify = (event) => { if (typeof callback === "function") callback(event); };
           const channel = supabase.channel("checkmate-friend-games")
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenges" }, (payload) => notify({ type: "change", table: "game_challenges", payload }))
@@ -22324,7 +22430,7 @@
         },
         subscribeSocialNotifications: async (callback) => {
           const supabase = await getSupabaseClient();
-          const userId = cachedAccount?.publicId || "";
+          const userId = cachedAccount?.authUserId || cachedAccount?.publicId || "";
           if (!userId) return () => {};
           const notify = (event) => { if (typeof callback === "function") callback(event); };
           const channel = supabase.channel("checkmate-social-notifications")
@@ -22337,7 +22443,7 @@
         },
         subscribeSocialActivity: async (callback) => {
           const supabase = await getSupabaseClient();
-          const userId = cachedAccount?.publicId || "";
+          const userId = cachedAccount?.authUserId || cachedAccount?.publicId || "";
           if (!userId) return () => {};
           const notify = (event) => { if (typeof callback === "function") callback(event); };
           const channel = supabase.channel("checkmate-social-activity")
@@ -22347,7 +22453,7 @@
         },
         subscribeMessaging: async (callback) => {
           const supabase = await getSupabaseClient();
-          const userId = cachedAccount?.publicId || "";
+          const userId = cachedAccount?.authUserId || cachedAccount?.publicId || "";
           if (!userId) return () => {};
           const notify = (event) => { if (typeof callback === "function") callback(event); };
           const channel = supabase.channel("checkmate-direct-messages")
@@ -22356,6 +22462,52 @@
             .on("postgres_changes", { event: "*", schema: "public", table: "conversation_typing" }, (payload) => notify({ type: "typing", payload }))
             .subscribe((status) => notify({ type: "status", status }));
           return () => { try { supabase.removeChannel(channel); } catch {} };
+        },
+        trackSocialPresence: async (status = "online", connected = true) => {
+          const supabase = await getSupabaseClient();
+          const userId = cachedAccount?.authUserId || cachedAccount?.publicId || "";
+          if (!userId) return false;
+          if (!socialPresenceOwnChannel) {
+            socialPresenceOwnChannel = supabase.channel(`nschess-presence:${userId}`, {
+              config: { private: true, presence: { key: userId } }
+            });
+            await new Promise((resolve, reject) => {
+              socialPresenceOwnChannel.subscribe((channelStatus) => {
+                if (channelStatus === "SUBSCRIBED") resolve();
+                else if (["CHANNEL_ERROR", "TIMED_OUT"].includes(channelStatus)) reject(new Error(`Presence channel ${channelStatus}`));
+              });
+            });
+          }
+          await socialPresenceOwnChannel.track({ userId, status: String(status || "online"), connected: Boolean(connected), lastSeen: new Date().toISOString() });
+          return true;
+        },
+        subscribeSocialPresence: async (targetIds = [], callback) => {
+          const supabase = await getSupabaseClient();
+          const viewerId = cachedAccount?.authUserId || cachedAccount?.publicId || "";
+          const ids = [...new Set((Array.isArray(targetIds) ? targetIds : []).map((id) => String(id || "")).filter((id) => id && id !== viewerId))];
+          const channels = [];
+          const notify = (event) => { if (typeof callback === "function") callback(event); };
+          for (const targetId of ids) {
+            const topic = `nschess-presence:${targetId}`;
+            if (socialPresenceSubscriptions.has(topic)) continue;
+            const channel = supabase.channel(topic, { config: { private: true, presence: { key: viewerId || undefined } } });
+            channel.on("presence", { event: "sync" }, () => notify({ type: "presence", event: "sync", userId: targetId, state: channel.presenceState() }));
+            channel.on("presence", { event: "join" }, (payload) => notify({ type: "presence", event: "join", userId: targetId, payload, state: channel.presenceState() }));
+            channel.on("presence", { event: "leave" }, (payload) => notify({ type: "presence", event: "leave", userId: targetId, payload, state: channel.presenceState() }));
+            socialPresenceSubscriptions.set(topic, channel);
+            channels.push(channel);
+            channel.subscribe((status) => notify({ type: "status", status, userId: targetId }));
+          }
+          return () => {
+            channels.forEach((channel) => { try { supabase.removeChannel(channel); } catch {} });
+            channels.forEach((channel) => { for (const [topic, stored] of socialPresenceSubscriptions.entries()) if (stored === channel) socialPresenceSubscriptions.delete(topic); });
+          };
+        },
+        stopSocialPresence: async () => {
+          const supabase = await getSupabaseClient().catch(() => null);
+          if (socialPresenceOwnChannel) { try { await socialPresenceOwnChannel.untrack(); } catch {} try { supabase?.removeChannel(socialPresenceOwnChannel); } catch {} socialPresenceOwnChannel = null; }
+          for (const channel of socialPresenceSubscriptions.values()) { try { supabase?.removeChannel(channel); } catch {} }
+          socialPresenceSubscriptions.clear();
         },
         createTournament: (event) => callFriendRpc("create_tournament", {
           p_title: String(event?.title || ""),
@@ -26991,12 +27143,59 @@
         challenge_declined: ["Challenge declined", "The challenge is no longer waiting."],
         message_received: isDirectMessage ? ["New direct message", "Open Friends to continue the conversation."] : ["New game message", "Open the private game chat."],
         gift_received: ["You received a gift", "Open the Store to see your cosmetic."],
+        game_invite: ["Game invitation", "Open Friends to join the game."],
+        spectator_joined: ["A spectator joined", "Your live game has a new viewer."],
+        achievement_earned: ["Achievement earned", "Open the profile to see the milestone."],
       };
       const fallback = labels[notification.type] || ["Social update", "Open Friends to see the latest activity."];
       return {
         title: notification.actorUsername ? `${fallback[0]} from ${notification.actorUsername}` : fallback[0],
         detail: fallback[1]
       };
+    }
+
+    function friendPresenceLabel(friend = {}) {
+      const labels = { online: "Online", in_game: "In game", looking: "Looking for a match", idle: "Idle", offline: "Offline" };
+      if (friend.presenceStatus === "offline" && friend.lastSeenAt) {
+        const elapsed = Date.now() - Date.parse(friend.lastSeenAt);
+        if (Number.isFinite(elapsed) && elapsed > 0 && elapsed < 24 * 60 * 60 * 1000) {
+          const minutes = Math.max(1, Math.round(elapsed / 60000));
+          return `Last seen ${minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`}`;
+        }
+      }
+      return labels[friend.presenceStatus] || (friend.online ? "Online" : "Offline");
+    }
+
+    function friendPresenceClass(friend = {}) {
+      const status = ["online", "in_game", "looking", "idle", "offline"].includes(friend.presenceStatus) ? friend.presenceStatus : (friend.online ? "online" : "offline");
+      return `friend-status-dot is-${status.replace(/_/g, "-")}`;
+    }
+
+    function applyFriendPresenceRow(row = {}) {
+      const normalized = normalizeFriendRecord(row);
+      if (!normalized.id) return;
+      const update = (friend) => friend?.id === normalized.id ? { ...friend, ...normalized } : friend;
+      let changed = false;
+      friendNetworkState.directory = friendNetworkState.directory.map((friend) => { const next = update(friend); changed ||= next !== friend; return next; });
+      friendNetworkState.search = friendNetworkState.search.map((friend) => update(friend));
+      if (changed) {
+        renderPlaySocialBar();
+        renderFriendsHub();
+      }
+    }
+
+    function applySocialPresenceEvent(event = {}) {
+      const row = event?.payload?.new || event?.payload?.old || event?.row || null;
+      if (row?.user_id) { applyFriendPresenceRow(row); return; }
+      const state = event?.state && typeof event.state === "object" ? event.state : {};
+      const targetId = String(event.userId || "");
+      const entries = Object.values(state).flatMap((items) => Array.isArray(items) ? items : [items]);
+      const presence = entries.find((entry) => String(entry?.userId || entry?.user_id || "") === targetId) || entries[0];
+      if (targetId && presence) {
+        applyFriendPresenceRow({ public_id: targetId, online: presence.connected !== false, presence_status: presence.status || (presence.connected === false ? "offline" : "online"), last_seen_at: presence.lastSeen || new Date().toISOString() });
+      } else if (targetId && event.event === "leave") {
+        applyFriendPresenceRow({ public_id: targetId, online: false, presence_status: "offline", last_seen_at: new Date().toISOString() });
+      }
     }
 
     function normalizeSocialActivity(row = {}) {
@@ -27016,6 +27215,10 @@
       const payload = activity.payload || {};
       const labels = {
         game_started: [`${actor} started a game`, `${payload.gameType || "Chess"}${payload.clock ? ` - ${payload.clock}` : ""}`],
+        game_finished: [`${actor} finished a game`, payload.result ? `Result: ${payload.result}` : "Game complete."],
+        won_ranked_game: [`${actor} won a ranked game`, "A strong result on the leaderboard."],
+        beat_ai: [`${actor} beat the AI`, "A new training milestone."],
+        became_online: [`${actor} is online`, "Ready for a game or message."],
         rating_reached: [`${actor} reached ${Number(payload.threshold || payload.rating || 0) || "a new"} rating`, "A new milestone on the leaderboard."],
         puzzle_solved: [`${actor} solved a puzzle`, payload.theme ? `Theme: ${payload.theme}` : "A tactical win for the day."],
         lesson_completed: [`${actor} completed a lesson`, payload.title ? String(payload.title) : "A new training idea is ready."],
@@ -27147,7 +27350,9 @@
       return {
         view: ["online", "all", "requests", "sent", "favorites", "recent", "notifications", "activity", "messages"].includes(saved?.view) ? saved.view : "online",
         selectedId: String(saved?.selectedId || ""),
-        search: String(saved?.search || "")
+        search: String(saved?.search || ""),
+        minRating: String(saved?.minRating ?? ""),
+        maxRating: String(saved?.maxRating ?? "")
       };
     }
 
@@ -27184,6 +27389,28 @@
       }
     }
 
+    function renderFriendProfileDetails(profile = null) {
+      const stats = document.getElementById("friendsHubProfileStats");
+      const activity = document.getElementById("friendsHubProfileActivity");
+      if (!stats || !activity) return;
+      if (!profile) { stats.replaceChildren(); activity.hidden = true; activity.replaceChildren(); return; }
+      const source = profile.stats && typeof profile.stats === "object" ? profile.stats : {};
+      const values = [
+        ["Rapid", source.rapid || "—"], ["Blitz", source.blitz || "—"], ["Bullet", source.bullet || "—"],
+        ["Games", source.gamesPlayed ?? "—"], ["Wins", source.wins ?? "—"], ["Win %", source.winPercentage != null ? `${source.winPercentage}%` : "—"]
+      ];
+      stats.replaceChildren(...values.map(([label, value]) => { const item = createBookText("span", "friends-hub-profile-stat", ""); item.append(createBookText("small", "", label), createBookText("strong", "", String(value))); return item; }));
+      const recent = Array.isArray(profile.recentActivity) ? profile.recentActivity : [];
+      const achievements = Array.isArray(profile.achievements) ? profile.achievements : [];
+      activity.hidden = !recent.length && !achievements.length && !profile.private;
+      activity.replaceChildren(...(recent.length || achievements.length ? [
+        recent.length ? createBookText("strong", "", "Recent activity") : null,
+        ...recent.slice(0, 4).map((item) => { const line = createBookText("span", "", String(item.payload?.label || item.activity_type || "Activity")); line.append(createBookText("small", "", item.created_at ? new Date(item.created_at).toLocaleDateString() : "")); return line; }),
+        achievements.length ? createBookText("strong", "", `Achievements · ${achievements.length}`) : null,
+        ...achievements.slice(0, 3).map((item) => createBookText("span", "", String(item.key || item.achievementKey || "Achievement")))
+      ].filter(Boolean) : profile.private ? [createBookText("small", "", "This player keeps profile details private.")] : []));
+    }
+
     function setFriendHubProfile(friend = null) {
       const empty = document.getElementById("friendsHubProfileEmpty");
       const content = document.getElementById("friendsHubProfileContent");
@@ -27191,6 +27418,7 @@
       if (!friend) {
         empty.hidden = false;
         content.hidden = true;
+        renderFriendProfileDetails(null);
         saveFriendHubState({ selectedId: "" });
         return;
       }
@@ -27200,12 +27428,25 @@
       const meta = document.getElementById("friendsHubProfileMeta");
       const bio = document.getElementById("friendsHubProfileBio");
       const favorite = document.getElementById("friendsHubProfileFavorite");
+      const cachedProfile = friendProfileCache.get(friend.id) || null;
       const favorites = readFriendHubFavorites();
       if (avatar) avatar.textContent = friend.avatar && friend.avatar !== "auto" ? friend.avatar.slice(0, 2) : friend.name.slice(0, 1).toUpperCase();
-      if (status) status.textContent = friend.online ? "Online" : "Offline";
+      if (status) status.textContent = friendPresenceLabel(friend);
       if (name) name.textContent = friend.name;
-      if (meta) meta.textContent = `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo`;
-      if (bio) bio.textContent = friend.online ? "Ready for a focused game?" : "Invite them when they are back online.";
+      if (meta) meta.textContent = `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo${cachedProfile?.country || friend.country ? ` · ${cachedProfile?.country || friend.country}` : ""}`;
+      if (bio) bio.textContent = friend.inGame ? "Currently playing a live game." : friend.online ? "Ready for a focused game?" : "Invite them when they are back online.";
+      renderFriendProfileDetails(cachedProfile);
+      const add = document.getElementById("friendsHubProfileAdd");
+      const remove = document.getElementById("friendsHubProfileRemove");
+      const watch = document.getElementById("friendsHubProfileWatch");
+      const block = document.getElementById("friendsHubProfileBlock");
+      const report = document.getElementById("friendsHubProfileReport");
+      const isFriend = friend.requestStatus === "accepted";
+      if (add) { add.hidden = isFriend || friend.requestDirection === "outgoing"; add.textContent = friend.requestDirection === "outgoing" ? "Request pending" : "Add Friend"; add.disabled = friend.requestDirection === "outgoing"; add.onclick = () => void setFriendRequest(friend, "send"); }
+      if (remove) { remove.hidden = !isFriend; remove.onclick = () => void setFriendRequest(friend, "remove"); }
+      if (watch) { watch.hidden = !friend.inGame; watch.onclick = async () => { try { const code = await getFriendProvider()?.getActiveFriendGame?.(friend.id); if (code) await openFriendSpectator(code); else document.getElementById("friendsHubStatus").textContent = "That game is no longer available to watch."; } catch (error) { document.getElementById("friendsHubStatus").textContent = error?.message || "Spectating is unavailable."; } }; }
+      if (block) block.onclick = () => { blockNschessUser({ id: friend.id, name: friend.name }); setFriendHubProfile(null); renderFriendsHub(); };
+      if (report) report.onclick = () => openSafetyReport({ userId: friend.id, username: friend.name, contextType: "profile", contextId: friend.id });
       if (favorite) {
         favorite.textContent = favorites.has(friend.id) ? "★ Favorited" : "☆ Favorite";
         favorite.classList.toggle("is-active", favorites.has(friend.id));
@@ -27238,6 +27479,16 @@
       empty.hidden = true;
       content.hidden = false;
       saveFriendHubState({ selectedId: friend.id });
+      const requestId = ++friendProfileRequest;
+      const cached = friendProfileCache.get(friend.id);
+      if (!cached && getFriendProvider()?.getSocialPlayerProfile) {
+        void getFriendProvider().getSocialPlayerProfile(friend.id).then((profile) => {
+          if (requestId !== friendProfileRequest || friendHubState.selectedId !== friend.id || !profile) return;
+          friendProfileCache.set(friend.id, profile);
+          renderFriendProfileDetails(profile);
+          if (profile.presenceStatus) { const next = normalizeFriendRecord({ ...friend, online: profile.online, presence_status: profile.presenceStatus, last_seen_at: profile.lastSeen }); applyFriendPresenceRow({ public_id: friend.id, online: next.online, presence_status: next.presenceStatus, last_seen_at: next.lastSeenAt }); }
+        }).catch(() => {});
+      }
     }
 
     function createFriendsHubCard(friend, mode = "friend") {
@@ -27250,9 +27501,9 @@
       const avatar = createBookText("span", "friend-result-avatar", friend.avatar && friend.avatar !== "auto" ? friend.avatar.slice(0, 2) : friend.name.slice(0, 1).toUpperCase());
       const copy = document.createElement("span");
       copy.className = "friends-hub-card-copy";
-      copy.append(createBookText("strong", "", friend.name), createBookText("small", "", `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo · ${friend.online ? "Online" : "Offline"}`));
-      const dot = createBookText("span", `friend-status-dot${friend.online ? "" : " is-offline"}`, "");
-      dot.setAttribute("aria-label", friend.online ? "Online" : "Offline");
+      copy.append(createBookText("strong", "", friend.name), createBookText("small", "", `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo · ${friendPresenceLabel(friend)}${friend.mutualFriendsCount ? ` · ${friend.mutualFriendsCount} mutual` : ""}`));
+      const dot = createBookText("span", friendPresenceClass(friend), "");
+      dot.setAttribute("aria-label", friendPresenceLabel(friend));
       main.append(avatar, copy, dot);
       const actions = document.createElement("span");
       actions.className = "friends-hub-card-actions";
@@ -27334,6 +27585,8 @@
       try {
         const rows = await provider.getConversationMessages(conversation.id, null, 80);
         messagingHubState.messages = (Array.isArray(rows) ? rows : []).reverse();
+        messagingHubState.olderCursor = messagingHubState.messages[0]?.created_at || messagingHubState.messages[0]?.createdAt || null;
+        messagingHubState.hasOlder = Array.isArray(rows) && rows.length >= 80;
         await provider.markConversationRead?.(conversation.id);
         messagingHubState.conversations = messagingHubState.conversations.map((item) => item.id === conversation.id ? { ...item, unread: 0 } : item);
       } catch {
@@ -27384,13 +27637,51 @@
       const muteButton = document.getElementById("friendsHubConversationMute");
       if (muteButton) { muteButton.disabled = !active; muteButton.textContent = active?.muted ? "Unmute" : "Mute"; muteButton.onclick = active ? async () => { try { await getFriendProvider()?.muteConversation?.(active.id, !active.muted); await refreshMessaging(); } catch {} } : null; }
       const messageList = document.getElementById("friendsHubConversationMessages");
-      if (messageList) messageList.replaceChildren(...(messagingHubState.messages.length ? messagingHubState.messages.map((message) => { const line = document.createElement("div"); line.className = `friends-hub-conversation-message${message.sender_id === getFriendCurrentUserId() || message.senderId === getFriendCurrentUserId() ? " is-self" : ""}`; line.append(createBookText("small", "", message.sender_username || message.senderUsername || "Player"), document.createTextNode(String(message.body || ""))); return line; }) : [createBookText("p", "friends-hub-empty", active ? "No messages yet. Say hello." : "Choose a conversation to read messages.")]));
+      if (messageList) {
+        const selfId = getFriendCurrentUserId();
+        const lastSelfIndex = messagingHubState.messages.reduce((index, message, currentIndex) => (message.sender_id === selfId || message.senderId === selfId ? currentIndex : index), -1);
+        messageList.replaceChildren(...(messagingHubState.messages.length ? messagingHubState.messages.map((message, index) => {
+          const isSelf = message.sender_id === selfId || message.senderId === selfId;
+          const line = document.createElement("div");
+          line.className = `friends-hub-conversation-message${isSelf ? " is-self" : ""}`;
+          line.append(createBookText("small", "", message.sender_username || message.senderUsername || "Player"), document.createTextNode(String(message.body || "")));
+          if (isSelf && index === lastSelfIndex && active?.unread === 0) line.append(createBookText("small", "friends-hub-read-receipt", "Read"));
+          return line;
+        }) : [createBookText("p", "friends-hub-empty", active ? "No messages yet. Say hello." : "Choose a conversation to read messages.")]));
+      }
+      const older = document.getElementById("friendsHubLoadOlderMessages");
+      if (older) {
+        older.hidden = !active || !messagingHubState.hasOlder;
+        older.onclick = async () => {
+          if (!active || !messagingHubState.olderCursor) return;
+          older.disabled = true;
+          try {
+            const rows = await getFriendProvider()?.getConversationMessages?.(active.id, messagingHubState.olderCursor, 80);
+            const next = (Array.isArray(rows) ? rows : []).reverse();
+            messagingHubState.messages = [...next, ...messagingHubState.messages];
+            messagingHubState.olderCursor = next[0]?.created_at || next[0]?.createdAt || messagingHubState.olderCursor;
+            messagingHubState.hasOlder = next.length >= 80;
+            renderMessagingPanel();
+          } catch {}
+          finally { older.disabled = false; }
+        };
+      }
       const input = document.getElementById("friendsHubMessageInput");
       const send = document.getElementById("friendsHubMessageSend");
       // Muting suppresses notifications only; it must not prevent either
       // participant from continuing the conversation.
       if (input) input.disabled = !active;
       if (send) send.disabled = !active;
+      const emoji = document.getElementById("friendsHubMessageEmoji");
+      if (emoji) {
+        emoji.disabled = !active;
+        emoji.onclick = () => {
+          if (!input || !active) return;
+          input.value = `${input.value}${input.value ? " " : ""}\u{1F642}`;
+          input.focus({ preventScroll: true });
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+      }
       const typing = document.getElementById("friendsHubTyping");
       if (typing) typing.textContent = messagingHubState.typing.length ? `${active?.participantName || "Friend"} is typing…` : "";
     }
@@ -27422,7 +27713,7 @@
       try { messagingRealtimeUnsubscribe?.(); } catch {}
       messagingRealtimeUnsubscribe = null;
       messagingRealtimeSubscribing = false;
-      messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false };
+      messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false };
     }
 
     function setupFriendsHubMessaging() {
@@ -27519,9 +27810,15 @@
       setupFriendsHubMessaging();
       const input = document.getElementById("friendHubSearchInput");
       if (input) input.value = friendHubState.search;
+      const minRating = document.getElementById("friendHubMinRating");
+      const maxRating = document.getElementById("friendHubMaxRating");
+      if (minRating) minRating.value = friendHubState.minRating;
+      if (maxRating) maxRating.value = friendHubState.maxRating;
       root.querySelectorAll("[data-friend-hub-view]").forEach((button) => button.addEventListener("click", () => { saveFriendHubState({ view: button.dataset.friendHubView, search: "" }); if (input) input.value = ""; renderFriendsHub(); if (button.dataset.friendHubView === "messages") { void refreshMessaging({ selectFirst: true }); ensureMessagingRealtime(); } if (button.dataset.friendHubView === "activity") { void refreshSocialActivity(); ensureSocialActivityRealtime(); } }));
       input?.addEventListener("input", () => { window.clearTimeout(friendHubSearchTimer); saveFriendHubState({ search: input.value }); if (friendHubState.view === "messages") { renderFriendsHub(); return; } friendHubSearchTimer = window.setTimeout(() => void searchFriendPlayers(input.value).then(renderFriendsHub), 220); renderFriendsHub(); });
-      document.getElementById("friendHubSearchButton")?.addEventListener("click", () => friendHubState.view === "messages" ? renderFriendsHub() : void searchFriendPlayers(input?.value || "").then(renderFriendsHub));
+      const runPlayerSearch = () => { saveFriendHubState({ minRating: minRating?.value || "", maxRating: maxRating?.value || "" }); return searchFriendPlayers(input?.value || "", { minRating: minRating?.value, maxRating: maxRating?.value }).then(renderFriendsHub); };
+      document.getElementById("friendHubSearchButton")?.addEventListener("click", () => friendHubState.view === "messages" ? renderFriendsHub() : void runPlayerSearch());
+      [minRating, maxRating].forEach((field) => field?.addEventListener("change", () => { if (friendHubState.view !== "messages") void runPlayerSearch(); }));
       document.getElementById("friendsHubProfileClose")?.addEventListener("click", () => setFriendHubProfile(null));
       renderFriendsHub();
       void refreshFriendNetwork(true).then(renderFriendsHub);
@@ -27974,6 +28271,7 @@
         clearSearch();
         overlay.hidden = true;
         document.body.classList.remove("quick-match-searching");
+        void syncFriendPresence(!document.hidden);
         if (restoreFocus) state.returnFocus?.focus?.({ preventScroll: true });
         state.returnFocus = null;
       };
@@ -28033,6 +28331,7 @@
          setMatchMeta(state.options);
          overlay.hidden = false;
          document.body.classList.add("quick-match-searching");
+         void syncFriendPresence(true);
          status.textContent = `Searching for a human opponent... AI fallback after ${state.options.gameType === "rated" ? 25 : 12}s`;
         cancel?.focus({ preventScroll: true });
         state.controller = new AbortController();
