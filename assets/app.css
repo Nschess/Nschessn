@@ -36289,6 +36289,13 @@ body.post-game-dialog-open {
 .friends-hub-page .friends-hub-conversation-head strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .friends-hub-page .friends-hub-conversation-head small { color:#8f9bb6; }
 .friends-hub-page .friends-hub-conversation-messages { display:grid; align-content:start; gap:.45rem; min-height:12rem; max-height:24rem; overflow:auto; padding:.4rem; border:1px solid rgba(124,157,221,.16); border-radius:.75rem; background:rgba(4,10,23,.6); }
+.friends-hub-page .friends-hub-conversation-message { animation: friendsMessageIn .16s ease-out; content-visibility:auto; contain-intrinsic-size:3.4rem; }
+.friends-hub-page .friends-hub-conversation-message.is-sending { opacity:.68; }
+.friends-hub-page .friends-hub-conversation-message.is-failed { border:1px solid rgba(239,118,107,.65); }
+.friends-hub-page .friends-hub-message-meta { margin:.28rem 0 0; color:#aab8d7; font-size:.64rem; }
+.friends-hub-page .friends-hub-message-retry { margin-top:.3rem; border:0; color:#ffd18a; background:none; cursor:pointer; font:inherit; font-size:.68rem; }
+.friends-hub-page .friends-hub-new-messages { justify-self:center; border:1px solid rgba(127,153,255,.45); border-radius:999px; padding:.28rem .65rem; color:#dbe3ff; background:rgba(83,103,206,.24); cursor:pointer; font:inherit; font-size:.72rem; }
+@keyframes friendsMessageIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 .friends-hub-page .friends-hub-load-older { justify-self:center; border:0; color:#9eafff; background:none; cursor:pointer; font:inherit; font-size:.75rem; }
 .friends-hub-page .friends-hub-conversation-message { max-width:82%; padding:.52rem .65rem; border-radius:.7rem; color:#dfe7ff; background:rgba(77,97,153,.26); }
 .friends-hub-page .friends-hub-conversation-message.is-self { justify-self:end; background:linear-gradient(120deg,rgba(104,82,235,.68),rgba(65,143,211,.48)); }

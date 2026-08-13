@@ -11391,11 +11391,15 @@
     let friendHubReady = false;
     let friendHubSearchTimer = 0;
     let friendRealtimeReady = false;
-    let messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false };
+    let messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false, readAtByConversation: {}, pending: new Map(), reconnecting: false };
     let messagingRealtimeUnsubscribe = null;
     let messagingRealtimeSubscribing = false;
     let messagingRefreshPromise = null;
     let messagingTypingTimer = 0;
+    let messagingTypingStopTimer = 0;
+    let messagingRemoteTypingTimer = 0;
+    let messagingLastTypingSentAt = 0;
+    let messagingReconnectTimer = 0;
     let friendNetworkTimer = 0;
     let friendSearchTimer = 0;
     let friendSearchRequest = 0;
@@ -22330,6 +22334,7 @@
         getOrCreateConversation: (targetId) => callFriendRpc("get_or_create_conversation", { p_target_user: targetId }),
         listConversations: (limit = 40) => callFriendRpc("list_conversations", { p_limit: Math.max(1, Math.min(100, Number(limit) || 40)) }),
         getConversationMessages: (conversationId, before = null, limit = 50) => callFriendRpc("get_conversation_messages", { p_conversation_id: conversationId, p_before: before, p_limit: Math.max(1, Math.min(100, Number(limit) || 50)) }),
+        getConversationMessagesSince: (conversationId, since = null, limit = 100) => callFriendRpc("get_conversation_messages_since", { p_conversation_id: conversationId, p_since: since, p_limit: Math.max(1, Math.min(200, Number(limit) || 100)) }),
         sendDirectMessage: (conversationId, body) => callFriendRpc("send_direct_message", { p_conversation_id: conversationId, p_body: String(body || "") }),
         markConversationRead: (conversationId) => callFriendRpc("set_conversation_read", { p_conversation_id: conversationId }),
         muteConversation: (conversationId, muted) => callFriendRpc("set_conversation_muted", { p_conversation_id: conversationId, p_muted: Boolean(muted) }),
@@ -22458,7 +22463,7 @@
           const notify = (event) => { if (typeof callback === "function") callback(event); };
           const channel = supabase.channel("checkmate-direct-messages")
             .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages" }, (payload) => notify({ type: "message", payload }))
-            .on("postgres_changes", { event: "*", schema: "public", table: "conversation_participants", filter: `user_id=eq.${userId}` }, (payload) => notify({ type: "participant", payload }))
+            .on("postgres_changes", { event: "*", schema: "public", table: "conversation_participants" }, (payload) => notify({ type: "read", payload }))
             .on("postgres_changes", { event: "*", schema: "public", table: "conversation_typing" }, (payload) => notify({ type: "typing", payload }))
             .subscribe((status) => notify({ type: "status", status }));
           return () => { try { supabase.removeChannel(channel); } catch {} };
@@ -27180,7 +27185,13 @@
       friendNetworkState.search = friendNetworkState.search.map((friend) => update(friend));
       if (changed) {
         renderPlaySocialBar();
-        renderFriendsHub();
+        if (friendHubState.view !== "messages") renderFriendsHub();
+        else {
+          const active = messagingCurrentConversation();
+          const participant = active && active.participantId === normalized.id ? normalized : null;
+          const meta = document.getElementById("friendsHubConversationMeta");
+          if (participant && meta && !messagingHubState.reconnecting) meta.textContent = `${friendPresenceLabel(participant)} · independent from active games`;
+        }
       }
     }
 
@@ -27269,7 +27280,7 @@
         .then((rows) => {
           socialActivityState = (Array.isArray(rows) ? rows : []).map(normalizeSocialActivity).filter((row) => row.id && row.type);
           if (rerender) window.refreshSiteNotifications?.({ skipServer: true });
-          renderFriendsHub();
+          if (friendHubState.view !== "messages") renderFriendsHub();
           return socialActivityState;
         })
         .catch(() => [])
@@ -27316,7 +27327,9 @@
             readAt: row?.read_at || row?.readAt || ""
           })).filter((row) => row.id);
           if (rerender) window.refreshSiteNotifications?.({ skipServer: true });
-          renderFriendsHub();
+          // Message notifications are already handled by the message stream;
+          // rebuilding an open conversation would lose its scroll position.
+          if (friendHubState.view !== "messages") renderFriendsHub();
           return socialNotificationState;
         })
         .catch(() => [])
@@ -27544,6 +27557,20 @@
       return card;
     }
 
+    function normalizeDirectMessage(row = {}) {
+      const source = Array.isArray(row) ? (row[0] || {}) : row;
+      return {
+        id: String(source.id || source.message_id || ""),
+        conversation_id: String(source.conversation_id || source.conversationId || ""),
+        sender_id: String(source.sender_id || source.senderId || ""),
+        sender_username: String(source.sender_username || source.senderUsername || "Player"),
+        body: String(source.body || ""),
+        created_at: String(source.created_at || source.createdAt || new Date().toISOString()),
+        status: String(source.status || "sent"),
+        localId: String(source.localId || "")
+      };
+    }
+
     function normalizeConversation(row = {}) {
       return {
         id: String(row.conversation_id || row.conversationId || row.id || ""),
@@ -27551,12 +27578,125 @@
         participantName: String(row.participant_username || row.participantUsername || "Chess player"),
         participantAvatar: String(row.participant_avatar || row.participantAvatar || "auto"),
         participantOnline: Boolean(row.participant_online ?? row.participantOnline),
+        presenceStatus: String(row.presence_status || row.presenceStatus || (row.participant_online ? "online" : "offline")),
+        lastSeenAt: String(row.last_seen_at || row.lastSeenAt || ""),
         muted: Boolean(row.muted),
         unread: Number(row.unread_count || row.unreadCount || 0),
         lastBody: String(row.last_body || row.lastBody || ""),
         lastSenderId: String(row.last_sender_id || row.lastSenderId || ""),
         lastMessageAt: String(row.last_message_at || row.lastMessageAt || "")
       };
+    }
+
+    function messagingCurrentConversation() {
+      return messagingHubState.conversations.find((item) => item.id === messagingHubState.conversationId) || null;
+    }
+
+    function isMessagingAtBottom(element) {
+      return !element || element.scrollHeight - element.scrollTop - element.clientHeight < 72;
+    }
+
+    function messageDeliveryLabel(message = {}) {
+      const selfId = getFriendCurrentUserId();
+      if (message.sender_id !== selfId && message.senderId !== selfId) return "";
+      if (message.status === "sending") return "Sending…";
+      const readAt = messagingHubState.readAtByConversation?.[message.conversation_id || message.conversationId] || "";
+      if (readAt && Date.parse(readAt) >= Date.parse(message.created_at || message.createdAt || "")) return "✓✓ Read";
+      if (message.status === "delivered") return "✓✓ Delivered";
+      if (message.status === "failed") return "Retry";
+      return "✓ Sent";
+    }
+
+    function createMessagingMessageNode(message = {}) {
+      const normalized = normalizeDirectMessage(message);
+      const selfId = getFriendCurrentUserId();
+      const isSelf = normalized.sender_id === selfId;
+      const line = document.createElement("div");
+      line.className = `friends-hub-conversation-message${isSelf ? " is-self" : ""}${normalized.status === "sending" ? " is-sending" : ""}${normalized.status === "failed" ? " is-failed" : ""}`;
+      line.dataset.messageId = normalized.id || normalized.localId;
+      line.append(createBookText("small", "", normalized.sender_username || "Player"), document.createTextNode(normalized.body));
+      const footer = createBookText("small", "friends-hub-message-meta", `${new Date(normalized.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${messageDeliveryLabel(normalized) ? ` · ${messageDeliveryLabel(normalized)}` : ""}`);
+      line.append(footer);
+      if (normalized.status === "failed") {
+        const retry = createBookText("button", "friends-hub-message-retry", "Retry");
+        retry.type = "button";
+        retry.addEventListener("click", () => void retryMessagingMessage(normalized));
+        line.append(retry);
+      }
+      return line;
+    }
+
+    function patchMessagingMessageNode(message = {}) {
+      const list = document.getElementById("friendsHubConversationMessages");
+      if (!list) return false;
+      const normalized = normalizeDirectMessage(message);
+      const existing = [...list.querySelectorAll("[data-message-id]")].find((node) => node.dataset.messageId === normalized.id || node.dataset.messageId === normalized.localId);
+      if (!existing) return false;
+      const replacement = createMessagingMessageNode(normalized);
+      existing.replaceWith(replacement);
+      return true;
+    }
+
+    function appendMessagingMessage(message = {}, { forceScroll = false } = {}) {
+      const normalized = normalizeDirectMessage(message);
+      if (!normalized.id && !normalized.localId) return false;
+      if (messagingHubState.messages.some((item) => item.id === normalized.id && normalized.id)) return false;
+      const list = document.getElementById("friendsHubConversationMessages");
+      const wasAtBottom = isMessagingAtBottom(list);
+      messagingHubState.messages.push(normalized);
+      if (list) {
+        list.querySelector(".friends-hub-empty")?.remove();
+        list.append(createMessagingMessageNode(normalized));
+        if (wasAtBottom || forceScroll) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+        else document.getElementById("friendsHubNewMessages")?.removeAttribute("hidden");
+      }
+      return true;
+    }
+
+    function updateMessagingConversationSummary(message, { unread = false } = {}) {
+      const normalized = normalizeDirectMessage(message);
+      const index = messagingHubState.conversations.findIndex((item) => item.id === normalized.conversation_id);
+      if (index < 0) { void refreshMessaging({ selectFirst: false }); return; }
+      const current = messagingHubState.conversations[index];
+      messagingHubState.conversations[index] = { ...current, lastBody: normalized.body, lastMessageAt: normalized.created_at, unread: unread ? Number(current.unread || 0) + 1 : current.unread };
+      const card = [...document.querySelectorAll("[data-messaging-conversation]")].find((item) => item.dataset.messagingConversation === normalized.conversation_id);
+      if (card) {
+        const copy = card.querySelector(".friends-hub-card-copy");
+        if (copy) { const small = copy.querySelector("small"); if (small) small.textContent = normalized.body; }
+        const actions = card.querySelector(".friends-hub-card-actions");
+        if (actions && unread) { const badge = actions.querySelector(".badge") || createBookText("span", "badge", "0"); badge.textContent = String(messagingHubState.conversations[index].unread); if (!badge.parentElement) actions.prepend(badge); }
+      }
+      const messageBadge = document.getElementById("friendsHubMessagesBadge");
+      const totalUnread = messagingHubState.conversations.reduce((sum, item) => sum + Number(item.unread || 0), 0);
+      if (messageBadge) { messageBadge.textContent = String(totalUnread); messageBadge.hidden = !totalUnread; }
+      const socialUnread = friendNetworkState.directory.filter((friend) => friend.requestStatus === "pending" && friend.requestDirection === "incoming").length
+        + socialNotificationState.filter((note) => !note.readAt).length;
+      [document.getElementById("friendsNavBadge"), document.getElementById("friendsMobileBadge")].forEach((badge) => {
+        if (badge) { badge.textContent = String(socialUnread + totalUnread); badge.hidden = !(socialUnread + totalUnread); }
+      });
+    }
+
+    async function retryMessagingMessage(message) {
+      const provider = getFriendProvider();
+      if (!provider?.sendDirectMessage) return;
+      const pending = normalizeDirectMessage({ ...message, status: "sending" });
+      pending.localId = message.localId || message.id;
+      messagingHubState.pending.set(pending.localId, pending);
+      patchMessagingMessageNode(pending);
+      try {
+        const saved = normalizeDirectMessage(await provider.sendDirectMessage(pending.conversation_id, pending.body));
+        if (!saved.id) throw new Error("Message acknowledgement was incomplete. Try again.");
+        saved.status = "sent";
+        const settled = { ...saved, localId: pending.localId };
+        messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === pending.localId || item.id === pending.id ? settled : item);
+        patchMessagingMessageNode(settled);
+        messagingHubState.pending.delete(pending.localId);
+      } catch {
+        pending.status = "failed";
+        messagingHubState.pending.set(pending.localId, pending);
+        messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === pending.localId ? pending : item);
+        patchMessagingMessageNode(pending);
+      }
     }
 
     async function refreshMessaging({ selectFirst = false } = {}) {
@@ -27576,11 +27716,20 @@
 
     async function selectMessagingConversation(conversation, { open = true } = {}) {
       if (!conversation?.id) return;
+      const provider = getFriendProvider();
+      const previousConversationId = messagingHubState.conversationId;
+      if (previousConversationId && previousConversationId !== conversation.id) {
+        const stopPreviousTyping = provider?.setConversationTyping?.(previousConversationId, false);
+        if (stopPreviousTyping?.catch) void stopPreviousTyping.catch(() => {});
+      }
       messagingHubState.conversationId = conversation.id;
       messagingHubState.muted = Boolean(conversation.muted);
       messagingHubState.typing = [];
+      window.clearTimeout(messagingTypingTimer);
+      window.clearTimeout(messagingTypingStopTimer);
+      window.clearTimeout(messagingRemoteTypingTimer);
+      messagingLastTypingSentAt = 0;
       if (open) saveFriendHubState({ view: "messages", selectedId: conversation.participantId, search: "" });
-      const provider = getFriendProvider();
       if (!provider?.getConversationMessages) return renderFriendsHub();
       try {
         const rows = await provider.getConversationMessages(conversation.id, null, 80);
@@ -27610,6 +27759,7 @@
       list.replaceChildren(...(conversations.length ? conversations.map((conversation) => {
         const card = document.createElement("article");
         card.className = `friends-hub-card friends-hub-message-card${conversation.id === messagingHubState.conversationId ? " is-selected" : ""}`;
+        card.dataset.messagingConversation = conversation.id;
         const main = document.createElement("button");
         main.type = "button";
         main.className = "friends-hub-card-main";
@@ -27631,23 +27781,18 @@
         return card;
       }) : [(() => { const empty = document.createElement("div"); empty.className = "friends-hub-empty"; empty.append(createBookText("strong", "", "No conversations yet"), createBookText("span", "", "Open a friend profile and choose Message to start one.")); return empty; })()]));
       conversationPanel.hidden = false;
-      const active = conversations.find((item) => item.id === messagingHubState.conversationId);
+      const active = messagingCurrentConversation() || conversations.find((item) => item.id === messagingHubState.conversationId);
       document.getElementById("friendsHubConversationTitle").textContent = active?.participantName || "Select a conversation";
       document.getElementById("friendsHubConversationMeta").textContent = active ? `${active.participantOnline ? "Online" : "Offline"} · independent from active games` : "Messages are independent from active games.";
+      const liveParticipant = active ? friendNetworkState.directory.find((friend) => friend.id === active.participantId) : null;
+      const liveStatus = liveParticipant ? friendPresenceLabel(liveParticipant) : (active?.participantOnline ? "Online" : "Offline");
+      const conversationMeta = document.getElementById("friendsHubConversationMeta");
+      if (conversationMeta && active) conversationMeta.textContent = `${liveStatus} · independent from active games`;
       const muteButton = document.getElementById("friendsHubConversationMute");
       if (muteButton) { muteButton.disabled = !active; muteButton.textContent = active?.muted ? "Unmute" : "Mute"; muteButton.onclick = active ? async () => { try { await getFriendProvider()?.muteConversation?.(active.id, !active.muted); await refreshMessaging(); } catch {} } : null; }
       const messageList = document.getElementById("friendsHubConversationMessages");
       if (messageList) {
-        const selfId = getFriendCurrentUserId();
-        const lastSelfIndex = messagingHubState.messages.reduce((index, message, currentIndex) => (message.sender_id === selfId || message.senderId === selfId ? currentIndex : index), -1);
-        messageList.replaceChildren(...(messagingHubState.messages.length ? messagingHubState.messages.map((message, index) => {
-          const isSelf = message.sender_id === selfId || message.senderId === selfId;
-          const line = document.createElement("div");
-          line.className = `friends-hub-conversation-message${isSelf ? " is-self" : ""}`;
-          line.append(createBookText("small", "", message.sender_username || message.senderUsername || "Player"), document.createTextNode(String(message.body || "")));
-          if (isSelf && index === lastSelfIndex && active?.unread === 0) line.append(createBookText("small", "friends-hub-read-receipt", "Read"));
-          return line;
-        }) : [createBookText("p", "friends-hub-empty", active ? "No messages yet. Say hello." : "Choose a conversation to read messages.")]));
+        messageList.replaceChildren(...(messagingHubState.messages.length ? messagingHubState.messages.map(createMessagingMessageNode) : [createBookText("p", "friends-hub-empty", active ? "No messages yet. Say hello." : "Choose a conversation to read messages.")]));
       }
       const older = document.getElementById("friendsHubLoadOlderMessages");
       if (older) {
@@ -27656,15 +27801,23 @@
           if (!active || !messagingHubState.olderCursor) return;
           older.disabled = true;
           try {
+            const previousHeight = messageList?.scrollHeight || 0;
+            const previousTop = messageList?.scrollTop || 0;
             const rows = await getFriendProvider()?.getConversationMessages?.(active.id, messagingHubState.olderCursor, 80);
             const next = (Array.isArray(rows) ? rows : []).reverse();
             messagingHubState.messages = [...next, ...messagingHubState.messages];
             messagingHubState.olderCursor = next[0]?.created_at || next[0]?.createdAt || messagingHubState.olderCursor;
             messagingHubState.hasOlder = next.length >= 80;
             renderMessagingPanel();
+            if (messageList) messageList.scrollTop = messageList.scrollHeight - previousHeight + previousTop;
           } catch {}
           finally { older.disabled = false; }
         };
+      }
+      const newMessages = document.getElementById("friendsHubNewMessages");
+      if (newMessages) {
+        newMessages.hidden = true;
+        newMessages.onclick = () => { messageList?.scrollTo({ top: messageList.scrollHeight, behavior: "smooth" }); newMessages.hidden = true; };
       }
       const input = document.getElementById("friendsHubMessageInput");
       const send = document.getElementById("friendsHubMessageSend");
@@ -27686,34 +27839,132 @@
       if (typing) typing.textContent = messagingHubState.typing.length ? `${active?.participantName || "Friend"} is typing…` : "";
     }
 
+    function patchMessagingReadState(conversationId) {
+      const list = document.getElementById("friendsHubConversationMessages");
+      if (!list || conversationId !== messagingHubState.conversationId) return;
+      messagingHubState.messages.filter((item) => item.sender_id === getFriendCurrentUserId()).forEach((item) => patchMessagingMessageNode(item));
+    }
+
+    async function recoverMessagingConversation() {
+      const provider = getFriendProvider();
+      const conversationId = messagingHubState.conversationId;
+      if (!provider?.getConversationMessagesSince || !conversationId) return;
+      const persisted = messagingHubState.messages.filter((message) => message.id && message.id !== message.localId);
+      const latest = persisted[persisted.length - 1]?.created_at || null;
+      try {
+        const rows = await provider.getConversationMessagesSince(conversationId, latest, 200);
+        (Array.isArray(rows) ? rows : []).forEach((row) => {
+          const message = normalizeDirectMessage(row);
+          const isOpen = message.conversation_id === messagingHubState.conversationId && !document.getElementById("friendsHubConversation")?.hidden;
+          if (message.sender_id !== getFriendCurrentUserId()) appendMessagingMessage(message);
+          updateMessagingConversationSummary(message, { unread: !isOpen && message.sender_id !== getFriendCurrentUserId() });
+          if (isOpen && message.sender_id !== getFriendCurrentUserId()) void provider.markConversationRead?.(conversationId);
+        });
+      } catch {
+        // Older deployments without the additive recovery RPC stay connected;
+        // the next Realtime event remains authoritative.
+      }
+    }
+
+    async function handleMessagingRealtimeEvent(event = {}) {
+      if (event.type === "status") {
+        if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(event.status)) {
+          messagingHubState.reconnecting = true;
+          const connectionMeta = document.getElementById("friendsHubConversationMeta");
+          if (connectionMeta && messagingCurrentConversation()) connectionMeta.textContent = "Reconnecting…";
+          window.clearTimeout(messagingReconnectTimer);
+          messagingReconnectTimer = window.setTimeout(() => {
+            // Reconnect the single messaging channel in place. Keep the loaded
+            // message DOM, pending sends, and scroll position intact; the
+            // SUBSCRIBED callback performs cursor-only recovery.
+            try { messagingRealtimeUnsubscribe?.(); } catch {}
+            messagingRealtimeUnsubscribe = null;
+            messagingRealtimeSubscribing = false;
+            void ensureMessagingRealtime();
+          }, 1200);
+        } else if (event.status === "SUBSCRIBED") {
+          messagingHubState.reconnecting = false;
+          window.clearTimeout(messagingReconnectTimer);
+          messagingReconnectTimer = 0;
+          const connectionMeta = document.getElementById("friendsHubConversationMeta");
+          if (connectionMeta && messagingCurrentConversation()) connectionMeta.textContent = "Connected · independent from active games";
+          void recoverMessagingConversation();
+        }
+        return;
+      }
+      const row = event?.payload?.new || event?.payload?.old || {};
+      const conversationId = String(row.conversation_id || "");
+      if (!conversationId) return;
+      if (event.type === "typing") {
+        if (conversationId !== messagingHubState.conversationId || String(row.user_id || "") === getFriendCurrentUserId()) return;
+        messagingHubState.typing = row.is_typing && Date.now() - Date.parse(row.updated_at || "") < 12000 ? [row] : [];
+        const typing = document.getElementById("friendsHubTyping");
+        if (typing) typing.textContent = messagingHubState.typing.length ? `${messagingCurrentConversation()?.participantName || "Friend"} is typing…` : "";
+        window.clearTimeout(messagingRemoteTypingTimer);
+        if (messagingHubState.typing.length) {
+          messagingRemoteTypingTimer = window.setTimeout(() => {
+            messagingHubState.typing = [];
+            const indicator = document.getElementById("friendsHubTyping");
+            if (indicator) indicator.textContent = "";
+          }, 12000);
+        }
+        return;
+      }
+      if (event.type === "read") {
+        if (String(row.user_id || "") !== getFriendCurrentUserId() && row.last_read_at) {
+          messagingHubState.readAtByConversation[conversationId] = row.last_read_at;
+          patchMessagingReadState(conversationId);
+        }
+        return;
+      }
+      if (event.type !== "message") return;
+      const message = normalizeDirectMessage(row);
+      if (!message.id) return;
+      if (message.sender_username === "Player") {
+        const active = messagingCurrentConversation();
+        if (active?.participantId === message.sender_id) message.sender_username = active.participantName;
+        else if (message.sender_id === getFriendCurrentUserId()) message.sender_username = getFriendProvider()?.getCachedAccount?.()?.username || "You";
+      }
+      const pending = [...messagingHubState.pending.values()].find((item) => item.conversation_id === conversationId && item.sender_id === message.sender_id && item.body === message.body);
+      if (pending) {
+        messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === pending.localId ? { ...message, status: "delivered", localId: pending.localId } : item);
+        messagingHubState.pending.delete(pending.localId);
+        patchMessagingMessageNode({ ...message, status: "delivered", localId: pending.localId });
+      } else if (message.sender_id === getFriendCurrentUserId() && messagingHubState.messages.some((item) => item.id === message.id)) {
+        messagingHubState.messages = messagingHubState.messages.map((item) => item.id === message.id ? { ...item, status: "delivered" } : item);
+        patchMessagingMessageNode({ ...message, status: "delivered" });
+      } else if (message.conversation_id === messagingHubState.conversationId) {
+        appendMessagingMessage(message, { forceScroll: message.sender_id === getFriendCurrentUserId() });
+        if (message.sender_id !== getFriendCurrentUserId()) void getFriendProvider()?.markConversationRead?.(conversationId);
+      }
+      const isOpen = message.conversation_id === messagingHubState.conversationId && !document.getElementById("friendsHubConversation")?.hidden;
+      updateMessagingConversationSummary(message, { unread: !isOpen && message.sender_id !== getFriendCurrentUserId() });
+      if (isOpen && message.sender_id !== getFriendCurrentUserId()) messagingHubState.readAtByConversation[conversationId] = new Date().toISOString();
+    }
+
     async function ensureMessagingRealtime() {
       const provider = getFriendProvider();
       if (!provider?.subscribeMessaging || messagingRealtimeUnsubscribe || messagingRealtimeSubscribing) return;
       messagingRealtimeSubscribing = true;
-      try {
-        messagingRealtimeUnsubscribe = await provider.subscribeMessaging(async (event) => {
-          if (event?.type === "typing" && event.payload?.new?.conversation_id === messagingHubState.conversationId) {
-            const row = event.payload.new;
-            messagingHubState.typing = row.is_typing && Date.now() - Date.parse(row.updated_at || "") < 12000 ? [row] : [];
-            renderMessagingPanel();
-            return;
-          }
-          await refreshMessaging();
-          const conversationId = event?.payload?.new?.conversation_id;
-          if (conversationId && conversationId === messagingHubState.conversationId) await selectMessagingConversation(messagingHubState.conversations.find((item) => item.id === conversationId), { open: false });
-        });
-      } catch {
+      try { messagingRealtimeUnsubscribe = await provider.subscribeMessaging(handleMessagingRealtimeEvent); }
+      catch {
         messagingRealtimeUnsubscribe = null;
-      } finally {
-        messagingRealtimeSubscribing = false;
+        window.clearTimeout(messagingReconnectTimer);
+        messagingReconnectTimer = window.setTimeout(() => { messagingReconnectTimer = 0; void ensureMessagingRealtime(); }, 1500);
       }
+      finally { messagingRealtimeSubscribing = false; }
     }
 
     function stopMessagingRealtime() {
       try { messagingRealtimeUnsubscribe?.(); } catch {}
+      window.clearTimeout(messagingReconnectTimer);
+      window.clearTimeout(messagingTypingTimer);
+      window.clearTimeout(messagingTypingStopTimer);
+      window.clearTimeout(messagingRemoteTypingTimer);
+      messagingLastTypingSentAt = 0;
       messagingRealtimeUnsubscribe = null;
       messagingRealtimeSubscribing = false;
-      messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false };
+      messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false, readAtByConversation: {}, pending: new Map(), reconnecting: false };
     }
 
     function setupFriendsHubMessaging() {
@@ -27725,19 +27976,47 @@
         event.preventDefault();
         const text = String(input?.value || "").trim();
         if (!text || !messagingHubState.conversationId) return;
-        try { await getFriendProvider()?.sendDirectMessage?.(messagingHubState.conversationId, text); input.value = ""; await selectMessagingConversation(messagingHubState.conversations.find((item) => item.id === messagingHubState.conversationId), { open: false }); } catch (error) { document.getElementById("friendsHubStatus").textContent = error?.message || "Message could not be sent."; }
+        const conversationId = messagingHubState.conversationId;
+        const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const optimistic = normalizeDirectMessage({ localId, id: localId, conversation_id: conversationId, sender_id: getFriendCurrentUserId(), sender_username: getFriendProvider()?.getCachedAccount?.()?.username || "You", body: text, created_at: new Date().toISOString(), status: "sending" });
+        messagingHubState.pending.set(localId, optimistic);
+        appendMessagingMessage(optimistic, { forceScroll: true });
+        updateMessagingConversationSummary(optimistic);
+        input.value = "";
+        try {
+          const saved = normalizeDirectMessage(await getFriendProvider()?.sendDirectMessage?.(conversationId, text));
+          if (!saved.id) throw new Error("Message acknowledgement was incomplete. Try again.");
+          saved.status = "sent";
+          messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === localId || item.id === localId ? { ...saved, localId } : item);
+          messagingHubState.pending.delete(localId);
+          patchMessagingMessageNode({ ...saved, localId });
+        } catch (error) {
+          optimistic.status = "failed";
+          messagingHubState.pending.set(localId, optimistic);
+          messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === localId ? optimistic : item);
+          patchMessagingMessageNode(optimistic);
+          document.getElementById("friendsHubStatus").textContent = error?.message || "Message could not be sent. Retry from the message.";
+        }
       });
       input?.addEventListener("input", () => {
         window.clearTimeout(messagingTypingTimer);
+        window.clearTimeout(messagingTypingStopTimer);
         const conversationId = messagingHubState.conversationId;
         if (!conversationId) return;
         const provider = getFriendProvider();
-        const typingRequest = provider?.setConversationTyping?.(conversationId, true);
-        if (typingRequest?.catch) void typingRequest.catch(() => {});
-        messagingTypingTimer = window.setTimeout(() => {
+        const now = Date.now();
+        if (now - messagingLastTypingSentAt > 900) {
+          messagingLastTypingSentAt = now;
+          const typingRequest = provider?.setConversationTyping?.(conversationId, true);
+          if (typingRequest?.catch) void typingRequest.catch(() => {});
+        }
+        messagingTypingStopTimer = window.setTimeout(() => {
           const stopRequest = provider?.setConversationTyping?.(conversationId, false);
           if (stopRequest?.catch) void stopRequest.catch(() => {});
-        }, 1000);
+        }, 1400);
+      });
+      input?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); }
       });
     }
 
