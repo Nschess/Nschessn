@@ -11409,6 +11409,7 @@
     let friendNetworkRefreshQueued = false;
     let friendRealtimeReconnectTimer = 0;
     let friendRealtimeReconnectAttempts = 0;
+    let friendConnectionState = { state: "idle", message: "" };
     let friendPresenceTimer = 0;
     let friendPresenceInFlight = false;
     let friendPresenceVisibilityHandler = null;
@@ -11431,6 +11432,7 @@
     let realtimeMatchHeartbeatTimer = 0;
     let realtimeMatchHeartbeatInFlight = false;
     let realtimeMatchVisibilityHandler = null;
+    let friendSpectatorRefreshTimer = 0;
     let friendIncomingNoticeCode = "";
     let friendUiAbortController = null;
     const friendActionLocks = new Map();
@@ -11746,13 +11748,51 @@
       renderBeginnerBotPicker();
     }
 
+    function isFriendSpectatorMode(state = friendChallengeState) {
+      return Boolean(state?.remote && state?.spectator);
+    }
+
     function isRealtimeMatchActive() {
-      return Boolean(friendChallengeState?.remote && friendChallengeState?.active && friendChallengeState.status === "active");
+      return Boolean(friendChallengeState?.remote && friendChallengeState?.active && friendChallengeState.status === "active" && !isFriendSpectatorMode());
+    }
+
+    function setFriendConnectionState(state = "idle", message = "") {
+      friendConnectionState = { state, message };
+      renderFriendConnectionStatus();
+    }
+
+    function getFriendConnectionStatus(state = friendChallengeState || readFriendChallengeState()) {
+      if (!state?.remote) return { state: "idle", message: "Offline" };
+      if (isFriendSpectatorMode(state)) {
+        if (friendConnectionState.state === "reconnecting") return { state: "reconnecting", message: "Reconnecting..." };
+        if (friendConnectionState.state === "error") return friendConnectionState;
+        return { state: friendRealtimeReady ? "connected" : "syncing", message: friendRealtimeReady ? "Watching live" : "Syncing live board" };
+      }
+      if (state.active && state.status === "active") {
+        const opponent = getFriendMatchProfiles(state).opponent;
+        if (opponent && !opponent.online) return { state: "opponent-disconnected", message: "Opponent disconnected" };
+      }
+      return friendConnectionState.message ? friendConnectionState : {
+        state: friendRealtimeReady ? "connected" : "syncing",
+        message: friendRealtimeReady ? "Connected" : "Syncing..."
+      };
+    }
+
+    function renderFriendConnectionStatus(state = friendChallengeState || readFriendChallengeState()) {
+      const chip = document.getElementById("friendConnectionStatus");
+      if (!chip) return;
+      const visible = Boolean(state?.remote && ["pending", "accepted", "active", "completed"].includes(state.status));
+      chip.hidden = !visible;
+      if (!visible) return;
+      const status = getFriendConnectionStatus(state);
+      chip.dataset.state = status.state || "idle";
+      chip.textContent = status.message || "Connected";
     }
 
     function resetRealtimeContextForAi() {
       if (isRealtimeMatchActive()) void syncRealtimeMatchPresence(false);
       stopRealtimeMatchLifecycle();
+      stopFriendSpectatorWatch();
       stopFriendNetworkSync();
       stopTournamentNetworkSync();
       invalidateFriendChallengeSync();
@@ -11768,6 +11808,7 @@
         code: createFriendChallengeCode(), inviteType: "private", gameType: "casual", color: "random",
         fen: "", moves: [], status: "draft", active: false, pending: false, remote: false, createdAt: Date.now()
       };
+      setFriendConnectionState("idle", "");
       tournamentRuntime.events = [];
       tournamentRuntime.currentCode = "";
       tournamentRuntime.inviteResults = [];
@@ -12248,6 +12289,7 @@
       const storedMoves = (Array.isArray(state?.moves) ? state.moves : []).map(String).filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move));
       const localMoves = coachGame?.history({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion || ""}`) || [];
       const historyBasePly = Math.max(0, Number(state?.historyBasePly) || 0);
+      if (localMoves.length && storedMoves.length && storedMoves.every((move, index) => localMoves[index] === move)) return localMoves;
       if (historyBasePly > 0) return [...storedMoves.slice(0, historyBasePly), ...localMoves];
       return localMoves.length ? localMoves : storedMoves;
     }
@@ -12501,6 +12543,7 @@
       if (!piece || !coachGame) return false;
       if (reviewSelfAnalysisState) return piece.color === coachGame.turn();
       if (reviewRetryState) return piece.color === getReviewPlayerColor() && coachGame.turn() === getReviewPlayerColor();
+      if (isFriendSpectatorMode()) return false;
       if (friendChallengeState?.active) return piece.color === coachPlayerColor && coachGame.turn() === coachPlayerColor;
       return coachBotPaused ? piece.color === coachGame.turn() : piece.color === coachPlayerColor && coachGame.turn() === coachPlayerColor;
     }
@@ -16502,7 +16545,10 @@
       coachLastMove = move;
       advanceMatchClock(move.color);
       coachLearnerMoveScores = { fen: "", scored: [], pending: false };
-      if (friendChallengeState?.active) markFriendLocalMovePending(move, coachGame.fen(), getSyncedFriendMoves());
+      if (friendChallengeState?.active) {
+        markFriendLocalMovePending(move, coachGame.fen(), getSyncedFriendMoves());
+        setFriendConnectionState("waiting", "Waiting for server confirmation...");
+      }
       scheduleCoachBoardRender();
       scheduleCoachPanelUpdate();
       if (friendChallengeState?.active) {
@@ -16736,6 +16782,7 @@
       writeJsonStorage(friendChallengeStorageKey, friendChallengeState);
       if (options?.render !== false) {
         renderFriendChallengeLobby();
+        renderFriendConnectionStatus();
         renderPlaySocialBar();
       }
     }
@@ -16748,16 +16795,21 @@
       const panel = document.getElementById("friendGameChat");
       const drawer = document.getElementById("friendGameChatDrawer");
       const messages = document.getElementById("friendGameChatMessages");
+      const chatInput = document.getElementById("friendGameChatInput");
+      const chatSend = document.querySelector("#friendGameChatForm button[type='submit']");
       const socialInput = document.getElementById("playSocialMessageInput");
       const socialSend = document.getElementById("playSocialMessageSend");
       if (!panel || !messages) return;
       const enabled = Boolean(state?.remote && ["active", "completed"].includes(state.status));
+      const spectator = isFriendSpectatorMode(state);
       const opponent = getFriendMatchProfiles(state).opponent;
       const opponentBlocked = Boolean(opponent && isNschessUserBlocked(opponent.id, opponent.displayName));
       if (drawer) drawer.hidden = !enabled;
       panel.hidden = !enabled;
-      if (socialInput) { socialInput.disabled = !enabled || opponentBlocked; socialInput.placeholder = !enabled ? "Chat opens during friendly games" : opponentBlocked ? "Opponent is blocked on this device" : "Message your opponent"; }
-      if (socialSend) socialSend.disabled = !enabled || opponentBlocked;
+      if (socialInput) { socialInput.disabled = !enabled || spectator || opponentBlocked; socialInput.placeholder = !enabled ? "Chat opens during friendly games" : spectator ? "Spectators can read chat only" : opponentBlocked ? "Opponent is blocked on this device" : "Message your opponent"; }
+      if (socialSend) socialSend.disabled = !enabled || spectator || opponentBlocked;
+      if (chatInput) chatInput.disabled = !enabled || spectator || opponentBlocked;
+      if (chatSend) chatSend.disabled = !enabled || spectator || opponentBlocked;
       if (!enabled) return;
       const rows = (Array.isArray(state.messages) ? state.messages.slice(-24) : []).filter((message) => String(message.userId || message.user_id || "") === getFriendCurrentUserId() || !isNschessUserBlocked(message.userId || message.user_id, message.username));
       const signature = rows.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}:${message.body || ""}`).join("|");
@@ -16776,7 +16828,7 @@
       event?.preventDefault();
       const input = document.getElementById("friendGameChatInput");
       const text = String(input?.value || "").trim();
-      if (!text || !friendChallengeState?.remote) return;
+      if (!text || !friendChallengeState?.remote || isFriendSpectatorMode()) return;
       const code = friendChallengeState.code;
       return runFriendAction(`challenge:${code}:message:${text}`, () => sendFriendGameMessageRequest(code, text, input));
     }
@@ -16896,6 +16948,7 @@
         fen: String(raw.fen || ""),
         moves: Array.isArray(raw.moves) ? raw.moves.map(String) : [],
         revision: Math.max(0, Number(raw.revision) || 0),
+        viewerRole: String(raw.viewerRole || raw.viewer_role || ""),
         messages: Array.isArray(raw.messages) ? raw.messages : [],
         clockState: normalizeMatchClockState(raw.clockState || raw.clock_state, normalizeFriendChallengeClock(raw.clock)),
         updatedAt: String(raw.updatedAt || raw.updated_at || ""),
@@ -16906,6 +16959,8 @@
     function toFriendChallengeState(remote, previous = friendChallengeState || readFriendChallengeState()) {
       const me = getFriendCurrentUserId();
       const isCreator = Boolean(me && remote.creatorId === me);
+      const isParticipant = Boolean(me && (remote.creatorId === me || remote.opponentId === me));
+      const spectator = Boolean(remote.viewerRole === "spectator" || previous?.spectator && !isParticipant);
       const incoming = Boolean(me && !isCreator && remote.status === "pending" && (remote.opponentId === me || !remote.opponentId));
       return {
         ...previous,
@@ -16920,12 +16975,13 @@
         targetName: isCreator ? (remote.opponentName || "Friend") : remote.creatorName,
         inviteType: remote.inviteType,
         gameType: remote.gameType,
-        color: isCreator ? remote.creatorColor : oppositeFriendColor(remote.creatorColor),
+        color: spectator ? (previous?.color === "b" ? "b" : "w") : isCreator ? remote.creatorColor : oppositeFriendColor(remote.creatorColor),
+        spectator,
         clock: remote.clock,
         status: remote.status,
-        pending: remote.status === "pending" || remote.status === "accepted",
+        pending: !spectator && (remote.status === "pending" || remote.status === "accepted"),
         active: remote.status === "active",
-        incoming,
+        incoming: spectator ? false : incoming,
         online: true,
         fen: remote.fen,
         moves: remote.moves,
@@ -17007,7 +17063,11 @@
       const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteRevision === revision && previous.remoteMessageStamp === messageStamp;
       if (unchanged && !boardNeedsRestore) return true;
       const next = normalizeFriendChallengeState(toFriendChallengeState(remote));
-      if (boardNeedsRestore) next.historyBasePly = remote.moves.filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)).length;
+      let restoredFriendGame = null;
+      if (boardNeedsRestore) {
+        restoredFriendGame = buildFriendChallengeGameFromMoves(next);
+        next.historyBasePly = restoredFriendGame ? 0 : getFriendMoveCount(remote);
+      }
       friendChallengeState = next;
       if (remote.status === "active" && (previous?.status === "completed" || Boolean(completedGameSignature || coachTerminalOutcome || coachDrawAgreed || matchClockExpiredColor))) {
         coachMoveToken += 1;
@@ -17064,7 +17124,7 @@
       }
       if (boardNeedsRestore) {
         try {
-          coachGame = buildFriendChallengeGameFromMoves(next) || new CoachChess(remote.fen);
+          coachGame = restoredFriendGame || new CoachChess(remote.fen);
           coachPlayerColor = next.color;
           coachFlipped = next.color === "b";
           coachBotPaused = true;
@@ -17083,9 +17143,11 @@
       if (remote.status === "active") {
         renderInGamePlayerCard();
         updateAiPlayerHeader();
-        startRealtimeMatchLifecycle();
+        if (isFriendSpectatorMode(next)) startFriendSpectatorWatch();
+        else startRealtimeMatchLifecycle();
       }
       if (remote.status === "completed") {
+        stopFriendSpectatorWatch();
         stopRealtimeMatchLifecycle();
         completeCoachGame(getFriendGameOutcome(next));
         renderCoachBoard();
@@ -17094,8 +17156,8 @@
         if (next.tournamentPairingId && !next.tournamentResultReported) void reportTournamentResultFromBoard();
       }
       renderFriendGameChat(next);
-      renderFriendChallengeLobby();
-      renderPlaySocialBar();
+      renderFriendChallengeLobby({ renderDirectory: false });
+      if (remote.status !== "active") renderPlaySocialBar();
       return true;
     }
 
@@ -17112,6 +17174,83 @@
       });
       return `${base}#play?${params.toString()}`;
     }
+
+    function getFriendSpectateLink(state = friendChallengeState || readFriendChallengeState()) {
+      const source = normalizeFriendChallengeState(state);
+      const base = location.href.split("#")[0];
+      const params = new URLSearchParams({ spectate: source.code });
+      return `${base}#play?${params.toString()}`;
+    }
+
+    function stopFriendSpectatorWatch() {
+      window.clearInterval(friendSpectatorRefreshTimer);
+      friendSpectatorRefreshTimer = 0;
+    }
+
+    function startFriendSpectatorWatch() {
+      if (!isFriendSpectatorMode() || !friendChallengeState?.active) {
+        stopFriendSpectatorWatch();
+        return;
+      }
+      if (friendSpectatorRefreshTimer) return;
+      ensureFriendRealtime();
+      void refreshActiveFriendChallenge(friendChallengeState.code, true);
+      friendSpectatorRefreshTimer = window.setInterval(() => {
+        if (!isFriendSpectatorMode() || !friendChallengeState?.active) return stopFriendSpectatorWatch();
+        if (document.hidden) return;
+        void refreshActiveFriendChallenge(friendChallengeState.code, true);
+      }, 4000);
+    }
+
+    async function openFriendSpectator(code) {
+      const challengeCode = String(code || "").trim().toUpperCase();
+      const provider = getFriendProvider();
+      if (!challengeCode) {
+        setFriendChallengeStatus("Enter a challenge code to watch.");
+        return false;
+      }
+      if (!provider) {
+        setFriendChallengeStatus("Sign in to watch a live friend game.");
+        return false;
+      }
+      if (!provider.getFriendSpectatorChallenge) {
+        setFriendChallengeStatus("Live spectator mode is not available until the latest social migration is applied.");
+        return false;
+      }
+      try {
+        const remote = await provider.getFriendSpectatorChallenge(challengeCode);
+        applyRemoteFriendChallenge(remote, true);
+        startFriendSpectatorWatch();
+        window.setTimeout(() => document.getElementById("friendChallenge")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+        return true;
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "That game is not available for spectators.");
+        setFriendConnectionState("error", "Watch unavailable");
+        return false;
+      }
+    }
+
+    async function applyFriendSpectateFromHash() {
+      try {
+        const hashQuery = location.hash.includes("?") ? location.hash.split("?")[1] : "";
+        const params = new URLSearchParams(hashQuery);
+        const code = params.get("spectate");
+        if (!code) return false;
+        return openFriendSpectator(code);
+      } catch {
+        return false;
+      }
+    }
+
+    function watchFriendChallengeCode() {
+      const code = document.getElementById("friendJoinCode")?.value || "";
+      return runFriendAction(`challenge:spectate:${String(code).trim().toUpperCase()}`, () => openFriendSpectator(code));
+    }
+
+    function copyFriendSpectateLink() {
+      return copyFriendChallengeText(getFriendSpectateLink(friendChallengeState || readFriendChallengeState()), "Watch link");
+    }
+
     function getReceiverColorFromInvite(color = "random") {
       if (color === "w") return "b";
       if (color === "b") return "w";
@@ -17262,6 +17401,10 @@
         renderPlaySocialBar();
         renderFriendsHub();
         const state = friendChallengeState || readFriendChallengeState();
+        if (state.spectator) {
+          renderFriendChallengeLobby({ renderDirectory: false });
+          return true;
+        }
         const matching = state.remote ? friendNetworkState.challenges.find((challenge) => challenge.code === state.code) : null;
         const incoming = friendNetworkState.challenges.find((challenge) => challenge.status === "pending" && challenge.opponentId === getFriendCurrentUserId());
         if (matching) applyRemoteFriendChallenge(matching, true);
@@ -17303,12 +17446,18 @@
     async function refreshActiveFriendChallenge(code = friendChallengeState?.code, restoreBoard = true) {
       const provider = getFriendProvider();
       const challengeCode = String(code || "").toUpperCase();
-      if (!provider?.getFriendChallenge || !challengeCode) return false;
+      const spectator = isFriendSpectatorMode(friendChallengeState);
+      const fetchChallenge = spectator ? provider?.getFriendSpectatorChallenge : provider?.getFriendChallenge;
+      if (!fetchChallenge || !challengeCode) return false;
       if (friendChallengeRefreshPromise) return friendChallengeRefreshPromise;
       friendChallengeRefreshPromise = (async () => {
         try {
-          const remote = await provider.getFriendChallenge(challengeCode);
-          if (remote && friendChallengeState?.code === challengeCode) return applyRemoteFriendChallenge(remote, restoreBoard);
+          const remote = await fetchChallenge(challengeCode);
+          if (remote && friendChallengeState?.code === challengeCode) {
+            const applied = applyRemoteFriendChallenge(remote, restoreBoard);
+            setFriendConnectionState("connected", isFriendSpectatorMode() ? "Watching live" : "Connected");
+            return applied;
+          }
           return false;
         } catch {
           return false;
@@ -17350,9 +17499,11 @@
         if (event.status === "SUBSCRIBED") {
           friendRealtimeReady = true;
           friendRealtimeReconnectAttempts = 0;
+          setFriendConnectionState(friendConnectionState.state === "reconnecting" ? "reconnected" : "connected", friendConnectionState.state === "reconnecting" ? "Reconnected successfully" : isFriendSpectatorMode() ? "Watching live" : "Connected");
           queueFriendNetworkRefresh();
         } else if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(event.status)) {
           friendRealtimeReady = false;
+          setFriendConnectionState("reconnecting", "Reconnecting...");
           scheduleFriendRealtimeReconnect(generation);
         }
         return;
@@ -17381,7 +17532,11 @@
           }
           if (typeof unsubscribe === "function") friendNetworkUnsubscribe = unsubscribe;
         })
-        .catch(() => {})
+        .catch(() => {
+          friendRealtimeReady = false;
+          setFriendConnectionState("reconnecting", "Reconnecting...");
+          scheduleFriendRealtimeReconnect(generation);
+        })
         .finally(() => {
           if (generation === friendNetworkSubscriptionGeneration) friendNetworkSubscribing = false;
         });
@@ -17525,7 +17680,7 @@
       }
     }
 
-    function renderFriendChallengeLobby() {
+    function renderFriendChallengeLobby({ renderDirectory = true } = {}) {
       const state = normalizeFriendChallengeState(friendChallengeState || readFriendChallengeState());
       friendChallengeState = state;
       const setValue = (id, value) => {
@@ -17537,6 +17692,7 @@
       const status = document.getElementById("friendChallengeStatus");
       const joinCode = document.getElementById("friendJoinCode");
       const shareReady = Boolean(state.remote && ["pending", "accepted", "active"].includes(state.status));
+      const spectator = isFriendSpectatorMode(state);
       if (code) code.textContent = shareReady ? state.code : "READY";
       if (link) {
         link.value = shareReady ? getFriendInviteLink(state) : "";
@@ -17555,9 +17711,10 @@
           ? (state.incoming ? "Incoming challenge received. Accept to start the match." : state.online ? "Challenge sent. Share the link if your friend is on another device." : "Offline invite created. Copy the link or code to send it.")
           : state.active
           ? `Live friend board: ${state.gameType === "rated" ? "Rated" : "Casual"} • ${state.clock === "none" ? "No clock" : `${state.clock} clock`} • ${state.gameType === "casual" ? "takebacks allowed" : "rated rules"}.`
-          : state.status === "declined"
-          ? "This challenge was declined. Pick a fresh setup when you are ready."
-          : "Choose time and color, then challenge a player or share this code.";
+           : state.status === "declined"
+           ? "This challenge was declined. Pick a fresh setup when you are ready."
+           : "Choose time and color, then challenge a player or share this code.";
+        if (spectator) status.textContent = `Watching ${state.targetName || state.creatorName || "a live friend game"}. Moves and chat update automatically.`;
       }
       setValue("friendInviteType", state.inviteType);
       setValue("friendGameType", state.gameType);
@@ -17584,12 +17741,17 @@
         newCode.disabled = Boolean(state.active || (state.remote && (state.status !== "pending" || state.incoming)));
       }
       const matchActions = document.getElementById("friendMatchActions");
-      if (matchActions) matchActions.hidden = !state.active;
+      if (matchActions) matchActions.hidden = !state.active && !spectator;
       const takeback = document.getElementById("friendTakeback");
-      if (takeback) takeback.disabled = state.gameType === "rated";
+      if (takeback) takeback.disabled = spectator || state.gameType === "rated";
+      const rematch = document.getElementById("friendRematch");
+      if (rematch) rematch.disabled = spectator;
+      const spectateLink = document.getElementById("friendCopySpectateLink");
+      if (spectateLink) spectateLink.hidden = !state.remote || !["active", "completed"].includes(state.status) || spectator;
       renderFriendQr(state.code);
       renderFriendRequestCard(state);
-      renderFriendDirectory();
+      if (renderDirectory) renderFriendDirectory();
+      renderFriendConnectionStatus(state);
     }
 
     function updateFriendChallengeFromControls() {
@@ -17694,6 +17856,10 @@
     function startFriendChallenge(rematch = false) {
       if (!CoachChess) return;
       const state = friendChallengeState;
+      if (isFriendSpectatorMode(state)) {
+        setFriendChallengeStatus("Spectators can watch this game but cannot start or change it.");
+        return;
+      }
       if (!state?.remote) {
         setFriendChallengeStatus("Create or accept a real friend challenge first.");
         return;
@@ -17774,11 +17940,17 @@
 
     async function reconnectFriendChallengeRequest(state) {
       try {
-        const remote = await getFriendProvider()?.getFriendChallenge(state.code);
+        const provider = getFriendProvider();
+        const remote = isFriendSpectatorMode(state)
+          ? await provider?.getFriendSpectatorChallenge?.(state.code)
+          : await provider?.getFriendChallenge(state.code);
         if (!remote) throw new Error("Sign in to reconnect this game.");
         applyRemoteFriendChallenge(remote, true);
+        if (isFriendSpectatorMode(state)) startFriendSpectatorWatch();
+        setFriendConnectionState("reconnected", "Reconnected successfully");
         setFriendChallengeStatus(`Reconnected to friend challenge ${state.code}.`);
       } catch (error) {
+        setFriendConnectionState("error", "Reconnect failed");
         setFriendChallengeStatus(error?.message || "Could not reconnect this friend game.");
       }
     }
@@ -17846,21 +18018,25 @@
         const moves = getSyncedFriendMoves();
         const signature = `${state.remoteId || code}\u001f${state.serverRevision || 0}\u001f${coachGame.fen()}\u001f${JSON.stringify(moves)}`;
         if (signature === friendChallengeLastPositionSignature) return true;
+        setFriendConnectionState("syncing", moveApplied ? "Syncing move..." : "Syncing...");
         try {
           const remote = await provider.saveFriendChallengePosition({ ...state, fen: coachGame.fen(), moves, status: "active", moveApplied });
           if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) {
             friendChallengeLastPositionSignature = signature;
             if (normalizeRemoteFriendChallenge(remote)?.status === "completed") clearPendingFriendMove();
             applyRemoteFriendChallenge(remote, false);
+            setFriendConnectionState("connected", "Connected");
           }
           return true;
         } catch (error) {
           if (epoch === friendChallengeSyncEpoch) {
             if (isExplicitFriendSyncRejection(error)) {
               clearPendingFriendMove();
+              setFriendConnectionState("error", "Move rejected — reconnecting");
               setFriendChallengeStatus(error?.message || "Server rejected this move. Reconnecting the board.");
               window.setTimeout(() => void reconnectFriendChallenge(), 700);
             } else {
+              setFriendConnectionState("reconnecting", "Waiting for server confirmation...");
               setFriendChallengeStatus(error?.message || "Move saved locally. Retrying sync...");
               window.setTimeout(() => void syncFriendChallengePosition(moveApplied), 900);
             }
@@ -17877,6 +18053,7 @@
         if (epoch !== friendChallengeSyncEpoch || !state?.remote || !state.active || !coachGame || !provider) return false;
         const code = state.code;
         try {
+          setFriendConnectionState("syncing", "Syncing...");
           const remote = await provider.saveFriendChallengePosition({
             ...state,
             fen: coachGame.fen(),
@@ -17884,10 +18061,14 @@
             status,
             moveApplied: false
           });
-          if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) applyRemoteFriendChallenge(remote, false);
+          if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) {
+            applyRemoteFriendChallenge(remote, false);
+            setFriendConnectionState("connected", "Connected");
+          }
           return true;
         } catch (error) {
           if (epoch === friendChallengeSyncEpoch) {
+            setFriendConnectionState("reconnecting", "Reconnecting...");
             setFriendChallengeStatus(error?.message || "Game action saved locally. Reconnect to retry syncing it.");
             window.setTimeout(() => void reconnectFriendChallenge(), 700);
           }
@@ -18631,7 +18812,7 @@
       if (realtimeMatchHeartbeatInFlight) return;
       const state = friendChallengeState;
       const provider = getFriendProvider();
-      if (!state?.remote || !state.active || state.status !== "active" || !provider?.touchFriendChallengePresence) return;
+      if (isFriendSpectatorMode(state) || !state?.remote || !state.active || state.status !== "active" || !provider?.touchFriendChallengePresence) return;
       const epoch = friendChallengeSyncEpoch;
       const code = state.code;
       realtimeMatchHeartbeatInFlight = true;
@@ -18640,6 +18821,7 @@
         if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) applyRemoteFriendChallenge(remote, false);
         if (state.tournamentCode && provider.touchTournamentPresence) await provider.touchTournamentPresence(state.tournamentCode, connected);
       } catch {
+        setFriendConnectionState("reconnecting", "Reconnecting...");
         // Presence is retried by the next heartbeat; a failed pulse never changes a local game result.
       } finally {
         realtimeMatchHeartbeatInFlight = false;
@@ -18727,6 +18909,7 @@
 
       friendChallengeState = readFriendChallengeState();
       void applyFriendInviteFromHash();
+      void applyFriendSpectateFromHash();
       renderFriendChallengeLobby();
       renderPlaySocialBar();
       ["friendInviteType", "friendGameType", "friendColor", "friendClock"].forEach((id) => listen(id, "change", updateFriendChallengeFromControls));
@@ -18764,8 +18947,10 @@
         startFriendChallenge(false);
       });
       listen("friendJoin", "click", () => void joinFriendChallengeCode());
+      listen("friendSpectate", "click", () => void watchFriendChallengeCode());
       listen("friendReconnect", "click", () => void reconnectFriendChallenge());
       listen("friendRematch", "click", () => startFriendChallenge(true));
+      listen("friendCopySpectateLink", "click", copyFriendSpectateLink);
       listen("friendTakeback", "click", takebackFriendMove);
       listen("friendGameChatForm", "submit", sendFriendGameMessage);
       listen("playSocialMessageForm", "submit", sendPlaySocialMessage);
@@ -18774,10 +18959,15 @@
       }, options);
       window.addEventListener("hashchange", () => {
         if (location.hash.includes("challenge=")) void applyFriendInviteFromHash();
+        if (location.hash.includes("spectate=")) void applyFriendSpectateFromHash();
       }, options);
     }
 
     function takebackFriendMove() {
+      if (isFriendSpectatorMode()) {
+        setFriendChallengeStatus("Spectators cannot change the game.");
+        return;
+      }
       if (friendChallengeState?.gameType === "rated") {
         coachMessage = "Takeback is only available in casual friend games.";
         updateCoachPanel();
@@ -20872,7 +21062,7 @@
         if (cleanHash === "tournaments" || /(^|[?&])(mode=tournament|tournament=)/.test(rawHash)) {
           return { tab: "tournaments", panel: "play", focus: "tournamentLobby" };
         }
-        if (cleanHash === "friendChallenge" || /(^|[?&])(mode=friend|challenge=)/.test(rawHash)) {
+        if (cleanHash === "friendChallenge" || /(^|[?&])(mode=friend|challenge=|spectate=)/.test(rawHash)) {
           return { tab: "friendChallenge", panel: "play", focus: "friendChallenge" };
         }
 
@@ -20957,6 +21147,7 @@
 
       function showHome(shouldScroll = false) {
         suspendGameReviewWorkspaceForNavigation();
+        stopFriendSpectatorWatch();
         if (panelInitFrame) {
           window.cancelAnimationFrame(panelInitFrame);
           panelInitFrame = 0;
@@ -20986,6 +21177,9 @@
           showHome(shouldScroll);
           return;
         }
+
+        if (config.tab === "friendChallenge") startFriendSpectatorWatch();
+        else stopFriendSpectatorWatch();
 
         if (config.panel !== "gameReview") suspendGameReviewWorkspaceForNavigation();
         if (config.panel === "gameReview" && !document.getElementById("gameReview")?.classList.contains("is-review-page")) {
@@ -22063,6 +22257,7 @@
           p_clock: String(challenge?.clock || "10+0")
         }),
         getFriendChallenge: (code) => callFriendRpc("get_game_challenge", { p_code: String(code || "") }),
+        getFriendSpectatorChallenge: (code) => callFriendRpc("get_game_challenge_spectator", { p_code: String(code || "") }),
         touchFriendChallengePresence: (code, connected = true) => callFriendRpc("touch_game_challenge_presence", {
           p_code: String(code || ""), p_connected: Boolean(connected)
         }),
