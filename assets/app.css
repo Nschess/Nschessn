@@ -12783,6 +12783,10 @@
       box-shadow: none;
     }
 
+    .friend-status-dot.is-in-game { background:#ef766b; box-shadow:0 0 10px rgba(239,118,107,.55); }
+    .friend-status-dot.is-looking { background:#f1c56c; box-shadow:0 0 10px rgba(241,197,108,.5); }
+    .friend-status-dot.is-idle { background:#d4a851; box-shadow:0 0 8px rgba(212,168,81,.35); }
+
     .friend-card-actions {
       display: flex;
       gap: 6px;
@@ -36231,6 +36235,9 @@ body.post-game-dialog-open {
 .friends-hub-page .friends-hub-search { display:flex; align-items:center; min-width:min(15rem,44%); border:1px solid rgba(124,157,221,.28); border-radius:.7rem; background:rgba(6,13,29,.75); overflow:hidden; }
 .friends-hub-page .friends-hub-search input { min-width:0; flex:1; border:0; outline:0; padding:.65rem .7rem; color:#f4f7ff; background:transparent; font:inherit; }
 .friends-hub-page .friends-hub-search button { width:2.4rem; align-self:stretch; border:0; color:#aebdff; background:rgba(102,87,241,.18); cursor:pointer; font-size:1.15rem; }
+.friends-hub-page .friends-hub-search-filters { display:flex; flex-wrap:wrap; gap:.45rem; padding:.55rem .05rem .1rem; }
+.friends-hub-page .friends-hub-search-filters label { display:flex; align-items:center; gap:.35rem; color:#8493b2; font-size:.7rem; letter-spacing:.04em; text-transform:uppercase; }
+.friends-hub-page .friends-hub-search-filters input { width:5.2rem; min-width:0; border:1px solid rgba(124,157,221,.22); border-radius:.45rem; padding:.35rem .45rem; color:#eef3ff; background:rgba(6,13,29,.7); font:inherit; }
 .friends-hub-page .friends-hub-status { min-height:1.4rem; padding:.7rem .1rem .35rem; color:#8f9bb6; font-size:.82rem; }
 .friends-hub-page .friends-hub-list { display:grid; gap:.55rem; max-height:31rem; overflow:auto; padding:.25rem .1rem .15rem; scrollbar-color:#546aa8 transparent; }
 .friends-hub-page .friends-hub-card { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.75rem; padding:.7rem; border:1px solid rgba(124,157,221,.18); border-radius:.8rem; background:rgba(8,16,34,.72); }
@@ -36256,6 +36263,11 @@ body.post-game-dialog-open {
 .friends-hub-page .friends-hub-profile-top strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:1.15rem; }
 .friends-hub-page .friends-hub-profile-top span span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#8f9bb6; font-size:.78rem; }
 .friends-hub-page .friends-hub-profile-content > p { min-height:3.5rem; margin:1rem 0; color:#b1bdd5; line-height:1.5; }
+.friends-hub-page .friends-hub-profile-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; margin:.7rem 0; }
+.friends-hub-page .friends-hub-profile-stat { display:grid; gap:.1rem; padding:.45rem .55rem; border:1px solid rgba(124,157,221,.16); border-radius:.55rem; color:#8f9bb6; font-size:.68rem; }
+.friends-hub-page .friends-hub-profile-stat strong { color:#edf2ff; font-size:.9rem; }
+.friends-hub-page .friends-hub-profile-activity { display:grid; gap:.28rem; margin:.65rem 0; color:#aebbd4; font-size:.75rem; }
+.friends-hub-page .friends-hub-profile-activity small { color:#7f8daa; }
 .friends-hub-page .friends-hub-profile-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
 .friends-hub-page .friends-hub-profile-actions .button { flex:1; min-width:7rem; }
 .friends-hub-page .friends-hub-profile-close { margin-top:1rem; border:0; color:#8491ae; background:none; cursor:pointer; font:inherit; font-size:.78rem; }
@@ -36277,11 +36289,13 @@ body.post-game-dialog-open {
 .friends-hub-page .friends-hub-conversation-head strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .friends-hub-page .friends-hub-conversation-head small { color:#8f9bb6; }
 .friends-hub-page .friends-hub-conversation-messages { display:grid; align-content:start; gap:.45rem; min-height:12rem; max-height:24rem; overflow:auto; padding:.4rem; border:1px solid rgba(124,157,221,.16); border-radius:.75rem; background:rgba(4,10,23,.6); }
+.friends-hub-page .friends-hub-load-older { justify-self:center; border:0; color:#9eafff; background:none; cursor:pointer; font:inherit; font-size:.75rem; }
 .friends-hub-page .friends-hub-conversation-message { max-width:82%; padding:.52rem .65rem; border-radius:.7rem; color:#dfe7ff; background:rgba(77,97,153,.26); }
 .friends-hub-page .friends-hub-conversation-message.is-self { justify-self:end; background:linear-gradient(120deg,rgba(104,82,235,.68),rgba(65,143,211,.48)); }
 .friends-hub-page .friends-hub-conversation-message small { display:block; margin-bottom:.18rem; color:#aab8d7; font-size:.68rem; }
+.friends-hub-page .friends-hub-conversation-message .friends-hub-read-receipt { margin:.25rem 0 0; color:#b7c8ff; font-size:.64rem; text-align:right; }
 .friends-hub-page .friends-hub-typing { min-height:1rem; color:#86d5b0; font-size:.75rem; }
-.friends-hub-page .friends-hub-message-form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.5rem; }
+.friends-hub-page .friends-hub-message-form { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:.5rem; }
 .friends-hub-page .friends-hub-message-form input { min-width:0; border:1px solid rgba(124,157,221,.28); border-radius:.65rem; padding:.65rem .75rem; color:#f4f7ff; background:rgba(6,13,29,.75); font:inherit; }
 .friends-hub-page .friends-hub-message-form input:disabled { opacity:.5; }
 .friends-hub-page .friends-hub-message-form .button { min-width:4.5rem; }
