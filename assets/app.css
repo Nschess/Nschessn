@@ -12822,6 +12822,54 @@
       flex: 1 1 260px;
     }
 
+    .friend-connection-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 5px 10px;
+      border: 1px solid rgba(255, 248, 237, 0.12);
+      border-radius: 999px;
+      background: rgba(14, 22, 38, 0.82);
+      color: rgba(255, 248, 237, 0.78);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .friend-connection-status::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #94a3b8;
+      box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+    }
+
+    .friend-connection-status[data-state="connected"]::before,
+    .friend-connection-status[data-state="reconnected"]::before {
+      background: #50d67e;
+      box-shadow: 0 0 0 3px rgba(80, 214, 126, 0.14);
+    }
+
+    .friend-connection-status[data-state="syncing"]::before,
+    .friend-connection-status[data-state="waiting"]::before {
+      background: #ffd36b;
+      box-shadow: 0 0 0 3px rgba(255, 211, 107, 0.14);
+    }
+
+    .friend-connection-status[data-state="reconnecting"]::before,
+    .friend-connection-status[data-state="opponent-disconnected"]::before {
+      background: #ff9f6b;
+      box-shadow: 0 0 0 3px rgba(255, 159, 107, 0.14);
+    }
+
+    .friend-connection-status[data-state="error"]::before {
+      background: #ff705c;
+      box-shadow: 0 0 0 3px rgba(255, 112, 92, 0.14);
+    }
+
     .friend-lobby-foot {
       padding: 10px;
       border: 1px solid rgba(255, 248, 237, 0.1);

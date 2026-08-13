@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=review-v74-piece-assets" />
+  <link rel="stylesheet" href="assets/app.css?v=review-v75-multiplayer" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -2796,6 +2796,7 @@
               <div class="friend-share-row">
                 <input id="friendJoinCode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="Enter 10-character friend code" aria-label="Enter friend challenge code" />
                 <button class="button" type="button" id="friendJoin">Join game</button>
+                <button class="button secondary" type="button" id="friendSpectate">Watch</button>
               </div>
             </div>
           </section>
@@ -2803,8 +2804,10 @@
           <div class="friend-lobby-foot">
             <div class="friend-qr" id="friendQr" aria-label="Challenge QR-style share code"></div>
             <p id="friendChallengeStatus" aria-live="polite">Choose a time control, then create an invite.</p>
+            <span class="friend-connection-status" id="friendConnectionStatus" data-state="idle" aria-live="polite" hidden>Offline</span>
             <div class="friend-match-actions" id="friendMatchActions" hidden>
               <button class="button secondary" type="button" id="friendReconnect">Reconnect</button>
+              <button class="button secondary" type="button" id="friendCopySpectateLink">Copy watch link</button>
               <button class="button secondary" type="button" id="friendRematch">Rematch</button>
               <button class="button secondary" type="button" id="friendTakeback">Takeback</button>
             </div>
@@ -4275,6 +4278,6 @@
     </div>
   </aside>
 
-  <script defer src="assets/app.js?v=review-v74-piece-assets"></script>
+  <script defer src="assets/app.js?v=review-v75-multiplayer"></script>
 </body>
 </html>
