@@ -1,4 +1,6 @@
 -- Quick Match queue over game_challenges. Run after supabase/friends.sql.
+-- Existing installations should also apply migrations/20260814_intelligent_quick_match.sql
+-- for server-owned state, heartbeat cleanup, realtime pairing, and AI fallback.
 -- Pairing creates an active game_challenges row; the existing friend game engine handles play.
 
 alter table public.game_challenges

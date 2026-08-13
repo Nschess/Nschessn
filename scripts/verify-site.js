@@ -199,7 +199,7 @@ const requiredRegressionContracts = [
   ["friend challenge full join code", /id="friendJoinCode" maxlength="10"[\s\S]*?function joinFriendChallengeCode\([\s\S]*?slice\(0, 10\)/],
   ["friend challenge result-first sharing", /const shareReady = Boolean\(state\.remote[\s\S]*?link\.disabled = !shareReady[\s\S]*?primary\.textContent = !state\.remote \? "Create invite"/],
   ["friend challenge accessible panel switcher", /function setFriendChallengeLobbyView\([\s\S]*?createPanel\.hidden[\s\S]*?joinPanel\.hidden[\s\S]*?aria-selected/],
-  ["quick match provider queue methods", /joinMatchmakingQueue:\s*\(options = \{\}\) => callFriendRpc\("join_matchmaking_queue"/],
+  ["quick match provider queue methods", /joinMatchmakingQueue:\s*(?:async\s*)?\(options = \{\}\)[\s\S]*?callFriendRpc\("join_matchmaking_queue"/],
   ["quick match provider status methods", /getMatchmakingStatus:\s*\(ticketId\) => callFriendRpc\("get_matchmaking_status"/],
   ["quick match provider leave methods", /leaveMatchmakingQueue:\s*\(ticketId\) => callFriendRpc\("leave_matchmaking_queue"/],
   ["quick match online adapter", /function setupOnlineMatchmakingAdapter\([\s\S]*?window\.NschessOnlineMatchmaking = \{[\s\S]*?findMatch\([\s\S]*?getFriendProvider\(\)[\s\S]*?startMatch\([\s\S]*?getFriendChallenge\([\s\S]*?startFriendChallenge\(false\)/],
