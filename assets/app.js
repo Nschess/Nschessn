@@ -11404,6 +11404,7 @@
     let friendNetworkLastRefresh = 0;
     let friendNetworkUnsubscribe = null;
     let friendNetworkSubscribing = false;
+    let friendNetworkSubscriptionUserId = "";
     let friendNetworkSubscriptionGeneration = 0;
     let friendNetworkRefreshTimer = 0;
     let friendNetworkRefreshQueued = false;
@@ -17516,12 +17517,17 @@
         void refreshActiveFriendChallenge(friendChallengeState?.code, true);
         return;
       }
+      if (event?.table === "matchmaking_queue") {
+        window.dispatchEvent(new CustomEvent("nschess:matchmaking", { detail: event }));
+        return;
+      }
       queueFriendNetworkRefresh();
     }
 
     function ensureFriendRealtime(provider = getFriendProvider()) {
       if (friendNetworkUnsubscribe || friendNetworkSubscribing || !provider?.subscribeFriendChallenges) return;
       const generation = friendNetworkSubscriptionGeneration;
+      friendNetworkSubscriptionUserId = provider.getCachedAccount?.()?.publicId || "";
       friendNetworkSubscribing = true;
       friendRealtimeReady = false;
       Promise.resolve(provider.subscribeFriendChallenges((event) => handleFriendRealtimeEvent(event, generation)))
@@ -18767,6 +18773,7 @@
       friendActionLocks.clear();
       friendNetworkRequest += 1;
       friendNetworkSubscriptionGeneration += 1;
+      friendNetworkSubscriptionUserId = "";
       friendNetworkRefreshPromise = null;
       try { friendNetworkUnsubscribe?.(); } catch {}
       friendNetworkUnsubscribe = null;
@@ -18877,7 +18884,10 @@
     }
 
     function startFriendNetworkSync() {
-      if (!getFriendProvider()) return;
+      const provider = getFriendProvider();
+      if (!provider) return;
+      const activeUserId = provider.getCachedAccount?.()?.publicId || "";
+      if (friendNetworkUnsubscribe && activeUserId && friendNetworkSubscriptionUserId !== activeUserId) stopFriendNetworkSync();
       ensureFriendRealtime();
       ensureSocialNotificationRealtime();
       void refreshFriendNetwork(true);
@@ -22273,25 +22283,43 @@
           return callFriendRpc("save_game_challenge_position", { ...payload, p_move_applied: Boolean(challenge?.moveApplied) });
         },
         listFriendChallenges: () => callFriendRpc("list_game_challenges"),
-        joinMatchmakingQueue: (options = {}) => callFriendRpc("join_matchmaking_queue", {
-          p_queue: String(options.queue || "quick"),
-          p_clock: String(options.timeControl || options.clock || "5+0"),
-          p_game_type: String(options.gameType || "casual"),
-          p_preferred_color: String(options.preferredColor || "random")
-        }),
+        joinMatchmakingQueue: async (options = {}) => {
+          const payload = {
+            p_queue: String(options.queue || "quick"),
+            p_clock: String(options.timeControl || options.clock || "5+0"),
+            p_game_type: String(options.gameType || "casual"),
+            p_preferred_color: String(options.preferredColor || "random"),
+            p_region: String(options.region || "global").slice(0, 32)
+          };
+          try {
+            return await callFriendRpc("join_matchmaking_queue", payload);
+          } catch (error) {
+            // Keep the existing four-argument RPC usable while the additive queue migration rolls out.
+            const { p_region, ...legacyPayload } = payload;
+            return callFriendRpc("join_matchmaking_queue", legacyPayload);
+          }
+        },
         getMatchmakingStatus: (ticketId) => callFriendRpc("get_matchmaking_status", { p_ticket_id: ticketId }),
+        resolveMatchmakingTimeout: (ticketId) => callFriendRpc("resolve_matchmaking_timeout", { p_ticket_id: ticketId }),
+        heartbeatMatchmakingQueue: (ticketId) => callFriendRpc("heartbeat_matchmaking_queue", { p_ticket_id: ticketId }),
         leaveMatchmakingQueue: (ticketId) => callFriendRpc("leave_matchmaking_queue", { p_ticket_id: ticketId }),
         sendFriendMessage: (code, body) => callFriendRpc("send_game_challenge_message", { p_code: String(code || ""), p_body: String(body || "") }),
         subscribeFriendChallenges: async (callback) => {
           const supabase = await getSupabaseClient();
+          const userId = cachedAccount?.publicId || "";
           const notify = (event) => { if (typeof callback === "function") callback(event); };
           const channel = supabase.channel("checkmate-friend-games")
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenges" }, (payload) => notify({ type: "change", table: "game_challenges", payload }))
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_messages" }, (payload) => notify({ type: "change", table: "game_challenge_messages", payload }))
             .on("postgres_changes", { event: "*", schema: "public", table: "game_challenge_presence" }, (payload) => notify({ type: "change", table: "game_challenge_presence", payload }))
             .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests" }, (payload) => notify({ type: "change", table: "friend_requests", payload }))
-            .on("postgres_changes", { event: "*", schema: "public", table: "friend_presence" }, (payload) => notify({ type: "change", table: "friend_presence", payload }))
-            .subscribe((status) => notify({ type: "status", status }));
+            .on("postgres_changes", { event: "*", schema: "public", table: "friend_presence" }, (payload) => notify({ type: "change", table: "friend_presence", payload }));
+          if (userId) {
+            channel.on("postgres_changes", {
+              event: "*", schema: "public", table: "matchmaking_queue", filter: `user_id=eq.${userId}`
+            }, (payload) => notify({ type: "change", table: "matchmaking_queue", payload }));
+          }
+          channel.subscribe((status) => notify({ type: "status", status }));
           return () => { try { supabase.removeChannel(channel); } catch {} };
         },
         subscribeSocialNotifications: async (callback) => {
@@ -27719,23 +27747,15 @@
       });
     }
     function setupOnlineMatchmakingAdapter() {
-      const waitFor = (ms, signal) => new Promise((resolve, reject) => {
-        if (signal?.aborted) {
-          reject(new DOMException("Aborted", "AbortError"));
-          return;
-        }
-        const timer = window.setTimeout(resolve, ms);
-        signal?.addEventListener("abort", () => {
-          window.clearTimeout(timer);
-          reject(new DOMException("Aborted", "AbortError"));
-        }, { once: true });
-      });
       const normalizeMatchmakingTicket = (payload) => {
         const source = payload && typeof payload === "object" ? payload : {};
         return {
           status: String(source.status || ""),
           ticketId: source.ticketId || source.ticket_id || null,
-          challengeCode: String(source.challengeCode || source.challenge_code || "").toUpperCase()
+          challengeCode: String(source.challengeCode || source.challenge_code || "").toUpperCase(),
+          fallbackAt: source.fallbackAt || source.fallback_at || null,
+          fallbackSeconds: Number(source.fallbackSeconds || source.fallback_seconds || 0) || 0,
+          queueState: String(source.queueState || source.queue_state || "")
         };
       };
 
@@ -27750,33 +27770,91 @@
           }
           const signal = options.signal;
           let ticketId = null;
-          const leaveQueue = () => {
-            if (ticketId) void provider.leaveMatchmakingQueue?.(ticketId).catch(() => {});
-          };
-          if (signal?.aborted) return null;
-          try {
-            const joined = normalizeMatchmakingTicket(await provider.joinMatchmakingQueue(options));
-            ticketId = joined.ticketId;
-            if (joined.status === "matched" && joined.challengeCode) {
-              return { challengeCode: joined.challengeCode, ticketId };
-            }
-            while (!signal?.aborted && ticketId) {
-              await waitFor(2000, signal);
-              const status = normalizeMatchmakingTicket(await provider.getMatchmakingStatus(ticketId));
-              if (status.status === "matched" && status.challengeCode) {
-                return { challengeCode: status.challengeCode, ticketId };
-              }
-              if (status.status === "expired" || status.status === "left") break;
-            }
-            leaveQueue();
-            return null;
-          } catch (error) {
-            if (signal?.aborted || error?.name === "AbortError") return null;
-            leaveQueue();
-            throw error;
-          } finally {
-            if (signal?.aborted) leaveQueue();
-          }
+           const leaveQueue = () => {
+             if (ticketId) void provider.leaveMatchmakingQueue?.(ticketId).catch(() => {});
+           };
+           if (signal?.aborted) return null;
+           let heartbeatTimer = 0;
+           let fallbackTimer = 0;
+           let settled = false;
+           let realtimeHandler = null;
+           const cleanup = () => {
+             window.clearInterval(heartbeatTimer);
+             window.clearTimeout(fallbackTimer);
+             heartbeatTimer = 0;
+             fallbackTimer = 0;
+             if (realtimeHandler) window.removeEventListener("nschess:matchmaking", realtimeHandler);
+             realtimeHandler = null;
+           };
+           const resolveFromServer = async () => {
+             if (settled || !ticketId) return;
+             const status = normalizeMatchmakingTicket(await (provider.resolveMatchmakingTimeout
+               ? provider.resolveMatchmakingTimeout(ticketId)
+               : provider.getMatchmakingStatus(ticketId)));
+             if (status.status === "matched" && status.challengeCode) {
+               settled = true;
+               cleanup();
+               leaveQueue();
+               return { challengeCode: status.challengeCode, ticketId };
+             }
+             if (status.status === "ai_fallback" || status.queueState === "ai_fallback") {
+               settled = true;
+               cleanup();
+               leaveQueue();
+               return { fallback: true, ticketId };
+             }
+             const fallbackAt = status.fallbackAt ? Date.parse(status.fallbackAt) : 0;
+             if (fallbackAt > Date.now()) {
+               window.clearTimeout(fallbackTimer);
+               fallbackTimer = window.setTimeout(() => { void resolveFromServer().then((match) => match && finish(match)); }, Math.max(250, fallbackAt - Date.now() + 50));
+             }
+             return null;
+           };
+           let finish;
+           const finishPromise = new Promise((resolve) => { finish = resolve; });
+           try {
+             const joined = normalizeMatchmakingTicket(await provider.joinMatchmakingQueue(options));
+             ticketId = joined.ticketId;
+             if (joined.status === "matched" && joined.challengeCode) {
+               cleanup();
+               leaveQueue();
+               return { challengeCode: joined.challengeCode, ticketId };
+             }
+             const onRealtime = (event) => {
+               const row = event?.detail?.payload?.new || event?.detail?.payload?.old || {};
+               if (!ticketId || String(row.id || "") !== String(ticketId)) return;
+               const status = normalizeMatchmakingTicket({
+                 ...row,
+                 status: row.queue_state === "ai_fallback" ? "ai_fallback" : row.matched_code ? "matched" : "waiting"
+                });
+                if (status.status === "matched" && status.challengeCode) {
+                  settled = true;
+                  cleanup();
+                  leaveQueue();
+                  finish({ challengeCode: status.challengeCode, ticketId });
+               } else if (status.status === "ai_fallback") {
+                 settled = true;
+                 cleanup();
+                 leaveQueue();
+                 finish({ fallback: true, ticketId });
+               }
+             };
+             realtimeHandler = onRealtime;
+             window.addEventListener("nschess:matchmaking", realtimeHandler);
+             heartbeatTimer = window.setInterval(() => { void provider.heartbeatMatchmakingQueue?.(ticketId).catch(() => {}); }, 18000);
+             const fallbackAt = joined.fallbackAt ? Date.parse(joined.fallbackAt) : 0;
+             const fallbackDelay = fallbackAt > Date.now() ? fallbackAt - Date.now() + 50 : Math.max(1000, (joined.fallbackSeconds || (options.gameType === "rated" ? 25 : 12)) * 1000);
+             fallbackTimer = window.setTimeout(() => { void resolveFromServer().then((match) => match && finish(match)); }, fallbackDelay);
+             signal?.addEventListener("abort", () => { if (!settled) { settled = true; cleanup(); leaveQueue(); finish(null); } }, { once: true });
+             return await finishPromise;
+           } catch (error) {
+             cleanup();
+             if (signal?.aborted || error?.name === "AbortError") return null;
+             leaveQueue();
+             throw error;
+           } finally {
+             if (signal?.aborted && !settled) { cleanup(); leaveQueue(); }
+           }
         },
         async startMatch(match) {
           const provider = getFriendProvider();
@@ -27805,9 +27883,11 @@
       const status = document.getElementById("quickMatchStatus");
       const cancel = document.getElementById("quickMatchCancel");
       const stop = document.getElementById("quickMatchStop");
+      const change = document.getElementById("quickMatchChange");
       const metaType = document.getElementById("quickMatchMetaType");
       const metaTime = document.getElementById("quickMatchMetaTime");
       const metaColor = document.getElementById("quickMatchMetaColor");
+      const metaRange = document.getElementById("quickMatchMetaRange");
       const canUseOnlineQuickMatch = () => {
         const provider = getFriendProvider();
         return Boolean(provider?.joinMatchmakingQueue && provider.getCachedAccount?.()?.publicId);
@@ -27858,6 +27938,7 @@
         if (metaType) metaType.textContent = options.gameType === "rated" ? "Rated" : "Casual";
         if (metaTime) metaTime.textContent = options.timeControl;
         if (metaColor) metaColor.textContent = options.color === "random" ? "Random color" : options.color === "w" ? "White" : "Black";
+        if (metaRange) metaRange.textContent = "±100 rating";
       };
       const syncAiSettings = (options) => {
         const [minutes, increment] = options.timeControl.split("+");
@@ -27912,12 +27993,12 @@
         const adapter = window.NschessOnlineMatchmaking;
         if (typeof adapter?.findMatch !== "function") return new Promise(() => {});
         return Promise.resolve(adapter.findMatch({ ...getQueueOptions(), signal }))
-          .then((match) => match ? { match } : new Promise(() => {}))
-          .catch(() => new Promise(() => {}));
+          .then((match) => ({ match: match || null }));
       };
       const startOnlineMatch = async (match) => {
         const adapter = window.NschessOnlineMatchmaking;
         const options = getQueueOptions();
+        if (match?.fallback) return false;
         if (typeof adapter?.startMatch === "function") {
           await adapter.startMatch(match, options);
           return true;
@@ -27930,7 +28011,7 @@
       };
       const launchAiFallback = async (token) => {
         const options = { ...state.options };
-        status.textContent = "No online opponent found. Starting an AI match...";
+        status.textContent = "No players available. Starting a game against AI...";
         await new Promise((resolve) => window.setTimeout(resolve, 420));
         if (token !== state.token) return;
         if (/(^|[?&])mode=quick/.test(window.location.hash)) window.history?.replaceState?.(null, "", "#play");
@@ -27946,18 +28027,19 @@
       };
       const openSearch = () => {
         clearSearch();
+        ensureFriendRealtime();
         state.token += 1;
         const token = state.token;
-        setMatchMeta(state.options);
-        overlay.hidden = false;
-        document.body.classList.add("quick-match-searching");
-        status.textContent = "Searching the online pool…";
+         setMatchMeta(state.options);
+         overlay.hidden = false;
+         document.body.classList.add("quick-match-searching");
+         status.textContent = `Searching for a human opponent... AI fallback after ${state.options.gameType === "rated" ? 25 : 12}s`;
         cancel?.focus({ preventScroll: true });
         state.controller = new AbortController();
         const startedAt = Date.now();
         state.ticker = window.setInterval(() => {
           const seconds = Math.floor((Date.now() - startedAt) / 1000);
-          status.textContent = `Searching the online pool… ${seconds}s`;
+           status.textContent = `Searching for a human opponent... ${seconds}s · AI fallback after ${state.options.gameType === "rated" ? 25 : 12}s`;
         }, 1000);
         const searchTimeoutMs = canUseOnlineQuickMatch() ? 90000 : 7000;
         const fallback = new Promise((resolve) => {
@@ -27968,6 +28050,10 @@
           window.clearInterval(state.ticker);
           state.ticker = 0;
           if (result?.match) {
+            if (result.match.fallback) {
+              void launchAiFallback(token);
+              return;
+            }
             status.textContent = "Opponent found. Starting your online game…";
             try {
               if (await startOnlineMatch(result.match)) {
@@ -27978,6 +28064,11 @@
               // The fallback keeps Quick Match playable if a future provider fails to start.
             }
           }
+          void launchAiFallback(token);
+        }).catch(() => {
+          if (token !== state.token) return;
+          window.clearInterval(state.ticker);
+          state.ticker = 0;
           void launchAiFallback(token);
         });
       };
@@ -28014,6 +28105,11 @@
       setupStop?.addEventListener("click", () => closeSetup());
       cancel?.addEventListener("click", () => closeSearch());
       stop?.addEventListener("click", () => closeSearch());
+      change?.addEventListener("click", () => {
+        const trigger = state.returnFocus;
+        closeSearch({ restoreFocus: false });
+        openSetup(trigger);
+      });
       setup.addEventListener("click", (event) => { if (event.target === setup) closeSetup(); });
       overlay.addEventListener("click", (event) => { if (event.target === overlay) closeSearch(); });
       document.addEventListener("keydown", (event) => {

@@ -73,6 +73,13 @@ privacy, Store, and gifts use separate server-authoritative tables and RPCs.
 Future social features should add bounded RPCs or event types rather than writing
 these tables from the client.
 
+For Quick Match, apply `supabase/migrations/20260730_add_matchmaking_queue.sql`
+after `friends.sql`, then apply
+`supabase/migrations/20260814_intelligent_quick_match.sql`. The latter upgrades
+existing queue rows in place, adds heartbeat/region/state fields, serializes
+human pairing, and authoritatively resolves the casual (12s) or rated (25s) AI
+fallback. It is safe to rerun on an existing queue without deleting player data.
+
 For private in-app player reports, apply `supabase/moderation.sql` after `supabase/friends.sql`.
 
 ## Verification

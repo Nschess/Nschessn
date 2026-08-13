@@ -28151,6 +28151,8 @@
     .quick-match-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
     .quick-match-meta span { padding: 5px 8px; border: 1px solid var(--cq-border, var(--line)); border-radius: 999px; color: var(--cq-text-secondary, var(--soft)); background: var(--cq-surface-pill, rgba(59, 130, 246, 0.1)); font-size: 0.68rem; font-weight: 750; }
     .quick-match-dialog .button { min-width: 142px; margin-top: 3px; }
+    .quick-match-search-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; }
+    .quick-match-search-actions .button { min-width: 0; }
 
     .quick-match-setup-dialog { justify-items: stretch; text-align: left; }
     .quick-match-setup-dialog :is(.section-kicker, h2, .quick-match-status, .quick-match-symbol) { justify-self: center; text-align: center; }
