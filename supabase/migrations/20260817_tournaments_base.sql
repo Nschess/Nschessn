@@ -1,3 +1,7 @@
+-- Canonical tournament base schema for clean installs and upgrades.
+-- This migration mirrors supabase/tournaments.sql, which remains the legacy SQL-editor entry point.
+-- Apply auth.sql, friends.sql, moderation.sql, and the Store authority migration first.
+
 -- Run after auth.sql and friends.sql. Safe to run more than once.
 -- Tournaments reuse game_challenges, so the existing real-time board, clocks,
 -- reconnect flow, player cards, and game review remain the single game system.
@@ -1010,3 +1014,4 @@ begin
   end if;
 exception when undefined_table or invalid_schema_name or insufficient_privilege then null;
 end $$;
+

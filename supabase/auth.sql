@@ -32,7 +32,8 @@ alter table public.profiles add column if not exists updated_at timestamptz not 
 alter table public.profiles enable row level security;
 grant usage on schema public to anon, authenticated;
 grant select on public.profiles to anon, authenticated;
-grant update on public.profiles to authenticated;
+revoke update on public.profiles from authenticated;
+grant update (avatar, country_flag, title, friends, last_login_at, updated_at) on public.profiles to authenticated;
 
 drop policy if exists "public profile lookup" on public.profiles;
 drop policy if exists "profile owner update" on public.profiles;

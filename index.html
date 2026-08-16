@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=review-v78-chat" />
+  <link rel="stylesheet" href="assets/app.css?v=review-v105-tournaments-academy" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -170,6 +170,12 @@
             <div class="home-session-copy"><span class="home-session-kicker">Your daily session</span><strong id="homeSessionTitle">One calm move forward</strong><p id="homeSessionCopy">Your personal next step will appear here.</p><span class="home-session-meta" id="homeSessionMeta">Private plan · stored on this device</span></div>
             <a class="button" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Continue Daily Session</a>
             <div class="home-session-ritual" id="homeSessionRitual" aria-label="Today's three-step ritual"></div>
+            <section class="home-mission-dock" id="homeDailyGoals" aria-label="Daily and weekly missions">
+              <div class="home-mission-dock-head"><div><span class="home-mission-kicker">Daily missions</span><strong id="dailyMissionStreak">0 day streak</strong></div><strong id="dailyGoalsProgress">0/3</strong></div>
+              <ul class="daily-goals-list" id="dailyGoalsList"></ul>
+              <div class="home-mission-weekly"><div class="home-mission-dock-head"><div><span class="home-mission-kicker">Weekly challenges</span><strong>Build your rhythm</strong></div><strong id="weeklyGoalsProgress">0/3</strong></div><ul class="daily-goals-list" id="weeklyGoalsList"></ul></div>
+              <div class="home-mission-rewards"><span id="dailyGoalsReward">Daily reward: +50 XP · +50 coins</span><span id="weeklyGoalsReward">Weekly reward: +180 XP · +180 coins</span><small class="home-mission-reset">Resets daily · weekly resets Monday · cosmetic rewards only</small><button class="button" type="button" id="claimWeeklyGoals" disabled>Claim weekly</button></div>
+            </section>
             <div class="home-session-reward" id="homeSessionReward" hidden>
               <div><span class="home-session-reward-kicker">Daily ritual complete</span><strong id="homeSessionRewardText">Your 50 coin reward is ready.</strong></div>
               <button class="button" type="button" id="homeSessionClaim" data-home-action="claim-daily-ritual">Claim +50</button>
@@ -209,7 +215,6 @@
             </a>
             <div class="hero-logic-cache" aria-hidden="true">
               <div class="next-step-card"><span id="homeNextReason">Solve one puzzle, then stop while it still feels fun.</span><a href="#puzzles" id="homeNextAction">Start 3-minute quest</a></div>
-              <div class="daily-goals-card" id="homeDailyGoals"><span id="dailyGoalsProgress">0/3</span><ul id="dailyGoalsList"></ul><span id="dailyGoalsReward">Reward: +50 Coins</span><button type="button" id="claimDailyGoals" disabled>Claim</button></div>
               <div class="quick-practice"><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">2-minute practice</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Puzzle Rush">5 puzzles</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Endgames">One endgame</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Checkmates">Checkmate challenge</a></div>
               <p id="homeInsight">One puzzle today is better than none.</p>
               <div id="homeUnlocks"></div>
@@ -438,6 +443,7 @@
         </div>
         <div class="academy-track" id="academyTrack" aria-label="Recommended academy route"></div>
         <div class="academy-quiz" id="academyQuiz" aria-live="polite"></div>
+        <section class="academy-certificate" id="academyCertificate" aria-live="polite" aria-label="Academy certificates"></section>
       </div>
     </section>
 
@@ -526,7 +532,7 @@
                     <span class="profile-section-kicker">Performance</span>
                     <h4 id="profilePerformanceTitle">Ratings and activity</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-achievement-summary>0/5 unlocked</span>
+                  <span class="profile-section-status" data-profile-achievement-summary>0/18 unlocked</span>
                 </div>
                 <div class="profile-rating-grid">
                   <article class="profile-rating-card">
@@ -608,10 +614,91 @@
                     <span class="profile-section-kicker">Milestones</span>
                     <h4 id="profileAchievementsTitle">Achievements</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-achievement-summary>0/5 unlocked</span>
+                  <span class="profile-section-status" data-profile-achievement-summary>0/18 unlocked</span>
                 </div>
                 <div class="player-profile-achievements" data-profile-achievements aria-label="Achievements"></div>
               </section>
+
+              <div class="profile-enhancements" aria-label="Player profile highlights">
+              <div class="profile-command-section" aria-labelledby="profileCommandTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Player card</span>
+                    <h4 id="profileCommandTitle">Your numbers</h4>
+                  </div>
+                  <span class="profile-section-status">Live from your games</span>
+                </div>
+                <div class="profile-command-grid">
+                  <article class="profile-command-card">
+                    <span class="profile-command-label">Match record</span>
+                    <div class="profile-record-grid" data-profile-record aria-label="Win loss draw record"></div>
+                  </article>
+                  <article class="profile-command-card">
+                    <span class="profile-command-label">Puzzle practice</span>
+                    <div class="profile-mini-stats" data-profile-puzzle-stats aria-label="Puzzle statistics"></div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="profile-favorites-section" aria-labelledby="profileFavoritesTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Signature style</span>
+                    <h4 id="profileFavoritesTitle">Favorites</h4>
+                  </div>
+                </div>
+                <div class="profile-favorites-grid">
+                  <article class="profile-favorite-card">
+                    <span class="profile-command-label">Openings</span>
+                    <div data-profile-openings></div>
+                  </article>
+                  <article class="profile-favorite-card">
+                    <span class="profile-command-label">Board & pieces</span>
+                    <div data-profile-cosmetics></div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="profile-showcase-section" aria-labelledby="profileShowcaseTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Showcase</span>
+                    <h4 id="profileShowcaseTitle">Achievements & collections</h4>
+                  </div>
+                </div>
+                <div class="profile-achievement-showcase" data-profile-achievement-showcase aria-label="Achievement showcase"></div>
+                <div class="profile-collection-showcase" data-profile-collections aria-label="Collection progress"></div>
+              </div>
+
+              <div class="profile-history-section" aria-labelledby="profileHistoryTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Recent play</span>
+                    <h4 id="profileHistoryTitle">Match history</h4>
+                  </div>
+                  <span class="profile-section-status" data-profile-history-count>No completed games</span>
+                </div>
+                <div class="profile-match-history" data-profile-match-history aria-label="Recent match history"></div>
+              </div>
+
+              <div class="profile-season-section" aria-labelledby="profileSeasonTitle">
+                <div class="profile-section-heading">
+                  <div>
+                    <span class="profile-section-kicker">Season journey</span>
+                    <h4 id="profileSeasonTitle">Seasonal progress</h4>
+                  </div>
+                  <span class="profile-section-status" data-profile-season-label>Current season</span>
+                </div>
+                <div class="profile-season-card">
+                  <div class="profile-season-row">
+                    <span>Season XP</span>
+                    <strong data-profile-season-xp>0 / 1,000 XP</strong>
+                  </div>
+                  <div class="profile-season-progress" aria-hidden="true"><span data-profile-season-fill></span></div>
+                  <p data-profile-season-note>Keep playing, solving, and learning to advance your season track.</p>
+                </div>
+              </div>
+              </div>
             </aside>
             <details class="account-vault" aria-labelledby="accountVaultTitle">
               <summary id="accountVaultTitle">Account details <span>View</span></summary>
@@ -625,7 +712,7 @@
                 <span><strong data-account-field="streak">0 days</strong>Current streak</span>
                 <span><strong data-account-field="puzzleRating">400</strong>Puzzle rating</span>
                 <span><strong data-account-field="gameRating">400</strong>Game rating</span>
-                <span><strong data-account-field="achievements">0/5</strong>Achievements</span>
+                <span><strong data-account-field="achievements">0/18</strong>Achievements</span>
                 <span><strong data-account-field="story">0/8</strong>Story progress</span>
                 <span><strong data-account-field="settings">Dark / Wood</strong>Settings</span>
                 <span><strong data-account-field="stats">0 games</strong>Statistics</span>
@@ -1063,6 +1150,7 @@
               <h3>Adventure wallet</h3>
               <p>Earn coins by solving puzzles, watching Shorts, finishing videos, reviewing mistakes, and completing daily challenges.</p>
               <p class="store-status" id="storeStatus">Pick a reward to unlock or equip.</p>
+              <button class="button secondary store-inventory-open" type="button" id="storeInventoryOpen">Open inventory</button>
             </div>
             <div class="store-balance">
               <strong id="storeCoinBalance">0</strong>
@@ -1070,6 +1158,23 @@
             </div>
           </div>
           <div class="game-reward-row" id="storeInventory" aria-label="Equipped rewards"></div>
+          <section class="store-inventory-page" id="storeInventoryPage" aria-labelledby="storeInventoryTitle" hidden>
+            <header class="store-inventory-head">
+              <div><p class="section-kicker">Your collection</p><h3 id="storeInventoryTitle">Inventory</h3><p>Everything you own, equipped, favorited, and recently unlocked in one place.</p></div>
+              <button class="button secondary" type="button" id="storeInventoryClose">Back to Store</button>
+            </header>
+            <div class="store-inventory-tools" id="storeInventoryTools" aria-label="Inventory filters"></div>
+            <div class="store-inventory-grid" id="storeInventoryGrid" aria-live="polite"></div>
+            <div class="store-inventory-lower">
+              <section class="store-inventory-card" aria-labelledby="storeCollectionRewardsTitle"><h4 id="storeCollectionRewardsTitle">Collection rewards</h4><div id="storeCollectionRewards"></div></section>
+              <section class="store-inventory-card" aria-labelledby="storeRecommendationsTitle"><h4 id="storeRecommendationsTitle">Recommended next</h4><div id="storeRecommendations"></div></section>
+              <section class="store-inventory-card" aria-labelledby="storeHistoryTitle"><h4 id="storeHistoryTitle">Cosmetic history</h4><div id="storeCosmeticHistory"></div></section>
+            </div>
+          </section>
+          <section class="store-preview-tray" id="storePreviewTray" aria-labelledby="storePreviewTitle" hidden>
+            <div><p class="section-kicker">Temporary preview</p><h3 id="storePreviewTitle">Preview</h3><p id="storePreviewMeta">Nothing is equipped or purchased.</p></div>
+            <div class="store-preview-tray-actions"><button class="button secondary" type="button" id="storePreviewExit">Exit preview</button><button class="button" type="button" id="storePreviewEquip" disabled>Equip this item</button></div>
+          </section>
           <div class="store-showcase" id="storeShowcase" aria-label="Featured store collections"></div>
           <div class="store-category-tabs" id="storeCategoryTabs" role="list" aria-label="Store categories"></div>
           <section class="store-gift-panel" id="storeGiftPanel" aria-labelledby="storeGiftTitle">
@@ -1302,6 +1407,7 @@
           <button class="tab-button" type="button" role="tab" aria-selected="true" aria-controls="beginner" id="tab-beginner" data-level="beginner">Beginner</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="intermediate" id="tab-intermediate" data-level="intermediate">Intermediate</button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="advanced" id="tab-advanced" data-level="advanced">Advanced</button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="master" id="tab-master" data-level="master">Master</button>
         </div>
 
         <div class="lesson-grid" id="beginner" role="tabpanel" aria-labelledby="tab-beginner">
@@ -1440,6 +1546,33 @@
               <li>Critical moments</li>
               <li>Engine review</li>
             </ul>
+          </article>
+        </div>
+
+        <div class="lesson-grid hidden" id="master" role="tabpanel" aria-labelledby="tab-master">
+          <article class="lesson-card">
+            <span class="lesson-number">1</span>
+            <h3>Mastery: Candidate Move Lab</h3>
+            <p>Compare forcing moves, positional improvements, and the opponent's best reply before committing.</p>
+            <ul class="topic-list"><li>Candidate moves</li><li>Prophylaxis</li><li>Calculation</li></ul>
+          </article>
+          <article class="lesson-card">
+            <span class="lesson-number">2</span>
+            <h3>Mastery: Strategic Transformation</h3>
+            <p>Recognize when to change the pawn structure, trade a defender, or turn space into an endgame.</p>
+            <ul class="topic-list"><li>Imbalances</li><li>Transitions</li><li>Long plans</li></ul>
+          </article>
+          <article class="lesson-card">
+            <span class="lesson-number">3</span>
+            <h3>Mastery: Technical Conversion</h3>
+            <p>Practice converting small advantages with active kings, precise rook placement, and safe simplification.</p>
+            <ul class="topic-list"><li>Technique</li><li>Endgames</li><li>Precision</li></ul>
+          </article>
+          <article class="lesson-card">
+            <span class="lesson-number">4</span>
+            <h3>Mastery: Annotate Like a Coach</h3>
+            <p>Review a complete game, explain the turning points in your own words, and build the next practice plan.</p>
+            <ul class="topic-list"><li>Game Review</li><li>Self-analysis</li><li>Coach notes</li></ul>
           </article>
         </div>
       </div>
@@ -1671,6 +1804,55 @@
           <span>Avoid repeat moves</span>
           <span>Connect your rooks</span>
         </div>
+
+        <section class="opening-explorer" id="openingExplorer" aria-labelledby="openingExplorerTitle">
+          <header class="opening-explorer-head">
+            <div>
+              <p class="section-kicker">Interactive explorer</p>
+              <h3 id="openingExplorerTitle">Play the ideas, not just the moves</h3>
+              <p>Search a family, explore its most-played continuations, and try the first moves on the board.</p>
+            </div>
+            <div class="opening-explorer-search">
+              <label for="openingExplorerSearch">Search openings
+                <input id="openingExplorerSearch" type="search" autocomplete="off" placeholder="Name or ECO code" />
+              </label>
+              <span id="openingExplorerFavoriteCount" class="opening-explorer-favorite-count" aria-live="polite">0 favorites</span>
+            </div>
+          </header>
+          <div class="opening-explorer-layout">
+            <div class="opening-explorer-board-wrap">
+              <div class="opening-explorer-board" id="openingExplorerBoard" role="group" aria-label="Interactive opening board"></div>
+              <div class="opening-explorer-controls" aria-label="Opening board controls">
+                <button class="button secondary" id="openingExplorerPrev" type="button">Previous</button>
+                <button class="button secondary" id="openingExplorerReset" type="button">Reset</button>
+                <button class="button secondary" id="openingExplorerNext" type="button">Next</button>
+              </div>
+            </div>
+            <div class="opening-explorer-inspector">
+              <div class="opening-explorer-title-row">
+                <div>
+                  <span class="opening-explorer-eyebrow">Selected opening</span>
+                  <h4 id="openingExplorerName">Italian Game</h4>
+                </div>
+                <div class="opening-explorer-meta">
+                  <span id="openingExplorerECO">ECO C50</span>
+                  <button class="button secondary" id="openingExplorerFavorite" type="button" aria-pressed="false">☆ Favorite</button>
+                </div>
+              </div>
+              <p id="openingExplorerDescription">Fast development, pressure on f7, and a simple castling plan.</p>
+              <div class="opening-explorer-stats" aria-label="Reference results">
+                <span><strong id="openingExplorerWhiteRate">47%</strong><small>White wins</small></span>
+                <span><strong id="openingExplorerDrawRate">28%</strong><small>Draws</small></span>
+                <span><strong id="openingExplorerBlackRate">25%</strong><small>Black wins</small></span>
+              </div>
+              <div class="opening-explorer-lines">
+                <div class="opening-explorer-subhead"><h5>Popular continuations</h5><small>Click a line to replay it</small></div>
+                <div id="openingExplorerLines" class="opening-explorer-line-list"></div>
+              </div>
+              <div id="openingExplorerResults" class="opening-explorer-results" aria-label="Opening search results"></div>
+            </div>
+          </div>
+        </section>
 
         <div class="opening-grid">
           <article class="opening-card">
@@ -2707,6 +2889,7 @@
             </div>
           </aside>
         </div>
+
       </div>
     </section>
 
@@ -2850,6 +3033,14 @@
             <label>Rounds / mins
               <select id="tournamentLength"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option></select>
             </label>
+            <label>Start time (optional)
+              <input id="tournamentStartsAt" type="datetime-local" />
+            </label>
+            <div class="tournament-reward-preview" aria-label="Tournament rewards">
+              <span class="section-kicker">Podium rewards</span>
+              <strong>Cosmetic badge + coins + XP</strong>
+              <small>Top three finishers earn event-only recognition.</small>
+            </div>
             <button class="button" type="submit">Create Event</button>
           </form>
           <div class="tournament-grid">
@@ -3691,6 +3882,7 @@
           <button type="button" data-leaderboard-period="daily" aria-pressed="false">Daily</button>
           <button type="button" data-leaderboard-period="weekly" aria-pressed="false">Weekly</button>
           <button type="button" data-leaderboard-period="monthly" aria-pressed="false">Monthly</button>
+          <button type="button" data-leaderboard-period="seasonal" aria-pressed="false">Seasonal</button>
           <button type="button" data-leaderboard-period="all" aria-pressed="true">All-time</button>
         </div>
 
@@ -4283,6 +4475,6 @@
     </div>
   </aside>
 
-  <script defer src="assets/app.js?v=review-v78-chat"></script>
+  <script defer src="assets/app.js?v=review-v105-tournaments-academy"></script>
 </body>
 </html>
