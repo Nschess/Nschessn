@@ -105,7 +105,7 @@ grant select on public.store_catalog, public.user_inventory, public.gifts to aut
 -- preferences and progress. Remove broad UPDATE privileges so the wallet
 -- column can only be changed by the security-definer Store/game RPCs.
 revoke update on public.profiles from authenticated;
-grant update (avatar, country_flag, rating, xp, wins, losses, draws, title, friends, last_login_at, updated_at)
+grant update (avatar, country_flag, title, friends, last_login_at, updated_at)
   on public.profiles to authenticated;
 
 create or replace function public.get_store_state()
@@ -401,7 +401,7 @@ revoke all on function public.decline_cosmetic_gift(uuid) from public;
 revoke all on function public.admin_upsert_store_catalog(jsonb) from public;
 grant execute on function public.get_store_state() to authenticated;
 grant execute on function public.equip_cosmetic(text) to authenticated;
-grant execute on function public.credit_store_reward(bigint, text, text) to authenticated;
+grant execute on function public.credit_store_reward(bigint, text, text) to service_role;
 grant execute on function public.purchase_cosmetic(text, text) to authenticated;
 grant execute on function public.purchase_cosmetic_bundle(text[], numeric, text) to authenticated;
 grant execute on function public.list_gift_inbox(integer) to authenticated;

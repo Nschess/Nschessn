@@ -5,10 +5,21 @@
       document.body?.setAttribute("data-asset-warning", "true");
     }
 
+    function isLocalPieceAsset(asset) {
+      try {
+        return new URL(String(asset || ""), document.baseURI).pathname.includes("/assets/pieces/");
+      } catch {
+        return /(?:^|\/)assets\/pieces\//.test(String(asset || ""));
+      }
+    }
+
     window.addEventListener("error", (event) => {
       const target = event.target;
       if (!target || target === window) return;
       const asset = target.currentSrc || target.src || target.href || "";
+      // Piece SVGs have an element-level fallback. Do not classify a
+      // recoverable theme miss/prewarm failure as a deploy-shell warning.
+      if (isLocalPieceAsset(asset)) return;
       if (asset && /(?:assets|vendor|verified-puzzles)/.test(asset)) reportDeployAssetError(asset, target.tagName);
     }, true);
 
@@ -59,6 +70,7 @@
     let activePieceSvgSet = "chessnut";
     let pieceSvgRenderVersion = 0;
     const pieceSvgMarkupCache = new Map();
+    const unavailablePieceAssets = new Set();
     // The Chessnut migration keeps the existing board API intact: callers still
     // pass either FEN characters or chess.js piece objects to this renderer.
     const pieceCodeLookup = Object.freeze({
@@ -122,6 +134,7 @@
       const resolvedStyle = forceClassic ? "chessnut" : resolvePieceSvgSet(style);
       const theme = getPieceSvgTheme(resolvedStyle);
       const cacheKey = `${resolvedStyle}:${info.color}:${info.type}`;
+      if (unavailablePieceAssets.has(cacheKey)) return "";
       const cached = pieceSvgMarkupCache.get(cacheKey);
       if (cached) return cached;
       const asset = licensedPieceAssetSets[resolvedStyle]?.[`${info.color}${info.type}`];
@@ -151,11 +164,15 @@
 
     function prewarmPieceSvgSet(style = activePieceSvgSet) {
       const resolvedStyle = resolvePieceSvgSet(style);
-      Object.values(licensedPieceAssetSets[resolvedStyle] || licensedPieceAssetSets.chessnut).forEach((asset) => {
+      Object.entries(licensedPieceAssetSets[resolvedStyle] || licensedPieceAssetSets.chessnut).forEach(([pieceKey, asset]) => {
         if (prewarmedPieceAssets.has(asset)) return;
         prewarmedPieceAssets.add(asset);
         const image = new Image();
         image.decoding = "async";
+        image.addEventListener("error", () => {
+          const match = String(pieceKey).match(/^([wb])([kqrbnp])$/);
+          if (match) unavailablePieceAssets.add(`${resolvedStyle}:${match[1]}:${match[2]}`);
+        }, { once: true });
         image.src = asset;
       });
       ["K", "Q", "R", "B", "N", "P", "k", "q", "r", "b", "n", "p"].forEach((piece) => createPieceSvgMarkup(piece, resolvedStyle));
@@ -189,6 +206,7 @@
         return;
       }
       image.addEventListener("error", () => {
+        unavailablePieceAssets.add(`${image.dataset.style}:${image.dataset.piece}`);
         if (image.parentElement === square) showFallback();
       }, { once: true });
       if (image.complete && !image.naturalWidth) showFallback();
@@ -2407,10 +2425,10 @@
     // Themed collections keep discovery intentional while remaining cosmetic-only.
     // IDs are resolved against the catalog so a missing optional item never breaks Store rendering.
     const storeCollectionDefinitions = Object.freeze([
-      { id: "royal-court", name: "Royal Court", description: "Warm royal finishes for milestone games.", itemIds: ["board-royalCourt", "background-royal", "skin-maestro", "name-gold", "avatar-royal-lion", "frame-crown"] },
-      { id: "forest-defender", name: "Forest Defender", description: "Calm woodland color for patient, steady improvement.", itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald", "music-nature", "avatar-bat"] },
-      { id: "samurai", name: "Samurai", description: "Disciplined red-gold accents for tactical battles.", itemIds: ["board-dragon", "background-volcano", "skin-samurai", "lastmove-fire", "music-samurai", "avatar-samurai-mask", "frame-samurai"] },
-      { id: "space-explorer", name: "Space Explorer", description: "Deep-space contrast for long study sessions.", itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy", "music-space", "avatar-galaxy-star", "frame-galaxy"] }
+      { id: "royal-court", name: "Royal Court", description: "Warm royal finishes for milestone games.", itemIds: ["board-royalCourt", "background-royal", "skin-maestro", "name-gold", "avatar-royal-lion", "frame-crown"], reward: { type: "title", value: "Royal Collector", label: "Royal Collector title" } },
+      { id: "forest-defender", name: "Forest Defender", description: "Calm woodland color for patient, steady improvement.", itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald", "music-nature", "avatar-bat"], reward: { type: "title", value: "Forest Guardian", label: "Forest Guardian title" } },
+      { id: "samurai", name: "Samurai", description: "Disciplined red-gold accents for tactical battles.", itemIds: ["board-dragon", "background-volcano", "skin-samurai", "lastmove-fire", "music-samurai", "avatar-samurai-mask", "frame-samurai"], reward: { type: "title", value: "Samurai Focus", label: "Samurai Focus title" } },
+      { id: "space-explorer", name: "Space Explorer", description: "Deep-space contrast for long study sessions.", itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy", "music-space", "avatar-galaxy-star", "frame-galaxy"], reward: { type: "title", value: "Space Explorer", label: "Space Explorer title" } }
     ]);
     const storeCollectionByItem = new Map();
     storeCollectionDefinitions.forEach((collection) => {
@@ -2421,6 +2439,226 @@
       if (collection) item.collection = collection.name;
       item.surface = item.surface || getStoreSurfaceLabel(item);
     });
+
+    function cloneStorePrefs(prefs = readLearnerPrefs()) {
+      try { return JSON.parse(JSON.stringify(prefs)); } catch { return { ...prefs, audio: { ...(prefs.audio || {}) } }; }
+    }
+
+    function recordStoreHistory(kind, item) {
+      if (!item?.id || !["unlocked", "purchased", "equipped"].includes(kind)) return;
+      const current = storeState.history || { unlocked: [], purchased: [], equipped: [] };
+      const nextEntry = { itemId: item.id, at: new Date().toISOString() };
+      const next = [nextEntry, ...(Array.isArray(current[kind]) ? current[kind] : []).filter((entry) => entry.itemId !== item.id)].slice(0, 30);
+      storeState = { ...storeState, history: { ...current, [kind]: next } };
+      savePuzzleState();
+    }
+
+    function applyStoreItemToPrefs(item, prefs) {
+      const next = cloneStorePrefs(prefs);
+      if (!item) return next;
+      if (item.type === "board") next.board = item.value;
+      if (item.type === "skin") next.pieceSkin = item.value;
+      if (item.type === "pieceFinish") next.pieceFinish = item.value;
+      if (item.type === "trail") next.trail = item.value;
+      if (item.type === "avatar") next.avatar = item.value;
+      if (item.type === "avatarEffect") next.avatarEffect = item.value;
+      if (item.type === "frame") next.avatarFrame = item.value;
+      if (item.type === "lastMove") next.lastMoveColor = normalizeLastMoveValue(item.value);
+      if (item.type === "boardBorder") next.boardBorder = item.value;
+      if (item.type === "backgroundTheme") next.backgroundTheme = item.value;
+      if (item.type === "archetype") next.archetype = item.value;
+      if (item.type === "nameStyle") { next.nameStyle = item.value; next.nameFx = "on"; }
+      if (item.type === "musicPack") next.audio = { ...(next.audio || {}), musicPack: item.value };
+      if (item.type === "sfxPack") next.audio = { ...(next.audio || {}), sfxPack: item.value };
+      if (item.type === "title") next.title = item.value;
+      return next;
+    }
+
+    function renderStorePreviewTray() {
+      const tray = document.getElementById("storePreviewTray");
+      const title = document.getElementById("storePreviewTitle");
+      const meta = document.getElementById("storePreviewMeta");
+      const equip = document.getElementById("storePreviewEquip");
+      if (!tray || !title || !meta || !equip) return;
+      if (!storePreviewState?.item) {
+        tray.hidden = true;
+        equip.disabled = true;
+        return;
+      }
+      const item = storePreviewState.item;
+      tray.hidden = false;
+      title.textContent = item.name;
+      meta.textContent = `Temporary preview · ${getStoreSurfaceLabel(item)} · no purchase or equip has been saved.`;
+      const owned = isStoreItemOwned(item);
+      equip.disabled = !owned;
+      equip.textContent = owned ? "Equip this item" : "Buy to equip";
+    }
+
+    function stopStorePreview({ silent = false } = {}) {
+      if (!storePreviewState) return;
+      const previous = storePreviewState;
+      storePreviewState = null;
+      window.clearTimeout(previous.timer);
+      storePreviewAudioOverride = null;
+      const originalPrefs = previous.prefs;
+      if (previous.audio?.playing) startAudioMusic(previous.audio.scene || inferAudioScene(), previous.audio.current || originalPrefs.audio.musicPack, false);
+      else {
+        stopAudioMusic(false);
+        syncAudioSystem(originalPrefs.audio);
+      }
+      refreshPurchasedCosmetics(originalPrefs);
+      document.body.classList.remove("store-preview-active");
+      renderStorePreviewTray();
+      if (!silent) {
+        const status = document.getElementById("storeStatus");
+        if (status) status.textContent = "Preview ended. Your equipped cosmetics are restored.";
+      }
+    }
+
+    function startStorePreview(item) {
+      if (!item) return;
+      if (storePreviewState?.item?.id === item.id) return;
+      stopStorePreview({ silent: true });
+      const prefs = cloneStorePrefs(readLearnerPrefs());
+      storePreviewState = {
+        item,
+        prefs,
+        audio: { playing: Boolean(audioRuntime.playing), current: audioRuntime.current, scene: audioRuntime.scene },
+        timer: window.setTimeout(() => stopStorePreview({ silent: true }), 30000)
+      };
+      document.body.classList.add("store-preview-active");
+      const previewPrefs = applyStoreItemToPrefs(item, prefs);
+      if (item.type === "sfxPack") storePreviewAudioOverride = item.value;
+      refreshPurchasedCosmetics(previewPrefs);
+      if (item.type === "musicPack") startAudioMusic(inferAudioScene(), item.value, false);
+      if (item.type === "sfxPack") playAudioCue("notification");
+      renderStorePreviewTray();
+      const status = document.getElementById("storeStatus");
+      if (status) status.textContent = `${item.name} preview is live for 30 seconds. Exit preview to restore your setup.`;
+    }
+
+    function ensureStoreCollectionRewards({ announce = false } = {}) {
+      const current = storeState.collectionRewards || {};
+      const next = { ...current };
+      let changed = false;
+      storeCollectionDefinitions.forEach((collection) => {
+        const stats = getStoreCollectionProgress(collection);
+        if (stats.percent === 100 && collection.reward && !next[collection.id]) {
+          next[collection.id] = { ...collection.reward, unlockedAt: new Date().toISOString() };
+          changed = true;
+          if (announce) showCelebration("Collection complete!", collection.reward.label, collection.name);
+        }
+      });
+      if (changed) {
+        storeState = { ...storeState, collectionRewards: next };
+        savePuzzleState();
+      }
+      return next;
+    }
+
+    function equipStoreCollectionReward(collection) {
+      const reward = storeState.collectionRewards?.[collection?.id] || collection?.reward;
+      if (!collection || !reward || getStoreCollectionProgress(collection).percent < 100) return false;
+      if (reward.type !== "title" || !reward.value) return false;
+      const prefs = readLearnerPrefs();
+      const nextPrefs = { ...prefs, title: reward.value };
+      writeJsonStorage(learnerPrefsStorageKey, nextPrefs);
+      refreshPurchasedCosmetics(nextPrefs);
+      savePuzzleState();
+      const status = document.getElementById("storeStatus");
+      if (status) status.textContent = `${reward.label || reward.value} equipped as your profile title.`;
+      return true;
+    }
+
+    function getStoreRecommendations(owned = new Set(storeState.owned)) {
+      const favorites = storeItems.filter((item) => isStoreItemWishlisted(item));
+      const favoriteCollections = new Set(favorites.map((item) => item.collection).filter(Boolean));
+      const candidates = storeItems.filter((item) => getStoreUnlockMethod(item) === "Coins" && !isStoreItemOwned(item, owned));
+      const scored = candidates.map((item) => {
+        const collection = getStoreCollection(item);
+        const progress = collection ? getStoreCollectionProgress(collection, readLearnerPrefs(), owned) : null;
+        const bundle = storeBundles.find((entry) => entry.itemIds.includes(item.id));
+        return { item, score: (favoriteCollections.has(item.collection) ? 30 : 0) + (progress ? progress.percent : 0) + (bundle && progress?.remaining <= 2 ? 24 : 0) - Math.min(12, Number(item.cost || 0) / 100) };
+      }).sort((a, b) => b.score - a.score || Number(a.item.cost || 0) - Number(b.item.cost || 0));
+      return scored.slice(0, 4).map(({ item }) => item);
+    }
+
+    function formatStoreHistoryDate(value) {
+      const date = new Date(value);
+      return Number.isFinite(date.getTime()) ? date.toLocaleDateString([], { month: "short", day: "numeric" }) : "Recently";
+    }
+
+    function renderStoreInventory() {
+      const panel = document.getElementById("storeInventoryPage");
+      const tools = document.getElementById("storeInventoryTools");
+      const grid = document.getElementById("storeInventoryGrid");
+      if (!panel || !tools || !grid || panel.hidden) return;
+      const prefs = readLearnerPrefs();
+      const owned = new Set(storeState.owned || []);
+      const categories = ["all", ...new Set(storeItems.map((item) => getStoreCategory(item)))];
+      if (!tools.dataset.ready) {
+        tools.dataset.ready = "true";
+        const select = document.createElement("select");
+        select.id = "storeInventoryFilter";
+        select.setAttribute("aria-label", "Inventory filter");
+        ["owned", "equipped", "favorites", "recent"].forEach((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value[0].toUpperCase() + value.slice(1); select.append(option); });
+        const category = document.createElement("select");
+        category.id = "storeInventoryCategory";
+        category.setAttribute("aria-label", "Inventory category");
+        categories.forEach((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value === "all" ? "All categories" : value; category.append(option); });
+        const search = document.createElement("input");
+        search.type = "search"; search.id = "storeInventorySearch"; search.placeholder = "Search owned cosmetics"; search.setAttribute("aria-label", "Search inventory");
+        select.addEventListener("change", () => { storeInventoryUi.filter = select.value; renderStoreInventory(); });
+        category.addEventListener("change", () => { storeInventoryUi.category = category.value; renderStoreInventory(); });
+        search.addEventListener("input", () => { storeInventoryUi.query = search.value; renderStoreInventory(); });
+        tools.replaceChildren(select, category, search);
+      }
+      const select = document.getElementById("storeInventoryFilter");
+      const category = document.getElementById("storeInventoryCategory");
+      const search = document.getElementById("storeInventorySearch");
+      if (select) select.value = storeInventoryUi.filter;
+      if (category) category.value = categories.includes(storeInventoryUi.category) ? storeInventoryUi.category : "all";
+      if (search && search.value !== storeInventoryUi.query) search.value = storeInventoryUi.query;
+      const recentIds = new Set((storeState.history?.unlocked || []).map((entry) => entry.itemId));
+      const query = storeInventoryUi.query.trim().toLowerCase();
+      const items = storeItems.filter((item) => {
+        if (!isStoreItemOwned(item, owned)) return false;
+        if (storeInventoryUi.filter === "equipped" && !isStoreItemEquipped(item)) return false;
+        if (storeInventoryUi.filter === "favorites" && !isStoreItemWishlisted(item, prefs)) return false;
+        if (storeInventoryUi.filter === "recent" && !recentIds.has(item.id)) return false;
+        if (storeInventoryUi.category !== "all" && getStoreCategory(item) !== storeInventoryUi.category) return false;
+        return !query || `${item.name} ${item.description} ${getStoreSurfaceLabel(item)}`.toLowerCase().includes(query);
+      });
+      grid.replaceChildren(...(items.length ? items.map((item) => {
+        const card = document.createElement("article");
+        card.className = `store-inventory-item${isStoreItemEquipped(item) ? " is-equipped" : ""}`;
+        card.append(buildStorePreview(item), createBookText("strong", "", item.name), createBookText("small", "", `${getStoreCategory(item)} · ${getStoreSurfaceLabel(item)}`));
+        const actions = document.createElement("div"); actions.className = "store-inventory-item-actions";
+        const preview = createBookText("button", "button secondary", "Preview"); preview.type = "button"; preview.addEventListener("click", () => startStorePreview(item));
+        const equip = createBookText("button", "button", isStoreItemEquipped(item) ? "Equipped" : "Quick equip"); equip.type = "button"; equip.disabled = isStoreItemEquipped(item); equip.addEventListener("click", async () => { await equipStoreItem(item); renderStoreInventory(); });
+        actions.append(preview, equip); card.append(actions); return card;
+      }) : [createBookText("p", "store-inventory-empty", "No owned cosmetics match this filter yet.")]));
+      const rewards = document.getElementById("storeCollectionRewards");
+      const collectionRewards = ensureStoreCollectionRewards();
+      if (rewards) rewards.replaceChildren(...storeCollectionDefinitions.map((collection) => { const stats = getStoreCollectionProgress(collection, prefs, owned); const reward = collectionRewards[collection.id] || collection.reward; const row = createBookText("div", `store-collection-reward${stats.percent === 100 ? " is-complete" : ""}`, ""); row.append(createBookText("strong", "", collection.name), createBookText("small", "", `${stats.percent}% · ${stats.owned}/${stats.total} owned · ${stats.remaining} remaining · ${stats.percent === 100 ? `Unlocked: ${reward?.label || "Collection reward"}` : `Reward: ${reward?.label || "Collection title"}`}`)); return row; }));
+      if (rewards) rewards.querySelectorAll(".store-collection-reward").forEach((row, index) => {
+        const collection = storeCollectionDefinitions[index];
+        const reward = collectionRewards[collection.id] || collection.reward;
+        const complete = getStoreCollectionProgress(collection, prefs, owned).percent === 100;
+        if (!complete || reward?.type !== "title") return;
+        const button = createBookText("button", "button secondary", prefs.title === reward.value ? "Title equipped" : "Equip title");
+        button.type = "button";
+        button.disabled = prefs.title === reward.value;
+        button.addEventListener("click", () => { equipStoreCollectionReward(collection); renderStoreInventory(); });
+        row.append(button);
+      });
+      const recommendations = document.getElementById("storeRecommendations");
+      const recommended = getStoreRecommendations(owned);
+      if (recommendations) recommendations.replaceChildren(...(recommended.length ? recommended.map((item) => { const row = createBookText("div", "store-recommendation", ""); row.append(buildStorePreview(item), createBookText("span", "", `${item.name} · ${getStoreEstimatedDays(item)}`)); const button = createBookText("button", "button secondary", "Preview"); button.type = "button"; button.addEventListener("click", () => startStorePreview(item)); row.append(button); return row; }) : [createBookText("small", "", "Your collection is fully caught up. Check back after the next Store rotation.")]));
+      const history = document.getElementById("storeCosmeticHistory");
+      if (history) { const entries = [ ...(storeState.history?.unlocked || []).map((entry) => ({ ...entry, kind: "Unlocked" })), ...(storeState.history?.purchased || []).map((entry) => ({ ...entry, kind: "Purchased" })), ...(storeState.history?.equipped || []).map((entry) => ({ ...entry, kind: "Equipped" })) ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 12); history.replaceChildren(...(entries.length ? entries.map((entry) => createBookText("small", "", `${entry.kind} · ${getStoreItem(entry.itemId)?.name || entry.itemId} · ${formatStoreHistoryDate(entry.at)}`)) : [createBookText("small", "", "Your cosmetic history will appear here.")])); }
+    }
+
     const learnerLevels = [
       ["Level 1 Explorer", 0],
       ["Level 5 Adventurer", 80],
@@ -2666,6 +2904,9 @@
     let giftInboxState = [];
     let selectedGiftItemId = "";
     let flexBadgeState = null;
+    let storePreviewState = null;
+    let storePreviewAudioOverride = null;
+    let storeInventoryUi = { filter: "owned", query: "", category: "all" };
     let currentPuzzle = puzzleStateMatchesBank ? Math.max(0, Math.min(puzzles.length - 1, Number(savedPuzzleState.currentPuzzle) || 0)) : 0;
     let activePuzzlePlan = puzzleStateMatchesBank && puzzlePlanOptions.includes(savedPuzzleState.activePlan) ? savedPuzzleState.activePlan : "main";
     if (activePuzzlePlan === "all") activePuzzlePlan = "main";
@@ -2789,6 +3030,12 @@
     let puzzleWeaknesses = puzzleStateMatchesBank && savedPuzzleState.weaknesses && typeof savedPuzzleState.weaknesses === "object" ? savedPuzzleState.weaknesses : {};
     let weeklyPuzzleXp = savedPuzzleState.weekly && typeof savedPuzzleState.weekly === "object" ? savedPuzzleState.weekly : {};
     let favoriteOpening = savedPuzzleState.favoriteOpening || "Italian Game";
+    let favoriteOpenings = Array.isArray(savedPuzzleState.favoriteOpenings)
+      ? [...new Set(savedPuzzleState.favoriteOpenings.map((opening) => String(opening || "").trim()).filter(Boolean))].slice(0, 8)
+      : [];
+    if (!favoriteOpenings.length && favoriteOpening) favoriteOpenings = [favoriteOpening];
+    if (!favoriteOpenings.length) favoriteOpenings = ["Italian Game"];
+    favoriteOpening = favoriteOpenings[0] || "Italian Game";
     let beginnerTutorialState = readBeginnerTutorialState();
     let currentTutorialLesson = Math.max(0, Math.min(beginnerTutorialLessons.length - 1, Number(beginnerTutorialState.current) || 0));
     let selectedTutorialSquare = "";
@@ -2803,6 +3050,7 @@
     gameStats = {
       played: Math.max(0, Number(gameStats.played) || 0),
       wins: Math.max(0, Number(gameStats.wins) || 0),
+      draws: Math.max(0, Number(gameStats.draws) || 0),
       hanging: Math.max(0, Number(gameStats.hanging) || 0),
       moveQualityTotal: Math.max(0, Number(gameStats.moveQualityTotal) || 0),
       moveQualityMoves: Math.max(0, Number(gameStats.moveQualityMoves) || 0),
@@ -3997,6 +4245,195 @@
       updateLessonJourney();
     }
 
+    const openingExplorerCatalog = Object.freeze([
+      { title: "Italian Game", eco: "C50", description: "Fast development, pressure on f7, and a simple castling plan.", white: 47, draw: 28, black: 25, lines: [{ label: "Giuoco Piano", description: "Build the center before attacking.", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5"] }, { label: "Two Knights", description: "Tactical pressure on f7.", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6"] }] },
+      { title: "Queen's Gambit", eco: "D06", description: "Offer a wing pawn to claim central space and develop with purpose.", white: 45, draw: 30, black: 25, lines: [{ label: "QGD", description: "Solid center and natural development.", moves: ["d4", "d5", "c4", "e6", "Nc3", "Nf6"] }, { label: "Accepted", description: "Clarify the center, then recover the pawn.", moves: ["d4", "d5", "c4", "dxc4", "e4"] }] },
+      { title: "Sicilian Defense", eco: "B20", description: "Fight from the side with an unbalanced structure and active counterplay.", white: 44, draw: 25, black: 31, lines: [{ label: "Open Sicilian", description: "Immediate central tension.", moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4"] }, { label: "Rossolimo", description: "Develop with pressure on c6.", moves: ["e4", "c5", "Nf3", "Nc6", "Bb5"] }] },
+      { title: "Ruy Lopez", eco: "C60", description: "Pressure the defender of e5 and build a long-term central squeeze.", white: 46, draw: 29, black: 25, lines: [{ label: "Morphy Defense", description: "Ask the bishop to choose.", moves: ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6"] }, { label: "Berlin", description: "Challenge e4 immediately.", moves: ["e4", "e5", "Nf3", "Nc6", "Bb5", "Nf6"] }] },
+      { title: "French Defense", eco: "C00", description: "Build a resilient pawn chain, then attack its base from the wings.", white: 43, draw: 30, black: 27, lines: [{ label: "Advance", description: "Lock space and attack the base.", moves: ["e4", "e6", "d4", "d5", "e5", "c5"] }, { label: "Winawer", description: "Pin the knight and fight e4.", moves: ["e4", "e6", "d4", "d5", "Nc3", "Bb4"] }] },
+      { title: "Caro-Kann Defense", eco: "B10", description: "Support the central break with c6 and develop a healthy light-square bishop.", white: 45, draw: 31, black: 24, lines: [{ label: "Advance", description: "Develop the bishop before closing in.", moves: ["e4", "c6", "d4", "d5", "e5", "Bf5"] }, { label: "Classical", description: "Clarify the center cleanly.", moves: ["e4", "c6", "d4", "d5", "Nc3", "dxe4", "Nxe4"] }] },
+      { title: "London System", eco: "D02", description: "A reliable setup with Bf4, e3, c3, and a safe king.", white: 48, draw: 28, black: 24, lines: [{ label: "Main setup", description: "Simple development and a sturdy center.", moves: ["d4", "d5", "Nf3", "Nf6", "Bf4", "e6", "e3", "Bd6"] }, { label: "Early London", description: "Set the bishop before the center closes.", moves: ["d4", "d5", "Bf4", "Nf6", "e3"] }] },
+      { title: "King's Indian Defense", eco: "E60", description: "Allow space, then counterpunch the center with dynamic kingside play.", white: 46, draw: 26, black: 28, lines: [{ label: "Classical", description: "Big center versus kingside counterplay.", moves: ["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6"] }, { label: "Fianchetto", description: "Quieter pressure on the long diagonals.", moves: ["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "g3", "O-O"] }] },
+      { title: "Scandinavian Defense", eco: "B01", description: "Strike e4 immediately and accept early queen activity for a clear plan.", white: 45, draw: 27, black: 28, lines: [{ label: "Main line", description: "Retreat the queen and develop smoothly.", moves: ["e4", "d5", "exd5", "Qxd5", "Nc3", "Qa5"] }, { label: "Modern", description: "Delay recapture and develop first.", moves: ["e4", "d5", "exd5", "Nf6"] }] },
+      { title: "Nimzo-Indian Defense", eco: "E20", description: "Pin the knight, control e4, and trade structure for active piece play.", white: 44, draw: 30, black: 26, lines: [{ label: "Rubinstein", description: "Simple development and a solid center.", moves: ["d4", "Nf6", "c4", "e6", "Nc3", "Bb4", "e3", "O-O"] }, { label: "Classical", description: "Keep the bishop pair and protect c3.", moves: ["d4", "Nf6", "c4", "e6", "Nc3", "Bb4", "Qc2"] }] }
+    ]);
+    const openingExplorerStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const openingExplorerRuntime = { entry: openingExplorerCatalog[0], moves: [], moveIndex: 0, selected: "", ready: false };
+
+    function getOpeningExplorerEntries(query = "") {
+      const needle = String(query || "").trim().toLowerCase();
+      return needle ? openingExplorerCatalog.filter((entry) => `${entry.title} ${entry.eco}`.toLowerCase().includes(needle)) : openingExplorerCatalog;
+    }
+
+    function toggleOpeningFavorite(title) {
+      const name = String(title || "");
+      favoriteOpenings = favoriteOpenings.includes(name)
+        ? favoriteOpenings.filter((opening) => opening !== name)
+        : [...favoriteOpenings, name].slice(-8);
+      if (!favoriteOpenings.length) favoriteOpenings = ["Italian Game"];
+      favoriteOpening = favoriteOpenings[0];
+      savePuzzleState();
+      document.querySelectorAll("[data-favorite-opening]").forEach((item) => {
+        item.textContent = favoriteOpenings.includes(item.dataset.favoriteOpening) ? "Favorite opening" : "Set favorite";
+      });
+      renderOpeningExplorerFavoriteState();
+      renderBeginnerProgress();
+    }
+
+    function getOpeningExplorerGame() {
+      if (typeof CoachChess !== "function") return null;
+      const game = new CoachChess(openingExplorerStartFen);
+      openingExplorerRuntime.moves.slice(0, openingExplorerRuntime.moveIndex).forEach((move) => {
+        try { game.move(move); } catch { /* ignore an obsolete line and keep the board usable */ }
+      });
+      return game;
+    }
+
+    function renderOpeningExplorerBoard() {
+      const board = document.getElementById("openingExplorerBoard");
+      if (!board) return;
+      const game = getOpeningExplorerGame();
+      const boardRows = game?.board?.() || fenToSquares(openingExplorerStartFen.split(/\s+/)[0]).reduce((rows, piece, index) => {
+        if (index % 8 === 0) rows.push([]);
+        rows.at(-1).push(piece);
+        return rows;
+      }, []);
+      const legalTargets = new Set();
+      if (game && openingExplorerRuntime.selected) {
+        try { game.moves({ square: openingExplorerRuntime.selected, verbose: true }).forEach((move) => legalTargets.add(move.to)); } catch { /* no selection */ }
+      }
+      const fragment = document.createDocumentFragment();
+      boardRows.flat().forEach((piece, index) => {
+        const squareNameValue = squareName(index);
+        const row = Math.floor(index / 8);
+        const col = index % 8;
+        const square = document.createElement("button");
+        square.type = "button";
+        square.className = `opening-explorer-square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
+        square.dataset.square = squareNameValue;
+        const selected = openingExplorerRuntime.selected === squareNameValue;
+        if (selected) square.classList.add("is-selected");
+        if (legalTargets.has(squareNameValue)) square.classList.add("is-legal");
+        square.setAttribute("aria-label", getAccessibleSquareLabel(squareNameValue, piece, [selected ? "selected" : "", legalTargets.has(squareNameValue) ? "legal move" : ""]));
+        renderPieceOnSquare(square, piece);
+        square.addEventListener("click", () => {
+          const currentGame = getOpeningExplorerGame();
+          const currentBoard = currentGame?.board?.() || [];
+          const currentPiece = currentBoard[Math.floor(index / 8)]?.[index % 8];
+          if (!currentGame) {
+            openingExplorerRuntime.selected = "";
+            renderOpeningExplorerBoard();
+            return;
+          }
+          if (!openingExplorerRuntime.selected) {
+            if (currentPiece?.color === currentGame.turn()) openingExplorerRuntime.selected = squareNameValue;
+            renderOpeningExplorerBoard();
+            return;
+          }
+          let nextSelection = "";
+          try {
+            currentGame.move({ from: openingExplorerRuntime.selected, to: squareNameValue, promotion: "q" });
+            openingExplorerRuntime.moves = currentGame.history();
+            openingExplorerRuntime.moveIndex = openingExplorerRuntime.moves.length;
+          } catch {
+            nextSelection = currentPiece?.color === currentGame.turn() ? squareNameValue : "";
+          }
+          openingExplorerRuntime.selected = nextSelection;
+          renderOpeningExplorerBoard();
+        });
+        fragment.appendChild(square);
+      });
+      board.replaceChildren(fragment);
+      board.dataset.moveIndex = String(openingExplorerRuntime.moveIndex);
+    }
+
+    function renderOpeningExplorerFavoriteState() {
+      const button = document.getElementById("openingExplorerFavorite");
+      const count = document.getElementById("openingExplorerFavoriteCount");
+      if (button) {
+        const active = favoriteOpenings.includes(openingExplorerRuntime.entry.title);
+        button.textContent = active ? "★ Favorited" : "☆ Favorite";
+        button.setAttribute("aria-pressed", String(active));
+      }
+      if (count) count.textContent = `${favoriteOpenings.length} favorite${favoriteOpenings.length === 1 ? "" : "s"}`;
+    }
+
+    function renderOpeningExplorer() {
+      const root = document.getElementById("openingExplorer");
+      if (!root) return;
+      const entry = openingExplorerRuntime.entry || openingExplorerCatalog[0];
+      document.getElementById("openingExplorerName")?.replaceChildren(document.createTextNode(entry.title));
+      document.getElementById("openingExplorerECO")?.replaceChildren(document.createTextNode(`ECO ${entry.eco}`));
+      document.getElementById("openingExplorerDescription")?.replaceChildren(document.createTextNode(entry.description));
+      [
+        ["openingExplorerWhiteRate", `${entry.white}%`],
+        ["openingExplorerDrawRate", `${entry.draw}%`],
+        ["openingExplorerBlackRate", `${entry.black}%`]
+      ].forEach(([id, value]) => document.getElementById(id)?.replaceChildren(document.createTextNode(value)));
+      const lines = document.getElementById("openingExplorerLines");
+      if (lines) {
+        lines.replaceChildren(...entry.lines.map((line) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "opening-explorer-line";
+          button.append(createBookText("strong", "", line.label), createBookText("span", "", line.description), createBookText("small", "", line.moves.join(" ")));
+          button.addEventListener("click", () => {
+            openingExplorerRuntime.moves = [...line.moves];
+            openingExplorerRuntime.moveIndex = line.moves.length;
+            openingExplorerRuntime.selected = "";
+            renderOpeningExplorerBoard();
+          });
+          return button;
+        }));
+      }
+      const results = document.getElementById("openingExplorerResults");
+      if (results) {
+        const query = document.getElementById("openingExplorerSearch")?.value || "";
+        results.replaceChildren(...getOpeningExplorerEntries(query).map((result) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `opening-explorer-result${result.title === entry.title ? " is-active" : ""}`;
+          button.append(createBookText("strong", "", result.title), createBookText("span", "", `ECO ${result.eco}`));
+          button.addEventListener("click", () => {
+            openingExplorerRuntime.entry = result;
+            openingExplorerRuntime.moves = [];
+            openingExplorerRuntime.moveIndex = 0;
+            openingExplorerRuntime.selected = "";
+            renderOpeningExplorer();
+          });
+          return button;
+        }));
+      }
+      renderOpeningExplorerFavoriteState();
+      renderOpeningExplorerBoard();
+    }
+
+    function setupOpeningExplorer() {
+      const root = document.getElementById("openingExplorer");
+      if (!root || root.dataset.ready === "true") return;
+      root.dataset.ready = "true";
+      document.getElementById("openingExplorerSearch")?.addEventListener("input", () => renderOpeningExplorer());
+      document.getElementById("openingExplorerFavorite")?.addEventListener("click", () => toggleOpeningFavorite(openingExplorerRuntime.entry.title));
+      document.getElementById("openingExplorerReset")?.addEventListener("click", () => {
+        openingExplorerRuntime.moves = [];
+        openingExplorerRuntime.moveIndex = 0;
+        openingExplorerRuntime.selected = "";
+        renderOpeningExplorerBoard();
+      });
+      document.getElementById("openingExplorerPrev")?.addEventListener("click", () => {
+        openingExplorerRuntime.moveIndex = Math.max(0, openingExplorerRuntime.moveIndex - 1);
+        openingExplorerRuntime.selected = "";
+        renderOpeningExplorerBoard();
+      });
+      document.getElementById("openingExplorerNext")?.addEventListener("click", () => {
+        openingExplorerRuntime.moveIndex = Math.min(openingExplorerRuntime.moves.length, openingExplorerRuntime.moveIndex + 1);
+        openingExplorerRuntime.selected = "";
+        renderOpeningExplorerBoard();
+      });
+      renderOpeningExplorer();
+      loadChessRules().then(() => { openingExplorerRuntime.ready = true; renderOpeningExplorer(); }).catch(() => renderOpeningExplorer());
+    }
+
     function setupOpeningFavorites() {
       document.querySelectorAll(".opening-card").forEach((card) => {
         if (card.querySelector("[data-favorite-opening]")) return;
@@ -4005,17 +4442,11 @@
         button.type = "button";
         button.className = "button secondary";
         button.dataset.favoriteOpening = title;
-        button.textContent = favoriteOpening === title ? "Favorite opening" : "Set favorite";
-        button.addEventListener("click", () => {
-          favoriteOpening = title;
-          document.querySelectorAll("[data-favorite-opening]").forEach((item) => {
-            item.textContent = item.dataset.favoriteOpening === favoriteOpening ? "Favorite opening" : "Set favorite";
-          });
-          savePuzzleState();
-          renderBeginnerProgress();
-        });
+        button.textContent = favoriteOpenings.includes(title) ? "Favorite opening" : "Set favorite";
+        button.addEventListener("click", () => toggleOpeningFavorite(title));
         card.querySelector(".opening-body")?.appendChild(button);
       });
+      setupOpeningExplorer();
       renderMiniBoards();
     }
 
@@ -4674,6 +5105,7 @@
         completedGames: completedGameHistory.slice(0, 12),
         completedPathLessons: [...completedPathLessons],
         favoriteOpening,
+        favoriteOpenings,
         spacedReview,
         weaknesses: puzzleWeaknesses,
         store: storeState,
@@ -5087,11 +5519,21 @@
           .filter((id) => validIds.has(id))
           .filter((id) => getStoreItem(id)?.type !== "flexBadge")
         : [];
+      const normalizeHistory = (value) => Array.isArray(value)
+        ? value.map((entry) => ({ itemId: String(entry?.itemId || entry?.id || ""), at: String(entry?.at || entry?.timestamp || "") }))
+          .filter((entry) => entry.itemId && getStoreItem(entry.itemId)).slice(0, 30)
+        : [];
       return {
         owned: [...new Set([...defaultOwned, ...owned])],
         equipped: saved?.equipped && typeof saved.equipped === "object"
           ? Object.fromEntries(Object.entries(saved.equipped).filter(([type, id]) => type !== "flexBadge" && getStoreItem(id)?.type !== "flexBadge"))
-          : {}
+          : {},
+        history: {
+          unlocked: normalizeHistory(saved?.history?.unlocked),
+          purchased: normalizeHistory(saved?.history?.purchased),
+          equipped: normalizeHistory(saved?.history?.equipped)
+        },
+        collectionRewards: saved?.collectionRewards && typeof saved.collectionRewards === "object" ? { ...saved.collectionRewards } : {}
       };
     }
 
@@ -5653,6 +6095,7 @@
         equipFlexBadge(item.value);
         refreshPurchasedCosmetics();
         playAudioCue("equip");
+        recordStoreHistory("equipped", item);
         return true;
       }
       const prefs = readLearnerPrefs();
@@ -5694,6 +6137,7 @@
       if (item.type === "musicPack" && audioRuntime.playing) startAudioMusic(inferAudioScene(), item.value);
       else syncAudioSystem(nextPrefs.audio);
       playAudioCue("equip");
+      recordStoreHistory("equipped", item);
       return true;
     }
 
@@ -5744,6 +6188,8 @@
             storeState.owned = [...owned];
           }
         }
+        recordStoreHistory("purchased", item);
+        recordStoreHistory("unlocked", item);
         playAudioCue("purchase");
         showCelebration("Reward unlocked!", `-${item.cost} coins`, item.name);
       }
@@ -6237,17 +6683,7 @@
     }
 
     function previewAudioStoreItem(item) {
-      const theme = item.type === "sfxPack" ? getAudioSfxPack(item.value) : getAudioMusicTheme(item.value);
-      if (item.type === "sfxPack") {
-        const previous = readLearnerPrefs().audio.sfxPack;
-        writeAudioPrefs({ sfxPack: item.value });
-        playAudioCue("notification");
-        window.setTimeout(() => writeAudioPrefs({ sfxPack: previous }), 520);
-      } else {
-        startAudioMusic(inferAudioScene(), item.value, false);
-      }
-      const status = document.getElementById("storeStatus");
-      if (status) status.textContent = `Previewing ${theme.label}. Buy or equip when it feels right.`;
+      startStorePreview(item);
     }
 
     function buildMusicStoreTools(prefs = readLearnerPrefs()) {
@@ -6475,6 +6911,10 @@
         });
         storeState = { ...storeState, owned: [...owned] };
       }
+      details.missingItems.forEach((item) => {
+        recordStoreHistory("purchased", item);
+        recordStoreHistory("unlocked", item);
+      });
       savePuzzleState();
       await Promise.all(details.items.map((item) => equipStoreItem(item)));
       playAudioCue("purchase");
@@ -6596,7 +7036,8 @@
         fill.className = "store-progress-fill";
         fill.style.width = `${stats.percent}%`;
         track.appendChild(fill);
-        item.append(label, track, createBookText("small", "store-collection-subline", `${stats.owned} owned · ${stats.remaining} remaining · ${stats.bundleAvailable ? "Bundle available" : "No bundle"}`));
+        const reward = storeState.collectionRewards?.[collection.id] || collection.reward;
+        item.append(label, track, createBookText("small", "store-collection-subline", `${stats.owned} owned · ${stats.remaining} remaining · ${stats.bundleAvailable ? "Bundle available" : "No bundle"} · ${stats.percent === 100 && storeState.collectionRewards?.[collection.id] ? `Reward unlocked: ${reward?.label || "Collection title"}` : `Reward: ${reward?.label || "Collection title"}`}`));
         progress.appendChild(item);
       });
       panel.append(heading, filters, progress);
@@ -6642,6 +7083,7 @@
       grid.classList.remove("is-loading");
       const owned = new Set(storeState.owned);
       balance.textContent = formatProfileNumber(puzzleCoins);
+      ensureStoreCollectionRewards();
       syncPreferenceLocks();
       const prefs = readLearnerPrefs();
       const inventoryItems = [
@@ -6857,48 +7299,24 @@
             `store-preview-badge ${isEquipped ? "is-equipped" : isOwned ? "is-owned" : "is-locked"}`,
             isEquipped ? "\u2713 Equipped" : previewUnlockLabel
           ));
-          if (item.type === "nameStyle") {
-            card.addEventListener("mouseenter", () => setNameStylePreview(item.value));
-            card.addEventListener("focusin", () => setNameStylePreview(item.value));
-          }
-          if (item.type === "lastMove") {
-            card.addEventListener("mouseenter", () => setLastMovePreview(item.value));
-            card.addEventListener("focusin", () => setLastMovePreview(item.value));
-          }
-          if (item.type === "board") {
-            card.addEventListener("mouseenter", () => setBoardThemePreview(item.value));
-            card.addEventListener("focusin", () => setBoardThemePreview(item.value));
-          }
-          if (item.type === "backgroundTheme") {
-            card.addEventListener("mouseenter", () => setBackgroundThemePreview(item.value));
-            card.addEventListener("focusin", () => setBackgroundThemePreview(item.value));
-          }
           const actions = document.createElement("div");
           actions.className = "store-card-actions";
+          const temporaryPreview = createBookText("button", "button secondary", "Preview");
+          temporaryPreview.type = "button";
+          temporaryPreview.setAttribute("aria-label", `Preview ${item.name} temporarily`);
+          temporaryPreview.addEventListener("click", () => startStorePreview(item));
+          actions.append(temporaryPreview);
           if (["musicPack", "sfxPack"].includes(item.type)) {
-            const previewButton = document.createElement("button");
-            previewButton.type = "button";
-            previewButton.className = "button secondary";
-            previewButton.textContent = "Preview";
-            previewButton.addEventListener("click", () => previewAudioStoreItem(item));
             const favoriteButton = document.createElement("button");
             favoriteButton.type = "button";
             favoriteButton.className = "button secondary";
             favoriteButton.textContent = isFavorite ? "Favorited" : "Favorite";
             favoriteButton.setAttribute("aria-pressed", String(isFavorite));
             favoriteButton.addEventListener("click", () => toggleMusicFavorite(item));
-            actions.append(previewButton, favoriteButton);
+            actions.append(favoriteButton);
           }
           if (item.type === "nameStyle") {
-            const previewButton = document.createElement("button");
-            previewButton.type = "button";
-            previewButton.className = "button secondary";
-            previewButton.textContent = "Preview";
-            previewButton.addEventListener("click", () => {
-              setNameStylePreview(item.value);
-              document.getElementById("nameStyleDesigner")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-            });
-            actions.append(previewButton);
+            // The shared temporary preview action above covers name styles.
           }
           if (item.type === "nameStyle" || item.type === "lastMove") {
             const favoriteButton = document.createElement("button");
@@ -6915,46 +7333,25 @@
             actions.append(favoriteButton);
           }
           if (item.type === "board") {
-            const previewButton = document.createElement("button");
-            previewButton.type = "button";
-            previewButton.className = "button secondary";
-            previewButton.textContent = "Preview";
-            previewButton.addEventListener("click", () => {
-              setBoardThemePreview(item.value);
-              document.getElementById("boardThemeDesigner")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-            });
             const favoriteButton = document.createElement("button");
             favoriteButton.type = "button";
             favoriteButton.className = "button secondary";
             favoriteButton.textContent = isFavorite ? "Favorited" : "Favorite";
             favoriteButton.setAttribute("aria-pressed", String(isFavorite));
             favoriteButton.addEventListener("click", () => toggleBoardThemeFavorite(item.value));
-            actions.append(previewButton, favoriteButton);
+            actions.append(favoriteButton);
           }
           if (item.type === "backgroundTheme") {
-            const previewButton = document.createElement("button");
-            previewButton.type = "button";
-            previewButton.className = "button secondary";
-            previewButton.textContent = "Preview";
-            previewButton.addEventListener("click", () => setBackgroundThemePreview(item.value));
             const favoriteButton = document.createElement("button");
             favoriteButton.type = "button";
             favoriteButton.className = "button secondary";
             favoriteButton.textContent = isFavorite ? "Favorited" : "Favorite";
             favoriteButton.setAttribute("aria-pressed", String(isFavorite));
             favoriteButton.addEventListener("click", () => toggleBackgroundThemeFavorite(item.value));
-            actions.append(previewButton, favoriteButton);
+            actions.append(favoriteButton);
           }
           if (item.type === "skin") {
-            const previewButton = document.createElement("button");
-            previewButton.type = "button";
-            previewButton.className = "button secondary";
-            previewButton.textContent = "Preview set";
-            previewButton.addEventListener("click", () => {
-              renderPieceDesigner(item.value);
-              document.getElementById("pieceDesigner")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-            });
-            actions.append(previewButton);
+            // The shared temporary preview action above covers piece sets.
           }
           if (["avatar", "frame", "avatarEffect"].includes(item.type)) {
             const favoriteButton = document.createElement("button");
@@ -6985,6 +7382,8 @@
         });
       });
       grid.replaceChildren(...nodes);
+      renderStorePreviewTray();
+      renderStoreInventory();
       const designer = document.getElementById("pieceDesigner");
       if (designer) designer.hidden = activeStoreCategory !== "Chess Pieces";
       if (activeStoreCategory === "Chess Pieces") renderPieceDesigner();
@@ -6992,6 +7391,27 @@
 
     function setupStore() {
       setupStoreGifting();
+      const inventoryPage = document.getElementById("storeInventoryPage");
+      const openInventory = document.getElementById("storeInventoryOpen");
+      const closeInventory = document.getElementById("storeInventoryClose");
+      if (inventoryPage && !inventoryPage.dataset.ready) {
+        inventoryPage.dataset.ready = "true";
+        openInventory?.addEventListener("click", () => { inventoryPage.hidden = false; renderStoreInventory(); inventoryPage.scrollIntoView({ block: "start", behavior: "smooth" }); });
+        closeInventory?.addEventListener("click", () => { inventoryPage.hidden = true; document.getElementById("store")?.scrollIntoView({ block: "start", behavior: "smooth" }); });
+      }
+      const previewExit = document.getElementById("storePreviewExit");
+      const previewEquip = document.getElementById("storePreviewEquip");
+      if (previewExit && !previewExit.dataset.ready) { previewExit.dataset.ready = "true"; previewExit.addEventListener("click", () => stopStorePreview()); }
+      if (previewEquip && !previewEquip.dataset.ready) {
+        previewEquip.dataset.ready = "true";
+        previewEquip.addEventListener("click", async () => {
+          if (!storePreviewState?.item || !isStoreItemOwned(storePreviewState.item)) return;
+          const item = storePreviewState.item;
+          stopStorePreview({ silent: true });
+          await equipStoreItem(item);
+          renderStore();
+        });
+      }
       renderStore();
       void refreshServerStoreState().catch(() => {});
     }
@@ -7441,7 +7861,7 @@
       const cueType = aliases[type] || type || "ui";
       if (cueType === "hover" && !audioManager.unlocked) return;
       if (prefs.muted || !ensureAudioGraph()) return;
-      const pack = getAudioSfxPack(prefs.sfxPack);
+      const pack = getAudioSfxPack(storePreviewAudioOverride || prefs.sfxPack);
       if ((["move", "bot-move", "castle", "game-start"].includes(cueType) && prefs.pieceSounds === false)
         || (cueType === "capture" && prefs.captureSounds === false)
         || (cueType === "check" && prefs.checkSound === false)
@@ -7760,21 +8180,14 @@
 
     function addPuzzleCoins(amount, reason = "gameplay reward") {
       const earned = Math.max(0, Number(amount) || 0);
-      if (earned > 0 && storeServerRequiresAuthority()) {
-        void getAuthProvider().creditStoreReward(earned, reason, createStoreIdempotencyKey("reward"))
-          .then((result) => {
-            if (Number.isFinite(Number(result?.coins))) puzzleCoins = Math.max(0, Number(result.coins));
-            serverStoreState = serverStoreState ? { ...serverStoreState, coins: puzzleCoins } : serverStoreState;
-            renderStore();
-            renderBeginnerProgress();
-            renderPlayerProfile();
-          })
-          .catch(() => {});
-      } else {
-        // Guest mode keeps the existing local progression path. Authenticated
-        // wallets are updated only by the server RPC above.
-        puzzleCoins += earned;
-      }
+      if (earned < 1) return puzzleCoins;
+      // Authenticated wallets are server-owned. Local puzzle/lesson/video
+      // events do not carry a server-verifiable receipt, so they must never
+      // call a client-invokable coin-credit endpoint. Authoritative game and
+      // tournament rewards are settled by their server RPCs.
+      if (storeServerRequiresAuthority()) return puzzleCoins;
+      // Guest mode keeps the existing local progression path.
+      puzzleCoins += earned;
       return puzzleCoins;
     }
 
@@ -7973,27 +8386,42 @@
     }
 
     function getAchievementRoadmap() {
+      const makeProgress = (current, target, label) => ({ current: Math.max(0, Math.min(target, Number(current) || 0)), target, label });
       const stages = [
-        { label: "Beginner", short: "B", need: () => true, note: "Start your first tiny win" },
-        { label: "Explorer", short: "E", need: () => solvedPuzzles.size >= 3 || puzzleXp >= 50, note: "Solve 3 puzzles" },
-        { label: "Strategist", short: "S", need: () => gameStats.played >= 1 && solvedPuzzles.size >= 8, note: "Play and solve" },
-        { label: "Master Thinker", short: "MT", need: () => matchReviews.length >= 1 && getPuzzleAccuracy(0) >= 60, note: "Review one game" },
-        { label: "Champion", short: "C", need: () => gameStats.wins >= 1 && bestPuzzleStreak >= 5, note: "Win and build a streak" }
-      ];
+        { tier: "Beginner", label: "Beginner", short: "B", badge: "♙", note: "Start your first tiny win", condition: "Open your chess journey", reward: "+25 XP", progress: () => makeProgress(1, 1, "Journey started") },
+        { tier: "Beginner", label: "First Win", short: "W", badge: "✦", note: "Win your first game", condition: "Win 1 game", reward: "Rookie badge", progress: () => makeProgress(gameStats.wins, 1, "wins") },
+        { tier: "Beginner", label: "Puzzle Scout", short: "PS", badge: "◈", note: "Solve 3 puzzles", condition: "Solve 3 puzzles", reward: "+50 coins", progress: () => makeProgress(solvedPuzzles.size, 3, "puzzles") },
+        { tier: "Intermediate", label: "Explorer", short: "E", badge: "⌖", note: "Solve 3 puzzles", condition: "Solve 3 puzzles or earn 50 XP", reward: "+50 XP", progress: () => makeProgress(Math.max(solvedPuzzles.size, Math.floor(puzzleXp / 50)), 3, "puzzle milestones") },
+        { tier: "Intermediate", label: "Strategist", short: "S", badge: "♞", note: "Play and solve", condition: "Play 1 game and solve 8 puzzles", reward: "Strategist title", progress: () => makeProgress(Math.min(gameStats.played, 1) + Math.min(solvedPuzzles.size, 8) / 8, 2, "game + puzzle plan") },
+        { tier: "Intermediate", label: "Opening Student", short: "OS", badge: "⌂", note: "Complete 3 learning lessons", condition: "Celebrate 3 path lessons", reward: "+100 XP", progress: () => makeProgress(completedPathLessons.size, 3, "lessons") },
+        { tier: "Advanced", label: "Pattern Hunter", short: "PH", badge: "⚔", note: "Solve 25 puzzles", condition: "Solve 25 puzzles", reward: "Pattern badge", progress: () => makeProgress(solvedPuzzles.size, 25, "puzzles") },
+        { tier: "Advanced", label: "Master Thinker", short: "MT", badge: "MT", note: "Review one game", condition: "Review 1 game at 60% puzzle confidence", reward: "+150 XP", progress: () => makeProgress(Math.min(matchReviews.length, 1) + (getPuzzleAccuracy(0) >= 60 ? 1 : 0), 2, "review + confidence") },
+        { tier: "Advanced", label: "Review Minded", short: "RM", badge: "↺", note: "Review 3 games", condition: "Complete 3 game reviews", reward: "Analyst badge", progress: () => makeProgress(matchReviews.length, 3, "reviews") },
+        { tier: "Expert", label: "Tactician", short: "T", badge: "⚡", note: "Build a 10-puzzle streak", condition: "Reach a 10 puzzle streak", reward: "Tactician frame", progress: () => makeProgress(bestPuzzleStreak, 10, "streak") },
+        { tier: "Expert", label: "Deep Analyst", short: "DA", badge: "⌁", note: "Complete 5 game reviews", condition: "Complete 5 game reviews", reward: "Deep analyst title", progress: () => makeProgress(matchReviews.length, 5, "reviews") },
+        { tier: "Expert", label: "Champion", short: "C", badge: "♛", note: "Win and build a streak", condition: "Win 1 game and reach a 5 puzzle streak", reward: "Champion badge", progress: () => makeProgress(Math.min(gameStats.wins, 1) + Math.min(bestPuzzleStreak, 5) / 5, 2, "win + streak") },
+        { tier: "Seasonal", label: "Season Starter", short: "SS", badge: "◒", note: "Earn 250 season XP", condition: "Earn 250 XP this season", reward: "Season starter badge", progress: () => makeProgress(puzzleXp, 250, "season XP") },
+        { tier: "Seasonal", label: "Season Climber", short: "SC", badge: "▲", note: "Earn 750 season XP", condition: "Earn 750 XP this season", reward: "Season title", progress: () => makeProgress(puzzleXp, 750, "season XP") },
+        { tier: "Seasonal", label: "Season Complete", short: "SX", badge: "★", note: "Earn 1,500 season XP", condition: "Earn 1,500 XP this season", reward: "Exclusive season cosmetic", progress: () => makeProgress(puzzleXp, 1500, "season XP") },
+        { tier: "Secret", label: "First Blood", short: "?", badge: "?", note: "A hidden achievement", condition: "Hidden condition", reward: "Secret badge", secret: true, progress: () => makeProgress(gameStats.wins, 1, "hidden progress") },
+        { tier: "Secret", label: "Quiet Genius", short: "?", badge: "?", note: "A hidden achievement", condition: "Hidden condition", reward: "Secret title", secret: true, progress: () => makeProgress(solvedPuzzles.size >= 15 && getPuzzleAccuracy(0) >= 90 ? 1 : 0, 1, "hidden progress") },
+        { tier: "Secret", label: "Opening Scholar", short: "?", badge: "?", note: "A hidden achievement", condition: "Hidden condition", reward: "Secret opening frame", secret: true, progress: () => makeProgress(favoriteOpenings.length >= 2 ? 1 : 0, 1, "hidden progress") }
+      ].map((stage) => ({ ...stage, need: () => stage.progress().current >= stage.progress().target }));
       let currentFound = false;
       return stages.map((stage) => {
         const unlocked = Boolean(stage.need());
         const current = !unlocked && !currentFound;
         if (current) currentFound = true;
-        return { ...stage, unlocked, current };
+        const progress = stage.progress();
+        return { ...stage, progress, unlocked, current };
       });
     }
 
     function getNextAchievementMilestone() {
       const next = getAchievementRoadmap().find((stage) => !stage.unlocked);
       if (!next) return { label: "Champion", detail: "All current milestones unlocked. Build your next weekly streak.", href: "#puzzles", action: "puzzle-plan", plan: "adaptive" };
-      if (next.label === "Explorer") {
-        return { label: next.label, detail: Math.min(3, solvedPuzzles.size) + " / 3 puzzles solved", href: "#puzzles", action: "puzzle-plan", plan: "adaptive" };
+      if (next.label === "Explorer" || next.label === "Puzzle Scout") {
+        return { label: next.label, detail: `${next.progress.current} / ${next.progress.target} puzzles solved`, href: "#puzzles", action: "puzzle-plan", plan: "adaptive" };
       }
       if (next.label === "Strategist") {
         return gameStats.played < 1
@@ -8005,9 +8433,12 @@
           ? { label: next.label, detail: "Play and review one game", href: "#play", action: "", plan: "" }
           : { label: next.label, detail: Math.min(60, getPuzzleAccuracy(0)) + "% / 60% puzzle confidence", href: "#puzzles", action: "puzzle-plan", plan: "adaptive" };
       }
-      return gameStats.wins < 1
-        ? { label: next.label, detail: "Win one game", href: "#play", action: "", plan: "" }
-        : { label: next.label, detail: Math.min(5, bestPuzzleStreak) + " / 5 puzzle streak", href: "#puzzles", action: "puzzle-plan", plan: "Puzzle Rush" };
+      if (next.label === "First Win" || next.label === "Champion") {
+        return gameStats.wins < 1
+          ? { label: next.label, detail: "Win one game", href: "#play", action: "", plan: "" }
+          : { label: next.label, detail: `${Math.min(5, bestPuzzleStreak)} / 5 puzzle streak`, href: "#puzzles", action: "puzzle-plan", plan: "Puzzle Rush" };
+      }
+      return { label: next.label, detail: `${Math.round(next.progress.current * 10) / 10} / ${next.progress.target} ${next.progress.label}`, href: next.tier === "Expert" ? "#play" : "#puzzles", action: next.tier === "Expert" ? "" : "puzzle-plan", plan: next.tier === "Expert" ? "" : "adaptive" };
     }
     function renderAchievementRoadmap() {
       const target = document.getElementById("homeUnlocks");
@@ -8015,11 +8446,13 @@
       target.replaceChildren(...getAchievementRoadmap().map((stage) => {
         const step = document.createElement("span");
         step.className = `roadmap-step${stage.unlocked ? " is-unlocked" : ""}${stage.current ? " is-current" : ""}`;
-        step.title = stage.note;
+        step.dataset.achievementTier = stage.tier;
+        step.title = `${stage.condition}. Reward: ${stage.reward}`;
         step.append(
-          createBookText("span", "", stage.unlocked ? "\u2713" : stage.short),
+          createBookText("span", "", stage.unlocked ? "\u2713" : stage.badge),
           createBookText("strong", "", stage.label),
-          createBookText("small", "", stage.unlocked ? "Unlocked" : stage.note)
+          createBookText("small", "", `${stage.tier} · ${stage.unlocked ? "Unlocked" : `${Math.round(stage.progress.current * 10) / 10}/${stage.progress.target}`}`),
+          createBookText("small", "", stage.reward)
         );
         return step;
       }));
@@ -8054,9 +8487,15 @@
         ["forks", "Learn Forks", missionState.forks, missionState.forks ? "Done" : "Ready"]
       ].map(([id, label, done, meta]) => ({ id, label, done, meta }));
       const achievements = getAchievementRoadmap().map((stage) => ({
-        icon: stage.short,
+        icon: stage.badge || stage.short,
         label: stage.label,
-        unlocked: stage.unlocked
+        tier: stage.tier,
+        note: stage.note,
+        reward: stage.reward,
+        condition: stage.condition,
+        progress: stage.progress,
+        unlocked: stage.unlocked,
+        secret: Boolean(stage.secret)
       }));
 
       return {
@@ -8485,7 +8924,7 @@
       if (leaderboardRuntime.period === "all") return true;
       const updated = getLeaderboardUpdatedAt(account);
       if (!updated) return false;
-      const days = leaderboardRuntime.period === "daily" ? 1 : leaderboardRuntime.period === "weekly" ? 7 : 31;
+      const days = leaderboardRuntime.period === "daily" ? 1 : leaderboardRuntime.period === "weekly" ? 7 : leaderboardRuntime.period === "seasonal" ? 90 : 31;
       return Date.now() - updated <= days * 86400000;
     }
 
@@ -8519,7 +8958,7 @@
     }
 
     function getLeaderboardPeriodLabel() {
-      return ({ daily: "Daily", weekly: "Weekly", monthly: "Monthly", all: "All-time" })[leaderboardRuntime.period] || "All-time";
+      return ({ daily: "Daily", weekly: "Weekly", monthly: "Monthly", seasonal: "Seasonal", all: "All-time" })[leaderboardRuntime.period] || "All-time";
     }
 
     function ensureLeaderboardControls() {
@@ -8571,7 +9010,7 @@
       if (leaderboardRuntime.period === "all") return true;
       const updated = getTournamentLeaderboardUpdatedAt(event);
       if (!updated) return true;
-      const days = leaderboardRuntime.period === "daily" ? 1 : leaderboardRuntime.period === "weekly" ? 7 : 31;
+      const days = leaderboardRuntime.period === "daily" ? 1 : leaderboardRuntime.period === "weekly" ? 7 : leaderboardRuntime.period === "seasonal" ? 90 : 31;
       return Date.now() - updated <= days * 86400000;
     }
 
@@ -8956,14 +9395,23 @@
       });
       document.querySelectorAll("[data-profile-achievements]").forEach((achievementList) => {
         achievementList.replaceChildren(...profile.achievements.map((achievement) => {
-          const badge = createBookText("span", `player-profile-achievement${achievement.unlocked ? "" : " is-locked"}`, achievement.icon);
-          badge.title = `${achievement.label}: ${achievement.unlocked ? "unlocked" : "locked"}`;
+          const badge = document.createElement("span");
+          badge.className = `player-profile-achievement${achievement.unlocked ? "" : " is-locked"}`;
+          badge.dataset.achievementTier = achievement.tier || "";
+          const progress = achievement.progress || { current: 0, target: 1, label: "progress" };
+          badge.title = `${achievement.label}: ${achievement.unlocked ? "unlocked" : `${progress.current}/${progress.target} ${progress.label}`}. Reward: ${achievement.reward || "badge"}`;
           badge.setAttribute("aria-label", badge.title);
           badge.dataset.profileAchievementLabel = achievement.label;
+          badge.append(
+            createBookText("strong", "profile-achievement-icon", achievement.icon),
+            createBookText("small", "profile-achievement-label", achievement.secret && !achievement.unlocked ? "Secret" : achievement.label),
+            createBookText("small", "profile-achievement-meta", achievement.unlocked ? "Unlocked" : `${Math.round(progress.current * 10) / 10}/${progress.target}`)
+          );
           return badge;
         }));
       });
       renderProfileRatingHistory();
+      renderProfileShowcase(profile);
       renderProfileAvatarChoices(profile);
       renderAccountVault(profile);
       renderStyledUsernames(profile.name);
@@ -9006,18 +9454,141 @@
         chart.setAttribute("aria-label", label);
         if (chart.dataset.profileRatingSignature === historySignature) return;
         chart.dataset.profileRatingSignature = historySignature;
-        chart.replaceChildren(...points.map((point, index) => {
-          const marker = document.createElement("span");
-          const height = Math.round(Math.min(100, Math.max(16, ((point.rating - chartFloor) / (chartCeiling - chartFloor)) * 100)));
-          marker.className = `profile-rating-point${index === points.length - 1 ? " is-current" : ""}`;
-          marker.style.setProperty("--profile-rating-height", `${height}%`);
-          marker.title = point.at
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 520 132");
+        svg.setAttribute("preserveAspectRatio", "none");
+        svg.setAttribute("aria-hidden", "true");
+        svg.classList.add("profile-rating-svg");
+        [30, 66, 102].forEach((y) => {
+          const grid = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          grid.setAttribute("x1", "0"); grid.setAttribute("x2", "520");
+          grid.setAttribute("y1", String(y)); grid.setAttribute("y2", String(y));
+          grid.classList.add("profile-rating-gridline");
+          svg.append(grid);
+        });
+        const coordinates = points.map((point, index) => {
+          const x = points.length <= 1 ? 260 : (index / (points.length - 1)) * 500 + 10;
+          const y = 112 - (((point.rating - chartFloor) / (chartCeiling - chartFloor)) * 92);
+          return { x, y: Math.max(12, Math.min(112, y)), point };
+        });
+        const area = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        area.setAttribute("d", `M ${coordinates[0]?.x || 10} 116 L ${coordinates.map(({ x, y }) => `${x} ${y}`).join(" L ")} L ${coordinates.at(-1)?.x || 510} 116 Z`);
+        area.classList.add("profile-rating-area");
+        svg.append(area);
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        line.setAttribute("points", coordinates.map(({ x, y }) => `${x},${y}`).join(" "));
+        line.classList.add("profile-rating-line");
+        svg.append(line);
+        coordinates.forEach(({ x, y, point }, index) => {
+          const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          marker.setAttribute("cx", String(x)); marker.setAttribute("cy", String(y)); marker.setAttribute("r", index === coordinates.length - 1 ? "5" : "3.5");
+          marker.classList.add("profile-rating-marker");
+          if (index === coordinates.length - 1) marker.classList.add("is-current");
+          marker.dataset.rating = String(point.rating);
+          marker.setAttribute("tabindex", "0");
+          marker.setAttribute("role", "img");
+          marker.setAttribute("aria-label", point.at
             ? `${formatProfileNumber(point.rating)} puzzle rating - ${new Date(point.at).toLocaleDateString()}`
-            : `Current puzzle rating: ${formatProfileNumber(point.rating)}`;
-          marker.setAttribute("aria-hidden", "true");
-          return marker;
-        }));
+            : `Current puzzle rating: ${formatProfileNumber(point.rating)}`);
+          svg.append(marker);
+        });
+        const footer = createBookText("div", "profile-rating-axis", `${formatProfileNumber(points[0]?.rating || currentRating)}  ·  ${formatProfileNumber(currentRating)} current`);
+        chart.replaceChildren(svg, footer);
       });
+    }
+
+    function renderProfileShowcase(profile = getDragonProfileSnapshot()) {
+      const records = getCompletedGamesWithReviews();
+      const recordedWins = records.filter((game) => game.result === "win").length;
+      const recordedDraws = records.filter((game) => game.result === "draw").length;
+      const recordedLosses = records.filter((game) => game.result === "loss").length;
+      const played = Math.max(0, Number(gameStats.played) || 0, recordedWins + recordedDraws + recordedLosses);
+      const wins = Math.min(played, Math.max(0, Number(gameStats.wins) || 0, recordedWins));
+      const draws = Math.min(Math.max(0, played - wins), Math.max(0, Number(gameStats.draws) || 0, recordedDraws));
+      const losses = Math.max(0, played - wins - draws, recordedLosses);
+      const puzzleAttemptsTotal = puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts);
+      const puzzleAccuracy = puzzleAttemptsTotal ? getPuzzleAccuracy(0) : 0;
+      const setContent = (selector, nodes) => document.querySelectorAll(selector).forEach((target) => target.replaceChildren(...nodes));
+      const metric = (value, label, tone = "") => {
+        const node = createBookText("span", `profile-mini-stat${tone ? ` is-${tone}` : ""}`, "");
+        node.append(createBookText("strong", "", formatProfileNumber(value)), createBookText("small", "", label));
+        return node;
+      };
+
+      setContent("[data-profile-record]", [metric(wins, "Wins", "positive"), metric(losses, "Losses", "negative"), metric(draws, "Draws")]);
+      setContent("[data-profile-puzzle-stats]", [metric(solvedPuzzles.size, "Solved", "positive"), metric(puzzleAccuracy, "Accuracy"), metric(bestPuzzleStreak, "Best streak")]);
+
+      const openingCounts = new Map();
+      if (favoriteOpening) openingCounts.set(favoriteOpening, 1);
+      matchReviews.forEach((review) => {
+        const opening = String(review?.summary?.opening || "").trim();
+        if (opening) openingCounts.set(opening, (openingCounts.get(opening) || 0) + 1);
+      });
+      const openings = [...openingCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3);
+      setContent("[data-profile-openings]", openings.length
+        ? openings.map(([name, count], index) => {
+          const row = createBookText("div", "profile-favorite-row", "");
+          row.append(createBookText("span", "profile-favorite-rank", `${index + 1}`), createBookText("strong", "", name), createBookText("small", "", `${count} ${count === 1 ? "game" : "games"}`));
+          return row;
+        })
+        : [createBookText("p", "profile-empty-note", "Play or review a game to reveal your openings.")]);
+
+      const prefs = readLearnerPrefs();
+      const cosmetics = [
+        ["Board", getBoardTheme(prefs.board).label],
+        ["Pieces", getPieceSetTheme(prefs.pieceSkin).label],
+        ["Backdrop", getBackgroundTheme(prefs.backgroundTheme).label]
+      ];
+      setContent("[data-profile-cosmetics]", cosmetics.map(([label, value]) => {
+        const row = createBookText("div", "profile-favorite-row", "");
+        row.append(createBookText("span", "profile-favorite-rank", label.slice(0, 1)), createBookText("strong", "", value), createBookText("small", "", "Equipped"));
+        return row;
+      }));
+
+      setContent("[data-profile-achievement-showcase]", profile.achievements.map((achievement) => {
+        const card = createBookText("article", `profile-showcase-badge${achievement.unlocked ? " is-unlocked" : " is-locked"}`, "");
+        const progress = achievement.progress || { current: 0, target: 1, label: "progress" };
+        card.append(
+          createBookText("span", "profile-showcase-icon", achievement.icon),
+          createBookText("strong", "", achievement.secret && !achievement.unlocked ? "Secret achievement" : achievement.label),
+          createBookText("small", "", `${achievement.tier || "Milestone"} · ${achievement.unlocked ? "Unlocked" : `${Math.round(progress.current * 10) / 10}/${progress.target} ${progress.label}`}`),
+          createBookText("small", "profile-showcase-reward", `Reward: ${achievement.reward || "badge"}`)
+        );
+        card.title = achievement.condition || achievement.note || "Achievement";
+        card.setAttribute("aria-label", `${achievement.label}: ${achievement.unlocked ? "unlocked" : "locked"}. ${achievement.condition || "Hidden condition"}. Reward: ${achievement.reward || "badge"}`);
+        return card;
+      }));
+
+      const collections = typeof storeCollectionDefinitions !== "undefined" ? storeCollectionDefinitions : [];
+      setContent("[data-profile-collections]", collections.map((collection) => {
+        const progress = getStoreCollectionProgress(collection, prefs, new Set(storeState.owned));
+        const card = createBookText("article", "profile-collection-card", "");
+        const head = createBookText("div", "profile-collection-head", "");
+        head.append(createBookText("strong", "", collection.name), createBookText("span", "", `${progress.owned}/${progress.total}`));
+        const bar = createBookText("div", "profile-collection-progress", "");
+        const fill = createBookText("span", "", "");
+        fill.style.width = `${progress.percent}%`;
+        bar.append(fill);
+        card.append(head, bar, createBookText("small", "", progress.percent === 100 ? `${collection.reward?.label || "Collection reward"} unlocked` : `${progress.remaining} item${progress.remaining === 1 ? "" : "s"} remaining`));
+        return card;
+      }));
+
+      setContent("[data-profile-match-history]", records.slice(0, 6).map((game) => {
+        const resultLabel = game.result === "win" ? "Win" : game.result === "loss" ? "Loss" : game.result === "draw" ? "Draw" : "Aborted";
+        const row = createBookText("div", `profile-match-row is-${game.result}`, "");
+        row.append(createBookText("span", "profile-match-result", resultLabel), createBookText("div", "profile-match-opponent", ""), createBookText("time", "", formatAccountDate(game.completedAt)));
+        row.querySelector(".profile-match-opponent").append(createBookText("strong", "", game.opponentName), createBookText("small", "", `${game.mode} · ${game.moves} moves`));
+        return row;
+      }));
+      document.querySelectorAll("[data-profile-history-count]").forEach((target) => { target.textContent = records.length ? `${formatProfileNumber(records.length)} completed` : "No completed games"; });
+
+      const seasonTarget = 1000;
+      const seasonXp = Math.max(0, Number(profile.xp) || 0);
+      const seasonPercent = Math.min(100, Math.round((seasonXp / seasonTarget) * 100));
+      document.querySelectorAll("[data-profile-season-xp]").forEach((target) => { target.textContent = `${formatProfileNumber(Math.min(seasonXp, seasonTarget))} / ${formatProfileNumber(seasonTarget)} XP`; });
+      document.querySelectorAll("[data-profile-season-fill]").forEach((target) => { target.style.width = `${seasonPercent}%`; });
+      document.querySelectorAll("[data-profile-season-label]").forEach((target) => { target.textContent = seasonXp >= seasonTarget ? "Season complete" : `${seasonPercent}% complete`; });
+      document.querySelectorAll("[data-profile-season-note]").forEach((target) => { target.textContent = seasonXp >= seasonTarget ? "You reached the current season milestone. Keep building your next streak." : "Profile XP counts toward this season track across games, puzzles, and lessons."; });
     }
 
     function getLearnerPuzzleRating() {
@@ -9062,10 +9633,19 @@
         statistics: {
           gamesPlayed: gameStats.played,
           wins: gameStats.wins,
+          draws: gameStats.draws,
+          losses: Math.max(0, gameStats.played - gameStats.wins - gameStats.draws),
+          winRate: gameStats.played ? Math.round((gameStats.wins / gameStats.played) * 100) : 0,
           puzzlesSolved: solvedPuzzles.size,
           puzzleAccuracy: getPuzzleAccuracy(0),
           lessonsCompleted: lessonCount,
           timeSpentMinutes: getLearningMinutes(lessonCount)
+        },
+        favorites: {
+          opening: favoriteOpening,
+          board: getBoardTheme(prefs.board).label,
+          pieces: getPieceSetTheme(prefs.pieceSkin).label,
+          background: getBackgroundTheme(prefs.backgroundTheme).label
         },
         joinDate: learner.joinDate || "",
         lastLogin: learner.lastLogin || ""
@@ -9392,8 +9972,8 @@
       }
       if (rewardText) {
         rewardText.textContent = daily.claimed
-          ? "Ritual complete - 50 coins added to your balance."
-          : "Ritual complete - your 50 coin reward is ready.";
+          ? `Mission streak ${daily.streak} days - 50 XP and 50 coins added.`
+          : "Daily missions complete - your 50 XP and 50 coin reward is ready.";
       }
       if (rewardClaim) {
         rewardClaim.hidden = !daily.complete || daily.claimed;
@@ -9526,14 +10106,21 @@
     ];
 
     function readAcademyState() {
-      return readJsonStorage(academyStorageKey, { quizDate: "", answered: [], achievements: [] });
+      const saved = readJsonStorage(academyStorageKey, { quizDate: "", answered: [], achievements: [], certificates: [] });
+      return {
+        quizDate: String(saved?.quizDate || ""),
+        answered: Array.isArray(saved?.answered) ? saved.answered : [],
+        achievements: Array.isArray(saved?.achievements) ? saved.achievements : [],
+        certificates: Array.isArray(saved?.certificates) ? saved.certificates : []
+      };
     }
 
     function writeAcademyState(state) {
       writeJsonStorage(academyStorageKey, {
         quizDate: state.quizDate || "",
         answered: [...new Set(state.answered || [])],
-        achievements: [...new Set(state.achievements || [])]
+        achievements: [...new Set(state.achievements || [])],
+        certificates: [...new Set(state.certificates || [])]
       });
     }
 
@@ -9550,6 +10137,69 @@
         Math.min(lessonDone, 8) * 3
       ));
       return { tutorialDone, lessonDone, focus, accuracy, progress };
+    }
+
+    function getAcademyCertificateProgress() {
+      const tiers = [
+        ["beginner", "Beginner", "Board Foundations", "+50 XP +10 coins"],
+        ["intermediate", "Intermediate", "Tactical Builder", "+75 XP +15 coins"],
+        ["advanced", "Advanced", "Position Coach", "+100 XP +20 coins"],
+        ["master", "Master", "Academy Mentor", "+150 XP +30 coins"]
+      ];
+      return tiers.map(([id, label, title, reward]) => {
+        const panel = document.getElementById(id);
+        const cards = panel ? [...panel.querySelectorAll(".lesson-card")] : [];
+        const completed = cards.filter((card, index) => {
+          const lessonId = card.dataset.lessonId || getPathLessonId(card, index);
+          return completedPathLessons.has(lessonId);
+        }).length;
+        return { id, label, title, reward, completed, total: cards.length, ready: cards.length > 0 && completed >= cards.length };
+      });
+    }
+
+    function renderAcademyCertificates() {
+      const box = document.getElementById("academyCertificate");
+      if (!box) return;
+      const state = readAcademyState();
+      const claimed = new Set(state.certificates || []);
+      const cards = getAcademyCertificateProgress();
+      const header = document.createElement("div");
+      header.className = "academy-certificate-head";
+      header.append(createBookText("strong", "", "Completion certificates"), createBookText("small", "", "Certificates turn each learning tier into a visible, cosmetic profile milestone."));
+      box.replaceChildren(header, ...cards.map((certificate) => {
+          const card = document.createElement("article");
+          card.className = `academy-certificate-card${certificate.ready ? " is-ready" : ""}${claimed.has(certificate.id) ? " is-claimed" : ""}`;
+          const progress = certificate.total ? Math.round((certificate.completed / certificate.total) * 100) : 0;
+          const title = document.createElement("div");
+          title.className = "academy-certificate-title";
+          title.append(createBookText("span", "academy-certificate-badge", certificate.ready ? "✓" : certificate.label.slice(0, 1)), createBookText("strong", "", `${certificate.label} · ${certificate.title}`));
+          const meter = document.createElement("div");
+          meter.className = "academy-certificate-meter";
+          const fill = document.createElement("i");
+          fill.style.width = `${progress}%`;
+          meter.append(fill);
+          const copy = createBookText("p", "", `${certificate.completed}/${certificate.total || 0} lessons · ${progress}% · ${certificate.reward}`);
+          card.append(title, meter, copy);
+          if (certificate.ready && !claimed.has(certificate.id)) {
+            card.append(createTournamentButton("Claim certificate", "button secondary", () => {
+              const next = readAcademyState();
+              if ((next.certificates || []).includes(certificate.id)) return;
+              next.certificates = [...new Set([...(next.certificates || []), certificate.id])];
+              writeAcademyState(next);
+              addPuzzleXp(50 + certificate.completed * 10);
+              addPuzzleCoins(10 + certificate.completed * 5, "academy certificate");
+              addExtraRewards({ coins: 10 + certificate.completed * 5 });
+              savePuzzleState();
+              renderAcademy();
+              renderBeginnerProgress();
+              renderPlayerProfile();
+              showCelebration(`${certificate.label} certificate claimed!`, certificate.reward, "Academy milestone");
+            }));
+          } else if (claimed.has(certificate.id)) {
+            card.append(createBookText("span", "academy-certificate-claimed", "Claimed · cosmetic profile milestone"));
+          }
+          return card;
+        }));
     }
 
     function buildAcademyCard(step) {
@@ -9668,6 +10318,7 @@
         options.appendChild(button);
       });
       quizBox.appendChild(options);
+      renderAcademyCertificates();
     }
 
     function setupAcademy() {
@@ -9727,82 +10378,153 @@
       writeJsonStorage(visitSnapshotStorageKey, getCurrentVisitSnapshot());
     }
 
+    function getMissionWeekKey(date = new Date()) {
+      const current = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const mondayOffset = (current.getDay() + 6) % 7;
+      current.setDate(current.getDate() - mondayOffset);
+      return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+    }
+
     function normalizeDailyGoalsState(saved = {}) {
       const today = getTodayKey();
+      const week = getMissionWeekKey();
       const state = saved && typeof saved === "object" ? saved : {};
-      if (state.date === today) {
-        return {
-          date: today,
-          claimed: Boolean(state.claimed),
-          startSolved: Math.max(0, Number(state.startSolved) || 0),
-          startGames: Math.max(0, Number(state.startGames) || 0),
-          startReviews: Math.max(0, Number(state.startReviews) || 0)
-        };
-      }
+      const sameDay = state.date === today;
+      const sameWeek = state.weekKey === week;
       return {
         date: today,
-        claimed: false,
-        startSolved: solvedPuzzles.size,
-        startGames: gameStats.played,
-        startReviews: matchReviews.length
+        claimed: sameDay && Boolean(state.claimed),
+        startSolved: sameDay ? Math.max(0, Number(state.startSolved) || 0) : solvedPuzzles.size,
+        startGames: sameDay ? Math.max(0, Number(state.startGames) || 0) : gameStats.played,
+        startReviews: sameDay ? Math.max(0, Number(state.startReviews) || 0) : matchReviews.length,
+        startCompletedGames: sameDay ? Math.max(0, Number(state.startCompletedGames) || 0) : completedGameHistory.length,
+        weekKey: week,
+        weekClaimed: sameWeek && Boolean(state.weekClaimed),
+        weekStartSolved: sameWeek ? Math.max(0, Number(state.weekStartSolved) || 0) : solvedPuzzles.size,
+        weekStartGames: sameWeek ? Math.max(0, Number(state.weekStartGames) || 0) : gameStats.played,
+        weekStartReviews: sameWeek ? Math.max(0, Number(state.weekStartReviews) || 0) : matchReviews.length,
+        weekStartCompletedGames: sameWeek ? Math.max(0, Number(state.weekStartCompletedGames) || 0) : completedGameHistory.length,
+        streak: Math.max(0, Number(state.streak) || 0),
+        lastClaimedDate: String(state.lastClaimedDate || "")
       };
     }
 
     function getDailyGoalsProgress() {
       dailyGoals = normalizeDailyGoalsState(dailyGoals);
       const puzzleDone = Math.max(0, solvedPuzzles.size - dailyGoals.startSolved);
-      const gameDone = Math.max(0, gameStats.played - dailyGoals.startGames);
+      const gameDone = Math.max(0, gameStats.played - dailyGoals.startGames, completedGameHistory.length - dailyGoals.startCompletedGames);
       const reviewDone = Math.max(0, matchReviews.length - dailyGoals.startReviews);
+      const weekPuzzleDone = Math.max(0, solvedPuzzles.size - dailyGoals.weekStartSolved);
+      const weekGameDone = Math.max(0, gameStats.played - dailyGoals.weekStartGames, completedGameHistory.length - dailyGoals.weekStartCompletedGames);
+      const weekReviewDone = Math.max(0, matchReviews.length - dailyGoals.weekStartReviews);
       const goals = [
-        { key: "puzzles", label: "Solve 3 puzzles", href: "#puzzles", done: puzzleDone >= 3, progress: `${Math.min(3, puzzleDone)}/3` },
-        { key: "game", label: "Play 1 game", href: "#play", done: gameDone >= 1, progress: `${Math.min(1, gameDone)}/1` },
-        { key: "review", label: "Review 1 game", href: "#play", done: reviewDone >= 1, progress: `${Math.min(1, reviewDone)}/1` }
+        { key: "puzzles", label: "Solve 3 puzzles", href: "#puzzles", done: puzzleDone >= 3, value: Math.min(3, puzzleDone), target: 3, progress: `${Math.min(3, puzzleDone)}/3` },
+        { key: "game", label: "Play 1 game", href: "#play", done: gameDone >= 1, value: Math.min(1, gameDone), target: 1, progress: `${Math.min(1, gameDone)}/1` },
+        { key: "review", label: "Review 1 game", href: "#play", done: reviewDone >= 1, value: Math.min(1, reviewDone), target: 1, progress: `${Math.min(1, reviewDone)}/1` }
+      ];
+      const weekly = [
+        { key: "weekly-puzzles", label: "Solve 12 puzzles", href: "#puzzles", done: weekPuzzleDone >= 12, value: Math.min(12, weekPuzzleDone), target: 12, progress: `${Math.min(12, weekPuzzleDone)}/12` },
+        { key: "weekly-games", label: "Play 3 games", href: "#play", done: weekGameDone >= 3, value: Math.min(3, weekGameDone), target: 3, progress: `${Math.min(3, weekGameDone)}/3` },
+        { key: "weekly-reviews", label: "Review 2 games", href: "#play", done: weekReviewDone >= 2, value: Math.min(2, weekReviewDone), target: 2, progress: `${Math.min(2, weekReviewDone)}/2` }
       ];
       const doneCount = goals.filter((goal) => goal.done).length;
-      return { goals, doneCount, complete: doneCount === goals.length, claimed: Boolean(dailyGoals.claimed) };
+      const weeklyDoneCount = weekly.filter((goal) => goal.done).length;
+      return {
+        goals,
+        weekly,
+        doneCount,
+        weeklyDoneCount,
+        complete: doneCount === goals.length,
+        weeklyComplete: weeklyDoneCount === weekly.length,
+        claimed: Boolean(dailyGoals.claimed),
+        weekClaimed: Boolean(dailyGoals.weekClaimed),
+        streak: dailyGoals.streak
+      };
+    }
+
+    function renderMissionItem(goal) {
+      const item = document.createElement("li");
+      const link = document.createElement("a");
+      const check = createBookText("span", "daily-goals-check", goal.done ? "\u2713" : "");
+      const copy = document.createElement("span");
+      copy.className = "daily-goal-copy";
+      copy.append(createBookText("span", "daily-goal-label", goal.label));
+      const meter = document.createElement("span");
+      meter.className = "daily-goal-meter";
+      const fill = document.createElement("i");
+      fill.style.width = `${Math.round((goal.value / goal.target) * 100)}%`;
+      meter.appendChild(fill);
+      copy.appendChild(meter);
+      const count = createBookText("span", "daily-goals-progress", goal.progress);
+      link.href = goal.href;
+      link.className = goal.done ? "is-done" : "";
+      if (goal.key === "puzzles" || goal.key === "weekly-puzzles") { link.dataset.homeAction = "puzzle-plan"; link.dataset.homePlan = "adaptive"; }
+      link.append(check, copy, count);
+      item.appendChild(link);
+      return item;
     }
 
     function renderDailyGoals() {
       const list = document.getElementById("dailyGoalsList");
+      const weeklyList = document.getElementById("weeklyGoalsList");
       const progress = document.getElementById("dailyGoalsProgress");
+      const weeklyProgress = document.getElementById("weeklyGoalsProgress");
       const reward = document.getElementById("dailyGoalsReward");
-      const claim = document.getElementById("claimDailyGoals");
-      if (!list || !progress || !reward || !claim) return;
+      const weeklyReward = document.getElementById("weeklyGoalsReward");
+      const dailyClaim = document.getElementById("claimDailyGoals") || document.getElementById("homeSessionClaim");
+      const weeklyClaim = document.getElementById("claimWeeklyGoals");
+      if (!list || !progress) return;
       const state = getDailyGoalsProgress();
       progress.textContent = `${state.doneCount}/${state.goals.length}`;
-      list.replaceChildren(...state.goals.map((goal) => {
-        const item = document.createElement("li");
-        const link = document.createElement("a");
-        const check = createBookText("span", "daily-goals-check", goal.done ? "\u2713" : "");
-        const label = createBookText("span", "", goal.label);
-        const count = createBookText("span", "daily-goals-progress", goal.progress);
-        link.href = goal.href;
-        link.className = goal.done ? "is-done" : "";
-        if (goal.key === "puzzles") link.dataset.homeAction = "puzzle-plan";
-        if (goal.key === "puzzles") link.dataset.homePlan = "adaptive";
-        link.append(check, label, count);
-        item.appendChild(link);
-        return item;
-      }));
-      claim.disabled = !state.complete || state.claimed;
-      claim.textContent = state.claimed ? "Claimed" : state.complete ? "Claim +50" : "Claim";
-      reward.textContent = state.claimed ? "Reward claimed: +50 Coins" : "Reward: +50 Coins";
+      weeklyProgress && (weeklyProgress.textContent = `${state.weeklyDoneCount}/${state.weekly.length}`);
+      list.replaceChildren(...state.goals.map(renderMissionItem));
+      weeklyList?.replaceChildren(...state.weekly.map(renderMissionItem));
+      const streak = document.getElementById("dailyMissionStreak");
+      if (streak) streak.textContent = `${state.streak} day streak`;
+      if (dailyClaim) {
+        dailyClaim.disabled = !state.complete || state.claimed;
+        dailyClaim.textContent = state.claimed ? "Claimed" : state.complete ? "Claim +50" : "Claim";
+      }
+      if (weeklyClaim) {
+        weeklyClaim.disabled = !state.weeklyComplete || state.weekClaimed;
+        weeklyClaim.textContent = state.weekClaimed ? "Claimed" : state.weeklyComplete ? "Claim weekly" : "Weekly locked";
+      }
+      if (reward) reward.textContent = state.claimed ? "Daily reward claimed: +50 XP · +50 coins" : "Daily reward: +50 XP · +50 coins";
+      if (weeklyReward) weeklyReward.textContent = state.weekClaimed ? "Weekly reward claimed: +180 XP · +180 coins" : "Weekly reward: +180 XP · +180 coins";
     }
 
     function claimDailyGoalsReward() {
       const state = getDailyGoalsProgress();
       if (!state.complete || state.claimed) return;
-      dailyGoals = { ...dailyGoals, claimed: true };
-      addPuzzleCoins(50, "daily reward");
+      const today = getTodayKey();
+      const gap = dailyGoals.lastClaimedDate ? getDayDistance(dailyGoals.lastClaimedDate, today) : 999;
+      dailyGoals = { ...dailyGoals, claimed: true, lastClaimedDate: today, streak: gap === 1 ? dailyGoals.streak + 1 : 1 };
+      addPuzzleXp(50);
+      addPuzzleCoins(50, "daily mission reward");
       savePuzzleState();
       renderBeginnerProgress();
       renderHomeDashboard();
       trackProductSignal("daily_plan_completed");
-      showCelebration("Daily goals complete!", "+50 coins", "Small habits win games.", { subtle: false });
+      showCelebration("Daily missions complete!", "+50 XP · +50 coins", `${dailyGoals.streak}-day mission streak.`, { subtle: false });
+    }
+
+    function claimWeeklyGoalsReward() {
+      const state = getDailyGoalsProgress();
+      if (!state.weeklyComplete || state.weekClaimed) return;
+      dailyGoals = { ...dailyGoals, weekClaimed: true };
+      addPuzzleXp(180);
+      addPuzzleCoins(180, "weekly mission reward");
+      savePuzzleState();
+      renderBeginnerProgress();
+      renderHomeDashboard();
+      trackProductSignal("weekly_missions_completed");
+      showCelebration("Weekly challenges complete!", "+180 XP · +180 coins", "Your training rhythm is getting stronger.", { subtle: false });
     }
 
     function setupDailyGoals() {
       document.getElementById("claimDailyGoals")?.addEventListener("click", claimDailyGoalsReward);
+      document.getElementById("homeSessionClaim")?.addEventListener("click", claimDailyGoalsReward);
+      document.getElementById("claimWeeklyGoals")?.addEventListener("click", claimWeeklyGoalsReward);
       renderDailyGoals();
     }
 
@@ -9903,7 +10625,7 @@
           createBookText("strong", "", event.title),
           createBookText("p", "", `${event.format === "swiss" ? "Swiss" : "Arena"} · ${event.clock} · ${event.participantCount}/${event.maxPlayers} players`)
         );
-        const status = createBookText("span", `home-tournament-status is-${event.status}`, formatTournamentStatus(event.status));
+        const status = createBookText("span", `home-tournament-status is-${event.status}${isTournamentScheduled(event) ? " is-scheduled" : ""}`, formatTournamentStatus(event.status, event));
         const link = createBookText("a", "home-lower-row-action", ">");
         link.href = `#play?mode=tournament&tournament=${encodeURIComponent(event.code)}`;
         link.dataset.siteTab = "tournaments";
@@ -17133,7 +17855,10 @@
           moves: Math.ceil(remote.moves.filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)).length / 2),
           termination: outcome?.termination || "Game complete"
         });
-        if (recorded) savePuzzleState();
+        if (recorded) {
+          savePuzzleState();
+          renderHomeDashboard();
+        }
       }
       if (boardNeedsRestore) {
         try {
@@ -18240,17 +18965,31 @@
         creatorName: String(raw.creatorName || raw.creator_name || "Host"),
         startsAt: String(raw.startsAt || raw.starts_at || ""),
         endsAt: String(raw.endsAt || raw.ends_at || ""),
+        seasonKey: String(raw.seasonKey || raw.season_key || getTournamentSeasonKey(raw.startsAt || raw.starts_at || raw.createdAt || raw.created_at || Date.now())),
         participantCount: Math.max(0, Number(raw.participantCount || raw.participant_count) || 0),
         joined: Boolean(raw.joined),
         isHost: Boolean(raw.isHost || raw.is_host),
         standings: Array.isArray(raw.standings) ? raw.standings : [],
         pairings: Array.isArray(raw.pairings) ? raw.pairings : [],
+        awards: Array.isArray(raw.awards) ? raw.awards : [],
         messages: Array.isArray(raw.messages) ? raw.messages : [],
         myPairing: raw.myPairing && typeof raw.myPairing === "object" ? raw.myPairing : null
       };
     }
 
-    function formatTournamentStatus(status = "draft") {
+    function getTournamentSeasonKey(value = Date.now()) {
+      const timestamp = Date.parse(value) || Number(value) || Date.now();
+      const date = new Date(timestamp);
+      const season = Math.floor(date.getUTCMonth() / 3) + 1;
+      return `${date.getUTCFullYear()}-S${season}`;
+    }
+
+    function isTournamentScheduled(event = {}) {
+      return event.status === "draft" && Number.isFinite(Date.parse(event.startsAt || "")) && Date.parse(event.startsAt) > Date.now();
+    }
+
+    function formatTournamentStatus(status = "draft", event = null) {
+      if (event && isTournamentScheduled(event)) return "Scheduled";
       return ({ draft: "Registration", running: "Live", paused: "Paused", completed: "Finished", cancelled: "Cancelled" })[status] || "Registration";
     }
 
@@ -18259,6 +18998,13 @@
       if (!Number.isFinite(remaining) || remaining <= 0) return "Finalizing";
       const total = Math.ceil(remaining / 1000);
       return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")} remaining`;
+    }
+
+    function formatTournamentSchedule(event = {}) {
+      if (!isTournamentScheduled(event)) return "";
+      const starts = Date.parse(event.startsAt || "");
+      if (!Number.isFinite(starts)) return "Scheduled";
+      return `Starts ${new Date(starts).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`;
     }
 
     function getSelectedTournament() {
@@ -18352,6 +19098,70 @@
       window.setTimeout(() => document.getElementById("tournamentLobby")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     }
 
+    function renderTournamentBracket(event) {
+      const section = document.createElement("section");
+      section.className = "tournament-section tournament-bracket";
+      const title = document.createElement("div");
+      title.className = "tournament-section-title";
+      title.append(createBookText("strong", "", event.format === "swiss" ? "Round path" : "Live bracket"), createBookText("span", "", event.format === "swiss" ? `${event.currentRound || 0}/${event.rounds} rounds` : "Pairings by round"));
+      section.append(title);
+      const rounds = new Map();
+      (event.pairings || []).forEach((pairing) => {
+        const round = Math.max(1, Number(pairing.round || pairing.round_no) || 1);
+        if (!rounds.has(round)) rounds.set(round, []);
+        rounds.get(round).push(pairing);
+      });
+      if (!rounds.size) {
+        section.append(createBookText("p", "tournament-empty", isTournamentScheduled(event) ? "The bracket will populate when registration opens." : "Pairings appear when the event starts."));
+        return section;
+      }
+      const rail = document.createElement("div");
+      rail.className = "tournament-bracket-rail";
+      [...rounds.entries()].sort((a, b) => a[0] - b[0]).forEach(([round, pairings]) => {
+        const column = document.createElement("div");
+        column.className = "tournament-bracket-round";
+        column.append(createBookText("strong", "", `Round ${round}`));
+        pairings.slice(0, 12).forEach((pairing) => {
+          const match = document.createElement("div");
+          match.className = `tournament-bracket-match${pairing.status === "active" ? " is-live" : ""}`;
+          const white = createBookText("span", "", pairing.whiteName || "White");
+          const black = createBookText("span", "", pairing.blackName || "Black");
+          const result = pairing.result && pairing.result !== "pending" ? pairing.result : pairing.status === "active" ? "Live" : "—";
+          match.append(white, black, createBookText("small", "", result));
+          column.append(match);
+        });
+        rail.append(column);
+      });
+      section.append(rail);
+      return section;
+    }
+
+    function renderTournamentRewards(event) {
+      const section = document.createElement("section");
+      section.className = "tournament-section tournament-rewards";
+      const title = document.createElement("div");
+      title.className = "tournament-section-title";
+      title.append(createBookText("strong", "", "Cosmetic podium rewards"), createBookText("span", "", event.status === "completed" ? "Awards settled" : "Earned at finish"));
+      section.append(title);
+      const defaults = [
+        { place: 1, label: "Champion's Crown", achievement: "Tournament Champion", coins: 300, xp: 180 },
+        { place: 2, label: "Finalist Crest", achievement: "Tournament Finalist", coins: 160, xp: 100 },
+        { place: 3, label: "Podium Badge", achievement: "Tournament Podium", coins: 90, xp: 60 }
+      ];
+      const awards = new Map((event.awards || []).map((award) => [Number(award.place), award]));
+      const grid = document.createElement("div");
+      grid.className = "tournament-reward-grid";
+      defaults.forEach((reward) => {
+        const awarded = awards.get(reward.place) || {};
+        const card = document.createElement("div");
+        card.className = "tournament-reward-card";
+        card.append(createBookText("span", "tournament-reward-place", `#${reward.place}`), createBookText("strong", "", awarded.cosmeticName || reward.label), createBookText("small", "", `${awarded.achievement || reward.achievement} · ${awarded.coins ?? reward.coins} coins · ${awarded.xp ?? reward.xp} XP`));
+        grid.append(card);
+      });
+      section.append(grid);
+      return section;
+    }
+
     function renderTournamentLobby() {
       const list = document.getElementById("tournamentList");
       const detail = document.getElementById("tournamentDetail");
@@ -18383,9 +19193,10 @@
           top.className = "tournament-card-top";
           const title = document.createElement("div");
           title.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? "Swiss" : "Arena"} | ${event.clock} | ${event.visibility}`));
-          const status = createBookText("span", `tournament-status is-${event.status}`, formatTournamentStatus(event.status));
+          const status = createBookText("span", `tournament-status is-${event.status}${isTournamentScheduled(event) ? " is-scheduled" : ""}`, formatTournamentStatus(event.status, event));
           top.append(title, status);
-          const meta = createBookText("div", "tournament-meta", `${event.participantCount}/${event.maxPlayers} players | Host: ${event.creatorName}`);
+          const schedule = formatTournamentSchedule(event);
+          const meta = createBookText("div", "tournament-meta", `${event.participantCount}/${event.maxPlayers} players | Host: ${event.creatorName}${schedule ? ` | ${schedule}` : ""}`);
           const actions = document.createElement("div");
           actions.className = "tournament-actions";
           actions.append(createTournamentButton(event.code === tournamentRuntime.currentCode ? "Selected" : "View", "button secondary", () => void openTournament(event.code)));
@@ -18406,15 +19217,15 @@
       head.className = "tournament-detail-head";
       const copy = document.createElement("div");
       copy.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? `Swiss • Round ${Math.max(1, event.currentRound)}/${event.rounds}` : "Arena"} • ${event.clock} • ${event.participantCount}/${event.maxPlayers} players`));
-      head.append(copy, createBookText("span", `tournament-status is-${event.status}`, formatTournamentStatus(event.status)));
+      head.append(copy, createBookText("span", `tournament-status is-${event.status}${isTournamentScheduled(event) ? " is-scheduled" : ""}`, formatTournamentStatus(event.status, event)));
 
       const stage = document.createElement("section");
       stage.className = "tournament-stage";
       const stageIcon = createBookText("span", "tournament-stage-icon", event.myPairing?.status === "active" ? "♞" : event.status === "running" ? "⌛" : "◈");
       const stageCopy = document.createElement("div");
       stageCopy.append(
-        createBookText("strong", "", event.myPairing?.status === "active" ? "Your game is ready" : event.status === "running" ? "Tournament live" : "Tournament lobby"),
-        createBookText("span", "", getTournamentWaitingCopy(event))
+        createBookText("strong", "", event.myPairing?.status === "active" ? "Your game is ready" : event.status === "running" ? "Tournament live" : isTournamentScheduled(event) ? "Scheduled event" : "Tournament lobby"),
+        createBookText("span", "", isTournamentScheduled(event) ? formatTournamentSchedule(event) : getTournamentWaitingCopy(event))
       );
       const progress = document.createElement("span");
       progress.className = "tournament-progress";
@@ -18579,7 +19390,7 @@
         });
         chat.append(chatForm);
       }
-      sections.append(standings, games, pairings, chat);
+      sections.append(renderTournamentBracket(event), standings, renderTournamentRewards(event), games, pairings, chat);
       detail.replaceChildren(head, stage, actionRow, share, inviteResults, sections);
       scheduleTournamentLaunch(event);
       renderHomeTournaments();
@@ -18656,6 +19467,8 @@
       const format = document.getElementById("tournamentFormat")?.value === "swiss" ? "swiss" : "arena";
       const size = Number(document.getElementById("tournamentLength")?.value) || 5;
       try {
+        const startsAtInput = document.getElementById("tournamentStartsAt")?.value || "";
+        const startsAt = startsAtInput ? new Date(startsAtInput).toISOString() : "";
         const created = await provider.createTournament({
           title: document.getElementById("tournamentName")?.value?.trim() || "Chess Event",
           format,
@@ -18663,10 +19476,13 @@
           clock: document.getElementById("tournamentClock")?.value || "10+0",
           maxPlayers: Number(document.getElementById("tournamentMaxPlayers")?.value) || 16,
           rounds: format === "swiss" ? size : 3,
-          durationMinutes: format === "arena" ? size * 10 : 30
+          durationMinutes: format === "arena" ? size * 10 : 30,
+          startsAt
         });
         setSelectedTournament(created);
         document.getElementById("tournamentName").value = "";
+        const startsAtField = document.getElementById("tournamentStartsAt");
+        if (startsAtField) startsAtField.value = "";
       } catch (error) {
         document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Tournament could not be created."));
       }
@@ -21246,6 +22062,7 @@
       });
 
       function showHome(shouldScroll = false) {
+        stopStorePreview({ silent: true });
         suspendGameReviewWorkspaceForNavigation();
         stopFriendSpectatorWatch();
         if (panelInitFrame) {
@@ -21278,6 +22095,7 @@
           return;
         }
 
+        if (config.panel !== "store") stopStorePreview({ silent: true });
         if (config.tab === "friendChallenge") startFriendSpectatorWatch();
         else stopFriendSpectatorWatch();
 
@@ -21400,7 +22218,7 @@
 
     function wireTabs() {
       const tabs = document.querySelectorAll(".tab-button");
-      const panels = ["beginner", "intermediate", "advanced"].map((id) => document.getElementById(id));
+      const panels = ["beginner", "intermediate", "advanced", "master"].map((id) => document.getElementById(id)).filter(Boolean);
 
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
@@ -22219,32 +23037,9 @@
       };
 
       const saveSupabaseLeaderboard = async (entry = {}) => {
-        const row = {
-          public_id: String(entry.publicId || ""),
-          username: normalizeAuthUsername(entry.username),
-          country_flag: normalizeCountryFlagValue(entry.countryFlag || ""),
-          title: String(entry.title || ""),
-          puzzle_rating: Math.max(400, Math.min(3000, Number(entry.puzzleRating) || 400)),
-          game_rating: Math.max(400, Math.min(3000, Number(entry.gameRating) || 400)),
-          achievements: Array.isArray(entry.achievements) ? entry.achievements.slice(0, 12) : [],
-          statistics: entry.statistics && typeof entry.statistics === "object" ? entry.statistics : {},
-          updated_at: entry.updatedAt || new Date().toISOString()
-        };
-        const supabase = await getSupabaseClient();
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-        const accessToken = sessionData.session?.access_token;
-        if (!accessToken) throw new Error("Sign in to sync your shared leaderboard progress.");
-        return request("rest/v1", "leaderboard_entries?on_conflict=public_id", {
-          method: "POST",
-          cache: "no-store",
-          headers: {
-            "Content-Type": "application/json",
-            Prefer: "resolution=merge-duplicates,return=representation",
-            Authorization: `Bearer ${accessToken}`
-          },
-          body: JSON.stringify(row)
-        });
+        // Competitive fields are copied by the server from the authoritative
+        // profile row.  Never PATCH/UPSERT a leaderboard row from browser data.
+        return callFriendRpc("sync_leaderboard_entry");
       };
 
       const getSharedLeaderboard = async (options = {}) => {
@@ -22514,15 +23309,19 @@
           for (const channel of socialPresenceSubscriptions.values()) { try { supabase?.removeChannel(channel); } catch {} }
           socialPresenceSubscriptions.clear();
         },
-        createTournament: (event) => callFriendRpc("create_tournament", {
-          p_title: String(event?.title || ""),
-          p_format: String(event?.format || "arena"),
-          p_visibility: String(event?.visibility || "public"),
-          p_clock: String(event?.clock || "10+0"),
-          p_max_players: Number(event?.maxPlayers) || 16,
-          p_rounds: Number(event?.rounds) || 3,
-          p_duration_minutes: Number(event?.durationMinutes) || 30
-        }),
+        createTournament: (event) => {
+          const payload = {
+            p_title: String(event?.title || ""),
+            p_format: String(event?.format || "arena"),
+            p_visibility: String(event?.visibility || "public"),
+            p_clock: String(event?.clock || "10+0"),
+            p_max_players: Number(event?.maxPlayers) || 16,
+            p_rounds: Number(event?.rounds) || 3,
+            p_duration_minutes: Number(event?.durationMinutes) || 30
+          };
+          if (event?.startsAt) payload.p_starts_at = event.startsAt;
+          return callFriendRpc("create_tournament", payload);
+        },
         listTournaments: () => callFriendRpc("list_tournaments"),
         getTournament: (code) => callFriendRpc("get_tournament", { p_code: String(code || "") }),
         joinTournament: (code) => callFriendRpc("join_tournament", { p_code: String(code || "") }),
@@ -22555,17 +23354,11 @@
           const row = {
             avatar: String(profileData.avatar || "auto").slice(0, 64),
             country_flag: normalizeCountryFlagValue(profileData.countryFlag || ""),
-            rating: Math.max(400, Math.min(3000, Number(profileData.rating) || 450)),
-            xp: Math.max(0, Number(profileData.xp) || 0),
-            wins: Math.max(0, Number(profileData.wins) || 0),
-            losses: Math.max(0, Number(profileData.losses) || 0),
-            draws: Math.max(0, Number(profileData.draws) || 0),
             title: String(profileData.title || "").slice(0, 48),
             friends: normalizeSupabaseProfileData(profileData).friends,
             last_login_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
-          if (Object.prototype.hasOwnProperty.call(profileData, "coins")) row.coins = Math.max(0, Number(profileData.coins) || 0);
           const profilePath = `profiles?id=eq.${encodeURIComponent(account.publicId)}&select=public_id,username,avatar,country_flag,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at`;
           const legacyProfilePath = `profiles?id=eq.${encodeURIComponent(account.publicId)}&select=public_id,username,avatar,rating,coins,xp,wins,losses,draws,title,friends,created_at,updated_at`;
           const requestOptions = { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Prefer: "return=representation" } };
@@ -28724,9 +29517,11 @@
     setupQuickMatch();
     setupMatchHistory();
     setupFirstVisitSetup();
+    setupDailyGoals();
     window.requestAnimationFrame(() => {
       setupVisualEntrances();
       setupPerformanceOptimizations();
+      renderHomeDashboard();
       void initializeDeferredFeature("hero");
     });
 
