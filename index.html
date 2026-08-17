@@ -1145,12 +1145,16 @@
         </div>
         <div class="store-shell store-premium-shell">
           <div class="store-wallet" aria-live="polite">
-            <div>
+            <div class="store-wallet-copy">
               <p class="store-wallet-kicker">Your currency</p>
               <h3>Adventure wallet</h3>
               <p>Earn coins by solving puzzles, watching Shorts, finishing videos, reviewing mistakes, and completing daily challenges.</p>
               <p class="store-status" id="storeStatus">Pick a reward to unlock or equip.</p>
-              <button class="button secondary store-inventory-open" type="button" id="storeInventoryOpen">Open inventory</button>
+              <div class="store-wallet-actions">
+                <button class="button secondary store-sync-retry" type="button" id="storeSyncRetry" hidden>Retry Store sync</button>
+                <button class="button secondary store-inventory-open" type="button" id="storeInventoryOpen">Open inventory</button>
+                <button class="button secondary store-gift-open" type="button" id="storeGiftOpen">Gifting</button>
+              </div>
             </div>
             <div class="store-balance">
               <strong id="storeCoinBalance">0</strong>
@@ -1158,7 +1162,7 @@
             </div>
           </div>
           <div class="game-reward-row" id="storeInventory" aria-label="Equipped rewards"></div>
-          <section class="store-inventory-page" id="storeInventoryPage" aria-labelledby="storeInventoryTitle" hidden>
+          <section class="store-inventory-page" id="storeInventoryPage" role="dialog" aria-modal="true" aria-labelledby="storeInventoryTitle" tabindex="-1" hidden>
             <header class="store-inventory-head">
               <div><p class="section-kicker">Your collection</p><h3 id="storeInventoryTitle">Inventory</h3><p>Everything you own, equipped, favorited, and recently unlocked in one place.</p></div>
               <button class="button secondary" type="button" id="storeInventoryClose">Back to Store</button>
@@ -1175,13 +1179,30 @@
             <div><p class="section-kicker">Temporary preview</p><h3 id="storePreviewTitle">Preview</h3><p id="storePreviewMeta">Nothing is equipped or purchased.</p></div>
             <div class="store-preview-tray-actions"><button class="button secondary" type="button" id="storePreviewExit">Exit preview</button><button class="button" type="button" id="storePreviewEquip" disabled>Equip this item</button></div>
           </section>
-          <div class="store-showcase" id="storeShowcase" aria-label="Featured store collections"></div>
+          <section class="store-featured-workspace" aria-labelledby="storeFeaturedTitle">
+            <div class="store-featured-stage">
+              <div class="store-featured-stage-head">
+                <div>
+                  <p class="section-kicker">Featured vault</p>
+                  <h3 id="storeFeaturedTitle">Make your next move iconic</h3>
+                </div>
+                <span class="store-featured-live">Live preview</span>
+              </div>
+              <div class="store-featured-preview" id="storeFeaturedPreview" aria-label="Featured cosmetic preview"></div>
+              <div class="store-showcase" id="storeShowcase" aria-label="Featured store collections"></div>
+            </div>
+            <aside class="store-featured-inspector" id="storeFeaturedInspector" aria-label="Featured cosmetic details"></aside>
+          </section>
           <div class="store-category-tabs" id="storeCategoryTabs" role="list" aria-label="Store categories"></div>
-          <section class="store-gift-panel" id="storeGiftPanel" aria-labelledby="storeGiftTitle">
-            <div class="store-gift-copy">
-              <p class="section-kicker">Cosmetic gifting</p>
-              <h3 id="storeGiftTitle">Send a little style</h3>
-              <p>Gift cosmetic Store items only. Coins, XP, ratings, and achievements can never be transferred.</p>
+          <div class="store-catalog-tools-host" id="storeCatalogToolsHost"></div>
+          <section class="store-gift-panel" id="storeGiftPanel" role="dialog" aria-modal="true" aria-labelledby="storeGiftTitle" tabindex="-1" hidden>
+            <div class="store-gift-head">
+              <div class="store-gift-copy">
+                <p class="section-kicker">Cosmetic gifting</p>
+                <h3 id="storeGiftTitle">Send a little style</h3>
+                <p>Gift cosmetic Store items only. Coins, XP, ratings, and achievements can never be transferred.</p>
+              </div>
+              <button class="button secondary store-gift-close" type="button" id="storeGiftClose">Close</button>
             </div>
             <form class="store-gift-form" id="storeGiftForm">
               <label>Recipient ID or username<input id="storeGiftRecipient" required maxlength="80" autocomplete="off" placeholder="Paste a registered player ID or username" /></label>

@@ -2925,12 +2925,16 @@
     let serverStoreCatalog = new Map();
     let serverStoreReady = false;
     let serverStoreRefreshPromise = null;
+    let serverStoreSyncStatus = "idle";
+    let serverStoreSyncError = null;
+    let serverStoreMissingIds = [];
     let giftInboxState = [];
     let selectedGiftItemId = "";
     let flexBadgeState = null;
     let storePreviewState = null;
     let storePreviewAudioOverride = null;
     let storeRenderSignature = "";
+    let storeFeaturedSelection = "";
     let storeInventoryUi = { filter: "owned", query: "", category: "all" };
     let currentPuzzle = puzzleStateMatchesBank ? Math.max(0, Math.min(puzzles.length - 1, Number(savedPuzzleState.currentPuzzle) || 0)) : 0;
     let activePuzzlePlan = puzzleStateMatchesBank && puzzlePlanOptions.includes(savedPuzzleState.activePlan) ? savedPuzzleState.activePlan : "main";
@@ -5574,6 +5578,83 @@
       return Boolean(getAuthProvider()?.getStoreState && getFriendCurrentUserId?.());
     }
 
+    function getMissingServerStoreItemIds(catalog = serverStoreCatalog) {
+      const catalogIds = catalog instanceof Map ? catalog : new Map();
+      return storeItems.map((item) => item.id).filter((itemId) => !catalogIds.has(itemId));
+    }
+
+    function describeStoreCatalogIssue(missingIds = []) {
+      const ids = [...new Set((Array.isArray(missingIds) ? missingIds : []).map((id) => String(id || "").trim()).filter(Boolean))];
+      if (!ids.length) return "Store sync failed — Retry.";
+      const visibleIds = ids.slice(0, 8).join(", ");
+      const suffix = ids.length > 8 ? ` (+${ids.length - 8} more)` : "";
+      return `Store sync failed — Retry. Missing cosmetic IDs: ${visibleIds}${suffix}`;
+    }
+
+    function renderStoreSyncFeedback() {
+      const status = document.getElementById("storeStatus");
+      const retry = document.getElementById("storeSyncRetry");
+      if (!status) return;
+      if (!storeServerRequiresAuthority()) {
+        if (retry) retry.hidden = true;
+        if (/^(Store sync failed|Syncing Store)/i.test(status.textContent || "")) {
+          status.textContent = "Pick a reward to unlock or equip.";
+          status.removeAttribute("title");
+        }
+        return;
+      }
+      if (serverStoreSyncStatus === "error") {
+        const message = serverStoreSyncError?.code === "STORE_CATALOG_INCOMPLETE"
+          ? describeStoreCatalogIssue(serverStoreMissingIds)
+          : "Store sync failed — Retry.";
+        status.textContent = message;
+        if (serverStoreMissingIds.length) status.title = serverStoreMissingIds.join(", ");
+        else status.removeAttribute("title");
+        if (retry) {
+          retry.hidden = false;
+          retry.disabled = false;
+        }
+        return;
+      }
+      if (serverStoreSyncStatus === "syncing") {
+        status.textContent = "Syncing Store…";
+        status.removeAttribute("title");
+        if (retry) {
+          retry.hidden = true;
+          retry.disabled = true;
+        }
+        return;
+      }
+      if (retry) {
+        retry.hidden = true;
+        retry.disabled = false;
+      }
+      if (serverStoreSyncStatus === "ready" && /^(Store sync failed|Syncing Store)/i.test(status.textContent || "")) {
+        status.textContent = "Pick a reward to unlock or equip.";
+        status.removeAttribute("title");
+      }
+    }
+
+    function validateServerStoreItem(item, { purchase = false } = {}) {
+      if (!item?.id || !serverStoreCatalog.has(item.id)) {
+        return { ok: false, message: `Store catalog is missing ${item?.id || "this cosmetic"}.` };
+      }
+      const row = serverStoreCatalog.get(item.id) || {};
+      const unlockMethod = String(row.unlock_method || row.unlockMethod || "Coins");
+      const serverType = String(row.item_type || row.itemType || "");
+      const serverCost = Number(row.cost_coins ?? row.costCoins);
+      if (serverType && serverType !== item.type) {
+        return { ok: false, message: `${item.name} has a mismatched server catalog type.` };
+      }
+      if (!Number.isFinite(serverCost) || serverCost < 0) {
+        return { ok: false, message: `${item.name} has an invalid server catalog price.` };
+      }
+      if (purchase && unlockMethod !== "Coins") {
+        return { ok: false, message: `${item.name} is unlocked through ${unlockMethod}, not coins.` };
+      }
+      return { ok: true, row };
+    }
+
     function getStoreServerCost(item = {}) {
       const row = serverStoreCatalog.get(item.id);
       return row ? Math.max(0, Number(row.cost_coins ?? row.costCoins) || 0) : Math.max(0, Number(item.cost) || 0);
@@ -5588,10 +5669,23 @@
       const provider = getAuthProvider();
       if (!provider?.getStoreState || !getFriendCurrentUserId?.()) return null;
       if (serverStoreRefreshPromise) return serverStoreRefreshPromise;
-      serverStoreRefreshPromise = provider.getStoreState().then((state) => {
+      serverStoreSyncStatus = "syncing";
+      serverStoreSyncError = null;
+      serverStoreMissingIds = [];
+      renderStoreSyncFeedback();
+      serverStoreRefreshPromise = Promise.resolve().then(() => provider.getStoreState()).then((state) => {
         const source = state && typeof state === "object" ? state : {};
         const catalog = Array.isArray(source.catalog) ? source.catalog : [];
-        serverStoreCatalog = new Map(catalog.map((item) => [String(item.item_id || item.itemId || ""), item]).filter(([id]) => id));
+        const nextCatalog = new Map(catalog.map((item) => [String(item.item_id || item.itemId || ""), item]).filter(([id]) => id));
+        const missingIds = getMissingServerStoreItemIds(nextCatalog);
+        serverStoreCatalog = nextCatalog;
+        serverStoreMissingIds = missingIds;
+        if (missingIds.length) {
+          const error = new Error(describeStoreCatalogIssue(missingIds));
+          error.code = "STORE_CATALOG_INCOMPLETE";
+          error.missingIds = missingIds;
+          throw error;
+        }
         const inventory = Array.isArray(source.inventory) ? source.inventory : [];
         // In authenticated mode the RPC inventory is the source of truth. Do
         // not merge browser defaults or legacy local ownership into it.
@@ -5602,9 +5696,12 @@
         }).filter(([type, id]) => type && id));
         serverStoreState = { ...source, coins: Math.max(0, Number(source.coins) || 0), inventory, catalog };
         serverStoreReady = true;
+        serverStoreSyncStatus = "ready";
+        serverStoreSyncError = null;
         puzzleCoins = serverStoreState.coins;
         storeState = { ...storeState, owned, equipped };
         savePuzzleState();
+        renderStoreSyncFeedback();
         if (rerender) {
           renderStore();
           renderBeginnerProgress();
@@ -5613,9 +5710,27 @@
         return serverStoreState;
       }).catch((error) => {
         serverStoreReady = false;
+        serverStoreState = null;
+        serverStoreSyncStatus = "error";
+        serverStoreSyncError = error instanceof Error ? error : new Error(String(error?.message || error || "Store sync failed"));
+        if (serverStoreSyncError.code === "STORE_CATALOG_INCOMPLETE") serverStoreMissingIds = [...new Set(serverStoreSyncError.missingIds || serverStoreMissingIds)];
+        renderStoreSyncFeedback();
+        if (rerender) renderStore();
         throw error;
       }).finally(() => { serverStoreRefreshPromise = null; });
       return serverStoreRefreshPromise;
+    }
+
+    async function ensureServerStoreReady() {
+      if (!storeServerRequiresAuthority()) return true;
+      if (storeServerIsActive()) return true;
+      try {
+        await refreshServerStoreState({ rerender: false });
+      } catch {
+        renderStoreSyncFeedback();
+        return false;
+      }
+      return storeServerIsActive();
     }
 
     function clearServerStoreState() {
@@ -5623,6 +5738,9 @@
       serverStoreCatalog = new Map();
       serverStoreReady = false;
       serverStoreRefreshPromise = null;
+      serverStoreSyncStatus = "idle";
+      serverStoreSyncError = null;
+      serverStoreMissingIds = [];
       giftInboxState = [];
       selectedGiftItemId = "";
     }
@@ -5633,7 +5751,12 @@
       const status = document.getElementById("storeGiftStatus");
       if (itemField) itemField.value = selectedGiftItemId;
       if (status) status.textContent = selectedGiftItemId ? `Ready to gift ${getStoreItem(selectedGiftItemId)?.name || selectedGiftItemId}.` : "Choose Gift on a purchasable cosmetic to prepare it.";
-      document.getElementById("storeGiftPanel")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      const panel = document.getElementById("storeGiftPanel");
+      if (panel) {
+        panel.hidden = false;
+        panel.focus({ preventScroll: true });
+      }
+      document.getElementById("storeGiftRecipient")?.focus({ preventScroll: true });
     }
 
     function renderStoreGiftInbox() {
@@ -5698,6 +5821,11 @@
         const message = String(document.getElementById("storeGiftMessage")?.value || "").trim();
         const status = document.getElementById("storeGiftStatus");
         if (!recipient || !itemId) { if (status) status.textContent = "Choose a recipient and a cosmetic first."; return; }
+        if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+          renderStoreSyncFeedback();
+          if (status) status.textContent = document.getElementById("storeStatus")?.textContent || "Store sync failed — Retry.";
+          return;
+        }
         if (!storeServerIsActive()) { if (status) status.textContent = "Sign in to send a server-verified cosmetic gift."; return; }
         try {
           await getAuthProvider().createCosmeticGift(recipient, itemId, message, createStoreIdempotencyKey("gift"));
@@ -6099,13 +6227,17 @@
     }
 
     async function equipStoreItem(item) {
-      if (!storeServerIsActive() && storeServerRequiresAuthority()) {
-        const status = document.getElementById("storeStatus");
-        if (status) status.textContent = "Store is still syncing. Try again in a moment.";
-        void refreshServerStoreState().catch(() => {});
+      if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        renderStoreSyncFeedback();
         return false;
       }
-      if (storeServerIsActive() && serverStoreCatalog.has(item?.id)) {
+      if (storeServerIsActive()) {
+        const validation = validateServerStoreItem(item);
+        if (!validation.ok) {
+          const status = document.getElementById("storeStatus");
+          if (status) status.textContent = validation.message;
+          return false;
+        }
         try {
           await getAuthProvider().equipCosmetic(item.id);
           await refreshServerStoreState({ rerender: false });
@@ -6169,10 +6301,8 @@
     async function buyOrEquipStoreItem(itemId) {
       const item = getStoreItem(itemId);
       if (!item) return;
-      if (!storeServerIsActive() && storeServerRequiresAuthority()) {
-        const status = document.getElementById("storeStatus");
-        if (status) status.textContent = "Store is still syncing. Try again in a moment.";
-        void refreshServerStoreState().catch(() => {});
+      if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        renderStoreSyncFeedback();
         return;
       }
       const owned = new Set(storeState.owned);
@@ -6182,19 +6312,20 @@
       const unlockMethodLabel = getStoreUnlockMethodLabel(item);
       const alreadyOwned = isFlexBadge ? userOwnsFlexBadge(item.value) : owned.has(item.id);
       if (!alreadyOwned) {
-        if (storeServerIsActive() && !serverStoreCatalog.has(item.id)) {
-          if (status) status.textContent = "This cosmetic is not available in the synchronized Store catalog yet.";
-          return;
+        if (storeServerIsActive()) {
+          const validation = validateServerStoreItem(item, { purchase: true });
+          if (!validation.ok) {
+            if (status) status.textContent = validation.message;
+            return;
+          }
         }
         if (unlockMethod !== "Coins") {
           if (status) status.textContent = `${item.name}: ${unlockMethodLabel} — ${getStoreUnlockLabel(item)}.`;
           return;
-          if (status) status.textContent = `${item.name}: ${unlockMethod} — ${getStoreUnlockLabel(item)}.`;
-          return;
         }
         const price = storeServerIsActive() ? getStoreServerCost(item) : item.cost;
         if (puzzleCoins < price) {
-          if (status) status.textContent = `Need ${formatProfileNumber(item.cost - puzzleCoins)} more coins for ${item.name}.`;
+          if (status) status.textContent = `Need ${formatProfileNumber(price - puzzleCoins)} more coins for ${item.name}.`;
           return;
         }
         if (storeServerIsActive()) {
@@ -6892,10 +7023,8 @@
     async function buyOrEquipStoreBundle(bundleId) {
       const bundle = storeBundles.find((entry) => entry.id === bundleId);
       if (!bundle) return;
-      if (!storeServerIsActive() && storeServerRequiresAuthority()) {
-        const status = document.getElementById("storeStatus");
-        if (status) status.textContent = "Store is still syncing. Try again in a moment.";
-        void refreshServerStoreState().catch(() => {});
+      if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        renderStoreSyncFeedback();
         return;
       }
       const status = document.getElementById("storeStatus");
@@ -6908,9 +7037,12 @@
         if (status) status.textContent = `${bundle.name} equipped. Every included cosmetic is ready.`;
         return;
       }
-      if (storeServerIsActive() && details.items.some((item) => !serverStoreCatalog.has(item.id))) {
-        if (status) status.textContent = "This bundle is not available in the synchronized Store catalog yet.";
-        return;
+      if (storeServerIsActive()) {
+        const invalidItem = details.missingItems.map((item) => validateServerStoreItem(item, { purchase: true })).find((result) => !result.ok);
+        if (invalidItem) {
+          if (status) status.textContent = invalidItem.message;
+          return;
+        }
       }
       const bundlePrice = storeServerIsActive()
         ? Math.max(0, Math.round(details.missingItems.reduce((sum, item) => sum + getStoreServerCost(item), 0) * (1 - Number(bundle.discount || 0))))
@@ -7072,30 +7204,113 @@
     function renderStoreShowcase(prefs) {
       const showcase = document.getElementById("storeShowcase");
       if (!showcase) return;
+      const featuredPreview = document.getElementById("storeFeaturedPreview");
+      const featuredInspector = document.getElementById("storeFeaturedInspector");
+      const boardCandidates = storeItems.filter((item) => item.type === "board");
+      const featuredAnchor = boardCandidates.find((item) => /royal|crystal|galaxy/i.test(item.name)) || boardCandidates[0] || storeItems.find((item) => item.type === "skin") || storeItems[0];
+      const boardSecondary = boardCandidates.find((item) => item.id !== featuredAnchor?.id && /royal|crystal|galaxy/i.test(item.name)) || boardCandidates.find((item) => item.id !== featuredAnchor?.id) || featuredAnchor;
       const picks = [
-        { label: "Featured", category: "Featured", item: storeItems.find((item) => item.type === "backgroundTheme" && /royal|aurora|galaxy/i.test(item.name)) },
-        { label: "Boards", category: "Boards", item: storeItems.find((item) => item.type === "board" && /royal|crystal|galaxy/i.test(item.name)) },
+        { label: "Featured", category: "Featured", item: featuredAnchor },
+        { label: "Boards", category: "Boards", item: boardSecondary },
         { label: "Piece Sets", category: "Chess Pieces", item: storeItems.find((item) => item.type === "skin" && /classic|royal|dragon/i.test(item.name)) },
         { label: "Themes", category: "Backgrounds", item: storeItems.find((item) => item.type === "backgroundTheme" && /forest|sakura|ocean|sunset/i.test(item.name)) },
         { label: "Avatars", category: "Avatars", item: storeItems.find((item) => ["avatar", "avatarEffect"].includes(item.type) && /divine|galaxy|phoenix/i.test(item.name)) },
         { label: "Bundles", category: "Bundles", bundle: storeBundles[0] }
-      ].filter((pick) => pick.item || pick.bundle);
+      ].filter((pick) => pick.item || pick.bundle).filter((pick, index, list) => {
+        const key = pick.item?.id || pick.bundle?.id || `${pick.label}-${index}`;
+        return list.findIndex((entry) => (entry.item?.id || entry.bundle?.id || "") === key) === index;
+      });
+      if (!picks.length) {
+        showcase.replaceChildren(createBookText("p", "store-empty-state", "Featured cosmetics are syncing. Try again in a moment."));
+        featuredPreview?.replaceChildren();
+        featuredInspector?.replaceChildren();
+        return;
+      }
+      let selectedPick = picks.find(({ item, bundle }) => (item?.id || bundle?.id) === storeFeaturedSelection) || picks[0];
+      storeFeaturedSelection = selectedPick.item?.id || selectedPick.bundle?.id || "";
       showcase.replaceChildren(...picks.map(({ label, category, item, bundle }) => {
         const card = document.createElement("button");
         const showcaseItem = item || getStoreItem(bundle?.itemIds?.[0]);
         const rarity = bundle?.rarity || getStoreDisplayRarity(showcaseItem) || "Common";
+        const selectionId = item?.id || bundle?.id || "";
         card.type = "button";
         card.className = "store-showcase-card";
+        card.setAttribute("aria-pressed", String(selectionId === storeFeaturedSelection));
         card.dataset.rarity = rarity;
         card.style.setProperty("--rarity-color", rarity === "Divine" ? "#fff2b8" : rarity === "Mythic" ? "#ff7adf" : rarity === "Legendary" ? "#ffd36b" : rarity === "Epic" ? "#ae87ff" : rarity === "Rare" ? "#6fa8dc" : "rgba(255,248,237,.34)");
         card.append(createBookText("strong", "", label), createBookText("span", "", bundle?.name || item.name));
         card.addEventListener("click", () => {
+          storeFeaturedSelection = selectionId;
           activeStoreCategory = category;
           renderStore();
-          document.getElementById("storeGrid")?.scrollIntoView({ block: "start", behavior: "smooth" });
         });
         return card;
       }));
+
+      if (!featuredPreview || !featuredInspector) return;
+      const selectedItem = selectedPick.item || getStoreItem(selectedPick.bundle?.itemIds?.[0]);
+      const owned = new Set(storeState.owned);
+      featuredPreview.replaceChildren();
+      featuredInspector.replaceChildren();
+      if (selectedPick.bundle) {
+        const details = getStoreBundleDetails(selectedPick.bundle, owned);
+        featuredPreview.appendChild(buildStoreBundlePreview(details.items));
+        featuredPreview.appendChild(createBookText("span", "store-featured-preview-caption", `${details.items.length} cosmetics · ${details.completion}% complete`));
+        const heading = createBookText("div", "store-featured-inspector-head", "");
+        heading.append(createBookText("span", "store-featured-rarity", selectedPick.bundle.rarity || "Epic"), createBookText("h3", "", selectedPick.bundle.name));
+        featuredInspector.append(heading, createBookText("p", "store-featured-description", selectedPick.bundle.description || "A coordinated set for your next session."));
+        const facts = createBookText("div", "store-featured-facts", "");
+        facts.append(
+          createBookText("span", "", `${details.ownedItems.length}/${details.items.length} owned`),
+          createBookText("span", "", `${formatProfileNumber(details.totalValue)} value`),
+          createBookText("span", "", details.missingItems.length ? `${formatProfileNumber(details.bundlePrice)} coins` : "Ready to equip"),
+          createBookText("span", "", details.missingItems.length ? `${details.percent}% off · Save ${formatProfileNumber(details.savings)}` : "All items owned")
+        );
+        featuredInspector.appendChild(facts);
+        const included = createBookText("p", "store-featured-surface", details.items.map((item) => getStoreSurfaceLabel(item)).filter(Boolean).join(" · "));
+        featuredInspector.appendChild(included);
+        const actions = createBookText("div", "store-featured-actions", "");
+        const previewButton = createBookText("button", "button secondary", "Preview");
+        previewButton.type = "button";
+        previewButton.addEventListener("click", () => selectedItem && startStorePreview(selectedItem));
+        const action = createBookText("button", details.missingItems.length ? "button" : "button secondary", details.missingItems.length ? `Buy bundle · ${formatProfileNumber(details.bundlePrice)}` : "Equip bundle");
+        action.type = "button";
+        action.addEventListener("click", () => buyOrEquipStoreBundle(selectedPick.bundle.id));
+        actions.append(previewButton, action);
+        featuredInspector.appendChild(actions);
+        return;
+      }
+
+      const item = selectedItem;
+      if (!item) return;
+      const isOwned = isStoreItemOwned(item, owned);
+      const isEquipped = isStoreItemEquipped(item);
+      const rarity = getStoreDisplayRarity(item);
+      const unlockMethod = getStoreUnlockMethodLabel(item);
+      featuredPreview.appendChild(buildStorePreview(item));
+      featuredPreview.appendChild(createBookText("span", "store-featured-preview-caption", `${getStoreCategory(item)} · ${getStoreSurfaceLabel(item)}`));
+      const heading = createBookText("div", "store-featured-inspector-head", "");
+      heading.append(createBookText("span", "store-featured-rarity", rarity), createBookText("h3", "", item.name));
+      featuredInspector.append(heading, createBookText("p", "store-featured-description", item.description || "A cosmetic finish for your Nschess identity."));
+      const facts = createBookText("div", "store-featured-facts", "");
+      facts.append(
+        createBookText("span", "", isEquipped ? "Equipped" : isOwned ? "Owned" : `${formatProfileNumber(item.cost || 0)} coins`),
+        createBookText("span", "", `Unlock: ${unlockMethod}`),
+        createBookText("span", "", `Appears in ${getStoreSurfaceLabel(item)}`)
+      );
+      const earningLabel = getStoreEstimatedDays(item);
+      if (earningLabel && !isOwned) facts.append(createBookText("span", "", earningLabel));
+      featuredInspector.appendChild(facts);
+      const actions = createBookText("div", "store-featured-actions", "");
+      const previewButton = createBookText("button", "button secondary", "Preview");
+      previewButton.type = "button";
+      previewButton.addEventListener("click", () => startStorePreview(item));
+      const primary = createBookText("button", isOwned ? "button secondary" : "button", isEquipped ? "Equipped" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${formatProfileNumber(item.cost || 0)}` : getStoreUnlockLabel(item));
+      primary.type = "button";
+      primary.disabled = isEquipped;
+      primary.addEventListener("click", () => buyOrEquipStoreItem(item.id));
+      actions.append(previewButton, primary);
+      featuredInspector.appendChild(actions);
     }
 
     function renderStore() {
@@ -7103,7 +7318,9 @@
       const balance = document.getElementById("storeCoinBalance");
       const inventory = document.getElementById("storeInventory");
       const tabs = document.getElementById("storeCategoryTabs");
+      const catalogToolsHost = document.getElementById("storeCatalogToolsHost");
       if (!grid || !balance || !inventory) return;
+      renderStoreSyncFeedback();
       grid.setAttribute("aria-busy", "false");
       grid.classList.remove("is-loading");
       const owned = new Set(storeState.owned);
@@ -7122,7 +7339,8 @@
         prefs,
         flexBadges: normalizeFlexBadgeState(flexBadgeState).badges.length,
         serverReady: serverStoreReady,
-        preview: storePreviewState?.item?.id || ""
+        preview: storePreviewState?.item?.id || "",
+        featured: storeFeaturedSelection
       });
       if (nextSignature === storeRenderSignature) {
         renderStorePreviewTray();
@@ -7200,7 +7418,12 @@
       renderLastMoveDesigner(prefs);
       renderBoardThemeDesigner(prefs);
       const nodes = [];
-      if (activeStoreCategory !== "Currency") nodes.push(buildStoreCatalogTools(prefs, owned));
+      const catalogTools = activeStoreCategory !== "Currency" ? buildStoreCatalogTools(prefs, owned) : null;
+      if (catalogToolsHost) {
+        catalogToolsHost.classList.toggle("is-empty", !catalogTools);
+        catalogToolsHost.replaceChildren(catalogTools || createBookText("span", "store-catalog-tools-empty", ""));
+      }
+      else if (catalogTools) nodes.push(catalogTools);
       categoryOrder.filter((category) => category === activeStoreCategory).forEach((category) => {
         if (category === "Currency") {
           const currencyCard = document.createElement("article");
@@ -7434,13 +7657,37 @@
 
     function setupStore() {
       setupStoreGifting();
+      const syncRetry = document.getElementById("storeSyncRetry");
+      if (syncRetry && !syncRetry.dataset.ready) {
+        syncRetry.dataset.ready = "true";
+        syncRetry.addEventListener("click", async () => {
+          syncRetry.disabled = true;
+          try {
+            await refreshServerStoreState();
+            const status = document.getElementById("storeStatus");
+            if (status) status.textContent = "Store synced. Try the purchase again.";
+          } catch {
+            renderStoreSyncFeedback();
+          } finally {
+            renderStoreSyncFeedback();
+          }
+        });
+      }
       const inventoryPage = document.getElementById("storeInventoryPage");
       const openInventory = document.getElementById("storeInventoryOpen");
       const closeInventory = document.getElementById("storeInventoryClose");
       if (inventoryPage && !inventoryPage.dataset.ready) {
         inventoryPage.dataset.ready = "true";
-        openInventory?.addEventListener("click", () => { inventoryPage.hidden = false; renderStoreInventory(); inventoryPage.scrollIntoView({ block: "start", behavior: "smooth" }); });
-        closeInventory?.addEventListener("click", () => { inventoryPage.hidden = true; document.getElementById("store")?.scrollIntoView({ block: "start", behavior: "smooth" }); });
+        openInventory?.addEventListener("click", () => { inventoryPage.hidden = false; renderStoreInventory(); inventoryPage.focus({ preventScroll: true }); });
+        closeInventory?.addEventListener("click", () => { inventoryPage.hidden = true; openInventory?.focus({ preventScroll: true }); });
+      }
+      const giftPanel = document.getElementById("storeGiftPanel");
+      const openGift = document.getElementById("storeGiftOpen");
+      const closeGift = document.getElementById("storeGiftClose");
+      if (giftPanel && !giftPanel.dataset.ready) {
+        giftPanel.dataset.ready = "true";
+        openGift?.addEventListener("click", () => { giftPanel.hidden = false; giftPanel.focus({ preventScroll: true }); refreshStoreGiftInbox(); });
+        closeGift?.addEventListener("click", () => { giftPanel.hidden = true; openGift?.focus({ preventScroll: true }); });
       }
       const previewExit = document.getElementById("storePreviewExit");
       const previewEquip = document.getElementById("storePreviewEquip");
