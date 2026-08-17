@@ -1,0 +1,55 @@
+/* Low-end device governor. This stylesheet is loaded only after the runtime
+   detects constrained hardware or a reduced-data connection. */
+body.perf-lite :where(.store-card, .player-flex-chip, .match-player-card, .ai-player-card, .puzzle-board-wrap, .friend-lobby, .home-dashboard) {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
+body.perf-lite :where(.piece-symbol, .styled-username, .store-preview-name-style, .match-flex-badge, .player-profile-avatar)::before,
+body.perf-lite :where(.piece-symbol, .styled-username, .store-preview-name-style, .match-flex-badge, .player-profile-avatar)::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  opacity: 0.18 !important;
+}
+
+body.perf-lite :where(.sparkle, .piece-spark, .piece-aura, .coin-fly, .review-arrow-layer) {
+  display: none !important;
+}
+
+body.perf-lite :where(section:not(.is-active-panel), .video-tier, .book-level-section, .store-grid, .leaderboard-grid) {
+  content-visibility: auto;
+  contain-intrinsic-size: 720px;
+}
+
+body.perf-lite :where(.short-slide:not(.is-active), .video-card:not(:hover), .store-card:not(:hover)) {
+  transform: none !important;
+  animation: none !important;
+}
+
+/* Keep constrained devices on compositor-friendly, low-paint surfaces. */
+body.perf-lite :where(.home-command-deck, .game-review-shell, .friends-hub-nav, .friends-hub-main, .friends-hub-profile, .tournament-card, .site-notification-item) {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+body.perf-lite :where(.home-quick-card, .home-summary-card, .store-card, .video-card, .book-card, .leaderboard-card, .site-notification-item):hover {
+  transform: none !important;
+}
+body.perf-lite :where(main > section.section-reveal, .board-intro) {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Full-screen themed backgrounds are the most expensive always-painted
+   layer on constrained devices. Preserve the theme, but stop its drift and
+   filter work so scrolling and input remain responsive. */
+body.perf-lite,
+body.perf-lite::before,
+body.perf-lite::after,
+body.perf-lite[data-background-key] {
+  animation: none !important;
+  transition: none !important;
+  filter: none !important;
+}
+body.perf-lite::before { background-attachment: scroll !important; }
