@@ -811,7 +811,7 @@
     .play-square.last-move .piece-svg,
     .tutorial-square.is-last .piece-symbol,
     .tutorial-square.is-last .piece-svg {
-      animation: pieceMoveArrive 240ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
+      animation: pieceMoveArrive 150ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
       will-change: transform, opacity;
     }
 
@@ -851,7 +851,11 @@
     body.low-performance .play-square.last-move .piece-symbol,
     body.low-performance .play-square.last-move .piece-svg,
     body.low-performance .tutorial-square.is-last .piece-symbol,
-    body.low-performance .tutorial-square.is-last .piece-svg {
+    body.low-performance .tutorial-square.is-last .piece-svg,
+    body.perf-lite .play-square.last-move .piece-symbol,
+    body.perf-lite .play-square.last-move .piece-svg,
+    body.perf-lite .tutorial-square.is-last .piece-symbol,
+    body.perf-lite .tutorial-square.is-last .piece-svg {
       animation: none;
       will-change: auto;
     }
@@ -3834,9 +3838,28 @@
       position: absolute;
       width: 34%;
       height: 34%;
-      border: 3px solid rgba(127, 166, 80, 0.85);
+      border: 3px solid rgba(231, 182, 93, 0.92);
       border-radius: 50%;
+      box-shadow: 0 0 10px rgba(231, 182, 93, 0.32);
       pointer-events: none;
+    }
+
+    .adventure-square.selected,
+    .tutorial-square.is-selected,
+    .opening-explorer-square.is-selected {
+      outline: 0;
+      box-shadow: inset 0 0 0 4px rgba(174, 135, 255, 0.96), inset 0 0 20px rgba(93, 191, 255, 0.3);
+    }
+
+    .tutorial-square.is-target::after,
+    .opening-explorer-square.is-legal::after {
+      background: rgba(231, 182, 93, 0.9);
+      box-shadow: 0 0 0 2px rgba(32, 29, 26, 0.22), 0 0 10px rgba(231, 182, 93, 0.3);
+    }
+
+    .tutorial-square.is-last,
+    .opening-explorer-square.is-last {
+      box-shadow: inset 0 0 0 2px rgba(231, 182, 93, 0.62);
     }
 
     .adventure-panel {
@@ -8235,7 +8258,7 @@
     }
 
     .play-square.selected {
-      box-shadow: inset 0 0 0 5px rgba(231, 182, 93, 0.88);
+      box-shadow: inset 0 0 0 4px rgba(174, 135, 255, 0.96), inset 0 0 22px rgba(93, 191, 255, 0.34);
     }
 
     .play-square.hint-destination {
@@ -8249,15 +8272,17 @@
       width: 28%;
       height: 28%;
       border-radius: 50%;
-      background: rgba(32, 29, 26, 0.34);
+      background: rgba(231, 182, 93, 0.92);
+      box-shadow: 0 0 0 2px rgba(32, 29, 26, 0.24), 0 0 10px rgba(231, 182, 93, 0.32);
       pointer-events: none;
     }
 
     .play-square.capture::after {
       width: 72%;
       height: 72%;
-      border: 4px solid rgba(216, 111, 98, 0.7);
+      border: 3px solid rgba(231, 182, 93, 0.96);
       background: transparent;
+      box-shadow: inset 0 0 0 2px rgba(32, 29, 26, 0.2), 0 0 12px rgba(231, 182, 93, 0.38);
     }
 
     .play-square.last-move {
@@ -8278,43 +8303,54 @@
     }
 
     .play-square.in-check {
-      background: linear-gradient(rgba(216, 111, 98, 0.72), rgba(216, 111, 98, 0.72)), var(--board-dark);
+      background: linear-gradient(rgba(255, 184, 77, 0.58), rgba(255, 184, 77, 0.58)), var(--board-dark);
       animation: kingCheckPulse 900ms ease-in-out 2;
     }
 
     .play-square.capture-impact {
-      animation: captureImpact 360ms cubic-bezier(.2, .9, .2, 1) both;
+      animation: captureImpact 150ms cubic-bezier(.2, .9, .2, 1) both;
     }
 
-    .play-square.capture-impact .piece-symbol {
-      animation: pieceCaptureLand 360ms cubic-bezier(.2, .9, .2, 1) both;
+    .play-square.capture-impact :is(.piece-symbol, .piece-svg) {
+      animation: pieceCaptureLand 150ms cubic-bezier(.2, .9, .2, 1) both;
     }
 
-    .play-square.promotion-bloom .piece-symbol {
-      animation: promotionBloom 620ms cubic-bezier(.18, .86, .24, 1) both;
+    .play-square.promotion-bloom :is(.piece-symbol, .piece-svg) {
+      animation: promotionBloom 170ms cubic-bezier(.18, .86, .24, 1) both;
+    }
+
+    .play-square.castle-impact :is(.piece-symbol, .piece-svg),
+    .play-square.en-passant-impact :is(.piece-symbol, .piece-svg) {
+      animation: boardSpecialLand 150ms cubic-bezier(.2, .8, .2, 1) both;
     }
 
     @keyframes captureImpact {
-      0% { box-shadow: inset 0 0 0 0 rgba(216, 111, 98, 0); }
-      45% { box-shadow: inset 0 0 0 6px rgba(216, 111, 98, 0.78), inset 0 0 24px rgba(216, 111, 98, 0.34); }
-      100% { box-shadow: inset 0 0 0 2px rgba(216, 111, 98, 0.22); }
+      0% { opacity: .82; transform: scale(.985); }
+      55% { opacity: 1; transform: scale(1.012); }
+      100% { opacity: 1; transform: scale(1); }
     }
 
     @keyframes pieceCaptureLand {
-      0% { opacity: .3; transform: scale(.76); filter: brightness(1.5) drop-shadow(0 0 14px rgba(255, 139, 116, .74)); }
-      68% { opacity: 1; transform: scale(1.12); }
-      100% { opacity: 1; transform: scale(1); filter: none; }
+      0% { opacity: .35; transform: scale(.88); }
+      68% { opacity: 1; transform: scale(1.045); }
+      100% { opacity: 1; transform: scale(1); }
     }
 
     @keyframes promotionBloom {
-      0% { opacity: .5; transform: scale(.7); filter: brightness(1.7) drop-shadow(0 0 18px rgba(255, 211, 107, .92)); }
-      62% { opacity: 1; transform: scale(1.16); }
-      100% { opacity: 1; transform: scale(1); filter: none; }
+      0% { opacity: .42; transform: scale(.82); }
+      62% { opacity: 1; transform: scale(1.07); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes boardSpecialLand {
+      0% { opacity: .48; transform: translate3d(0, 0, 0) scale(.9); }
+      70% { opacity: 1; transform: translate3d(0, 0, 0) scale(1.035); }
+      100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
     }
 
     @keyframes kingCheckPulse {
-      0%, 100% { box-shadow: inset 0 0 0 2px rgba(216, 111, 98, 0.3); }
-      50% { box-shadow: inset 0 0 0 5px rgba(255, 224, 214, 0.84), inset 0 0 28px rgba(216, 111, 98, 0.48); }
+      0%, 100% { box-shadow: inset 0 0 0 2px rgba(255, 184, 77, 0.36); }
+      50% { box-shadow: inset 0 0 0 5px rgba(255, 239, 190, 0.9), inset 0 0 28px rgba(255, 184, 77, 0.52); }
     }
 
     @keyframes boardVictorySparkle {
@@ -8323,14 +8359,24 @@
       100% { opacity: 0; transform: scale(1.08); }
     }
 
+    body.perf-lite .play-square.in-check,
+    body.perf-lite .play-square.capture-impact,
+    body.perf-lite .play-square.capture-impact :is(.piece-symbol, .piece-svg),
+    body.perf-lite .play-square.promotion-bloom :is(.piece-symbol, .piece-svg),
+    body.perf-lite .play-square.castle-impact :is(.piece-symbol, .piece-svg),
+    body.perf-lite .play-square.en-passant-impact :is(.piece-symbol, .piece-svg),
     body.reduced-motion .play-square.in-check,
     body.reduced-motion .play-square.capture-impact,
-    body.reduced-motion .play-square.capture-impact .piece-symbol,
-    body.reduced-motion .play-square.promotion-bloom .piece-symbol,
+    body.reduced-motion .play-square.capture-impact :is(.piece-symbol, .piece-svg),
+    body.reduced-motion .play-square.promotion-bloom :is(.piece-symbol, .piece-svg),
+    body.reduced-motion .play-square.castle-impact :is(.piece-symbol, .piece-svg),
+    body.reduced-motion .play-square.en-passant-impact :is(.piece-symbol, .piece-svg),
     body.low-performance .play-square.in-check,
     body.low-performance .play-square.capture-impact,
-    body.low-performance .play-square.capture-impact .piece-symbol,
-    body.low-performance .play-square.promotion-bloom .piece-symbol {
+    body.low-performance .play-square.capture-impact :is(.piece-symbol, .piece-svg),
+    body.low-performance .play-square.promotion-bloom :is(.piece-symbol, .piece-svg),
+    body.low-performance .play-square.castle-impact :is(.piece-symbol, .piece-svg),
+    body.low-performance .play-square.en-passant-impact :is(.piece-symbol, .piece-svg) {
       animation: none;
     }
 
@@ -8339,8 +8385,48 @@
     }
 
     .play-square.dragging {
-      opacity: 0.72;
-      transform: scale(0.96);
+      opacity: 0.92;
+      transform: none;
+      box-shadow: inset 0 0 0 3px rgba(93, 191, 255, 0.58), inset 0 0 18px rgba(93, 191, 255, 0.2);
+    }
+
+    .board-drag-ghost {
+      display: block;
+      transform-origin: center;
+      opacity: .96;
+      user-select: none;
+      filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.34)) drop-shadow(0 0 8px rgba(93, 191, 255, 0.22));
+      backface-visibility: hidden;
+      contain: layout paint;
+    }
+
+    :where(.puzzle-board, .opening-explorer-board).is-dragging {
+      box-shadow: inset 0 0 0 2px rgba(93, 191, 255, 0.52), inset 0 0 24px rgba(93, 191, 255, 0.14), 0 0 22px rgba(93, 191, 255, 0.18);
+    }
+
+    :where(.play-square, .opening-explorer-square, .real-puzzle-square, .tutorial-square, .adventure-square).is-long-press {
+      z-index: 3;
+      animation: boardLongPressPulse 460ms cubic-bezier(.2, .8, .2, 1) both;
+    }
+
+    @keyframes boardLongPressPulse {
+      0% { box-shadow: inset 0 0 0 2px rgba(174, 135, 255, 0.42); }
+      45% { box-shadow: inset 0 0 0 5px rgba(93, 191, 255, 0.9), inset 0 0 24px rgba(174, 135, 255, 0.34); }
+      100% { box-shadow: inset 0 0 0 2px rgba(174, 135, 255, 0.18); }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      :where(.play-square, .opening-explorer-square, .real-puzzle-square, .tutorial-square, .adventure-square):not(:disabled):hover .piece-svg,
+      :where(.play-square, .opening-explorer-square, .real-puzzle-square, .tutorial-square, .adventure-square):not(:disabled):focus-visible .piece-svg {
+        transform: translate3d(0, -2px, 0) scale(1.018);
+        transition: transform 110ms ease;
+      }
+    }
+
+    body.perf-lite :where(.play-square, .opening-explorer-square, .real-puzzle-square, .tutorial-square, .adventure-square).is-long-press,
+    body.reduced-motion :where(.play-square, .opening-explorer-square, .real-puzzle-square, .tutorial-square, .adventure-square).is-long-press,
+    body.low-performance :where(.play-square, .opening-explorer-square, .real-puzzle-square, .tutorial-square, .adventure-square).is-long-press {
+      animation: none;
     }
 
     .play-square.is-ai-thinking {
@@ -10748,6 +10834,7 @@
     }
 
     .tutorial-board {
+      position: relative;
       grid-column: 2;
       grid-row: 2;
       display: grid;
@@ -11434,6 +11521,11 @@
       position: relative;
     }
 
+    .puzzle-board,
+    .opening-explorer-board {
+      position: relative;
+    }
+
     .review-arrow-layer {
       position: absolute;
       inset: 0;
@@ -11445,6 +11537,69 @@
       display: block;
       border-radius: inherit;
       contain: layout paint;
+    }
+
+    .analysis-square-highlight {
+      fill: rgba(174, 135, 255, 0.18);
+      stroke: rgba(174, 135, 255, 0.62);
+      stroke-width: 0.06;
+      vector-effect: non-scaling-stroke;
+      pointer-events: none;
+    }
+
+    .analysis-square-highlight.is-attack {
+      fill: rgba(255, 128, 112, 0.16);
+      stroke: rgba(255, 128, 112, 0.66);
+    }
+
+    .analysis-square-highlight.is-legal {
+      fill: rgba(231, 182, 93, 0.16);
+      stroke: rgba(231, 182, 93, 0.64);
+    }
+
+    .analysis-square-highlight.is-engine {
+      fill: rgba(93, 191, 255, 0.15);
+      stroke: rgba(93, 191, 255, 0.68);
+    }
+
+    .premove-status {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 28px;
+      padding: 6px 9px;
+      border: 1px solid rgba(174, 135, 255, 0.48);
+      border-radius: 999px;
+      background: rgba(8, 13, 24, 0.86);
+      color: #dce8ff;
+      font-size: 0.68rem;
+      font-weight: 900;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+    }
+
+    .premove-status[data-state="ready"] {
+      border-color: rgba(231, 182, 93, 0.62);
+      color: #ffe7a8;
+    }
+
+    .play-square.premove-source {
+      box-shadow: inset 0 0 0 4px rgba(174, 135, 255, 0.92), inset 0 0 18px rgba(174, 135, 255, 0.26);
+    }
+
+    .play-square.premove-target {
+      box-shadow: inset 0 0 0 3px rgba(231, 182, 93, 0.88), inset 0 0 18px rgba(231, 182, 93, 0.22);
+    }
+
+    body.perf-lite .analysis-square-highlight,
+    body.perf-lite .premove-status {
+      backdrop-filter: none;
     }
 
     .review-arrow-line {
@@ -11465,6 +11620,17 @@
 
     .review-arrow-line.is-engine {
       stroke-dasharray: 0.22 0.12;
+    }
+
+    .review-arrow-line.is-candidate {
+      stroke: rgba(174, 135, 255, 0.94);
+      stroke-width: 0.1;
+      filter: drop-shadow(0 0 9px rgba(174, 135, 255, 0.42));
+    }
+
+    .review-arrow-line.is-threat {
+      stroke-dasharray: 0.18 0.1;
+      stroke-width: 0.095;
     }
 
     .play-square.review-from {
@@ -15944,6 +16110,21 @@
 
       :where(.play-board-wrap, .puzzle-board-wrap) {
         touch-action: manipulation;
+      }
+
+      .play-square,
+      .opening-explorer-square,
+      .real-puzzle-square,
+      .tutorial-square,
+      .adventure-square {
+        touch-action: none !important;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      :where(.play-actions .button, .friend-match-actions button, .opening-explorer-controls .button) {
+        min-height: 44px;
       }
     }
 
@@ -29057,7 +29238,7 @@
     }
 
     body:not(.theme-light) #play:not(.is-review-mode) .play-board { overflow: hidden; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(63, 37, 21, 0.54); }
-    body:not(.theme-light) #play:not(.is-review-mode) .play-square.selected { box-shadow: inset 0 0 0 3px rgba(164, 97, 255, 0.92); }
+    body:not(.theme-light) #play:not(.is-review-mode) .play-square.selected { box-shadow: inset 0 0 0 3px rgba(164, 97, 255, 0.92), inset 0 0 18px rgba(93, 191, 255, 0.32); }
     body:not(.theme-light) #play:not(.is-review-mode) .play-square.last-move { box-shadow: inset 0 0 0 2px rgba(170, 112, 255, 0.6); }
 
     body:not(.theme-light) #play:not(.is-review-mode) .play-bottom-actionbar,
@@ -30637,6 +30818,68 @@ body.site-tab-mode main > .site-panel.is-active-panel {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   :is(body:not(.theme-light), body.theme-light) :is(.button, .cq-button, .mission-button, .tab-button):not(:disabled):not([aria-disabled="true"]):active { transform: none; }
+}
+
+/* Runtime connectivity feedback: one small, non-layout-affecting announcement for
+   cloud features. The active game status remains in its own multiplayer panel. */
+.global-network-status {
+  position: fixed;
+  inset: max(76px, calc(env(safe-area-inset-top) + 12px)) 16px auto auto;
+  z-index: 1200;
+  width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, #ffd36b 48%, var(--cq-border, rgba(255,255,255,.18)));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cq-surface-glass-strong, #101a2b) 92%, #241b08);
+  color: var(--cq-text-primary, #fff8ed);
+  box-shadow: 0 12px 28px rgba(2, 6, 23, .28), inset 0 1px 0 rgba(255,255,255,.08);
+  font-size: .78rem;
+  font-weight: 750;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.global-network-status::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 8px 1px 0;
+  border-radius: 50%;
+  background: #ffd36b;
+  box-shadow: 0 0 0 3px rgba(255, 211, 107, .14);
+  vertical-align: middle;
+}
+
+.global-network-status[data-state="reconnected"] {
+  border-color: color-mix(in srgb, #50d67e 52%, var(--cq-border, rgba(255,255,255,.18)));
+}
+
+.global-network-status[data-state="reconnected"]::before {
+  background: #50d67e;
+  box-shadow: 0 0 0 3px rgba(80, 214, 126, .14);
+}
+
+@media (max-width: 699px) {
+  .global-network-status {
+    inset-inline: 12px;
+    top: max(72px, calc(env(safe-area-inset-top) + 10px));
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .global-network-status { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .global-network-status {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+  }
+  .global-network-status::before { background: CanvasText; box-shadow: none; }
 }
 
 /* Game Review: a dedicated analysis workspace, separate from the live-game board. */
