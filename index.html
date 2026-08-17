@@ -20,10 +20,11 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=review-v110-phase5-runtime" />
+  <link rel="stylesheet" href="assets/app.css?v=review-v127-a11y-connectivity" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
+  <div id="globalNetworkStatus" class="global-network-status" role="status" aria-live="polite" aria-atomic="true" hidden></div>
   <header class="site-header">
     <nav class="nav cq-navigation" aria-label="Main navigation">
       <a class="brand" href="#top" data-home-link aria-label="Nschess home">
@@ -3291,6 +3292,7 @@
               </div>
             </section>
             <div class="puzzle-board-wrap play-board-wrap cq-glass-container" aria-label="Playable chess board">
+              <div class="premove-status" id="premoveStatus" role="status" aria-live="polite" aria-atomic="true" hidden></div>
               <div class="review-eval-rail" id="reviewEvalRail" aria-label="Review evaluation bar" hidden>
                 <span class="review-eval-side review-eval-black">Black</span>
                 <span class="review-eval-fill" id="reviewEvalFill"></span>
@@ -3329,6 +3331,7 @@
                     <button class="button secondary" type="button" id="returnLobby">Lobby</button>
                     <button class="button" type="button" id="exportPgn">Copy PGN</button>
                     <button class="button secondary" type="button" id="importPgn">Import PGN</button>
+                    <button class="button secondary" type="button" id="cancelPremove" hidden>Cancel Premove</button>
                   </div>
                 </details>
               </div>
@@ -4496,6 +4499,6 @@
     </div>
   </aside>
 
-  <script defer src="assets/app.js?v=review-v110-phase5-runtime"></script>
+  <script defer src="assets/app.js?v=review-v127-a11y-connectivity"></script>
 </body>
 </html>

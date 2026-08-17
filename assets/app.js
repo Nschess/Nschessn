@@ -109,6 +109,415 @@
       if (square instanceof HTMLElement) square.focus({ preventScroll: true });
     }
 
+    // Shared board input foundation.  Board modes keep ownership of chess
+    // state and rendering; this layer only normalizes pointer, touch and
+    // keyboard events into a small interaction state machine.
+    const boardInteractionPhases = Object.freeze({ IDLE: "idle", PRESSED: "pressed", DRAGGING: "dragging" });
+    const boardInteractionEngine = (() => {
+      const registrations = new WeakMap();
+      const DRAG_THRESHOLD = 6;
+
+      function squareFromTarget(board, selector, target) {
+        const square = target instanceof Element ? target.closest(selector) : null;
+        return square && board.contains(square) ? square : null;
+      }
+
+      function squareAtPoint(board, selector, event) {
+        if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return null;
+        return squareFromTarget(board, selector, document.elementFromPoint(event.clientX, event.clientY));
+      }
+
+      function attach(board, options = {}) {
+        if (!(board instanceof HTMLElement)) return null;
+        const existing = registrations.get(board);
+        if (existing) return existing;
+        const selector = String(options.squareSelector || "[data-square]");
+        const state = {
+          phase: boardInteractionPhases.IDLE,
+          pointerId: null,
+          from: "",
+          hover: "",
+          startX: 0,
+          startY: 0,
+          suppressClick: false,
+          suppressTimer: 0,
+          longPressTimer: 0,
+          longPressVisualTimer: 0,
+          longPressTriggered: false,
+          ghost: null,
+          ghostFrame: 0,
+          ghostX: 0,
+          ghostY: 0,
+          ghostWidth: 0,
+          ghostHeight: 0
+        };
+        const callbacks = options;
+        const previousTouchAction = board.style.touchAction;
+        if (!previousTouchAction && callbacks.touchAction !== false) board.style.touchAction = "none";
+        if (!board.hasAttribute("aria-keyshortcuts")) {
+          board.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown ArrowLeft ArrowRight Home End Escape");
+        }
+        const setPhase = (next, event) => {
+          if (state.phase === next) return;
+          state.phase = next;
+          callbacks.onStateChange?.(next, state, event);
+        };
+        const armClickGuard = () => {
+          window.clearTimeout(state.suppressTimer);
+          state.suppressTimer = window.setTimeout(() => {
+            state.suppressClick = false;
+            state.suppressTimer = 0;
+          }, 500);
+        };
+        const clearLongPress = () => {
+          window.clearTimeout(state.longPressTimer);
+          state.longPressTimer = 0;
+        };
+        const clearLongPressVisual = () => {
+          window.clearTimeout(state.longPressVisualTimer);
+          state.longPressVisualTimer = 0;
+          board.querySelectorAll(`${selector}.is-long-press`).forEach((square) => square.classList.remove("is-long-press"));
+        };
+        const markLongPress = () => {
+          const square = board.querySelector(`${selector}[data-square="${state.from}"]`);
+          if (square) {
+            clearLongPressVisual();
+            square.classList.add("is-long-press");
+            state.longPressVisualTimer = window.setTimeout(() => {
+              square.classList.remove("is-long-press");
+              state.longPressVisualTimer = 0;
+            }, 460);
+          }
+          if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+            try { navigator.vibrate(8); } catch {}
+          }
+          callbacks.onLongPress?.(state.from, state);
+        };
+        const squareName = (square) => String(square?.dataset?.square || "");
+        const canInteract = (square, event) => Boolean(square && !square.disabled && callbacks.canInteract?.(squareName(square), event) !== false);
+        const clearGhost = () => {
+          if (state.ghostFrame) {
+            window.cancelAnimationFrame(state.ghostFrame);
+            state.ghostFrame = 0;
+          }
+          state.ghost?.remove();
+          state.ghost = null;
+          state.ghostWidth = 0;
+          state.ghostHeight = 0;
+        };
+        const positionGhost = () => {
+          state.ghostFrame = 0;
+          if (!state.ghost) return;
+          const x = state.ghostX - state.ghostWidth / 2;
+          const y = state.ghostY - state.ghostHeight / 2;
+          state.ghost.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        };
+        const moveGhost = (event) => {
+          if (!state.ghost || !Number.isFinite(event?.clientX) || !Number.isFinite(event?.clientY)) return;
+          state.ghostX = event.clientX;
+          state.ghostY = event.clientY;
+          if (!state.ghostFrame) state.ghostFrame = window.requestAnimationFrame(positionGhost);
+        };
+        const createGhost = (from, event) => {
+          if (callbacks.dragGhost === false || state.ghost || document.body?.classList.contains("perf-lite")) return;
+          const sourceSquare = board.querySelector(`${selector}[data-square="${from}"]`);
+          const sourcePiece = sourceSquare?.querySelector(".piece-svg, .piece-symbol, img");
+          if (!(sourcePiece instanceof HTMLElement) || !sourceSquare) return;
+          const rect = sourcePiece.getBoundingClientRect();
+          if (!rect.width || !rect.height) return;
+          const ghost = sourcePiece.cloneNode(true);
+          ghost.classList.add("board-drag-ghost");
+          ghost.removeAttribute("id");
+          ghost.setAttribute("aria-hidden", "true");
+          ghost.setAttribute("draggable", "false");
+          ghost.style.position = "fixed";
+          ghost.style.left = "0";
+          ghost.style.top = "0";
+          ghost.style.width = `${rect.width}px`;
+          ghost.style.height = `${rect.height}px`;
+          ghost.style.pointerEvents = "none";
+          ghost.style.zIndex = "1000";
+          ghost.style.willChange = "transform, opacity";
+          ghost.style.transition = "none";
+          state.ghost = ghost;
+          state.ghostWidth = rect.width;
+          state.ghostHeight = rect.height;
+          document.body.appendChild(ghost);
+          moveGhost(event);
+        };
+        const finishGhost = (accepted, event) => {
+          if (!state.ghost) return;
+          if (!accepted) {
+            const sourceSquare = board.querySelector(`${selector}[data-square="${state.from}"]`);
+            const sourcePiece = sourceSquare?.querySelector(".piece-svg, .piece-symbol, img");
+            const rect = sourcePiece?.getBoundingClientRect();
+            if (rect && rect.width && rect.height) {
+              state.ghost.style.transition = "transform 150ms cubic-bezier(.2,.8,.2,1), opacity 150ms ease";
+              state.ghost.style.transform = `translate3d(${rect.left + (rect.width - state.ghostWidth) / 2}px, ${rect.top + (rect.height - state.ghostHeight) / 2}px, 0)`;
+              state.ghost.style.opacity = "0.3";
+              window.setTimeout(clearGhost, 170);
+              return;
+            }
+          } else {
+            state.ghost.style.transition = "transform 130ms ease, opacity 130ms ease";
+            state.ghost.style.opacity = "0";
+            state.ghost.style.transform = `translate3d(${(event?.clientX || state.ghostX) - state.ghostWidth / 2}px, ${(event?.clientY || state.ghostY) - state.ghostHeight / 2}px, 0) scale(.94)`;
+            window.setTimeout(clearGhost, 145);
+            return;
+          }
+          clearGhost();
+        };
+        const emitHover = (square, event) => {
+          const next = squareName(square);
+          if (next === state.hover) return;
+          state.hover = next;
+          callbacks.onHover?.(next, event, state);
+          callbacks.onHighlight?.({ type: "hover", square: next }, event, state);
+        };
+        const releasePointer = (event) => {
+          if (state.pointerId !== null && board.hasPointerCapture?.(state.pointerId)) {
+            try { board.releasePointerCapture(state.pointerId); } catch {}
+          }
+          state.pointerId = null;
+          clearLongPress();
+          setPhase(boardInteractionPhases.IDLE, event);
+          state.from = "";
+          state.startX = 0;
+          state.startY = 0;
+          if (event) callbacks.onPointerEnd?.(event, state);
+        };
+        const onPointerDown = (event) => {
+          if (event.pointerType === "mouse" && event.button !== 0) return;
+          const square = squareFromTarget(board, selector, event.target);
+          if (!canInteract(square, event)) return;
+          setPhase(boardInteractionPhases.PRESSED, event);
+          state.pointerId = event.pointerId;
+          state.from = squareName(square);
+          state.startX = event.clientX;
+          state.startY = event.clientY;
+          window.clearTimeout(state.suppressTimer);
+          state.suppressTimer = 0;
+          state.suppressClick = false;
+          state.longPressTriggered = false;
+          clearLongPress();
+          clearLongPressVisual();
+          emitHover(square, event);
+          try { board.setPointerCapture(event.pointerId); } catch {}
+          // A touch gesture belongs to the board once it starts. Preventing
+          // the browser's scroll gesture here keeps board input deterministic.
+          if (event.pointerType === "touch") event.preventDefault();
+          if (event.pointerType === "touch") {
+            state.longPressTimer = window.setTimeout(() => {
+              state.longPressTimer = 0;
+              if (state.pointerId !== event.pointerId || state.phase !== boardInteractionPhases.PRESSED) return;
+              state.longPressTriggered = true;
+              markLongPress();
+            }, 360);
+          }
+          callbacks.onPointerDown?.(state.from, event, state);
+        };
+        const onPointerMove = (event) => {
+          const square = squareAtPoint(board, selector, event) || squareFromTarget(board, selector, event.target);
+          emitHover(square, event);
+          if (state.pointerId !== event.pointerId || state.phase === boardInteractionPhases.IDLE) return;
+          const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
+          if (distance >= DRAG_THRESHOLD) clearLongPress();
+          if (state.phase === boardInteractionPhases.PRESSED && distance >= DRAG_THRESHOLD && callbacks.canDrag?.(state.from, event) !== false) {
+            setPhase(boardInteractionPhases.DRAGGING, event);
+            board.classList.add("is-dragging");
+            callbacks.onDragStart?.(state.from, event, state);
+            createGhost(state.from, event);
+          }
+          if (state.phase === boardInteractionPhases.DRAGGING && event.pointerType === "touch") event.preventDefault();
+          if (state.phase === boardInteractionPhases.DRAGGING) moveGhost(event);
+          callbacks.onPointerMove?.(squareName(square), event, state);
+        };
+        const onPointerUp = (event) => {
+          if (state.pointerId !== event.pointerId) return;
+          const source = state.from;
+          const destination = squareAtPoint(board, selector, event) || squareFromTarget(board, selector, event.target);
+          const wasDragging = state.phase === boardInteractionPhases.DRAGGING;
+          state.suppressClick = true;
+          callbacks.onHighlight?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
+          callbacks.onAnimation?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
+          if (wasDragging) {
+            const result = callbacks.onDrop?.(source, squareName(destination), event, state);
+            finishGhost(result !== false, event);
+          }
+          else if (!state.longPressTriggered) callbacks.onSelect?.(source, event, state);
+          board.classList.remove("is-dragging");
+          releasePointer(event);
+          // Some browsers dispatch the compatibility click a frame later;
+          // keep the guard alive long enough to consume it without a second
+          // chess-state transition. A new pointerdown clears it immediately.
+          armClickGuard();
+        };
+        const onPointerCancel = (event) => {
+          if (state.pointerId !== event.pointerId) return;
+          callbacks.onCancel?.(state.from, event, state);
+          callbacks.onAnimation?.({ type: "cancel", from: state.from }, event, state);
+          board.classList.remove("is-dragging");
+          clearGhost();
+          state.suppressClick = true;
+          releasePointer(event);
+          armClickGuard();
+        };
+        const onClick = (event) => {
+          const square = squareFromTarget(board, selector, event.target);
+          if (!square) return;
+          if (state.suppressClick) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          if (canInteract(square, event)) callbacks.onSelect?.(squareName(square), event, state);
+        };
+        const onDragStart = (event) => {
+          // Native HTML5 drag creates a second input pipeline. Pointer events
+          // are the canonical path for mouse and touch, so suppress the
+          // browser ghost while retaining keyboard activation of square buttons.
+          if (squareFromTarget(board, selector, event.target)) event.preventDefault();
+        };
+        const onContextMenu = (event) => {
+          const square = squareFromTarget(board, selector, event.target);
+          if (!callbacks.onContextMenu) return;
+          event.preventDefault();
+          callbacks.onContextMenu(squareName(square), event, state);
+        };
+        const onKeyDown = (event) => {
+          const square = squareFromTarget(board, selector, event.target);
+          if (event.key === "Escape") {
+            callbacks.onCancel?.(state.from || squareName(square), event, state);
+            state.from = "";
+            setPhase(boardInteractionPhases.IDLE, event);
+            return;
+          }
+          if (!square || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          const squares = [...board.querySelectorAll(selector)];
+          const index = squares.indexOf(square);
+          if (index < 0) return;
+          const row = Math.floor(index / 8);
+          const col = index % 8;
+          let nextIndex = index;
+          if (event.key === "ArrowUp") nextIndex = row > 0 ? index - 8 : index;
+          if (event.key === "ArrowDown") nextIndex = row < 7 ? index + 8 : index;
+          if (event.key === "ArrowLeft") nextIndex = col > 0 ? index - 1 : index;
+          if (event.key === "ArrowRight") nextIndex = col < 7 ? index + 1 : index;
+          if (event.key === "Home") nextIndex = 0;
+          if (event.key === "End") nextIndex = squares.length - 1;
+          if (nextIndex === index || !squares[nextIndex]) return;
+          event.preventDefault();
+          squares[nextIndex].focus({ preventScroll: true });
+        };
+
+        board.addEventListener("pointerdown", onPointerDown, { passive: false });
+        board.addEventListener("pointermove", onPointerMove, { passive: false });
+        board.addEventListener("pointerup", onPointerUp, { passive: false });
+        board.addEventListener("pointercancel", onPointerCancel, { passive: false });
+        const onPointerOver = (event) => emitHover(squareFromTarget(board, selector, event.target), event);
+        const onPointerOut = (event) => {
+          if (!squareFromTarget(board, selector, event.relatedTarget)) emitHover(null, event);
+        };
+        board.addEventListener("pointerover", onPointerOver, { passive: true });
+        board.addEventListener("pointerout", onPointerOut, { passive: true });
+        board.addEventListener("click", onClick);
+        board.addEventListener("dragstart", onDragStart);
+        board.addEventListener("contextmenu", onContextMenu);
+        board.addEventListener("keydown", onKeyDown);
+
+        const registration = {
+          board,
+          state,
+          detach() {
+            board.removeEventListener("pointerdown", onPointerDown);
+            board.removeEventListener("pointermove", onPointerMove);
+            board.removeEventListener("pointerup", onPointerUp);
+            board.removeEventListener("pointercancel", onPointerCancel);
+            board.removeEventListener("pointerover", onPointerOver);
+            board.removeEventListener("pointerout", onPointerOut);
+            board.removeEventListener("click", onClick);
+            board.removeEventListener("dragstart", onDragStart);
+            board.removeEventListener("contextmenu", onContextMenu);
+            board.removeEventListener("keydown", onKeyDown);
+            window.clearTimeout(state.suppressTimer);
+            state.suppressTimer = 0;
+            clearLongPress();
+            clearLongPressVisual();
+            board.classList.remove("is-dragging");
+            clearGhost();
+            if (!previousTouchAction && callbacks.touchAction !== false) board.style.touchAction = "";
+            registrations.delete(board);
+          }
+        };
+        registrations.set(board, registration);
+        return registration;
+      }
+
+      return Object.freeze({
+        phases: boardInteractionPhases,
+        attach,
+        detach(board) { registrations.get(board)?.detach(); },
+        getState(board) { return registrations.get(board)?.state || null; }
+      });
+    })();
+
+    const boardMotionTokens = new WeakMap();
+    function boardMotionEnabled() {
+      const body = document.body;
+      return Boolean(body && !body.classList.contains("perf-lite") && !body.classList.contains("low-performance") && !body.classList.contains("reduced-motion") && !window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+    }
+
+    function getBoardMotionPaths(move) {
+      if (!move?.from || !move?.to) return [];
+      const paths = [{ from: move.from, to: move.to }];
+      const flags = String(move.flags || "");
+      if (flags.includes("k") || flags.includes("q")) {
+        const rank = move.color === "b" ? "8" : "1";
+        paths.push(flags.includes("k")
+          ? { from: `h${rank}`, to: `f${rank}` }
+          : { from: `a${rank}`, to: `d${rank}` });
+      }
+      return paths;
+    }
+
+    function animateBoardPieceTransition(board, move) {
+      if (!boardMotionEnabled() || !(board instanceof HTMLElement)) return;
+      const paths = getBoardMotionPaths(move);
+      if (!paths.length) return;
+      const token = (boardMotionTokens.get(board) || 0) + 1;
+      boardMotionTokens.set(board, token);
+      window.requestAnimationFrame(() => {
+        if (boardMotionTokens.get(board) !== token) return;
+        paths.forEach(({ from, to }) => {
+          const fromSquare = board.querySelector(`[data-square="${from}"]`);
+          const toSquare = board.querySelector(`[data-square="${to}"]`);
+          const piece = toSquare?.querySelector(".piece-svg, .piece-symbol, img");
+          if (!fromSquare || !toSquare || !(piece instanceof HTMLElement)) return;
+          const fromRect = fromSquare.getBoundingClientRect();
+          const toRect = toSquare.getBoundingClientRect();
+          if (!fromRect.width || !toRect.width) return;
+          const previous = { transform: piece.style.transform, opacity: piece.style.opacity, transition: piece.style.transition };
+          const dx = fromRect.left - toRect.left;
+          const dy = fromRect.top - toRect.top;
+          piece.style.transition = "none";
+          piece.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+          piece.style.opacity = "0.72";
+          window.requestAnimationFrame(() => {
+            if (!piece.isConnected) return;
+            piece.style.transition = "transform 150ms cubic-bezier(.2,.8,.2,1), opacity 150ms ease";
+            piece.style.transform = "translate3d(0, 0, 0)";
+            piece.style.opacity = "1";
+            window.setTimeout(() => {
+              if (!piece.isConnected || boardMotionTokens.get(board) !== token) return;
+              piece.style.transform = previous.transform;
+              piece.style.opacity = previous.opacity;
+              piece.style.transition = previous.transition;
+            }, 165);
+          });
+        });
+      });
+    }
+
     function resolvePieceSvgSet(style) {
       const requested = String(style || "chessnut").toLowerCase();
       return supportedPieceSvgSets.has(requested) ? requested : "chessnut";
@@ -3555,8 +3964,16 @@
 
         renderPieceOnSquare(square, piece);
         square.setAttribute("aria-label", `${name}${piece ? ` ${piece}` : ""}`);
-        square.addEventListener("click", () => handleAdventureClick(name));
         board.appendChild(square);
+      });
+      boardInteractionEngine.attach(board, {
+        squareSelector: ".adventure-square",
+        onSelect(square) { handleAdventureClick(square); },
+        onCancel() {
+          if (!selectedAdventureSquare) return;
+          selectedAdventureSquare = "";
+          renderAdventureBoard();
+        }
       });
     }
 
@@ -3842,10 +4259,52 @@
           legalTargets.includes(name) ? "legal destination" : "",
           tutorialLastMove?.includes(name) ? "last move" : ""
         ]));
-        square.addEventListener("click", () => handleTutorialSquare(name));
         board.appendChild(square);
       });
+      boardInteractionEngine.attach(board, {
+        squareSelector: ".tutorial-square",
+        onSelect(square, event) {
+          if (event?.shiftKey && selectedTutorialSquare && selectedTutorialSquare !== square) {
+            addAnalysisArrow(board, {
+              id: `tutorial-user-arrow:${selectedTutorialSquare}-${square}`,
+              from: selectedTutorialSquare,
+              to: square,
+              kind: "primary",
+              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "green"
+            });
+            selectedTutorialSquare = "";
+            renderTutorialBoard();
+            return;
+          }
+          handleTutorialSquare(square);
+        },
+        onLongPress(square) {
+          toggleAnalysisHighlight(board, { id: `tutorial-user-highlight:${square}`, square, kind: "coach", color: "blue" });
+        },
+        onCancel() {
+          clearAnalysisUserOverlay(board);
+          if (!selectedTutorialSquare) return;
+          selectedTutorialSquare = "";
+          renderTutorialBoard();
+        },
+        onContextMenu() {
+          clearAnalysisUserOverlay(board);
+        }
+      });
+      const tutorialEffectKey = tutorialLastMove?.join("-") || "";
+      const animateTutorialMove = Boolean(tutorialEffectKey && board.dataset.pieceEffect !== tutorialEffectKey);
+      if (tutorialEffectKey) board.dataset.pieceEffect = tutorialEffectKey;
+      if (animateTutorialMove) animateBoardPieceTransition(board, { from: tutorialLastMove[0], to: tutorialLastMove[1] });
       restoreBoardFocus(board, focusedSquareName);
+      renderAnalysisOverlay({
+        board,
+        wrap: board,
+        arrows: tutorialLastMove?.length === 2 ? [{ id: "tutorial-last-move", from: tutorialLastMove[0], to: tutorialLastMove[1], kind: "training", color: "yellow" }] : [],
+        highlights: [
+          ...(selectedTutorialSquare ? [{ id: "tutorial-selected", square: selectedTutorialSquare, kind: "selected", color: "blue" }] : []),
+          ...legalTargets.map((square) => ({ id: `tutorial-legal:${square}`, square, kind: "legal", color: "yellow" }))
+        ]
+      });
     }
 
     function setTutorialCoach(message, speak = false) {
@@ -4318,6 +4777,33 @@
       return game;
     }
 
+    function handleOpeningExplorerSquare(squareNameValue) {
+      const currentGame = getOpeningExplorerGame();
+      const currentBoard = currentGame?.board?.() || [];
+      const index = squareToIndex(squareNameValue);
+      const currentPiece = index >= 0 ? currentBoard[Math.floor(index / 8)]?.[index % 8] : null;
+      if (!currentGame) {
+        openingExplorerRuntime.selected = "";
+        renderOpeningExplorerBoard();
+        return;
+      }
+      if (!openingExplorerRuntime.selected) {
+        if (currentPiece?.color === currentGame.turn()) openingExplorerRuntime.selected = squareNameValue;
+        renderOpeningExplorerBoard();
+        return;
+      }
+      let nextSelection = "";
+      try {
+        currentGame.move({ from: openingExplorerRuntime.selected, to: squareNameValue, promotion: "q" });
+        openingExplorerRuntime.moves = currentGame.history();
+        openingExplorerRuntime.moveIndex = openingExplorerRuntime.moves.length;
+      } catch {
+        nextSelection = currentPiece?.color === currentGame.turn() ? squareNameValue : "";
+      }
+      openingExplorerRuntime.selected = nextSelection;
+      renderOpeningExplorerBoard();
+    }
+
     function renderOpeningExplorerBoard() {
       const board = document.getElementById("openingExplorerBoard");
       if (!board) return;
@@ -4327,10 +4813,16 @@
         rows.at(-1).push(piece);
         return rows;
       }, []);
-      const legalTargets = new Set();
+      const legalMovesByTarget = new Map();
       if (game && openingExplorerRuntime.selected) {
-        try { game.moves({ square: openingExplorerRuntime.selected, verbose: true }).forEach((move) => legalTargets.add(move.to)); } catch { /* no selection */ }
+        try { game.moves({ square: openingExplorerRuntime.selected, verbose: true }).forEach((move) => legalMovesByTarget.set(move.to, move)); } catch { /* no selection */ }
       }
+      const legalTargets = new Set(legalMovesByTarget.keys());
+      const openingHistory = game?.history?.({ verbose: true }) || [];
+      const openingLastMove = openingHistory.at(-1) || null;
+      const openingCheckedKing = game && callCoachRule(game, "isCheck", "in_check")
+        ? boardRows.flat().map((piece, squareIndex) => piece?.type === "k" && piece?.color === game.turn() ? squareName(squareIndex) : "").find(Boolean) || ""
+        : "";
       const fragment = document.createDocumentFragment();
       boardRows.flat().forEach((piece, index) => {
         const squareNameValue = squareName(index);
@@ -4342,38 +4834,71 @@
         square.dataset.square = squareNameValue;
         const selected = openingExplorerRuntime.selected === squareNameValue;
         if (selected) square.classList.add("is-selected");
-        if (legalTargets.has(squareNameValue)) square.classList.add("is-legal");
-        square.setAttribute("aria-label", getAccessibleSquareLabel(squareNameValue, piece, [selected ? "selected" : "", legalTargets.has(squareNameValue) ? "legal move" : ""]));
+        const legalMove = legalMovesByTarget.get(squareNameValue);
+        if (legalMove) square.classList.add(legalMove.captured || String(legalMove.flags || "").includes("e") ? "is-capture" : "is-legal");
+        if (openingLastMove && [openingLastMove.from, openingLastMove.to].includes(squareNameValue)) square.classList.add("is-last");
+        if (openingLastMove?.to === squareNameValue && openingLastMove.captured) square.classList.add("is-capture");
+        if (openingCheckedKing === squareNameValue) square.classList.add("is-check");
+        square.setAttribute("aria-label", getAccessibleSquareLabel(squareNameValue, piece, [selected ? "selected" : "", legalMove ? (legalMove.captured || String(legalMove.flags || "").includes("e") ? "capture available" : "legal move") : ""]));
         renderPieceOnSquare(square, piece);
-        square.addEventListener("click", () => {
-          const currentGame = getOpeningExplorerGame();
-          const currentBoard = currentGame?.board?.() || [];
-          const currentPiece = currentBoard[Math.floor(index / 8)]?.[index % 8];
-          if (!currentGame) {
-            openingExplorerRuntime.selected = "";
-            renderOpeningExplorerBoard();
-            return;
-          }
-          if (!openingExplorerRuntime.selected) {
-            if (currentPiece?.color === currentGame.turn()) openingExplorerRuntime.selected = squareNameValue;
-            renderOpeningExplorerBoard();
-            return;
-          }
-          let nextSelection = "";
-          try {
-            currentGame.move({ from: openingExplorerRuntime.selected, to: squareNameValue, promotion: "q" });
-            openingExplorerRuntime.moves = currentGame.history();
-            openingExplorerRuntime.moveIndex = openingExplorerRuntime.moves.length;
-          } catch {
-            nextSelection = currentPiece?.color === currentGame.turn() ? squareNameValue : "";
-          }
-          openingExplorerRuntime.selected = nextSelection;
-          renderOpeningExplorerBoard();
-        });
         fragment.appendChild(square);
       });
       board.replaceChildren(fragment);
       board.dataset.moveIndex = String(openingExplorerRuntime.moveIndex);
+      boardInteractionEngine.attach(board, {
+        squareSelector: ".opening-explorer-square",
+        onSelect(square, event) {
+          if (event?.shiftKey && openingExplorerRuntime.selected && openingExplorerRuntime.selected !== square) {
+            addAnalysisArrow(board, {
+              id: `opening-user-arrow:${openingExplorerRuntime.selected}-${square}`,
+              from: openingExplorerRuntime.selected,
+              to: square,
+              kind: "primary",
+              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "green"
+            });
+            openingExplorerRuntime.selected = "";
+            renderOpeningExplorerBoard();
+            return;
+          }
+          handleOpeningExplorerSquare(square);
+        },
+        onLongPress(square) {
+          toggleAnalysisHighlight(board, { id: `opening-user-highlight:${square}`, square, kind: "coach", color: "yellow" });
+        },
+        onCancel() {
+          clearAnalysisUserOverlay(board);
+          if (!openingExplorerRuntime.selected) return;
+          openingExplorerRuntime.selected = "";
+          renderOpeningExplorerBoard();
+        },
+        onContextMenu() {
+          clearAnalysisUserOverlay(board);
+        }
+      });
+      const openingEffectKey = openingLastMove ? `${openingExplorerRuntime.moveIndex}-${openingLastMove.from}-${openingLastMove.to}-${openingLastMove.san || ""}` : "";
+      const animateOpeningMove = Boolean(openingEffectKey && board.dataset.pieceEffect !== openingEffectKey);
+      if (openingEffectKey) board.dataset.pieceEffect = openingEffectKey;
+      if (animateOpeningMove) animateBoardPieceTransition(board, openingLastMove);
+      const openingHighlights = [
+        ...(openingExplorerRuntime.selected ? [{ id: "opening-selected", square: openingExplorerRuntime.selected, kind: "engine", color: "blue" }] : []),
+        ...[...legalMovesByTarget.entries()].map(([square, move]) => ({
+          id: `opening-legal:${square}`,
+          square,
+          kind: move?.captured || String(move?.flags || "").includes("e") ? "attack" : "legal",
+          color: move?.captured || String(move?.flags || "").includes("e") ? "red" : "yellow"
+        })),
+        ...(openingCheckedKing ? [{ id: "opening-check", square: openingCheckedKing, kind: "attack", color: "red" }] : []),
+        ...(openingLastMove ? [
+          { id: "opening-last-from", square: openingLastMove.from, kind: "played", color: "yellow" },
+          { id: "opening-last-to", square: openingLastMove.to, kind: "played", color: "yellow" }
+        ] : [])
+      ];
+      renderAnalysisOverlay({
+        board,
+        wrap: board,
+        arrows: openingLastMove ? [{ id: "opening-last-move", from: openingLastMove.from, to: openingLastMove.to, kind: "played", color: "yellow" }] : [],
+        highlights: openingHighlights
+      });
     }
 
     function renderOpeningExplorerFavoriteState() {
@@ -15545,6 +16070,7 @@
     function suspendGameReviewWorkspaceForNavigation() {
       const reviewPage = document.getElementById("gameReview");
       if (!reviewPage?.classList.contains("is-review-page") || isGameReviewRoute()) return;
+      clearAllAnalysisOverlays();
       window.clearInterval(reviewReplayTimer);
       reviewReplayTimer = 0;
       stopReviewBestLineReplay();
@@ -16354,6 +16880,8 @@
           mode: getReviewAnalysisModeLabel(mode),
           evalText: result?.evalText || "0.00",
           best: bestMove?.san || result?.bestMove || "--",
+          bestMoveUci: result?.bestMove || "",
+          pvUci: result?.pv || "",
           depth: result?.depth || "--",
           line: formatReviewSelfAnalysisPrincipalVariation(fen, result?.pv)
         };
@@ -17270,13 +17798,29 @@
     }
 
     function getReviewOverlayData() {
-      if (reviewSelfAnalysisState) return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
+      if (reviewSelfAnalysisState) {
+        const state = reviewSelfAnalysisState;
+        const fen = coachGame?.fen?.() || state.baseFen || "";
+        const engineMove = state.analysis?.bestMoveUci ? getMoveFromFenUci(fen, state.analysis.bestMoveUci) : null;
+        const best = engineMove ? { id: "self-analysis-best", from: engineMove.from, to: engineMove.to, promotion: engineMove.promotion || "", kind: "best", color: "green", label: state.analysis.best } : null;
+        const privateLine = state.analysis?.pvUci && fen ? getReviewBestLineMoves({ fenBefore: fen, pvUci: state.analysis.pvUci }).slice(0, 4).map((lineMove, index) => ({
+          id: `self-analysis-pv-${index}`, from: lineMove.from, to: lineMove.to, promotion: lineMove.promotion || "", kind: "pv", color: "blue", label: lineMove.san
+        })) : [];
+        const played = coachLastMove?.from && coachLastMove?.to ? { id: "self-analysis-played", from: coachLastMove.from, to: coachLastMove.to, kind: "played", color: "yellow", label: coachLastMove.san } : null;
+        return {
+          arrows: [...(played ? [played] : []), ...(best ? [best] : []), ...privateLine],
+          attacks: new Set(),
+          engineSquares: new Set(best ? [best.from, best.to] : []),
+          played,
+          best
+        };
+      }
       if (reviewRetryState) {
         const move = activeMatchReview?.moves?.[reviewRetryState.index];
         if (!reviewRetryState.hint || !move?.bestFrom || !move?.bestTo) {
           return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
         }
-        const best = { from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", label: move.best };
+        const best = { id: "review-best-retry", from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", color: "green", label: move.best };
         return {
           arrows: [best], attacks: getReviewMoveAttackSquares(move, true), engineSquares: new Set([best.from, best.to]), played: null, best
         };
@@ -17285,7 +17829,7 @@
         if (!reviewBestLineMove?.from || !reviewBestLineMove?.to) {
           return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
         }
-        const best = { ...reviewBestLineMove, kind: "best" };
+        const best = { id: "review-best-line", ...reviewBestLineMove, kind: "best", color: "green" };
         return {
           arrows: [best],
           attacks: new Set(),
@@ -17296,78 +17840,383 @@
       }
       const move = activeMatchReview?.moves?.[reviewReplayIndex];
       if (!move) return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
-      const played = { from: move.from, to: move.to, promotion: move.promotion || "", kind: "played", label: move.san };
-      const best = { from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", label: move.best };
+      const played = { id: `review-played-${reviewReplayIndex}`, from: move.from, to: move.to, promotion: move.promotion || "", kind: "played", color: "yellow", label: move.san };
+      const best = { id: `review-best-${reviewReplayIndex}`, from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", color: "green", label: move.best };
       const hasBest = Boolean(best.from && best.to);
       const showBest = hasBest && !sameReviewPath(played, best);
-      const arrows = [played, ...(showBest ? [best] : [])];
+      const pvArrows = getReviewBestLineMoves(move).slice(0, 4).map((lineMove, index) => ({
+        id: `review-pv-${reviewReplayIndex}-${index}`,
+        from: lineMove.from,
+        to: lineMove.to,
+        promotion: lineMove.promotion || "",
+        kind: "pv",
+        color: "blue",
+        label: lineMove.san
+      }));
+      const threat = [...getReviewMoveAttackSquares(move, reviewCompareMode === "best" && hasBest)]
+        .filter((square) => square && square !== move.to)
+        .slice(0, 1)
+        .map((square) => ({ id: `review-threat-${reviewReplayIndex}`, from: move.to, to: square, kind: "threat", color: "red" }));
+      const arrows = [played, ...(showBest ? [best] : []), ...pvArrows, ...threat];
       const attacks = getReviewMoveAttackSquares(move, reviewCompareMode === "best" && hasBest);
       const engineSquares = new Set(showBest || reviewCompareMode === "best" ? [best.from, best.to].filter(Boolean) : []);
       return { arrows, attacks, engineSquares, played, best: hasBest ? best : null };
     }
 
+    const ANALYSIS_OVERLAY_NS = "http://www.w3.org/2000/svg";
+    const ANALYSIS_OVERLAY_COLORS = Object.freeze({
+      green: { stroke: "rgba(127,166,80,.94)", fill: "rgba(127,166,80,.22)", glow: "rgba(127,166,80,.42)" },
+      blue: { stroke: "rgba(93,191,255,.94)", fill: "rgba(93,191,255,.18)", glow: "rgba(93,191,255,.42)" },
+      yellow: { stroke: "rgba(255,211,107,.94)", fill: "rgba(255,211,107,.19)", glow: "rgba(255,211,107,.42)" },
+      red: { stroke: "rgba(255,128,112,.94)", fill: "rgba(255,128,112,.18)", glow: "rgba(255,128,112,.42)" }
+    });
+    const analysisOverlayControllers = new WeakMap();
+    const analysisOverlayStates = new Set();
+    let analysisOverlaySequence = 0;
+
+    function normalizeAnalysisColor(value, kind = "") {
+      const explicit = String(value || "").toLowerCase();
+      if (ANALYSIS_OVERLAY_COLORS[explicit]) return explicit;
+      const normalizedKind = String(kind || "").toLowerCase();
+      if (["best", "engine"].includes(normalizedKind)) return "green";
+      if (["pv", "candidate"].includes(normalizedKind)) return "blue";
+      if (["threat", "attack"].includes(normalizedKind)) return "red";
+      return "yellow";
+    }
+
+    function analysisOverlayElement(name) {
+      return document.createElementNS(ANALYSIS_OVERLAY_NS, name);
+    }
+
+    function analysisOverlayControllerFor(board, target = board) {
+      if (!(board instanceof HTMLElement) || !(target instanceof HTMLElement)) return null;
+      const existing = analysisOverlayControllers.get(board);
+      if (existing && existing.target === target) return existing;
+      if (existing) existing.destroy();
+      const state = {
+        board,
+        target,
+        svg: null,
+        defs: null,
+        highlightGroup: null,
+        arrowGroup: null,
+        markerIds: new Map(),
+        arrowNodes: new Map(),
+        highlightNodes: new Map(),
+        baseArrows: [],
+        baseHighlights: [],
+        userArrows: new Map(),
+        userHighlights: new Map(),
+        raf: 0,
+        destroyed: false
+      };
+      const controller = {
+        state,
+        board,
+        target,
+        ensureLayer() {
+          if (state.destroyed) return null;
+          const layers = [...target.querySelectorAll(":scope > .review-arrow-layer")];
+          layers.slice(1).forEach((layer) => layer.remove());
+          if (!layers[0]) {
+            const svg = analysisOverlayElement("svg");
+            svg.classList.add("review-arrow-layer");
+            svg.setAttribute("viewBox", "0 0 8 8");
+            svg.setAttribute("preserveAspectRatio", "none");
+            svg.setAttribute("aria-hidden", "true");
+            const defs = analysisOverlayElement("defs");
+            const highlightGroup = analysisOverlayElement("g");
+            const arrowGroup = analysisOverlayElement("g");
+            highlightGroup.setAttribute("data-analysis-layer", "highlights");
+            arrowGroup.setAttribute("data-analysis-layer", "arrows");
+            svg.append(defs, highlightGroup, arrowGroup);
+            target.appendChild(svg);
+            state.svg = svg;
+            state.defs = defs;
+            state.highlightGroup = highlightGroup;
+            state.arrowGroup = arrowGroup;
+          } else if (state.svg !== layers[0]) {
+            state.svg = layers[0];
+            state.defs = state.svg.querySelector("defs") || analysisOverlayElement("defs");
+            state.highlightGroup = state.svg.querySelector('[data-analysis-layer="highlights"]') || analysisOverlayElement("g");
+            state.arrowGroup = state.svg.querySelector('[data-analysis-layer="arrows"]') || analysisOverlayElement("g");
+            state.highlightGroup.setAttribute("data-analysis-layer", "highlights");
+            state.arrowGroup.setAttribute("data-analysis-layer", "arrows");
+            if (!state.defs.parentNode) state.svg.prepend(state.defs);
+            if (!state.highlightGroup.parentNode) state.svg.append(state.highlightGroup);
+            if (!state.arrowGroup.parentNode) state.svg.append(state.arrowGroup);
+          }
+          return state.svg;
+        },
+        schedule() {
+          if (state.destroyed || state.raf) return;
+          state.raf = window.requestAnimationFrame(() => {
+            state.raf = 0;
+            controller.draw();
+          });
+        },
+        draw() {
+          if (state.destroyed) return;
+          const arrows = [...state.baseArrows, ...state.userArrows.values()];
+          const highlights = [...state.baseHighlights, ...state.userHighlights.values()];
+          if (!arrows.length && !highlights.length) {
+            state.svg?.remove();
+            state.svg = null;
+            state.arrowNodes.clear();
+            state.highlightNodes.clear();
+            return;
+          }
+          const svg = controller.ensureLayer();
+          if (!svg) return;
+          const squares = [...board.querySelectorAll("[data-square]")].map((square) => square.dataset.square || "");
+          const point = (index) => ({ x: (index % 8) + 0.5, y: Math.floor(index / 8) + 0.5 });
+          const liveArrowIds = new Set();
+          arrows.forEach((arrow, index) => {
+            const fromIndex = squares.indexOf(arrow.from);
+            const toIndex = squares.indexOf(arrow.to);
+            if (fromIndex < 0 || toIndex < 0) return;
+            const id = String(arrow.id || `${arrow.kind || "arrow"}:${arrow.from}-${arrow.to}-${index}`);
+            liveArrowIds.add(id);
+            let line = state.arrowNodes.get(id);
+            if (!line || !line.isConnected) {
+              line = analysisOverlayElement("line");
+              state.arrowNodes.set(id, line);
+              state.arrowGroup.appendChild(line);
+            }
+            const colorName = normalizeAnalysisColor(arrow.color, arrow.kind);
+            const color = ANALYSIS_OVERLAY_COLORS[colorName];
+            const from = point(fromIndex);
+            const to = point(toIndex);
+            const kind = String(arrow.kind || "").toLowerCase();
+            line.setAttribute("class", `review-arrow-line ${kind === "best" || kind === "engine" ? "is-best is-engine" : kind === "candidate" || kind === "pv" ? "is-candidate" : kind === "threat" ? "is-threat" : "is-played"}`);
+            line.setAttribute("x1", String(from.x));
+            line.setAttribute("y1", String(from.y));
+            line.setAttribute("x2", String(to.x));
+            line.setAttribute("y2", String(to.y));
+            line.setAttribute("marker-end", `url(#${controller.markerFor(colorName)})`);
+            line.style.stroke = color.stroke;
+            line.dataset.arrowId = id;
+            if (arrow.label) line.setAttribute("aria-label", String(arrow.label));
+            else line.removeAttribute("aria-label");
+          });
+          [...state.arrowNodes].forEach(([id, line]) => {
+            if (!liveArrowIds.has(id)) {
+              line.remove();
+              state.arrowNodes.delete(id);
+            }
+          });
+          const liveHighlightIds = new Set();
+          highlights.forEach((highlight, index) => {
+            const squareName = typeof highlight === "string" ? highlight : highlight.square;
+            const squareIndex = squares.indexOf(squareName);
+            if (squareIndex < 0) return;
+            const id = String((typeof highlight === "string" ? `highlight:${squareName}` : highlight.id) || `${highlight.kind || "highlight"}:${squareName}-${index}`);
+            liveHighlightIds.add(id);
+            let rect = state.highlightNodes.get(id);
+            if (!rect || !rect.isConnected) {
+              rect = analysisOverlayElement("rect");
+              state.highlightNodes.set(id, rect);
+              state.highlightGroup.appendChild(rect);
+            }
+            const kind = typeof highlight === "string" ? "" : String(highlight.kind || "");
+            const colorName = normalizeAnalysisColor(typeof highlight === "string" ? "" : highlight.color, kind);
+            const color = ANALYSIS_OVERLAY_COLORS[colorName];
+            rect.setAttribute("class", `analysis-square-highlight${kind ? ` is-${kind}` : ""}`);
+            rect.setAttribute("x", String(squareIndex % 8 + 0.07));
+            rect.setAttribute("y", String(Math.floor(squareIndex / 8) + 0.07));
+            rect.setAttribute("width", "0.86");
+            rect.setAttribute("height", "0.86");
+            rect.setAttribute("rx", "0.12");
+            rect.style.fill = color.fill;
+            rect.style.stroke = color.stroke;
+            rect.dataset.highlightId = id;
+          });
+          [...state.highlightNodes].forEach(([id, rect]) => {
+            if (!liveHighlightIds.has(id)) {
+              rect.remove();
+              state.highlightNodes.delete(id);
+            }
+          });
+        },
+        markerFor(colorName) {
+          const existing = state.markerIds.get(colorName);
+          if (existing && state.defs?.querySelector(`[id="${existing}"]`)) return existing;
+          const id = `analysis-arrow-head-${++analysisOverlaySequence}-${colorName}`;
+          const marker = analysisOverlayElement("marker");
+          marker.setAttribute("id", id);
+          marker.setAttribute("markerWidth", "0.42");
+          marker.setAttribute("markerHeight", "0.42");
+          marker.setAttribute("refX", "0.36");
+          marker.setAttribute("refY", "0.21");
+          marker.setAttribute("orient", "auto");
+          marker.setAttribute("markerUnits", "userSpaceOnUse");
+          const path = analysisOverlayElement("path");
+          path.setAttribute("d", "M0,0 L0.42,0.21 L0,0.42 Z");
+          path.setAttribute("fill", ANALYSIS_OVERLAY_COLORS[colorName].stroke);
+          marker.appendChild(path);
+          controller.ensureLayer()?.querySelector("defs")?.appendChild(marker);
+          state.markerIds.set(colorName, id);
+          return id;
+        },
+        render(nextArrows, nextHighlights) {
+          state.baseArrows = (Array.isArray(nextArrows) ? nextArrows : []).map((arrow, index) => typeof arrow === "string" ? null : ({ ...arrow, id: arrow.id || `base-arrow-${index}` })).filter(Boolean);
+          state.baseHighlights = (Array.isArray(nextHighlights) ? nextHighlights : []).map((highlight, index) => typeof highlight === "string" ? { id: `base-highlight-${highlight}-${index}`, square: highlight } : ({ ...highlight, id: highlight.id || `base-highlight-${highlight.square}-${index}` })).filter((highlight) => highlight?.square);
+          controller.schedule();
+          return controller;
+        },
+        addArrow(arrow) {
+          if (!arrow?.from || !arrow?.to) return controller;
+          const id = String(arrow.id || `user-arrow:${arrow.from}-${arrow.to}-${Date.now()}`);
+          state.userArrows.set(id, { ...arrow, id });
+          controller.schedule();
+          return controller;
+        },
+        toggleHighlight(highlight) {
+          if (!highlight?.square) return controller;
+          const id = String(highlight.id || `user-highlight:${highlight.square}`);
+          if (state.userHighlights.has(id)) state.userHighlights.delete(id);
+          else state.userHighlights.set(id, { ...highlight, id });
+          controller.schedule();
+          return controller;
+        },
+        clearItem(id) {
+          state.userArrows.delete(String(id));
+          state.userHighlights.delete(String(id));
+          state.baseArrows = state.baseArrows.filter((arrow) => String(arrow.id) !== String(id));
+          state.baseHighlights = state.baseHighlights.filter((highlight) => String(highlight.id) !== String(id));
+          controller.schedule();
+        },
+        clearUser() {
+          state.userArrows.clear();
+          state.userHighlights.clear();
+          controller.schedule();
+        },
+        clearAll() {
+          state.baseArrows = [];
+          state.baseHighlights = [];
+          controller.clearUser();
+        },
+        destroy() {
+          if (state.destroyed) return;
+          state.destroyed = true;
+          if (state.raf) window.cancelAnimationFrame(state.raf);
+          state.raf = 0;
+          state.svg?.remove();
+          state.arrowNodes.clear();
+          state.highlightNodes.clear();
+          analysisOverlayStates.delete(state);
+          analysisOverlayControllers.delete(board);
+        }
+      };
+      analysisOverlayControllers.set(board, controller);
+      analysisOverlayStates.add(state);
+      return controller;
+    }
+
+    function renderAnalysisOverlay({ board, arrows = [], highlights = [], wrap = null } = {}) {
+      if (!(board instanceof HTMLElement)) return null;
+      const target = wrap instanceof HTMLElement ? wrap : board;
+      const controller = analysisOverlayControllerFor(board, target);
+      return controller?.render(arrows, highlights) || null;
+    }
+
+    function addAnalysisArrow(board, arrow) {
+      return analysisOverlayControllers.get(board)?.addArrow(arrow) || null;
+    }
+
+    function toggleAnalysisHighlight(board, highlight) {
+      return analysisOverlayControllers.get(board)?.toggleHighlight(highlight) || analysisOverlayControllerFor(board, board)?.toggleHighlight(highlight) || null;
+    }
+
+    function clearAnalysisOverlayItem(board, id) {
+      analysisOverlayControllers.get(board)?.clearItem(id);
+    }
+
+    function clearAnalysisUserOverlay(board) {
+      analysisOverlayControllers.get(board)?.clearUser();
+    }
+
+    function clearAnalysisOverlay(board, { includeUser = true } = {}) {
+      const controller = analysisOverlayControllers.get(board);
+      if (!controller) return;
+      if (includeUser) controller.clearAll();
+      else controller.clearUser();
+      controller.destroy();
+    }
+
+    function clearAllAnalysisOverlays() {
+      [...analysisOverlayStates].forEach((state) => analysisOverlayControllers.get(state.board)?.destroy());
+    }
+
     function renderReviewArrow() {
-      const wrap = document.querySelector("#coachBoard")?.closest(".puzzle-board-wrap");
-      if (!wrap) return;
-      wrap.querySelector(".review-arrow-layer")?.remove();
+      const board = document.querySelector("#coachBoard");
+      const wrap = board?.closest(".puzzle-board-wrap");
+      if (!board || !wrap) return;
+      const reviewPage = document.getElementById("gameReview");
+      if (!reviewPage?.classList.contains("is-review-page")) {
+        clearAnalysisOverlay(board);
+        return;
+      }
       const overlay = getReviewOverlayData();
-      if (!overlay.arrows.length || !activeMatchReview) return;
-      const squares = getCoachSquares();
-      const point = (index) => ({ x: (index % 8) + 0.5, y: Math.floor(index / 8) + 0.5 });
-      const lines = overlay.arrows.map((arrow, index) => {
-        const fromIndex = squares.indexOf(arrow.from);
-        const toIndex = squares.indexOf(arrow.to);
-        if (fromIndex < 0 || toIndex < 0) return "";
-        const from = point(fromIndex);
-        const to = point(toIndex);
-        if (![from.x, from.y, to.x, to.y].every(Number.isFinite)) return "";
-        const markerId = `reviewArrowHead-${reviewReplayIndex}-${arrow.kind}-${index}`;
-        const color = arrow.kind === "best" ? "rgba(93,191,255,.92)" : "rgba(255,211,107,.92)";
-        const cls = `review-arrow-line ${arrow.kind === "best" ? "is-best is-engine" : "is-played"}`;
-        return `<marker id="${markerId}" markerWidth="0.42" markerHeight="0.42" refX="0.36" refY="0.21" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L0.42,0.21 L0,0.42 Z" fill="${color}"/></marker>|<line class="${cls}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" marker-end="url(#${markerId})"/>`;
-      }).filter(Boolean);
-      if (!lines.length) return;
-      const defs = lines.map((line) => line.split("|")[0]).join("");
-      const body = lines.map((line) => line.split("|")[1]).join("");
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.classList.add("review-arrow-layer");
-      svg.setAttribute("viewBox", "0 0 8 8");
-      svg.setAttribute("preserveAspectRatio", "none");
-      svg.setAttribute("aria-hidden", "true");
-      svg.innerHTML = `<defs>${defs}</defs>${body}`;
-      wrap.appendChild(svg);
+      if (!activeMatchReview) {
+        clearAnalysisOverlay(board);
+        return;
+      }
+      const highlights = [
+        ...[...overlay.attacks].map((square) => ({ id: `review-attack-${square}`, square, kind: "attack", color: "red" })),
+        ...[...overlay.engineSquares].map((square) => ({ id: `review-engine-${square}`, square, kind: "engine", color: "green" })),
+        ...(overlay.played ? [{ id: "review-played-from", square: overlay.played.from, kind: "played", color: "yellow" }, { id: "review-played-to", square: overlay.played.to, kind: "played", color: "yellow" }] : [])
+      ];
+      renderAnalysisOverlay({ board, wrap: board, arrows: overlay.arrows, highlights });
     }
 
     function bindCoachBoardEvents(board) {
-      if (board.dataset.eventsBound === "true") return;
-      board.dataset.eventsBound = "true";
-      const squareFromEvent = (event) => event.target instanceof Element ? event.target.closest(".play-square") : null;
-
-      board.addEventListener("dragstart", (event) => {
-        const square = squareFromEvent(event);
-        if (!square?.draggable || !coachGame || coachThinking || isCoachGameOver()) return event.preventDefault();
-        const from = square.dataset.square;
-        if (!from) return event.preventDefault();
-        coachSelected = from;
-        coachLegalMoves = coachGame.moves({ square: from, verbose: true });
-        warmCoachLearnerMoveScores();
-        event.dataTransfer?.setData("text/plain", from);
-        square.classList.add("dragging");
-      });
-      board.addEventListener("dragend", (event) => squareFromEvent(event)?.classList.remove("dragging"));
-      board.addEventListener("dragover", (event) => {
-        if (squareFromEvent(event)) event.preventDefault();
-      });
-      board.addEventListener("drop", (event) => {
-        const square = squareFromEvent(event);
-        const from = event.dataTransfer?.getData("text/plain");
-        if (!square || !from) return;
-        event.preventDefault();
-        makeCoachMove(from, square.dataset.square);
-      });
-      board.addEventListener("click", (event) => {
-        const square = squareFromEvent(event);
-        if (square) handleCoachSquare(square.dataset.square);
+      boardInteractionEngine.attach(board, {
+        squareSelector: ".play-square",
+        canDrag(from) { return Boolean(board.querySelector(`[data-square="${from}"]`)?.draggable); },
+        onDragStart(from, event) {
+          if (!coachGame || coachThinking || isCoachGameOver()) return;
+          coachSelected = from;
+          if (isLivePremoveEnabled() && coachGame.turn() !== coachPlayerColor) {
+            coachLegalMoves = [];
+            event.preventDefault();
+            return;
+          }
+          coachLegalMoves = coachGame.moves({ square: from, verbose: true });
+          warmCoachLearnerMoveScores();
+          board.querySelector(`[data-square="${from}"]`)?.classList.add("dragging");
+          event.preventDefault();
+        },
+        onDrop(from, to) {
+          board.querySelector(`[data-square="${from}"]`)?.classList.remove("dragging");
+          if (isLivePremoveEnabled() && coachGame?.turn() !== coachPlayerColor) return queueCoachPremove(from, to);
+          return Boolean(from && to && makeCoachMove(from, to));
+        },
+        onCancel(from) {
+          if (from) board.querySelector(`[data-square="${from}"]`)?.classList.remove("dragging");
+          if (isLivePremoveEnabled()) cancelCoachPremove();
+        },
+        onContextMenu() {
+          if (isLivePremoveEnabled()) cancelCoachPremove();
+          else if (document.getElementById("gameReview")?.classList.contains("is-review-page")) clearAnalysisUserOverlay(board);
+        },
+        onSelect(square, event) {
+          const reviewPageActive = document.getElementById("gameReview")?.classList.contains("is-review-page");
+          if (reviewPageActive && event?.shiftKey && coachSelected && coachSelected !== square) {
+            addAnalysisArrow(board, {
+              id: `review-user-arrow:${coachSelected}-${square}`,
+              from: coachSelected,
+              to: square,
+              kind: "primary",
+              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "green"
+            });
+            coachSelected = "";
+            coachLegalMoves = [];
+            renderCoachBoard();
+            return;
+          }
+          handleCoachSquare(square);
+        }
       });
     }
 
@@ -17421,8 +18270,11 @@
       else delete board.dataset.pieceEffect;
       const captureEffect = Boolean(coachLastMove?.captured || String(coachLastMove?.flags || "").includes("e"));
       const promotionEffect = Boolean(coachLastMove?.promotion);
-      const reviewVisual = getReviewMoveVisual();
-      const reviewOverlay = getReviewOverlayData();
+      const reviewPageActive = Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
+      const reviewVisual = reviewPageActive ? getReviewMoveVisual() : null;
+      const reviewOverlay = reviewPageActive
+        ? getReviewOverlayData()
+        : { attacks: new Set(), engineSquares: new Set(), best: null };
       const boardWrap = board.closest(".puzzle-board-wrap");
       if (boardWrap) {
         const tactic = String(activeMatchReview?.moves?.[reviewReplayIndex]?.tactic || "").toLowerCase();
@@ -17447,10 +18299,14 @@
         if (piece) className += ` ${piece.color === "w" ? "white-piece" : "black-piece"}`;
         if (squareNameValue === coachSelected || coachPremove?.from === squareNameValue) className += " selected";
         if (coachPremove?.to === squareNameValue) className += " legal";
+        if (coachPremove?.from === squareNameValue) className += " premove-source";
+        if (coachPremove?.to === squareNameValue) className += " premove-target";
         if (legalMove) className += legalMove.captured || legalMove.flags.includes("e") ? " capture" : " legal";
         if (lastSquares.includes(squareNameValue)) className += " last-move";
         if (animateEffect && squareNameValue === coachLastMove?.to && captureEffect) className += " capture-impact";
         if (animateEffect && squareNameValue === coachLastMove?.to && promotionEffect) className += " promotion-bloom";
+        if (animateEffect && squareNameValue === coachLastMove?.to && /[kq]/.test(String(coachLastMove?.flags || ""))) className += " castle-impact";
+        if (animateEffect && squareNameValue === coachLastMove?.to && String(coachLastMove?.flags || "").includes("e")) className += " en-passant-impact";
         if (reviewVisual?.from === squareNameValue) className += " review-from";
         if (reviewVisual?.to === squareNameValue) className += " review-to";
         if (reviewVisual?.best && (reviewVisual.from === squareNameValue || reviewVisual.to === squareNameValue)) className += " review-best";
@@ -17460,7 +18316,8 @@
         if (threatSquares.has(squareNameValue)) className += " threat";
         if (coachThinking) className += " is-ai-thinking";
         if (square.className !== className) square.className = className;
-        const draggable = Boolean(piece && isCoachPlayablePiece(piece) && !coachThinking && !gameOver);
+        const premovePiece = Boolean(piece && isLivePremoveEnabled() && piece.color === coachPlayerColor && coachGame.turn() !== coachPlayerColor);
+        const draggable = Boolean(piece && (isCoachPlayablePiece(piece) || premovePiece) && !coachThinking && !gameOver);
         if (square.draggable !== draggable) square.draggable = draggable;
         const pieceKey = piece ? `${pieceSvgRenderVersion}:${activePieceSvgSet}:${piece.color}${piece.type}` : "empty";
         if (square.dataset.pieceKey !== pieceKey) {
@@ -17469,6 +18326,8 @@
         }
         const ariaLabel = getAccessibleSquareLabel(squareNameValue, piece, [
           squareNameValue === coachSelected || coachPremove?.from === squareNameValue ? "selected" : "",
+          coachPremove?.from === squareNameValue ? "premove source" : "",
+          coachPremove?.to === squareNameValue ? "premove destination" : "",
           legalMove ? "legal destination" : "",
           lastSquares.includes(squareNameValue) ? "last move" : "",
           squareNameValue === checkedKing ? "in check" : "",
@@ -17480,6 +18339,8 @@
         }
       });
       renderReviewArrow();
+      renderPremoveStatus();
+      if (animateEffect && coachLastMove) animateBoardPieceTransition(board, coachLastMove);
 
       syncCoachBoardOutcome();
     }
@@ -17573,19 +18434,17 @@
       if (!coachGame || coachThinking || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return;
       const piece = coachGame.get(square);
 
-      if (friendChallengeState?.active && coachGame.turn() !== coachPlayerColor) {
+      if (isLivePremoveEnabled() && coachGame.turn() !== coachPlayerColor) {
+        if (coachPremove?.from === square) {
+          cancelCoachPremove();
+          return;
+        }
         if (coachPremove?.from && square !== coachPremove.from) {
-          coachPremove = { ...coachPremove, to: square };
-          coachMessage = `Premove queued: ${coachPremove.from}-${coachPremove.to}. It will play if legal after your friend's move.`;
-          scheduleCoachBoardRender();
-          updateCoachPanel();
+          queueCoachPremove(coachPremove.from, square);
           return;
         }
         if (piece?.color === coachPlayerColor) {
-          coachPremove = { from: square, to: "" };
-          coachMessage = "Premove ready. Pick the destination square while your friend thinks.";
-          scheduleCoachBoardRender();
-          updateCoachPanel();
+          queueCoachPremove(square);
           return;
         }
       }
@@ -19177,13 +20036,63 @@
       document.getElementById("friendChallenge")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    function tryRunCoachPremove() {
-      if (!coachPremove || !friendChallengeState?.active || !coachGame || coachGame.turn() !== coachPlayerColor) return false;
-      const queued = coachPremove;
+    function isLivePremoveEnabled() {
+      return Boolean(
+        friendChallengeState?.remote
+        && friendChallengeState.active
+        && !isFriendSpectatorMode(friendChallengeState)
+        && !document.getElementById("gameReview")?.classList.contains("is-review-page")
+      );
+    }
+
+    function renderPremoveStatus() {
+      const status = document.getElementById("premoveStatus");
+      const cancel = document.getElementById("cancelPremove");
+      const live = isLivePremoveEnabled();
+      const queued = live && coachPremove?.from && coachPremove?.to;
+      if (status) {
+        status.hidden = !queued;
+        status.dataset.state = queued ? "ready" : "idle";
+        status.textContent = queued ? `Premove queued: ${coachPremove.from} → ${coachPremove.to}` : "";
+      }
+      if (cancel) cancel.hidden = !queued;
+    }
+
+    function cancelCoachPremove(message = "Premove cancelled.") {
+      if (!coachPremove) return false;
       coachPremove = null;
-      const legal = coachGame.moves({ square: queued.from, verbose: true }).some((move) => move.to === queued.to);
-      if (!legal) {
+      if (message) coachMessage = message;
+      renderPremoveStatus();
+      scheduleCoachBoardRender();
+      updateCoachPanel();
+      return true;
+    }
+
+    function queueCoachPremove(from, to = "") {
+      if (!isLivePremoveEnabled() || !coachGame || coachGame.turn() === coachPlayerColor) return false;
+      const piece = coachGame.get(from);
+      if (!piece || piece.color !== coachPlayerColor) return false;
+      coachPremove = { from, to };
+      coachMessage = to
+        ? `Premove queued: ${from}-${to}. It will play if legal after your friend's move.`
+        : "Premove ready. Pick the destination square while your friend thinks.";
+      renderPremoveStatus();
+      scheduleCoachBoardRender();
+      updateCoachPanel();
+      return true;
+    }
+
+    function tryRunCoachPremove() {
+      if (!coachPremove || !isLivePremoveEnabled() || !coachGame || coachGame.turn() !== coachPlayerColor) return false;
+      const queued = { ...coachPremove };
+      coachPremove = null;
+      renderPremoveStatus();
+      const legalMove = coachGame.moves({ square: queued.from, verbose: true }).find((move) => move.to === queued.to);
+      if (!legalMove) {
         coachMessage = "Your premove was no longer legal after your friend's move.";
+        renderPremoveStatus();
+        scheduleCoachBoardRender();
+        updateCoachPanel();
         return false;
       }
       return makeCoachMove(queued.from, queued.to);
@@ -21225,35 +22134,26 @@
     }
 
     function bindRealPuzzleBoardEvents(board) {
-      if (board.dataset.eventsBound === "true") return;
-      board.dataset.eventsBound = "true";
-      const squareFromEvent = (event) => event.target instanceof Element ? event.target.closest(".real-puzzle-square") : null;
-
-      board.addEventListener("dragstart", (event) => {
-        const square = squareFromEvent(event);
-        if (!square?.draggable || !realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return event.preventDefault();
-        const from = square.dataset.square;
-        if (!from) return event.preventDefault();
-        realPuzzleSelected = from;
-        realPuzzleLegalMoves = realPuzzleGame.moves({ square: from, verbose: true });
-        event.dataTransfer?.setData("text/plain", from);
-        square.classList.add("dragging");
-      });
-      board.addEventListener("dragend", (event) => squareFromEvent(event)?.classList.remove("dragging"));
-      board.addEventListener("dragover", (event) => {
-        if (squareFromEvent(event)) event.preventDefault();
-      });
-      board.addEventListener("drop", (event) => {
-        const square = squareFromEvent(event);
-        const from = event.dataTransfer?.getData("text/plain");
-        if (!square || !from) return;
-        event.preventDefault();
-        realPuzzleSelected = from;
-        handleRealPuzzleSquare(square.dataset.square);
-      });
-      board.addEventListener("click", (event) => {
-        const square = squareFromEvent(event);
-        if (square) handleRealPuzzleSquare(square.dataset.square);
+      boardInteractionEngine.attach(board, {
+        squareSelector: ".real-puzzle-square",
+        canDrag(from) { return Boolean(board.querySelector(`[data-square="${from}"]`)?.draggable); },
+        onDragStart(from, event) {
+          if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
+          realPuzzleSelected = from;
+          realPuzzleLegalMoves = realPuzzleGame.moves({ square: from, verbose: true });
+          board.querySelector(`[data-square="${from}"]`)?.classList.add("dragging");
+          event.preventDefault();
+        },
+        onDrop(from, to) {
+          board.querySelector(`[data-square="${from}"]`)?.classList.remove("dragging");
+          if (!to) return false;
+          realPuzzleSelected = from;
+          return handleRealPuzzleSquare(to) !== false;
+        },
+        onCancel(from) {
+          if (from) board.querySelector(`[data-square="${from}"]`)?.classList.remove("dragging");
+        },
+        onSelect(square) { handleRealPuzzleSquare(square); }
       });
     }
 
@@ -21294,6 +22194,12 @@
       const checkedKing = realPuzzleGame && callCoachRule(realPuzzleGame, "isCheck", "in_check")
         ? getRealPuzzleSquares().find((square) => realPuzzleGame.get(square)?.type === "k" && realPuzzleGame.get(square)?.color === realPuzzleGame.turn()) || ""
         : "";
+      const effectKey = realPuzzleLastMove ? `${realPuzzleStep}-${realPuzzleLastMove.from}-${realPuzzleLastMove.to}-${realPuzzleLastMove.san || ""}` : "";
+      const animateEffect = Boolean(effectKey && board.dataset.pieceEffect !== effectKey);
+      if (effectKey) board.dataset.pieceEffect = effectKey;
+      else delete board.dataset.pieceEffect;
+      const captureEffect = Boolean(realPuzzleLastMove?.captured || String(realPuzzleLastMove?.flags || "").includes("e"));
+      const promotionEffect = Boolean(realPuzzleLastMove?.promotion);
       const squareNames = getRealPuzzleSquares();
       const boardSquares = ensureRealPuzzleBoardSquares(board, squareNames);
       squareNames.forEach((squareNameValue) => {
@@ -21306,6 +22212,10 @@
         if (squareNameValue === realPuzzleSelected) square.classList.add("selected");
         if (legalMove) square.classList.add(legalMove.captured || legalMove.flags.includes("e") ? "capture" : "legal");
         if (lastSquares.includes(squareNameValue)) square.classList.add("last-move");
+        if (animateEffect && squareNameValue === realPuzzleLastMove?.to && captureEffect) square.classList.add("capture-impact");
+        if (animateEffect && squareNameValue === realPuzzleLastMove?.to && promotionEffect) square.classList.add("promotion-bloom");
+        if (animateEffect && squareNameValue === realPuzzleLastMove?.to && /[kq]/.test(String(realPuzzleLastMove?.flags || ""))) square.classList.add("castle-impact");
+        if (animateEffect && squareNameValue === realPuzzleLastMove?.to && String(realPuzzleLastMove?.flags || "").includes("e")) square.classList.add("en-passant-impact");
         if (squareNameValue === checkedKing) square.classList.add("in-check");
         // Squares own their piece nodes. A full-position key forced all 64
         // squares to repaint after every legal move, causing the visible dark
@@ -21327,6 +22237,7 @@
         square.disabled = realPuzzlePhase !== "PlayerTurn" || realPuzzleReplaying;
         square.draggable = Boolean(piece && piece.color === realPuzzleGame?.turn() && !square.disabled);
       });
+      if (animateEffect && realPuzzleLastMove) animateBoardPieceTransition(board, realPuzzleLastMove);
     }
 
     function renderRealPuzzle() {
@@ -21563,7 +22474,7 @@
     }
 
     function handleRealPuzzleSquare(square) {
-      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
+      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return false;
       startRealPuzzleTimer();
       const piece = realPuzzleGame.get(square);
       if (realPuzzleSelected && square !== realPuzzleSelected) {
@@ -21573,14 +22484,19 @@
           const selectedMove = legalMoves.find((candidate) => moveToUci(candidate).toLowerCase() === expected)
             || legalMoves.find((move) => move.promotion === "q")
             || legalMoves[0];
-          if (selectedMove) void finishRealPuzzleMove(selectedMove);
-          return;
+          if (selectedMove) {
+            void finishRealPuzzleMove(selectedMove);
+            return true;
+          }
+          return false;
         }
       }
       if (piece && piece.color === realPuzzleGame.turn()) {
         realPuzzleSelected = square;
         realPuzzleLegalMoves = realPuzzleGame.moves({ square, verbose: true });
         document.getElementById("realPuzzleFeedback").textContent = `${realPuzzleLegalMoves.length} legal move${realPuzzleLegalMoves.length === 1 ? "" : "s"} highlighted.`;
+        renderRealPuzzleBoard();
+        return true;
       } else {
         realPuzzleSelected = "";
         realPuzzleLegalMoves = [];
@@ -21588,6 +22504,7 @@
         playPuzzleTone("wrong");
       }
       renderRealPuzzleBoard();
+      return false;
     }
 
     function showRealPuzzleHint() {
@@ -21860,6 +22777,7 @@
       document.getElementById("abortGame")?.addEventListener("click", abortFriendGame);
       document.getElementById("resignGame")?.addEventListener("click", resignCoachGame);
       document.getElementById("returnLobby")?.addEventListener("click", returnFriendLobby);
+      document.getElementById("cancelPremove")?.addEventListener("click", () => cancelCoachPremove());
       document.getElementById("exportPgn").addEventListener("click", exportCoachPgn);
       document.getElementById("reviewExportPgn")?.addEventListener("click", exportCoachPgn);
       document.getElementById("importPgn")?.addEventListener("click", importCoachPgn);
@@ -22214,7 +23132,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v110-phase5-runtime";
+    const routeModuleVersion = "review-v127-a11y-connectivity";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -22435,6 +23353,7 @@
       function showHome(shouldScroll = false) {
         routeModuleActivationGeneration += 1;
         stopStorePreview({ silent: true });
+        clearAllAnalysisOverlays();
         suspendGameReviewWorkspaceForNavigation();
         stopFriendSpectatorWatch();
         if (panelInitFrame) {
@@ -22472,6 +23391,8 @@
         routeModuleActivationGeneration += 1;
 
         if (config.panel !== "store") stopStorePreview({ silent: true });
+        if (config.panel === "gameReview") clearAllAnalysisOverlays();
+        else if (!(config.tab === "openings" || config.tab === "tutorial")) clearAllAnalysisOverlays();
         if (config.tab === "friendChallenge") startFriendSpectatorWatch();
         else stopFriendSpectatorWatch();
 
@@ -27982,7 +28903,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v110-phase5-runtime";
+    const optionalRouteStylesheetVersion = "review-v127-a11y-connectivity";
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
       if (!key) return Promise.resolve(false);
@@ -28212,6 +29133,47 @@
     });
 
     document.getElementById("restartAdventure").addEventListener("click", renderAdventureMission);
+    }
+
+    function setupNetworkStatus() {
+      if (setupNetworkStatus.ready) return;
+      const node = document.getElementById("globalNetworkStatus");
+      if (!node) return;
+      setupNetworkStatus.ready = true;
+      let wasOffline = navigator.onLine === false;
+      let hideTimer = 0;
+      const clearHideTimer = () => {
+        if (!hideTimer) return;
+        window.clearTimeout(hideTimer);
+        hideTimer = 0;
+      };
+      const show = (state, message, duration = 0) => {
+        clearHideTimer();
+        node.dataset.state = state;
+        node.textContent = message;
+        node.hidden = false;
+        if (duration > 0) hideTimer = window.setTimeout(() => {
+          hideTimer = 0;
+          node.hidden = true;
+        }, duration);
+      };
+      const handleOffline = () => {
+        wasOffline = true;
+        show("offline", "You’re offline. Online games, social features, and cloud sync are unavailable.");
+      };
+      const handleOnline = () => {
+        if (!wasOffline) return;
+        wasOffline = false;
+        show("reconnected", "Back online. Cloud features can reconnect now.", 4500);
+      };
+      window.addEventListener("offline", handleOffline, { passive: true });
+      window.addEventListener("online", handleOnline, { passive: true });
+      if (wasOffline) handleOffline();
+      setupNetworkStatus.cleanup = () => {
+        clearHideTimer();
+        window.removeEventListener("offline", handleOffline);
+        window.removeEventListener("online", handleOnline);
+      };
     }
 
     function setupServiceWorker() {
@@ -29933,6 +30895,7 @@
 
     applyStartupTheme();
     setupRuntimeSafety();
+    setupNetworkStatus();
     setupServiceWorker();
     setupSiteTabs();
     primeHomeRankings();
