@@ -169,6 +169,7 @@
         prewarmedPieceAssets.add(asset);
         const image = new Image();
         image.decoding = "async";
+        image.fetchPriority = "low";
         image.addEventListener("error", () => {
           const match = String(pieceKey).match(/^([wb])([kqrbnp])$/);
           if (match) unavailablePieceAssets.add(`${resolvedStyle}:${match[1]}:${match[2]}`);
@@ -188,6 +189,14 @@
     }
 
     function renderPieceOnSquare(square, piece, style = activePieceSvgSet, forceClassic = false) {
+      if (!(square instanceof HTMLElement)) return;
+      const info = getPieceCodeInfo(piece);
+      const resolvedStyle = forceClassic ? "chessnut" : resolvePieceSvgSet(style);
+      const renderKey = info
+        ? `${pieceSvgRenderVersion}:${resolvedStyle}:${forceClassic ? "classic" : "theme"}:${info.color}${info.type}`
+        : "empty";
+      if (square.dataset.pieceRenderKey === renderKey) return;
+      square.dataset.pieceRenderKey = renderKey;
       const markup = createPieceSvgMarkup(piece, style, forceClassic);
       square.textContent = "";
       if (!piece) return;
@@ -199,12 +208,21 @@
         showFallback();
         return;
       }
-      square.innerHTML = markup;
-      const image = square.querySelector(".piece-svg");
-      if (!image) {
-        showFallback();
-        return;
-      }
+      const asset = licensedPieceAssetSets[resolvedStyle]?.[`${info.color}${info.type}`];
+      if (!asset) { showFallback(); return; }
+      const image = document.createElement("img");
+      image.className = `piece-svg ${info.color === "w" ? "white-piece" : "black-piece"}`;
+      image.src = asset;
+      image.alt = "";
+      image.setAttribute("aria-hidden", "true");
+      image.draggable = false;
+      image.decoding = "async";
+      image.fetchPriority = "auto";
+      image.referrerPolicy = "no-referrer";
+      image.dataset.piece = `${info.color}${info.type}`;
+      image.dataset.style = resolvedStyle;
+      image.dataset.rarity = getPieceSvgTheme(resolvedStyle).rarity;
+      square.replaceChildren(image);
       image.addEventListener("error", () => {
         unavailablePieceAssets.add(`${image.dataset.style}:${image.dataset.piece}`);
         if (image.parentElement === square) showFallback();
@@ -2629,7 +2647,8 @@
         if (storeInventoryUi.category !== "all" && getStoreCategory(item) !== storeInventoryUi.category) return false;
         return !query || `${item.name} ${item.description} ${getStoreSurfaceLabel(item)}`.toLowerCase().includes(query);
       });
-      grid.replaceChildren(...(items.length ? items.map((item) => {
+      if (items.length) {
+        patchKeyedChildren(grid, items, (item) => item.id, (item) => {
         const card = document.createElement("article");
         card.className = `store-inventory-item${isStoreItemEquipped(item) ? " is-equipped" : ""}`;
         card.append(buildStorePreview(item), createBookText("strong", "", item.name), createBookText("small", "", `${getStoreCategory(item)} · ${getStoreSurfaceLabel(item)}`));
@@ -2637,7 +2656,12 @@
         const preview = createBookText("button", "button secondary", "Preview"); preview.type = "button"; preview.addEventListener("click", () => startStorePreview(item));
         const equip = createBookText("button", "button", isStoreItemEquipped(item) ? "Equipped" : "Quick equip"); equip.type = "button"; equip.disabled = isStoreItemEquipped(item); equip.addEventListener("click", async () => { await equipStoreItem(item); renderStoreInventory(); });
         actions.append(preview, equip); card.append(actions); return card;
-      }) : [createBookText("p", "store-inventory-empty", "No owned cosmetics match this filter yet.")]));
+        }, (item) => JSON.stringify([item.id, isStoreItemEquipped(item), isStoreItemWishlisted(item, prefs), storeInventoryUi.filter, storeInventoryUi.category]));
+      } else {
+        const emptyKey = "inventory-empty";
+        const empty = grid.firstElementChild?.dataset?.renderKey === emptyKey ? grid.firstElementChild : (() => { const node = createBookText("p", "store-inventory-empty", "No owned cosmetics match this filter yet."); node.dataset.renderKey = emptyKey; return node; })();
+        grid.replaceChildren(empty);
+      }
       const rewards = document.getElementById("storeCollectionRewards");
       const collectionRewards = ensureStoreCollectionRewards();
       if (rewards) rewards.replaceChildren(...storeCollectionDefinitions.map((collection) => { const stats = getStoreCollectionProgress(collection, prefs, owned); const reward = collectionRewards[collection.id] || collection.reward; const row = createBookText("div", `store-collection-reward${stats.percent === 100 ? " is-complete" : ""}`, ""); row.append(createBookText("strong", "", collection.name), createBookText("small", "", `${stats.percent}% · ${stats.owned}/${stats.total} owned · ${stats.remaining} remaining · ${stats.percent === 100 ? `Unlocked: ${reward?.label || "Collection reward"}` : `Reward: ${reward?.label || "Collection title"}`}`)); return row; }));
@@ -2906,6 +2930,7 @@
     let flexBadgeState = null;
     let storePreviewState = null;
     let storePreviewAudioOverride = null;
+    let storeRenderSignature = "";
     let storeInventoryUi = { filter: "owned", query: "", category: "all" };
     let currentPuzzle = puzzleStateMatchesBank ? Math.max(0, Math.min(puzzles.length - 1, Number(savedPuzzleState.currentPuzzle) || 0)) : 0;
     let activePuzzlePlan = puzzleStateMatchesBank && puzzlePlanOptions.includes(savedPuzzleState.activePlan) ? savedPuzzleState.activePlan : "main";
@@ -7086,6 +7111,24 @@
       ensureStoreCollectionRewards();
       syncPreferenceLocks();
       const prefs = readLearnerPrefs();
+      const nextSignature = JSON.stringify({
+        category: activeStoreCategory,
+        catalog: storeCatalogUi,
+        inventory: storeInventoryUi,
+        coins: puzzleCoins,
+        owned: [...owned].sort(),
+        equipped: storeState.equipped,
+        state: storeState,
+        prefs,
+        flexBadges: normalizeFlexBadgeState(flexBadgeState).badges.length,
+        serverReady: serverStoreReady,
+        preview: storePreviewState?.item?.id || ""
+      });
+      if (nextSignature === storeRenderSignature) {
+        renderStorePreviewTray();
+        return;
+      }
+      storeRenderSignature = nextSignature;
       const inventoryItems = [
         `Archetype: ${getArchetypeTheme(prefs.archetype).label}`,
         `Board: ${getBoardTheme(prefs.board).label}`,
@@ -11370,6 +11413,12 @@
       updatePuzzleClock();
     }
 
+    function resumePuzzleTimer() {
+      if (puzzleTimerId || !puzzleStartAt || activeAnswered) return;
+      puzzleTimerId = window.setInterval(updatePuzzleClock, 500);
+      updatePuzzleClock();
+    }
+
     function recordPuzzleSolveStats() {
       if (puzzleStartAt) {
         puzzleSolveTimes = [...puzzleSolveTimes, Date.now() - puzzleStartAt].slice(-200);
@@ -11728,78 +11777,16 @@
     }
 
     function renderPuzzleBoard() {
-      const puzzle = puzzles[currentPuzzle];
-      const board = document.getElementById("puzzleBoard");
+      // The legacy puzzle shell remains in the markup for backwards-compatible
+      // IDs and controls, but its board is no longer rendered. The visible
+      // puzzle uses the keyed renderer below, which owns stable squares and
+      // delegated input handlers.
+      const panel = document.getElementById("puzzles");
+      if (!panel?.classList.contains("is-active-panel")) return;
+      const board = document.getElementById("realPuzzleBoard");
+      if (!board || typeof renderRealPuzzleBoard !== "function") return;
       const focusedSquareName = getFocusedBoardSquare(board);
-      const legalByTarget = new Map(puzzleLegalMoves.map((move) => [move.to, move]));
-      const lastSquares = puzzleLastMove ? [puzzleLastMove.from, puzzleLastMove.to] : [];
-      const checkedKing = puzzleGame && callCoachRule(puzzleGame, "isCheck", "in_check") ? findPuzzleKing(puzzleGame.turn()) : "";
-      const hintVisible = activeAnswered;
-      const effectKey = puzzleLastMove ? `${puzzleLastMove.from}-${puzzleLastMove.to}-${puzzleLastMove.san || ""}` : "";
-      const animateEffect = Boolean(effectKey && board.dataset.pieceEffect !== effectKey);
-      if (effectKey) board.dataset.pieceEffect = effectKey;
-      else delete board.dataset.pieceEffect;
-      const captureEffect = Boolean(puzzleLastMove?.captured || String(puzzleLastMove?.flags || "").includes("e"));
-      const promotionEffect = Boolean(puzzleLastMove?.promotion);
-
-      board.innerHTML = "";
-      if (!puzzleGame) {
-        fenToSquares(puzzle.fen).forEach((piece, index) => {
-          const row = Math.floor(index / 8);
-          const col = index % 8;
-          const square = document.createElement("span");
-          square.className = `puzzle-square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
-          const colorClass = pieceColorClass(piece);
-          if (colorClass) square.classList.add(colorClass);
-          renderPieceOnSquare(square, piece);
-          board.appendChild(square);
-        });
-        return;
-      }
-
-      getPuzzleSquares().forEach((name) => {
-        const piece = puzzleGame.get(name);
-        const legalMove = legalByTarget.get(name);
-        const square = document.createElement("button");
-        square.type = "button";
-        square.dataset.square = name;
-        square.className = `puzzle-square play-square ${isLightCoachSquare(name) ? "light" : "dark"}`;
-        if (piece) square.classList.add(piece.color === "w" ? "white-piece" : "black-piece");
-        if (name === selectedPuzzleSquare) square.classList.add("selected");
-        if (legalMove) square.classList.add(legalMove.captured || legalMove.flags.includes("e") ? "capture" : "legal");
-        if (lastSquares.includes(name)) square.classList.add("last-move");
-        if (animateEffect && name === puzzleLastMove?.to && captureEffect) square.classList.add("capture-impact");
-        if (animateEffect && name === puzzleLastMove?.to && promotionEffect) square.classList.add("promotion-bloom");
-        if (name === checkedKing) square.classList.add("in-check");
-        if (puzzleHintDestination && name === puzzleHintDestination) square.classList.add("hint-destination");
-        if (hintVisible && puzzle.targets.includes(name)) square.classList.add("target");
-        renderPieceOnSquare(square, piece);
-        square.setAttribute("aria-label", getAccessibleSquareLabel(name, piece, [
-          name === selectedPuzzleSquare ? "selected" : "",
-          legalMove ? "legal destination" : "",
-          lastSquares.includes(name) ? "last move" : "",
-          name === checkedKing ? "in check" : "",
-          puzzleHintDestination === name ? "hint" : ""
-        ]));
-        square.draggable = Boolean(piece && piece.color === puzzleGame.turn() && (puzzleStarted || puzzleAnalyzeMode) && (!activeAnswered || puzzleAnalyzeMode));
-        square.addEventListener("dragstart", (event) => {
-          if (!square.draggable) return event.preventDefault();
-          event.dataTransfer.setData("text/plain", name);
-          square.classList.add("dragging");
-        });
-        square.addEventListener("dragend", () => square.classList.remove("dragging"));
-        square.addEventListener("dragover", (event) => event.preventDefault());
-        square.addEventListener("drop", (event) => {
-          event.preventDefault();
-          const from = event.dataTransfer.getData("text/plain");
-          if (from) {
-            selectedPuzzleSquare = from;
-            handlePuzzleSquare(name);
-          }
-        });
-        square.addEventListener("click", () => handlePuzzleSquare(name));
-        board.appendChild(square);
-      });
+      renderRealPuzzleBoard();
       restoreBoardFocus(board, focusedSquareName);
     }
 
@@ -11870,6 +11857,10 @@
     }
 
     function renderPuzzle() {
+      // The hidden legacy shell is retained only for compatibility. Avoid
+      // rebuilding its controls (or the modern board) while another route is
+      // active; the keyed renderer runs when the puzzle panel is visible.
+      if (document.getElementById("realPuzzles") && !document.getElementById("puzzles")?.classList.contains("is-active-panel")) return;
       if (document.getElementById("realPuzzles") && !realPuzzleCollectionLoaded) {
         const feedback = document.getElementById("feedback");
         if (feedback) feedback.textContent = "Preparing puzzles...";
@@ -12105,12 +12096,14 @@
     let matchStartedAt = Date.now();
     let matchEndedElapsedMs = null;
     let matchTimerInterval = 0;
+    let matchTimerNetworkHandler = null;
     let matchClockState = null;
     let matchClockExpiredColor = "";
     let friendChallengeState = null;
     let friendNetworkState = { directory: [], search: [], challenges: [] };
     let friendHubState = { view: "online", selectedId: "", search: "", minRating: "", maxRating: "" };
     let friendHubReady = false;
+    let friendHubRenderSignature = "";
     let friendHubSearchTimer = 0;
     let friendRealtimeReady = false;
     let messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false, readAtByConversation: {}, pending: new Map(), reconnecting: false };
@@ -13204,8 +13197,19 @@
     function startMatchPlayerTimer() {
       if (matchTimerInterval) return;
       matchTimerInterval = window.setInterval(updateMatchPlayerTimer, 1000);
-      window.addEventListener("online", updateMatchPlayerTimer);
-      window.addEventListener("offline", updateMatchPlayerTimer);
+      matchTimerNetworkHandler = updateMatchPlayerTimer;
+      window.addEventListener("online", matchTimerNetworkHandler);
+      window.addEventListener("offline", matchTimerNetworkHandler);
+    }
+
+    function stopMatchPlayerTimer() {
+      window.clearInterval(matchTimerInterval);
+      matchTimerInterval = 0;
+      if (matchTimerNetworkHandler) {
+        window.removeEventListener("online", matchTimerNetworkHandler);
+        window.removeEventListener("offline", matchTimerNetworkHandler);
+      }
+      matchTimerNetworkHandler = null;
     }
 
     function renderInGamePlayerCard() {
@@ -13715,11 +13719,6 @@
         scheduleEnginePanelUpdate();
         return worker;
       });
-    }
-
-    function warmCoachEngineForPlayPage() {
-      if (!document.getElementById("play")?.classList.contains("is-active-panel")) return Promise.resolve(null);
-      return initializeCoachEngine();
     }
 
     async function getStockfishMove(moves) {
@@ -18411,17 +18410,27 @@
           .filter((friend) => friend.id !== getFriendCurrentUserId())
           .filter((friend) => !isNschessUserBlocked(friend.id, friend.name))
           .slice(0, 6);
-        results.replaceChildren(...(matches.length
-          ? matches.map((friend) => createFriendCard(friend, "search"))
-          : [createBookText("p", "", !provider ? "Sign in to search registered players." : query ? "No registered player matched that search." : "Type a registered username to find players.")]));
+        if (matches.length) {
+          patchKeyedChildren(results, matches, (friend) => friend.id, (friend) => createFriendCard(friend, "search"), (friend) => JSON.stringify([friend.id, friend.name, friend.title, friend.rating, friend.online, friend.requestStatus, friend.requestDirection]));
+        } else {
+          const emptyKey = "friend-search-empty";
+          const empty = results.firstElementChild?.dataset?.renderKey === emptyKey ? results.firstElementChild : (() => { const node = createBookText("p", "", !provider ? "Sign in to search registered players." : query ? "No registered player matched that search." : "Type a registered username to find players."); node.dataset.renderKey = emptyKey; return node; })();
+          results.replaceChildren(empty);
+        }
       }
       if (list) {
-        const incomingCards = directory.filter((friend) => friend.requestDirection === "incoming" && friend.requestStatus === "pending").map((friend) => createFriendCard(friend, "incoming"));
-        const outgoingCards = directory.filter((friend) => friend.requestDirection === "outgoing" && friend.requestStatus === "pending").map((friend) => createFriendCard(friend, "outgoing"));
-        const savedFriends = directory.filter((friend) => friend.requestStatus === "accepted").map((friend) => createFriendCard(friend, "friend"));
-        list.replaceChildren(...(incomingCards.length || outgoingCards.length || savedFriends.length
-          ? [...incomingCards, ...outgoingCards, ...savedFriends]
-          : [createBookText("p", "", "No friends yet. Search a registered username above.")]));
+        const records = [
+          ...directory.filter((friend) => friend.requestDirection === "incoming" && friend.requestStatus === "pending").map((friend) => ({ friend, mode: "incoming" })),
+          ...directory.filter((friend) => friend.requestDirection === "outgoing" && friend.requestStatus === "pending").map((friend) => ({ friend, mode: "outgoing" })),
+          ...directory.filter((friend) => friend.requestStatus === "accepted").map((friend) => ({ friend, mode: "friend" }))
+        ];
+        if (records.length) {
+          patchKeyedChildren(list, records, ({ friend, mode }) => `${mode}:${friend.id}`, ({ friend, mode }) => createFriendCard(friend, mode), ({ friend, mode }) => JSON.stringify([mode, friend.id, friend.name, friend.title, friend.rating, friend.online, friend.requestStatus, friend.requestDirection]));
+        } else {
+          const emptyKey = "friend-list-empty";
+          const empty = list.firstElementChild?.dataset?.renderKey === emptyKey ? list.firstElementChild : (() => { const node = createBookText("p", "", "No friends yet. Search a registered username above."); node.dataset.renderKey = emptyKey; return node; })();
+          list.replaceChildren(empty);
+        }
       }
     }
 
@@ -19176,7 +19185,17 @@
         return;
       }
       const events = tournamentRuntime.events;
-      const renderSignature = JSON.stringify({ currentCode: tournamentRuntime.currentCode, events, inviteResults: tournamentRuntime.inviteResults.map((player) => player.id) });
+      const renderSignature = JSON.stringify({
+        currentCode: tournamentRuntime.currentCode,
+        events: events.map((event) => [
+          event.code, event.status, event.currentRound, event.participantCount, event.joined, event.isHost, event.startsAt, event.endsAt,
+          event.standings.slice(0, 12).map((entry) => [entry.id, entry.playerRank || entry.player_rank, entry.score, entry.wins, entry.draws, entry.losses]),
+          event.pairings.slice(0, 20).map((pairing) => [pairing.id, pairing.status, pairing.result, pairing.round]),
+          event.messages.slice(-12).map((message) => [message.id, message.body, message.createdAt || message.created_at]),
+          event.myPairing?.id || "", event.myPairing?.status || ""
+        ]),
+        inviteResults: tournamentRuntime.inviteResults.map((player) => player.id)
+      });
       if (tournamentRuntime.renderSignature === renderSignature) {
         const selected = getSelectedTournament();
         if (selected) scheduleTournamentLaunch(selected);
@@ -19617,6 +19636,7 @@
       friendSearchTimer = 0;
       friendSearchRequest += 1;
       friendNetworkState.search = [];
+      friendHubRenderSignature = "";
       friendActionLocks.clear();
       friendNetworkRequest += 1;
       friendNetworkSubscriptionGeneration += 1;
@@ -19776,7 +19796,11 @@
       renderTournamentLobby();
       void refreshTournamentNetwork(true);
       ensureTournamentRealtime();
-      tournamentRuntime.timer = window.setInterval(() => void refreshTournamentNetwork(), 2500);
+      tournamentRuntime.timer = window.setInterval(() => {
+        if (!document.hidden && document.getElementById("play")?.classList.contains("is-active-panel") && new URLSearchParams(location.hash.split("?")[1] || "").has("tournament")) {
+          void refreshTournamentNetwork();
+        }
+      }, 2500);
       networkVisibilityHandler = () => {
         void syncTournamentLobbyPresence(!document.hidden);
         if (!document.hidden) {
@@ -19785,6 +19809,36 @@
         }
       };
       document.addEventListener("visibilitychange", networkVisibilityHandler);
+    }
+
+    function syncActiveRouteRuntime(panel = "", tab = "") {
+      const activePanel = String(panel || "");
+      const activeTab = String(tab || "");
+      const playVisible = activePanel === "play";
+      const friendsVisible = activePanel === "friends";
+      const reviewVisible = activePanel === "gameReview";
+      const tournamentVisible = playVisible && activeTab === "tournaments";
+      if (playVisible || friendsVisible) {
+        startFriendNetworkSync();
+      } else {
+        // Release social subscriptions when no social workspace is open;
+        // they are re-established when the route becomes active again.
+        stopFriendNetworkSync();
+      }
+      if (tournamentVisible) {
+        startTournamentNetworkSync();
+      } else {
+        stopTournamentNetworkSync();
+      }
+      if (playVisible || reviewVisible) startMatchPlayerTimer();
+      else stopMatchPlayerTimer();
+      if (activePanel === "puzzles") {
+        resumePuzzleTimer();
+        if (realPuzzleStartedAt && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+      } else {
+        stopPuzzleTimer();
+        stopRealPuzzleTimer();
+      }
     }
 
     function startFriendNetworkSync() {
@@ -19799,7 +19853,9 @@
       void refreshFriendNetwork(true);
       void refreshSocialNotifications();
       if (!friendNetworkTimer) friendNetworkTimer = window.setInterval(() => {
-        if (!friendRealtimeReady) void refreshFriendNetwork(true);
+        const socialWorkspaceVisible = document.getElementById("play")?.classList.contains("is-active-panel")
+          || document.getElementById("friends")?.classList.contains("is-active-panel");
+        if (!document.hidden && socialWorkspaceVisible && !friendRealtimeReady) void refreshFriendNetwork(true);
       }, 30000);
     }
 
@@ -21617,8 +21673,6 @@
       window.addEventListener("hashchange", () => {
         if (location.hash.includes("tournament=")) void refreshTournamentNetwork(true);
       });
-      startFriendNetworkSync();
-      startTournamentNetworkSync();
       startMatchPlayerTimer();
       updateAiPlayerHeader();
       renderCoachBoard();
@@ -21845,11 +21899,18 @@
         return setupSupabaseAuthUi();
       },
       play: () => {
+        // Play-only services are initialized when the workspace is entered.
+        // Keeping matchmaking/reporting out of startup avoids wiring global
+        // listeners on routes that cannot use them.
+        setupSafetyReport();
+        setupOnlineMatchmakingAdapter();
+        setupQuickMatch();
+        setupMatchHistory();
+        void initializeDeferredFeature("audio");
         setupPlayWorkspaceDrawers();
         setupCoachAvatarAssets();
         renderCoordinates();
         const setup = setupPlayableChess();
-        window.requestAnimationFrame(() => { void warmCoachEngineForPlayPage(); });
         Promise.resolve(setup).then(
           () => scheduleBackgroundTask(() => initializeDeferredFeature("performance"), 800),
           () => scheduleBackgroundTask(() => initializeDeferredFeature("performance"), 800)
@@ -21858,10 +21919,10 @@
       },
       bots: setupAiBotRoster,
       puzzles: () => {
+        void initializeDeferredFeature("audio");
         syncPuzzleSoundButton();
         return setupRealPuzzles();
       },
-      puzzleControls: setupLegacyPuzzleControls,
       store: setupStore,
       settings: setupSettingsPage,
       admin: setupAdminPanel,
@@ -21887,6 +21948,10 @@
       friends: setupFriendsHub,
       leaderboards: renderLeaderboards,
       hero: () => {
+        setupDailyGoals();
+        setupMatchHistory();
+        setupFirstVisitSetup();
+        void initializeDeferredFeature("audio");
         buildHeroBoard();
       },
       coachQuotes: setupCoachQuotes,
@@ -21898,6 +21963,54 @@
       performance: setupPerformanceOptimizations
     };
     const deferredFeaturePromises = new Map();
+    // Route bootstrap modules are intentionally tiny manifests. They are
+    // loaded only when a route is entered, while the feature implementations
+    // stay in this shared runtime so existing behavior and state remain
+    // unchanged. Dynamic imports are cached by the browser automatically.
+    const routeModuleVersion = "review-v110-phase5-runtime";
+    const routeModuleNames = Object.freeze({
+      home: "home",
+      play: "play",
+      puzzles: "puzzles",
+      gameReview: "review",
+      store: "store",
+      friends: "friends",
+      academy: "academy",
+      videos: "videos",
+      bots: "bots",
+      tournament: "tournament",
+      messaging: "messaging",
+      login: "login",
+      settings: "settings",
+      tutorial: "tutorial",
+      paths: "paths",
+      adventures: "adventures",
+      openings: "openings",
+      books: "books",
+      leaderboards: "leaderboards",
+      plan: "plan",
+      admin: "admin"
+    });
+    const routeModulePromises = new Map();
+    let routeModuleActivationGeneration = 0;
+
+    function getRouteModuleName(panel, tab = "") {
+      if (panel === "gameReview") return routeModuleNames.gameReview;
+      if (panel === "play" && tab === "tournaments") return routeModuleNames.tournament;
+      if (panel === "friends" && friendHubState?.view === "messages") return routeModuleNames.messaging;
+      return routeModuleNames[panel] || "";
+    }
+
+    function loadRouteModule(panel, tab = "") {
+      const name = getRouteModuleName(panel, tab);
+      if (!name) return Promise.resolve(null);
+      const existing = routeModulePromises.get(name);
+      if (existing) return existing;
+      const href = `assets/routes/${encodeURIComponent(name)}.js?v=${routeModuleVersion}`;
+      const task = import(href).catch(() => null);
+      routeModulePromises.set(name, task);
+      return task;
+    }
 
     function initializeDeferredFeature(name) {
       const existing = deferredFeaturePromises.get(name);
@@ -21916,12 +22029,15 @@
       return task;
     }
 
-    function initializePanelFeatures(panel) {
-      const featureNames = {
+    function initializePanelFeatures(panel, tab = "") {
+      const activationGeneration = ++routeModuleActivationGeneration;
+      const eagerRouteStyles = { friends: ["friends"], openings: ["openings"] }[panel] || [];
+      eagerRouteStyles.forEach((style) => void loadOptionalRouteStylesheet(style));
+      const fallbackFeatureNames = [...({
         login: ["login"],
         play: ["preferences", "play"],
         bots: ["bots"],
-        puzzles: ["puzzleControls", "puzzles"],
+        puzzles: ["puzzles"],
         store: ["store"],
         settings: ["preferences", "audio", "settings"],
         admin: ["admin"],
@@ -21936,9 +22052,17 @@
         plan: ["plan"],
         friends: ["friends"],
         leaderboards: ["leaderboards"]
-      }[panel] || [];
-      if (featureNames.length) featureNames.unshift("persistence");
-      featureNames.forEach((name) => void initializeDeferredFeature(name));
+      }[panel] || [])];
+      void loadRouteModule(panel, tab).then((module) => {
+        if (activationGeneration !== routeModuleActivationGeneration) return;
+        const featureNames = Array.isArray(module?.features) && module.features.length ? [...module.features] : fallbackFeatureNames;
+        // The audio player is shared markup, but its listeners are still
+        // attached only when a visible route needs them (rather than at boot).
+        if (document.getElementById("audioPlayer")) featureNames.push("audio");
+        if (featureNames.length) featureNames.unshift("persistence");
+        [...new Set(featureNames)].forEach((name) => void initializeDeferredFeature(name));
+        (Array.isArray(module?.styles) ? module.styles : []).forEach((style) => void loadOptionalRouteStylesheet(style));
+      });
     }
 
     function setupSiteTabs() {
@@ -22062,6 +22186,7 @@
       });
 
       function showHome(shouldScroll = false) {
+        routeModuleActivationGeneration += 1;
         stopStorePreview({ silent: true });
         suspendGameReviewWorkspaceForNavigation();
         stopFriendSpectatorWatch();
@@ -22082,6 +22207,9 @@
           activePanel.hidden = true;
           activePanel = null;
         }
+        syncActiveRouteRuntime("", "");
+        window.__refreshVisibleSectionObserver?.();
+        window.__refreshVisualEntrances?.();
 
         if (shouldScroll) {
           playAudioCue("page-home");
@@ -22094,6 +22222,7 @@
           showHome(shouldScroll);
           return;
         }
+        routeModuleActivationGeneration += 1;
 
         if (config.panel !== "store") stopStorePreview({ silent: true });
         if (config.tab === "friendChallenge") startFriendSpectatorWatch();
@@ -22135,10 +22264,13 @@
           panel.hidden = false;
           activePanel = panel;
         }
+        syncActiveRouteRuntime(config.panel, config.tab);
+        window.__refreshVisibleSectionObserver?.();
+        window.__refreshVisualEntrances?.();
         if (panelInitFrame) window.cancelAnimationFrame(panelInitFrame);
         panelInitFrame = window.requestAnimationFrame(() => {
           panelInitFrame = 0;
-          initializePanelFeatures(config.panel);
+          initializePanelFeatures(config.panel, config.tab);
           if (config.panel === "store") {
             // The wallet/inventory is server-authoritative. Refresh on every
             // Store visit so a purchase, gift claim, or reward made elsewhere
@@ -22515,7 +22647,7 @@
       });
       skip.addEventListener("click", finishTour);
       window.addEventListener("resize", schedulePlacement, { passive: true });
-      window.addEventListener("scroll", schedulePlacement, true);
+      window.addEventListener("scroll", schedulePlacement, { capture: true, passive: true });
       window.setTimeout(showStep, 850);
     }
 
@@ -25238,6 +25370,32 @@
       return element;
     }
 
+    // Reconcile keyed lists without throwing away unchanged DOM nodes. This is
+    // intentionally small and framework-free so social/store updates keep
+    // their existing event handlers while avoiding a full subtree rebuild.
+    function patchKeyedChildren(container, items, keyOf, renderItem, signatureOf = null) {
+      if (!container) return;
+      const records = Array.isArray(items) ? items : [];
+      const existing = new Map([...container.children]
+        .map((node) => [node.dataset?.renderKey || "", node])
+        .filter(([key]) => key));
+      const fragment = document.createDocumentFragment();
+      records.forEach((item, index) => {
+        const key = String(keyOf(item, index) || `index-${index}`);
+        const signature = signatureOf ? String(signatureOf(item, index) || "") : "";
+        let node = existing.get(key);
+        if (!node || (signature && node.dataset.renderSignature !== signature)) {
+          node = renderItem(item, index);
+          if (!(node instanceof Element)) return;
+          node.dataset.renderKey = key;
+          if (signature) node.dataset.renderSignature = signature;
+        }
+        fragment.append(node);
+        existing.delete(key);
+      });
+      container.replaceChildren(fragment);
+    }
+
     function readGentleStartState() {
       const fallback = {
         date: getTodayKey(),
@@ -27576,6 +27734,29 @@
       backgroundTaskScheduledFor = 0;
     }
 
+    const optionalRouteStylesheetPromises = new Map();
+    const optionalRouteStylesheetVersion = "review-v110-phase5-runtime";
+    function loadOptionalRouteStylesheet(name) {
+      const key = String(name || "").trim().toLowerCase();
+      if (!key) return Promise.resolve(false);
+      const existing = optionalRouteStylesheetPromises.get(key);
+      if (existing) return existing;
+      const task = new Promise((resolve) => {
+        const href = `assets/routes/${encodeURIComponent(key)}.css?v=${optionalRouteStylesheetVersion}`;
+        const current = document.querySelector(`link[data-route-style="${key}"]`);
+        if (current) { resolve(true); return; }
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href;
+        link.dataset.routeStyle = key;
+        link.onload = () => resolve(true);
+        link.onerror = () => { link.remove(); resolve(false); };
+        document.head.append(link);
+      });
+      optionalRouteStylesheetPromises.set(key, task);
+      return task;
+    }
+
     function setupPerformanceOptimizations() {
       if (window.__checkmateQuestPerformanceBound) return;
       window.__checkmateQuestPerformanceBound = true;
@@ -27587,6 +27768,7 @@
         const slowNetwork = /(^|-)2g$/.test(connection?.effectiveType || "");
         const enabled = lowMemory || lowCpu || saveData || slowNetwork || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         document.body.classList.toggle("perf-lite", enabled);
+        if (enabled) void loadOptionalRouteStylesheet("perf-lite");
         document.documentElement.style.setProperty("--perf-mode", enabled ? "lite" : "full");
         return enabled;
       };
@@ -27619,7 +27801,12 @@
             entry.target.classList.toggle("is-near-viewport", entry.isIntersecting);
           });
         }, { rootMargin: "900px 0px" });
-        document.querySelectorAll("main > section").forEach((section) => sectionObserver.observe(section));
+        const refreshSectionObserver = () => {
+          sectionObserver.disconnect();
+          document.querySelectorAll("main > section:not([hidden])").forEach((section) => sectionObserver.observe(section));
+        };
+        refreshSectionObserver();
+        window.__refreshVisibleSectionObserver = refreshSectionObserver;
       }
 
       let resizeFrame = 0;
@@ -27642,20 +27829,34 @@
           window.clearInterval(reviewReplayTimer);
           reviewReplayTimer = 0;
           stopReviewBestLineReplay();
+          stopMatchPlayerTimer();
+          stopPuzzleTimer();
+          stopRealPuzzleTimer();
           const reviewPlay = document.getElementById("reviewPlay");
           if (reviewPlay) reviewPlay.textContent = "Play";
+        } else {
+          const activePanel = document.querySelector("main > .site-panel.is-active-panel")?.id || "";
+          if (activePanel === "play" || activePanel === "gameReview") startMatchPlayerTimer();
+          if (activePanel === "puzzles") {
+            resumePuzzleTimer();
+            if (realPuzzleStartedAt && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+          }
         }
       });
 
       window.addEventListener("pagehide", () => {
         prefetchController.abort();
         sectionObserver?.disconnect();
+        if (window.__refreshVisibleSectionObserver) delete window.__refreshVisibleSectionObserver;
+        window.__cleanupVisualEntrances?.();
+        if (window.__refreshVisualEntrances) delete window.__refreshVisualEntrances;
+        if (window.__cleanupVisualEntrances) delete window.__cleanupVisualEntrances;
         connection?.removeEventListener?.("change", applyPerformanceMode);
         if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
         flushReviewAnalysisCache();
         window.clearInterval(reviewReplayTimer);
         stopReviewBestLineReplay();
-        window.clearInterval(matchTimerInterval);
+        stopMatchPlayerTimer();
         window.clearInterval(puzzleTimerId);
         window.clearInterval(realPuzzleTimerId);
       }, { once: true });
@@ -27702,7 +27903,14 @@
             observer.unobserve(entry.target);
           });
         }, { rootMargin: "0px 0px -8%", threshold: 0.03 });
-        sections.forEach((section) => observer.observe(section));
+        const refreshVisualEntrances = () => {
+          sections.filter((section) => !section.hidden).forEach((section) => {
+            if (!section.classList.contains("is-revealed")) observer.observe(section);
+          });
+        };
+        refreshVisualEntrances();
+        window.__refreshVisualEntrances = refreshVisualEntrances;
+        window.__cleanupVisualEntrances = () => observer.disconnect();
       }
       window.requestAnimationFrame(() => boards.forEach((board) => board.classList.add("is-board-ready")));
     }
@@ -27714,88 +27922,6 @@
       event.preventDefault();
       runHomeAction(trigger.dataset.homeAction, trigger.dataset.homePlan, trigger.dataset.homeReviewPgn, trigger);
     });
-
-    function setupLegacyPuzzleControls() {
-      if (setupLegacyPuzzleControls.ready) return;
-      setupLegacyPuzzleControls.ready = true;
-    document.getElementById("nextPuzzle").addEventListener("click", () => {
-      goToNextPuzzle(1);
-    });
-    document.getElementById("prevPuzzle").addEventListener("click", () => {
-      goToNextPuzzle(-1);
-    });
-    document.getElementById("randomPuzzle").addEventListener("click", goToRandomPuzzle);
-
-    document.addEventListener("keydown", (event) => {
-      if (!document.getElementById("puzzles")?.classList.contains("is-active-panel")) return;
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
-      if (event.key === "ArrowRight") goToNextPuzzle(1);
-      if (event.key === "ArrowLeft") goToNextPuzzle(-1);
-      if (event.key.toLowerCase() === "r") goToRandomPuzzle();
-    });
-
-    document.getElementById("startPuzzle").addEventListener("click", startPuzzle);
-    document.getElementById("flipPuzzle").addEventListener("click", flipPuzzleBoard);
-    document.getElementById("soundPuzzle").addEventListener("click", togglePuzzleSound);
-    document.getElementById("retryPuzzle").addEventListener("click", retryPuzzle);
-    document.getElementById("analyzePuzzle").addEventListener("click", toggleAnalyzePuzzle);
-    document.getElementById("replayPuzzle").addEventListener("click", replayPuzzleSolution);
-
-    document.querySelectorAll("[data-puzzle-plan]").forEach((button) => {
-      button.addEventListener("click", () => setPuzzlePlan(button.dataset.puzzlePlan));
-    });
-
-    document.querySelectorAll("[data-puzzle-focus]").forEach((button) => {
-      button.addEventListener("click", () => focusPuzzlePanel(button.dataset.puzzleFocus, button));
-    });
-
-    document.querySelectorAll("[data-open-puzzle]").forEach((button) => {
-      button.addEventListener("click", () => openPuzzleByTitle(button.dataset.openPuzzle));
-    });
-
-    document.querySelectorAll("[data-mini-plan]").forEach((button) => {
-      button.addEventListener("click", () => startMiniGame(button.dataset.miniPlan));
-    });
-
-    document.getElementById("dailyPuzzle").addEventListener("click", () => {
-      activePuzzlePlan = "main";
-      currentPuzzle = getDailyPuzzleIndex();
-      renderPuzzle();
-    });
-
-    document.getElementById("resetPuzzle").addEventListener("click", () => {
-      createProgressBackup("before puzzle reset");
-      currentPuzzle = 0;
-      streak = 0;
-      puzzleAttempts = 0;
-      puzzleCorrect = 0;
-      puzzleFailed = 0;
-      puzzleSolveTimes = [];
-      puzzleRatingHistory = [];
-      puzzleStars = 0;
-      puzzleKeys = 0;
-      puzzleChests = 0;
-      spacedReview = null;
-      puzzleWeaknesses = {};
-      solvedPuzzles.clear();
-      renderPuzzle();
-    });
-
-    document.getElementById("hintPuzzle").addEventListener("click", () => {
-      showNextPuzzleHint();
-    });
-
-    document.getElementById("revealPuzzle").addEventListener("click", () => {
-      if (activeAnswered) return;
-      revealPuzzleSolution();
-    });
-
-    document.getElementById("visionAnswer").addEventListener("click", () => {
-      const answer = document.getElementById("visionAnswerText");
-      answer.hidden = !answer.hidden;
-      document.getElementById("visionAnswer").textContent = answer.hidden ? "Show Answer" : "Hide Answer";
-    });
-    }
 
     function setupProfileControls() {
       if (setupProfileControls.ready) return;
@@ -28543,36 +28669,51 @@
       renderFriendsHub();
     }
 
+    function createMessagingConversationCard(conversation) {
+      const card = document.createElement("article");
+      card.className = `friends-hub-card friends-hub-message-card${conversation.id === messagingHubState.conversationId ? " is-selected" : ""}`;
+      card.dataset.messagingConversation = conversation.id;
+      const main = document.createElement("button");
+      main.type = "button";
+      main.className = "friends-hub-card-main";
+      main.addEventListener("click", () => void selectMessagingConversation(conversation));
+      const avatar = createBookText("span", "friend-result-avatar", conversation.participantAvatar !== "auto" ? conversation.participantAvatar.slice(0, 2) : conversation.participantName.slice(0, 1).toUpperCase());
+      const copy = document.createElement("span");
+      copy.className = "friends-hub-card-copy";
+      copy.append(createBookText("strong", "", conversation.participantName), createBookText("small", "", conversation.lastBody || "No messages yet"));
+      main.append(avatar, copy);
+      const actions = document.createElement("span");
+      actions.className = "friends-hub-card-actions";
+      if (conversation.unread) actions.append(createBookText("span", "badge", String(conversation.unread)));
+      const mute = createBookText("button", "button secondary friends-hub-favorite", conversation.muted ? "🔇" : "🔔");
+      mute.type = "button";
+      mute.title = conversation.muted ? "Unmute conversation" : "Mute conversation";
+      mute.addEventListener("click", async (event) => { event.stopPropagation(); try { await getFriendProvider()?.muteConversation?.(conversation.id, !conversation.muted); await refreshMessaging(); } catch {} });
+      actions.append(mute);
+      card.append(main, actions);
+      return card;
+    }
+
     function renderMessagingPanel() {
       const list = document.getElementById("friendsHubList");
       const conversationPanel = document.getElementById("friendsHubConversation");
       if (!list || !conversationPanel) return;
       const query = String(friendHubState.search || "").trim().toLowerCase();
       const conversations = (messagingHubState.conversations || []).filter((conversation) => !query || conversation.participantName.toLowerCase().includes(query) || conversation.lastBody.toLowerCase().includes(query));
-      list.replaceChildren(...(conversations.length ? conversations.map((conversation) => {
-        const card = document.createElement("article");
-        card.className = `friends-hub-card friends-hub-message-card${conversation.id === messagingHubState.conversationId ? " is-selected" : ""}`;
-        card.dataset.messagingConversation = conversation.id;
-        const main = document.createElement("button");
-        main.type = "button";
-        main.className = "friends-hub-card-main";
-        main.addEventListener("click", () => void selectMessagingConversation(conversation));
-        const avatar = createBookText("span", "friend-result-avatar", conversation.participantAvatar !== "auto" ? conversation.participantAvatar.slice(0, 2) : conversation.participantName.slice(0, 1).toUpperCase());
-        const copy = document.createElement("span");
-        copy.className = "friends-hub-card-copy";
-        copy.append(createBookText("strong", "", conversation.participantName), createBookText("small", "", conversation.lastBody || "No messages yet"));
-        main.append(avatar, copy);
-        const actions = document.createElement("span");
-        actions.className = "friends-hub-card-actions";
-        if (conversation.unread) actions.append(createBookText("span", "badge", String(conversation.unread)));
-        const mute = createBookText("button", "button secondary friends-hub-favorite", conversation.muted ? "🔇" : "🔔");
-        mute.type = "button";
-        mute.title = conversation.muted ? "Unmute conversation" : "Mute conversation";
-        mute.addEventListener("click", async (event) => { event.stopPropagation(); try { await getFriendProvider()?.muteConversation?.(conversation.id, !conversation.muted); await refreshMessaging(); } catch {} });
-        actions.append(mute);
-        card.append(main, actions);
-        return card;
-      }) : [(() => { const empty = document.createElement("div"); empty.className = "friends-hub-empty"; empty.append(createBookText("strong", "", "No conversations yet"), createBookText("span", "", "Open a friend profile and choose Message to start one.")); return empty; })()]));
+      if (conversations.length) {
+        patchKeyedChildren(
+          list,
+          conversations,
+          (conversation) => conversation.id,
+          createMessagingConversationCard,
+          (conversation) => JSON.stringify([conversation.id, conversation.participantName, conversation.participantAvatar, conversation.lastBody, conversation.unread, conversation.muted, conversation.id === messagingHubState.conversationId])
+        );
+      } else {
+        const emptyKey = "messages-empty";
+        const existingEmpty = list.firstElementChild?.dataset?.renderKey === emptyKey ? list.firstElementChild : null;
+        const empty = existingEmpty || (() => { const node = document.createElement("div"); node.className = "friends-hub-empty"; node.append(createBookText("strong", "", "No conversations yet"), createBookText("span", "", "Open a friend profile and choose Message to start one.")); node.dataset.renderKey = emptyKey; return node; })();
+        list.replaceChildren(empty);
+      }
       conversationPanel.hidden = false;
       const active = messagingCurrentConversation() || conversations.find((item) => item.id === messagingHubState.conversationId);
       document.getElementById("friendsHubConversationTitle").textContent = active?.participantName || "Select a conversation";
@@ -28585,7 +28726,19 @@
       if (muteButton) { muteButton.disabled = !active; muteButton.textContent = active?.muted ? "Unmute" : "Mute"; muteButton.onclick = active ? async () => { try { await getFriendProvider()?.muteConversation?.(active.id, !active.muted); await refreshMessaging(); } catch {} } : null; }
       const messageList = document.getElementById("friendsHubConversationMessages");
       if (messageList) {
-        messageList.replaceChildren(...(messagingHubState.messages.length ? messagingHubState.messages.map(createMessagingMessageNode) : [createBookText("p", "friends-hub-empty", active ? "No messages yet. Say hello." : "Choose a conversation to read messages.")]));
+        if (messagingHubState.messages.length) {
+          patchKeyedChildren(
+            messageList,
+            messagingHubState.messages,
+            (message) => message.id || message.localId,
+            createMessagingMessageNode,
+            (message) => JSON.stringify([message.id, message.localId, message.body, message.status, message.created_at, messageDeliveryLabel(message)])
+          );
+        } else {
+          const emptyKey = "conversation-empty";
+          const empty = messageList.firstElementChild?.dataset?.renderKey === emptyKey ? messageList.firstElementChild : (() => { const node = createBookText("p", "friends-hub-empty", active ? "No messages yet. Say hello." : "Choose a conversation to read messages."); node.dataset.renderKey = emptyKey; return node; })();
+          messageList.replaceChildren(empty);
+        }
       }
       const older = document.getElementById("friendsHubLoadOlderMessages");
       if (older) {
@@ -28837,6 +28990,21 @@
                   : [];
       let mode = friendHubState.view === "requests" ? "incoming" : friendHubState.view === "sent" ? "outgoing" : "friend";
       if (query) { records = searchResults; mode = "search"; }
+      const nextRenderSignature = JSON.stringify({
+        view: friendHubState.view,
+        selectedId: friendHubState.selectedId,
+        query,
+        mode,
+        favorites: [...favorites].sort(),
+        records: records.map((friend) => [friend.id, friend.name, friend.title, friend.rating, friend.avatar, friendPresenceLabel(friend), friend.requestStatus, friend.requestDirection, friend.mutualFriendsCount]),
+        directory: directory.map((friend) => [friend.id, friendPresenceLabel(friend), friend.requestStatus, friend.requestDirection]),
+        search: searchResults.map((friend) => [friend.id, friendPresenceLabel(friend), friend.requestStatus, friend.requestDirection]),
+        notifications: socialNotificationState.map((note) => [note.id, note.readAt, note.type]),
+        activity: socialActivityState.map((entry) => [entry.id, entry.createdAt || entry.created_at, entry.activityType || entry.activity_type]),
+        conversations: messagingHubState.conversations.map((conversation) => [conversation.id, conversation.lastBody, conversation.unread, conversation.muted, conversation.participantOnline])
+      });
+      if (nextRenderSignature === friendHubRenderSignature) return;
+      friendHubRenderSignature = nextRenderSignature;
       const viewCopy = {
         online: ["Online now", "Friends ready to play"], all: ["All friends", "Your chess network"], requests: ["Friend requests", "People waiting for your reply"], sent: ["Sent requests", "Invitations on their way"], favorites: ["Favorites", "Your closest training partners"], recent: ["Recent players", "Players you recently challenged"], notifications: ["Notifications", "Social updates"], activity: ["Activity feed", "What your friends are doing"], messages: ["Messages", "Private conversations"]
       }[friendHubState.view] || ["Online now", "Friends ready to play"];
@@ -28868,7 +29036,20 @@
         const notes = socialNotificationState;
           list.replaceChildren(...(notes.length ? notes.map((note) => { const copy = socialNotificationLabel(note); const button = createBookText("button", `friends-hub-notification${note.readAt ? " is-read" : ""}`, ""); button.type = "button"; button.append(createBookText("strong", "", copy.title), createBookText("small", "", copy.detail)); button.addEventListener("click", () => { void markSocialNotificationsRead([note.id]); if (note.type === "message_received" && !String(note.entityCode || "").trim()) { saveFriendHubState({ view: "messages", search: "" }); void refreshMessaging().then(() => { const conversation = messagingHubState.conversations.find((item) => item.id === note.entityId); if (conversation) void selectMessagingConversation(conversation, { open: false }); }); } else if (note.type === "message_received") { openTab("friendChallenge", "#play?mode=friend"); } }); return button; }) : [createBookText("div", "friends-hub-empty", "No notifications yet.")]));
       } else {
-        list.replaceChildren(...(records.length ? records.map((friend) => createFriendsHubCard(friend, mode)) : [(() => { const empty = document.createElement("div"); empty.className = "friends-hub-empty"; empty.append(createBookText("strong", "", query ? "No players found" : friendHubState.view === "online" ? "No friends are online" : "Nothing here yet"), createBookText("span", "", query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")); return empty; })()]));
+        if (records.length) {
+          patchKeyedChildren(
+            list,
+            records,
+            (friend) => friend.id,
+            (friend) => createFriendsHubCard(friend, mode),
+            (friend) => JSON.stringify([friend.id, mode, friend.name, friend.title, friend.rating, friend.avatar, friendPresenceLabel(friend), friend.requestStatus, friend.requestDirection, friend.mutualFriendsCount, favorites.has(friend.id)])
+          );
+        } else {
+          const emptyKey = "friends-empty";
+          const existingEmpty = list.firstElementChild?.dataset?.renderKey === emptyKey ? list.firstElementChild : null;
+          const empty = existingEmpty || (() => { const node = document.createElement("div"); node.className = "friends-hub-empty"; node.append(createBookText("strong", "", query ? "No players found" : friendHubState.view === "online" ? "No friends are online" : "Nothing here yet"), createBookText("span", "", query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")); node.dataset.renderKey = emptyKey; return node; })();
+          list.replaceChildren(empty);
+        }
       }
       const selected = [...directory, ...searchResults, ...recent].find((friend) => friend.id === friendHubState.selectedId);
       if (selected) setFriendHubProfile(selected);
@@ -29507,22 +29688,19 @@
     setupRuntimeSafety();
     setupServiceWorker();
     setupSiteTabs();
-    setupAudioSystem();
     primeHomeRankings();
     void setupSupabaseAuthUi();
     setupSiteSearch();
     setupSiteNotifications();
-    setupSafetyReport();
-    setupOnlineMatchmakingAdapter();
-    setupQuickMatch();
-    setupMatchHistory();
-    setupFirstVisitSetup();
-    setupDailyGoals();
     window.requestAnimationFrame(() => {
       setupVisualEntrances();
       setupPerformanceOptimizations();
       renderHomeDashboard();
-      void initializeDeferredFeature("hero");
+      void loadRouteModule("home").then((module) => {
+        const features = Array.isArray(module?.features) && module.features.length ? module.features : ["hero"];
+        features.forEach((name) => void initializeDeferredFeature(name));
+        (Array.isArray(module?.styles) ? module.styles : []).forEach((style) => void loadOptionalRouteStylesheet(style));
+      });
     });
 
     window.addEventListener("load", () => {

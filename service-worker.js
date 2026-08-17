@@ -1,13 +1,14 @@
-// Bump this name whenever the shipped shell changes. The review workspace
-// depends on its HTML, CSS, and JavaScript being from the same release.
-const CACHE_NAME = "nschess-shell-v105-tournaments-academy";
+// Bump this name whenever the shipped shell changes. Keep only the critical
+// shell in the install cache; route modules and optional styles are cached
+// after their first request so install work stays small.
+const CACHE_NAME = "nschess-shell-v110-phase5-runtime";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v105-tournaments-academy",
-  "./assets/app.js?v=review-v105-tournaments-academy",
+  "./assets/app.css?v=review-v110-phase5-runtime",
+  "./assets/app.js?v=review-v110-phase5-runtime",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
