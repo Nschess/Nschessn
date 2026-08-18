@@ -1,14 +1,14 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v127-a11y-connectivity";
+const CACHE_NAME = "nschess-shell-v131-board-lifecycle";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v127-a11y-connectivity",
-  "./assets/app.js?v=review-v127-a11y-connectivity",
+  "./assets/app.css?v=review-v131-board-lifecycle",
+  "./assets/app.js?v=review-v131-board-lifecycle",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
