@@ -467,7 +467,10 @@
           abortActivePointer(event);
         };
         const onWindowBlur = (event) => {
-          if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE) return;
+          if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE) {
+            callbacks.onLifecycleCancel?.(event, state);
+            return;
+          }
           const pointerId = state.pointerId;
           abortActivePointer({
             ...event,
@@ -573,7 +576,10 @@
           board,
           state,
           cancel(event = null) {
-            if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE) return;
+            if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE) {
+              callbacks.onLifecycleCancel?.(event, state);
+              return;
+            }
             const pointerId = state.pointerId;
             abortActivePointer({
               ...(event && typeof event === "object" ? event : {}),
@@ -582,6 +588,7 @@
             });
           },
           detach() {
+            callbacks.onLifecycleCancel?.({ type: "detach" }, state);
             board.removeEventListener("pointerdown", onPointerDown);
             board.removeEventListener("pointermove", onPointerMove);
             board.removeEventListener("pointerup", onPointerUp);
@@ -18334,6 +18341,20 @@
       return hadUserOverlay;
     }
 
+    // User arrows/highlights are temporary annotations for the local Play
+    // position.  They belong to a committed move transition, not to a board
+    // rerender or an aborted pointer gesture.  Review and live Friend boards
+    // own separate state (and live Friend games are intentionally move-only),
+    // so never clear their overlays from the Play move path.
+    function clearCoachTemporaryAnalysis() {
+      const board = document.getElementById("coachBoard");
+      if (!board) return false;
+      const reviewPageActive = Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
+      const liveFriendGame = Boolean(friendChallengeState?.remote && friendChallengeState.active);
+      if (reviewPageActive || reviewSelfAnalysisState || reviewRetryState || liveFriendGame) return false;
+      return clearAnalysisUserOverlay(board);
+    }
+
     function clearAnalysisOverlay(board, { includeUser = true } = {}) {
       const controller = analysisOverlayControllers.get(board);
       if (!controller) return;
@@ -18352,6 +18373,14 @@
     function createAnalysisGestureHandlers(board, prefix) {
       const previewId = `${prefix}-preview`;
       const clearPreview = () => clearAnalysisOverlayItem(board, previewId);
+      const toggleMatchingArrow = (from, to) => {
+        const controller = analysisOverlayControllers.get(board);
+        const existing = [...(controller?.state.userArrows?.values?.() || [])]
+          .find((arrow) => arrow.from === from && arrow.to === to);
+        if (!existing) return false;
+        clearAnalysisOverlayItem(board, existing.id);
+        return true;
+      };
       return {
         analysisGestures: true,
         onArrowMove(from, to, event) {
@@ -18370,6 +18399,7 @@
         onArrowEnd(from, to, event) {
           clearPreview();
           if (!from || !to || from === to) return false;
+          if (toggleMatchingArrow(from, to)) return true;
           addAnalysisArrow(board, {
             id: `${prefix}-${from}-${to}-${++analysisOverlaySequence}`,
             from,
@@ -18403,8 +18433,21 @@
       const wrap = board?.closest(".puzzle-board-wrap");
       if (!board || !wrap) return;
       const reviewPage = document.getElementById("gameReview");
-      if (!reviewPage?.classList.contains("is-review-page")) {
-        clearAnalysisOverlay(board);
+      const reviewPageActive = Boolean(reviewPage?.classList.contains("is-review-page"));
+      const liveFriendGame = Boolean(
+        friendChallengeState?.remote
+        && friendChallengeState.active
+      );
+      if (!reviewPageActive) {
+        // Live friend games are server-authoritative and must never expose
+        // analysis annotations.  Normal Play, however, owns its user overlay
+        // and needs to retain it when the board rerenders after a move.
+        if (liveFriendGame) {
+          clearAnalysisOverlay(board);
+        } else {
+          const controller = analysisOverlayControllers.get(board);
+          controller?.render([], []);
+        }
         return;
       }
       const overlay = getReviewOverlayData();
@@ -18425,7 +18468,15 @@
         squareSelector: ".play-square",
         ...createAnalysisGestureHandlers(board, "review-user-arrow"),
         analysisGestures() {
-          return Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
+          const reviewPageActive = Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
+          const liveFriendGame = Boolean(
+            friendChallengeState?.remote
+            && friendChallengeState.active
+          );
+          // The shared board engine rejects secondary-button input unless
+          // this callback opts in.  Normal Play is an analysis-capable local
+          // board; active Friend games remain move/premove-only.
+          return reviewPageActive || !liveFriendGame;
         },
         canDrag(from) { return Boolean(board.querySelector(`[data-square="${from}"]`)?.draggable); },
         onDragStart(from, event) {
@@ -18450,12 +18501,23 @@
           let handled = false;
           if (from) board.querySelector(`[data-square="${from}"]`)?.classList.remove("dragging");
           if (isLivePremoveEnabled()) handled = cancelCoachPremove() || handled;
-          if (document.getElementById("gameReview")?.classList.contains("is-review-page")) handled = clearAnalysisUserOverlay(board) || handled;
+          // Aborting a piece drag must not erase already-committed analysis
+          // annotations on the local Play board.  Review keeps its familiar
+          // Escape/abort cleanup; arrow previews are cleared by onArrowCancel.
+          const reviewPageActive = Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
+          if (reviewPageActive && !isLivePremoveEnabled()) handled = clearAnalysisUserOverlay(board) || handled;
           return handled;
         },
         onContextMenu() {
           if (isLivePremoveEnabled()) cancelCoachPremove();
-          else if (document.getElementById("gameReview")?.classList.contains("is-review-page")) clearAnalysisUserOverlay(board);
+          else clearAnalysisUserOverlay(board);
+        },
+        onLifecycleCancel() {
+          // Route changes, blur, hidden-tab transitions, and detach can occur
+          // while the board is idle with a premove queued.  They do not enter
+          // the active-pointer cancellation path, so clear that state here.
+          if (isLivePremoveEnabled()) return cancelCoachPremove();
+          return false;
         },
         onSelect(square, event) {
           const reviewPageActive = document.getElementById("gameReview")?.classList.contains("is-review-page");
@@ -18637,6 +18699,7 @@
         return false;
       }
 
+      clearCoachTemporaryAnalysis();
       coachSelected = "";
       coachLegalMoves = [];
       coachPremove = null;
@@ -18762,6 +18825,7 @@
               || (isStrongStockfishBot(config) ? null : getReliableCoachFallback(legalReplies));
           const move = safeReply && coachGame.move(toCoachMoveInput(safeReply));
           if (move) {
+            clearCoachTemporaryAnalysis();
             coachLastMove = move;
             advanceMatchClock(move.color);
             playCoachMoveSound(move, "bot");
@@ -19154,6 +19218,18 @@
       if (remoteMatchesPendingFriendMove(remote)) clearPendingFriendMove(remote);
       else if (shouldDeferRemoteForPendingFriendMove(remote)) return true;
       if (previous?.remoteId === remote.id && Number(remote.revision) < Number(previous.serverRevision || 0)) return true;
+      const previousBoardMoves = getFriendBoardMoveList(previous);
+      const remoteBoardMoves = getFriendBoardMoveList(remote);
+      // A chat/presence update can carry the same board position.  Only a
+      // position advance (new FEN or move list) is allowed to wake a queued
+      // premove; this prevents an ACK or duplicate realtime event from
+      // executing it early or twice.
+      const remotePositionChanged = Boolean(
+        previous?.remoteId !== remote.id
+        || String(previous?.fen || "") !== String(remote.fen || "")
+        || previousBoardMoves.length !== remoteBoardMoves.length
+        || previousBoardMoves.at(-1) !== remoteBoardMoves.at(-1)
+      );
       const boardNeedsRestore = Boolean(restoreBoard && ["active", "completed"].includes(remote.status) && CoachChess && remote.fen && (!coachGame || coachGame.fen() !== remote.fen));
       const messageStamp = remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|");
       const revision = getFriendChallengeRevision(remote);
@@ -19222,6 +19298,7 @@
           renderHomeDashboard();
         }
       }
+      let boardRestored = false;
       if (boardNeedsRestore) {
         try {
           coachGame = restoredFriendGame || new CoachChess(remote.fen);
@@ -19233,13 +19310,21 @@
           coachLegalMoves = [];
           coachLastMove = coachGame.history({ verbose: true }).at(-1) || null;
           coachMessage = remote.status === "completed" ? formatFriendGameOutcome(getFriendGameOutcome(next)) : "Friend move received. Your board is up to date.";
-          tryRunCoachPremove();
+          boardRestored = true;
           renderCoachBoard();
           updateCoachPanel();
         } catch {
           setFriendChallengeStatus("Your friend game updated, but the board could not be restored. Reconnect once more.");
         }
       }
+      // Revalidate only after the authoritative remote position is applied.
+      // The restore flag is needed for reconnects; remotePositionChanged also
+      // covers a realtime update that arrived while the board already had the
+      // current FEN.  Both paths converge on one execution attempt.
+      const canCheckPremove = remote.status === "active"
+        && Boolean(coachPremove)
+        && (boardRestored || (remotePositionChanged && !boardNeedsRestore && coachGame && (!remote.fen || coachGame.fen() === remote.fen)));
+      if (canCheckPremove) tryRunCoachPremove();
       if (remote.status === "active") {
         renderInGamePlayerCard();
         updateAiPlayerHeader();
@@ -23389,7 +23474,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v131-board-lifecycle";
+    const routeModuleVersion = "review-v133-play-premove";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -23609,6 +23694,7 @@
 
       function showHome(shouldScroll = false) {
         boardInteractionEngine.cancelAll({ type: "routechange" });
+        cancelCoachPremove();
         routeModuleActivationGeneration += 1;
         stopStorePreview({ silent: true });
         clearAllAnalysisOverlays();
@@ -23647,6 +23733,7 @@
           return;
         }
         boardInteractionEngine.cancelAll({ type: "routechange" });
+        cancelCoachPremove();
         routeModuleActivationGeneration += 1;
 
         if (config.panel !== "store") stopStorePreview({ silent: true });
@@ -29162,7 +29249,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v131-board-lifecycle";
+    const optionalRouteStylesheetVersion = "review-v133-play-premove";
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
       if (!key) return Promise.resolve(false);
