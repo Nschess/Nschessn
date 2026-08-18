@@ -115,7 +115,10 @@
     const boardInteractionPhases = Object.freeze({ IDLE: "idle", PRESSED: "pressed", DRAGGING: "dragging" });
     const boardInteractionEngine = (() => {
       const registrations = new WeakMap();
-      const DRAG_THRESHOLD = 6;
+      const activeRegistrations = new Set();
+      // Keep the threshold small enough for immediate pickup while still
+      // filtering pointer jitter on touch screens.
+      const DRAG_THRESHOLD = 5;
 
       function squareFromTarget(board, selector, target) {
         const square = target instanceof Element ? target.closest(selector) : null;
@@ -149,7 +152,11 @@
           ghostX: 0,
           ghostY: 0,
           ghostWidth: 0,
-          ghostHeight: 0
+          ghostHeight: 0,
+          pointerMode: "",
+          gestureCommitted: false,
+          ghostClearTimer: 0,
+          dragSafetyTimer: 0
         };
         const callbacks = options;
         const previousTouchAction = board.style.touchAction;
@@ -196,6 +203,10 @@
         const squareName = (square) => String(square?.dataset?.square || "");
         const canInteract = (square, event) => Boolean(square && !square.disabled && callbacks.canInteract?.(squareName(square), event) !== false);
         const clearGhost = () => {
+          if (state.ghostClearTimer) {
+            window.clearTimeout(state.ghostClearTimer);
+            state.ghostClearTimer = 0;
+          }
           if (state.ghostFrame) {
             window.cancelAnimationFrame(state.ghostFrame);
             state.ghostFrame = 0;
@@ -219,7 +230,7 @@
           if (!state.ghostFrame) state.ghostFrame = window.requestAnimationFrame(positionGhost);
         };
         const createGhost = (from, event) => {
-          if (callbacks.dragGhost === false || state.ghost || document.body?.classList.contains("perf-lite")) return;
+          if (callbacks.dragGhost === false || state.ghost) return;
           const sourceSquare = board.querySelector(`${selector}[data-square="${from}"]`);
           const sourcePiece = sourceSquare?.querySelector(".piece-svg, .piece-symbol, img");
           if (!(sourcePiece instanceof HTMLElement) || !sourceSquare) return;
@@ -236,7 +247,7 @@
           ghost.style.width = `${rect.width}px`;
           ghost.style.height = `${rect.height}px`;
           ghost.style.pointerEvents = "none";
-          ghost.style.zIndex = "1000";
+          ghost.style.zIndex = "2147483000";
           ghost.style.willChange = "transform, opacity";
           ghost.style.transition = "none";
           state.ghost = ghost;
@@ -245,7 +256,7 @@
           document.body.appendChild(ghost);
           moveGhost(event);
         };
-        const finishGhost = (accepted, event) => {
+        const finishGhost = (accepted, event, destinationRect = null) => {
           if (!state.ghost) return;
           if (!accepted) {
             const sourceSquare = board.querySelector(`${selector}[data-square="${state.from}"]`);
@@ -255,14 +266,29 @@
               state.ghost.style.transition = "transform 150ms cubic-bezier(.2,.8,.2,1), opacity 150ms ease";
               state.ghost.style.transform = `translate3d(${rect.left + (rect.width - state.ghostWidth) / 2}px, ${rect.top + (rect.height - state.ghostHeight) / 2}px, 0)`;
               state.ghost.style.opacity = "0.3";
-              window.setTimeout(clearGhost, 170);
+              state.ghostClearTimer = window.setTimeout(() => {
+                state.ghostClearTimer = 0;
+                clearGhost();
+              }, 170);
               return;
             }
           } else {
+            const snapRect = destinationRect && destinationRect.width && destinationRect.height
+              ? destinationRect
+              : null;
+            const snapX = snapRect
+              ? snapRect.left + (snapRect.width - state.ghostWidth) / 2
+              : (event?.clientX || state.ghostX) - state.ghostWidth / 2;
+            const snapY = snapRect
+              ? snapRect.top + (snapRect.height - state.ghostHeight) / 2
+              : (event?.clientY || state.ghostY) - state.ghostHeight / 2;
             state.ghost.style.transition = "transform 130ms ease, opacity 130ms ease";
             state.ghost.style.opacity = "0";
-            state.ghost.style.transform = `translate3d(${(event?.clientX || state.ghostX) - state.ghostWidth / 2}px, ${(event?.clientY || state.ghostY) - state.ghostHeight / 2}px, 0) scale(.94)`;
-            window.setTimeout(clearGhost, 145);
+            state.ghost.style.transform = `translate3d(${snapX}px, ${snapY}px, 0) scale(.94)`;
+            state.ghostClearTimer = window.setTimeout(() => {
+              state.ghostClearTimer = 0;
+              clearGhost();
+            }, 145);
             return;
           }
           clearGhost();
@@ -278,18 +304,28 @@
           if (state.pointerId !== null && board.hasPointerCapture?.(state.pointerId)) {
             try { board.releasePointerCapture(state.pointerId); } catch {}
           }
+          if (state.dragSafetyTimer) {
+            window.clearTimeout(state.dragSafetyTimer);
+            state.dragSafetyTimer = 0;
+          }
           state.pointerId = null;
           clearLongPress();
           setPhase(boardInteractionPhases.IDLE, event);
           state.from = "";
           state.startX = 0;
           state.startY = 0;
+          state.pointerMode = "";
           if (event) callbacks.onPointerEnd?.(event, state);
         };
         const onPointerDown = (event) => {
-          if (event.pointerType === "mouse" && event.button !== 0) return;
           const square = squareFromTarget(board, selector, event.target);
           if (!canInteract(square, event)) return;
+          const analysisGestures = typeof callbacks.analysisGestures === "function"
+            ? callbacks.analysisGestures(squareName(square), event, state) === true
+            : callbacks.analysisGestures === true;
+          const secondaryButton = event.pointerType === "mouse" && event.button === 2;
+          if (event.pointerType === "mouse" && event.button !== 0 && !secondaryButton) return;
+          if (secondaryButton && !analysisGestures) return;
           setPhase(boardInteractionPhases.PRESSED, event);
           state.pointerId = event.pointerId;
           state.from = squareName(square);
@@ -299,13 +335,19 @@
           state.suppressTimer = 0;
           state.suppressClick = false;
           state.longPressTriggered = false;
+          state.gestureCommitted = false;
+          state.pointerMode = analysisGestures && (secondaryButton || event.shiftKey)
+            ? "analysis-arrow"
+            : analysisGestures && (event.ctrlKey || event.metaKey)
+              ? "analysis-highlight"
+              : "piece";
           clearLongPress();
           clearLongPressVisual();
           emitHover(square, event);
           try { board.setPointerCapture(event.pointerId); } catch {}
           // A touch gesture belongs to the board once it starts. Preventing
           // the browser's scroll gesture here keeps board input deterministic.
-          if (event.pointerType === "touch") event.preventDefault();
+          if (event.pointerType === "touch" || state.pointerMode !== "piece") event.preventDefault();
           if (event.pointerType === "touch") {
             state.longPressTimer = window.setTimeout(() => {
               state.longPressTimer = 0;
@@ -314,19 +356,41 @@
               markLongPress();
             }, 360);
           }
-          callbacks.onPointerDown?.(state.from, event, state);
+          if (state.pointerMode === "analysis-arrow") callbacks.onArrowStart?.(state.from, event, state);
+          else if (state.pointerMode === "analysis-highlight") callbacks.onAnalysisHighlightStart?.(state.from, event, state);
+          else callbacks.onPointerDown?.(state.from, event, state);
         };
         const onPointerMove = (event) => {
           const square = squareAtPoint(board, selector, event) || squareFromTarget(board, selector, event.target);
           emitHover(square, event);
           if (state.pointerId !== event.pointerId || state.phase === boardInteractionPhases.IDLE) return;
           const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
+          if (state.pointerMode === "analysis-arrow") {
+            if (distance >= DRAG_THRESHOLD) callbacks.onArrowMove?.(state.from, squareName(square), event, state);
+            if (event.pointerType === "touch" || event.buttons === 2) event.preventDefault();
+            callbacks.onPointerMove?.(squareName(square), event, state);
+            return;
+          }
+          if (state.pointerMode === "analysis-highlight") {
+            if (event.pointerType === "touch") event.preventDefault();
+            return;
+          }
           if (distance >= DRAG_THRESHOLD) clearLongPress();
           if (state.phase === boardInteractionPhases.PRESSED && distance >= DRAG_THRESHOLD && callbacks.canDrag?.(state.from, event) !== false) {
             setPhase(boardInteractionPhases.DRAGGING, event);
             board.classList.add("is-dragging");
             callbacks.onDragStart?.(state.from, event, state);
             createGhost(state.from, event);
+            window.clearTimeout(state.dragSafetyTimer);
+            state.dragSafetyTimer = window.setTimeout(() => {
+              if (state.pointerId !== event.pointerId || state.phase !== boardInteractionPhases.DRAGGING) return;
+              callbacks.onCancel?.(state.from, event, state);
+              board.classList.remove("is-dragging");
+              clearGhost();
+              state.suppressClick = true;
+              releasePointer(event);
+              armClickGuard();
+            }, 12000);
           }
           if (state.phase === boardInteractionPhases.DRAGGING && event.pointerType === "touch") event.preventDefault();
           if (state.phase === boardInteractionPhases.DRAGGING) moveGhost(event);
@@ -336,13 +400,44 @@
           if (state.pointerId !== event.pointerId) return;
           const source = state.from;
           const destination = squareAtPoint(board, selector, event) || squareFromTarget(board, selector, event.target);
+          if (state.pointerMode === "analysis-arrow") {
+            state.suppressClick = true;
+            try {
+              state.gestureCommitted = callbacks.onArrowEnd?.(source, squareName(destination), event, state) === true;
+            } catch (error) {
+              state.gestureCommitted = false;
+              callbacks.onError?.(error, event, state);
+            }
+            releasePointer(event);
+            armClickGuard();
+            return;
+          }
+          if (state.pointerMode === "analysis-highlight") {
+            state.suppressClick = true;
+            try {
+              callbacks.onAnalysisHighlight?.(source, event, state);
+            } catch (error) {
+              callbacks.onError?.(error, event, state);
+            }
+            releasePointer(event);
+            armClickGuard();
+            return;
+          }
           const wasDragging = state.phase === boardInteractionPhases.DRAGGING;
+          const destinationRect = destination?.getBoundingClientRect?.() || null;
           state.suppressClick = true;
           callbacks.onHighlight?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
           callbacks.onAnimation?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
           if (wasDragging) {
-            const result = callbacks.onDrop?.(source, squareName(destination), event, state);
-            finishGhost(result !== false, event);
+            let accepted = false;
+            try {
+              accepted = callbacks.onDrop?.(source, squareName(destination), event, state) !== false;
+            } catch (error) {
+              accepted = false;
+              callbacks.onError?.(error, event, state);
+            } finally {
+              finishGhost(accepted, event, destinationRect);
+            }
           }
           else if (!state.longPressTriggered) callbacks.onSelect?.(source, event, state);
           board.classList.remove("is-dragging");
@@ -352,8 +447,9 @@
           // chess-state transition. A new pointerdown clears it immediately.
           armClickGuard();
         };
-        const onPointerCancel = (event) => {
+        const abortActivePointer = (event) => {
           if (state.pointerId !== event.pointerId) return;
+          if (state.pointerMode === "analysis-arrow") callbacks.onArrowCancel?.(state.from, event, state);
           callbacks.onCancel?.(state.from, event, state);
           callbacks.onAnimation?.({ type: "cancel", from: state.from }, event, state);
           board.classList.remove("is-dragging");
@@ -361,6 +457,27 @@
           state.suppressClick = true;
           releasePointer(event);
           armClickGuard();
+        };
+        const onPointerCancel = (event) => abortActivePointer(event);
+        const onWindowPointerEnd = (event) => {
+          if (state.pointerId !== event.pointerId || state.phase === boardInteractionPhases.IDLE) return;
+          // Pointer capture normally delivers this to the board. Keep a
+          // window-level fallback for browsers that release capture when a
+          // render replaces the square nodes during an illegal drop.
+          abortActivePointer(event);
+        };
+        const onWindowBlur = (event) => {
+          if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE) return;
+          const pointerId = state.pointerId;
+          abortActivePointer({
+            ...event,
+            pointerId,
+            type: "windowblur"
+          });
+        };
+        const onVisibilityChange = (event) => {
+          if (document.visibilityState !== "hidden") return;
+          onWindowBlur(event);
         };
         const onClick = (event) => {
           const square = squareFromTarget(board, selector, event.target);
@@ -380,16 +497,39 @@
         };
         const onContextMenu = (event) => {
           const square = squareFromTarget(board, selector, event.target);
+          if (state.gestureCommitted) {
+            state.gestureCommitted = false;
+            event.preventDefault();
+            return;
+          }
           if (!callbacks.onContextMenu) return;
           event.preventDefault();
           callbacks.onContextMenu(squareName(square), event, state);
         };
+        const cancelKeyboardInteraction = (event) => {
+          const source = state.from;
+          if (state.pointerMode === "analysis-arrow") callbacks.onArrowCancel?.(source, event, state);
+          const handled = callbacks.onCancel?.(source, event, state) === true;
+          callbacks.onAnimation?.({ type: "cancel", from: source }, event, state);
+          board.classList.remove("is-dragging");
+          clearGhost();
+          clearLongPress();
+          clearLongPressVisual();
+          state.suppressClick = true;
+          // Use the shared release path so Escape also clears pointer
+          // capture, drag safety timers, coordinates, and callbacks.
+          releasePointer(event);
+          armClickGuard();
+          return handled;
+        };
         const onKeyDown = (event) => {
           const square = squareFromTarget(board, selector, event.target);
           if (event.key === "Escape") {
-            callbacks.onCancel?.(state.from || squareName(square), event, state);
-            state.from = "";
-            setPhase(boardInteractionPhases.IDLE, event);
+            event.preventDefault();
+            const handled = state.pointerId !== null || state.phase !== boardInteractionPhases.IDLE || state.from
+              ? cancelKeyboardInteraction(event)
+              : callbacks.onCancel?.(squareName(square), event, state) === true;
+            if (handled) event.stopPropagation();
             return;
           }
           if (!square || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -424,10 +564,23 @@
         board.addEventListener("dragstart", onDragStart);
         board.addEventListener("contextmenu", onContextMenu);
         board.addEventListener("keydown", onKeyDown);
+        window.addEventListener("pointerup", onWindowPointerEnd);
+        window.addEventListener("pointercancel", onWindowPointerEnd);
+        window.addEventListener("blur", onWindowBlur);
+        document.addEventListener("visibilitychange", onVisibilityChange);
 
         const registration = {
           board,
           state,
+          cancel(event = null) {
+            if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE) return;
+            const pointerId = state.pointerId;
+            abortActivePointer({
+              ...(event && typeof event === "object" ? event : {}),
+              pointerId,
+              type: event?.type || "cancel"
+            });
+          },
           detach() {
             board.removeEventListener("pointerdown", onPointerDown);
             board.removeEventListener("pointermove", onPointerMove);
@@ -439,17 +592,25 @@
             board.removeEventListener("dragstart", onDragStart);
             board.removeEventListener("contextmenu", onContextMenu);
             board.removeEventListener("keydown", onKeyDown);
+            window.removeEventListener("pointerup", onWindowPointerEnd);
+            window.removeEventListener("pointercancel", onWindowPointerEnd);
+            window.removeEventListener("blur", onWindowBlur);
+            document.removeEventListener("visibilitychange", onVisibilityChange);
             window.clearTimeout(state.suppressTimer);
             state.suppressTimer = 0;
+            window.clearTimeout(state.dragSafetyTimer);
+            state.dragSafetyTimer = 0;
             clearLongPress();
             clearLongPressVisual();
             board.classList.remove("is-dragging");
             clearGhost();
             if (!previousTouchAction && callbacks.touchAction !== false) board.style.touchAction = "";
             registrations.delete(board);
+            activeRegistrations.delete(registration);
           }
         };
         registrations.set(board, registration);
+        activeRegistrations.add(registration);
         return registration;
       }
 
@@ -457,6 +618,7 @@
         phases: boardInteractionPhases,
         attach,
         detach(board) { registrations.get(board)?.detach(); },
+        cancelAll(event = null) { activeRegistrations.forEach((registration) => registration.cancel(event)); },
         getState(board) { return registrations.get(board)?.state || null; }
       });
     })();
@@ -3954,6 +4116,7 @@
         const name = squareName(index);
         const square = document.createElement("button");
         square.type = "button";
+        square.dataset.square = name;
         square.className = `adventure-square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
 
         const colorClass = pieceColorClass(piece);
@@ -4263,6 +4426,7 @@
       });
       boardInteractionEngine.attach(board, {
         squareSelector: ".tutorial-square",
+        ...createAnalysisGestureHandlers(board, "tutorial-user-arrow"),
         onSelect(square, event) {
           if (event?.shiftKey && selectedTutorialSquare && selectedTutorialSquare !== square) {
             addAnalysisArrow(board, {
@@ -4270,7 +4434,7 @@
               from: selectedTutorialSquare,
               to: square,
               kind: "primary",
-              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "green"
+              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "cyan"
             });
             selectedTutorialSquare = "";
             renderTutorialBoard();
@@ -4847,6 +5011,7 @@
       board.dataset.moveIndex = String(openingExplorerRuntime.moveIndex);
       boardInteractionEngine.attach(board, {
         squareSelector: ".opening-explorer-square",
+        ...createAnalysisGestureHandlers(board, "opening-user-arrow"),
         onSelect(square, event) {
           if (event?.shiftKey && openingExplorerRuntime.selected && openingExplorerRuntime.selected !== square) {
             addAnalysisArrow(board, {
@@ -4854,7 +5019,7 @@
               from: openingExplorerRuntime.selected,
               to: square,
               kind: "primary",
-              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "green"
+              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "cyan"
             });
             openingExplorerRuntime.selected = "";
             renderOpeningExplorerBoard();
@@ -17868,7 +18033,9 @@
       green: { stroke: "rgba(127,166,80,.94)", fill: "rgba(127,166,80,.22)", glow: "rgba(127,166,80,.42)" },
       blue: { stroke: "rgba(93,191,255,.94)", fill: "rgba(93,191,255,.18)", glow: "rgba(93,191,255,.42)" },
       yellow: { stroke: "rgba(255,211,107,.94)", fill: "rgba(255,211,107,.19)", glow: "rgba(255,211,107,.42)" },
-      red: { stroke: "rgba(255,128,112,.94)", fill: "rgba(255,128,112,.18)", glow: "rgba(255,128,112,.42)" }
+      red: { stroke: "rgba(255,128,112,.94)", fill: "rgba(255,128,112,.18)", glow: "rgba(255,128,112,.42)" },
+      cyan: { stroke: "rgba(116,214,255,.96)", fill: "rgba(116,214,255,.18)", glow: "rgba(116,214,255,.44)" },
+      violet: { stroke: "rgba(197,140,255,.96)", fill: "rgba(197,140,255,.18)", glow: "rgba(197,140,255,.44)" }
     });
     const analysisOverlayControllers = new WeakMap();
     const analysisOverlayStates = new Set();
@@ -17903,6 +18070,7 @@
         markerIds: new Map(),
         arrowNodes: new Map(),
         highlightNodes: new Map(),
+        gradientIds: new Map(),
         baseArrows: [],
         baseHighlights: [],
         userArrows: new Map(),
@@ -17994,7 +18162,9 @@
             line.setAttribute("x2", String(to.x));
             line.setAttribute("y2", String(to.y));
             line.setAttribute("marker-end", `url(#${controller.markerFor(colorName)})`);
-            line.style.stroke = color.stroke;
+            line.style.stroke = kind === "primary" && ["cyan", "violet"].includes(colorName)
+              ? `url(#${controller.primaryGradient()})`
+              : color.stroke;
             line.dataset.arrowId = id;
             if (arrow.label) line.setAttribute("aria-label", String(arrow.label));
             else line.removeAttribute("aria-label");
@@ -18051,11 +18221,32 @@
           marker.setAttribute("orient", "auto");
           marker.setAttribute("markerUnits", "userSpaceOnUse");
           const path = analysisOverlayElement("path");
-          path.setAttribute("d", "M0,0 L0.42,0.21 L0,0.42 Z");
+          path.setAttribute("d", "M0,0 Q0.16,0.21 0,0.42 L0.42,0.21 Z");
           path.setAttribute("fill", ANALYSIS_OVERLAY_COLORS[colorName].stroke);
           marker.appendChild(path);
           controller.ensureLayer()?.querySelector("defs")?.appendChild(marker);
           state.markerIds.set(colorName, id);
+          return id;
+        },
+        primaryGradient() {
+          const existing = state.gradientIds.get("primary");
+          if (existing && state.defs?.querySelector(`[id="${existing}"]`)) return existing;
+          const id = `analysis-arrow-gradient-${++analysisOverlaySequence}`;
+          const gradient = analysisOverlayElement("linearGradient");
+          gradient.setAttribute("id", id);
+          gradient.setAttribute("x1", "0");
+          gradient.setAttribute("y1", "0");
+          gradient.setAttribute("x2", "1");
+          gradient.setAttribute("y2", "1");
+          const start = analysisOverlayElement("stop");
+          start.setAttribute("offset", "0%");
+          start.setAttribute("stop-color", "#74d6ff");
+          const end = analysisOverlayElement("stop");
+          end.setAttribute("offset", "100%");
+          end.setAttribute("stop-color", "#c58cff");
+          gradient.append(start, end);
+          controller.ensureLayer()?.querySelector("defs")?.appendChild(gradient);
+          state.gradientIds.set("primary", id);
           return id;
         },
         render(nextArrows, nextHighlights) {
@@ -18104,6 +18295,7 @@
           state.svg?.remove();
           state.arrowNodes.clear();
           state.highlightNodes.clear();
+          state.gradientIds.clear();
           analysisOverlayStates.delete(state);
           analysisOverlayControllers.delete(board);
         }
@@ -18121,7 +18313,9 @@
     }
 
     function addAnalysisArrow(board, arrow) {
-      return analysisOverlayControllers.get(board)?.addArrow(arrow) || null;
+      return analysisOverlayControllers.get(board)?.addArrow(arrow)
+        || analysisOverlayControllerFor(board, board)?.addArrow(arrow)
+        || null;
     }
 
     function toggleAnalysisHighlight(board, highlight) {
@@ -18133,7 +18327,11 @@
     }
 
     function clearAnalysisUserOverlay(board) {
-      analysisOverlayControllers.get(board)?.clearUser();
+      const controller = analysisOverlayControllers.get(board);
+      if (!controller) return false;
+      const hadUserOverlay = controller.state.userArrows.size > 0 || controller.state.userHighlights.size > 0;
+      controller.clearUser();
+      return hadUserOverlay;
     }
 
     function clearAnalysisOverlay(board, { includeUser = true } = {}) {
@@ -18142,6 +18340,58 @@
       if (includeUser) controller.clearAll();
       else controller.clearUser();
       controller.destroy();
+    }
+
+    function getAnalysisGestureColor(event, secondary = false) {
+      if (event?.altKey) return "blue";
+      if (event?.ctrlKey || event?.metaKey) return "red";
+      if (secondary) return "yellow";
+      return "cyan";
+    }
+
+    function createAnalysisGestureHandlers(board, prefix) {
+      const previewId = `${prefix}-preview`;
+      const clearPreview = () => clearAnalysisOverlayItem(board, previewId);
+      return {
+        analysisGestures: true,
+        onArrowMove(from, to, event) {
+          if (!from || !to || from === to) {
+            clearPreview();
+            return;
+          }
+          addAnalysisArrow(board, {
+            id: previewId,
+            from,
+            to,
+            kind: "primary",
+            color: getAnalysisGestureColor(event, event?.button === 2)
+          });
+        },
+        onArrowEnd(from, to, event) {
+          clearPreview();
+          if (!from || !to || from === to) return false;
+          addAnalysisArrow(board, {
+            id: `${prefix}-${from}-${to}-${++analysisOverlaySequence}`,
+            from,
+            to,
+            kind: "primary",
+            color: getAnalysisGestureColor(event, event?.button === 2)
+          });
+          return true;
+        },
+        onAnalysisHighlight(square, event) {
+          if (!square) return false;
+          toggleAnalysisHighlight(board, {
+            id: `${prefix}-highlight:${square}`,
+            square,
+            kind: "user",
+            color: "violet"
+          });
+          return true;
+        },
+        onArrowCancel() { clearPreview(); },
+        onError() { clearPreview(); }
+      };
     }
 
     function clearAllAnalysisOverlays() {
@@ -18173,6 +18423,10 @@
     function bindCoachBoardEvents(board) {
       boardInteractionEngine.attach(board, {
         squareSelector: ".play-square",
+        ...createAnalysisGestureHandlers(board, "review-user-arrow"),
+        analysisGestures() {
+          return Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
+        },
         canDrag(from) { return Boolean(board.querySelector(`[data-square="${from}"]`)?.draggable); },
         onDragStart(from, event) {
           if (!coachGame || coachThinking || isCoachGameOver()) return;
@@ -18193,8 +18447,11 @@
           return Boolean(from && to && makeCoachMove(from, to));
         },
         onCancel(from) {
+          let handled = false;
           if (from) board.querySelector(`[data-square="${from}"]`)?.classList.remove("dragging");
-          if (isLivePremoveEnabled()) cancelCoachPremove();
+          if (isLivePremoveEnabled()) handled = cancelCoachPremove() || handled;
+          if (document.getElementById("gameReview")?.classList.contains("is-review-page")) handled = clearAnalysisUserOverlay(board) || handled;
+          return handled;
         },
         onContextMenu() {
           if (isLivePremoveEnabled()) cancelCoachPremove();
@@ -18208,7 +18465,7 @@
               from: coachSelected,
               to: square,
               kind: "primary",
-              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "green"
+              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "cyan"
             });
             coachSelected = "";
             coachLegalMoves = [];
@@ -23132,7 +23389,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v127-a11y-connectivity";
+    const routeModuleVersion = "review-v131-board-lifecycle";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -23351,6 +23608,7 @@
       });
 
       function showHome(shouldScroll = false) {
+        boardInteractionEngine.cancelAll({ type: "routechange" });
         routeModuleActivationGeneration += 1;
         stopStorePreview({ silent: true });
         clearAllAnalysisOverlays();
@@ -23388,6 +23646,7 @@
           showHome(shouldScroll);
           return;
         }
+        boardInteractionEngine.cancelAll({ type: "routechange" });
         routeModuleActivationGeneration += 1;
 
         if (config.panel !== "store") stopStorePreview({ silent: true });
@@ -28903,7 +29162,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v127-a11y-connectivity";
+    const optionalRouteStylesheetVersion = "review-v131-board-lifecycle";
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
       if (!key) return Promise.resolve(false);
