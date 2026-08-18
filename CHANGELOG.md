@@ -1,5 +1,18 @@
 # Changelog
 
+## v133 - Play arrow lifecycle and premove reconciliation
+
+- Clear local Play analysis arrows and gesture highlights only after a real
+  chess move commits; illegal drops, rerenders, and aborted drags preserve them.
+- Revalidate one queued Friend premove after an authoritative remote position
+  advance, preventing early execution and duplicate moves while cancelling
+  invalid premoves cleanly.
+
+## v132 - Play board arrows and overlay isolation
+
+- Enabled right-button analysis arrows on the local Play board while keeping active Friend games move-only.
+- Preserved Play user annotations across board rerenders and kept analysis SVG layers board-relative, transparent, and pointer-passive.
+
 ## v131 - Board lifecycle cleanup
 
 - Added a shared route-transition cancellation hook that clears active board
