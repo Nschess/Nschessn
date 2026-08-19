@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=review-v133-play-premove" />
+  <link rel="stylesheet" href="assets/app.css?v=review-v155-legacy-music-retirement" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -875,7 +875,7 @@
                 <div class="settings-card wide">
                   <h4>Sound Toggles</h4>
                   <div class="settings-grid">
-                    <label class="settings-check"><input type="checkbox" data-audio-setting="backgroundMusic" /> Background Music</label>
+                    <label class="settings-check" title="Allow the selected music to play during active games. Move and capture sounds are separate."><input type="checkbox" data-audio-setting="backgroundMusic" /> Music during games</label>
                     <label class="settings-check"><input type="checkbox" data-audio-setting="pieceSounds" /> Piece Sounds</label>
                     <label class="settings-check"><input type="checkbox" data-audio-setting="captureSounds" /> Capture Sounds</label>
                     <label class="settings-check"><input type="checkbox" data-audio-setting="checkSound" /> Check Sound</label>
@@ -936,6 +936,8 @@
                   <label class="settings-field">Board Size <input type="range" min="82" max="122" step="2" value="100" data-pref-setting="boardScale" aria-label="Fine board size" /></label>
                   <label class="settings-field">Animation Speed <select data-pref-setting="speed"><option value="normal">Normal</option><option value="slow">Slow</option><option value="fast">Fast</option></select></label>
                   <label class="settings-field">Motion <select data-pref-setting="motion"><option value="system">Use device setting</option><option value="reduced">Reduced motion</option></select></label>
+                  <label class="settings-field">Premove <select data-pref-setting="premove"><option value="off">Disabled</option><option value="on">Enabled</option></select></label>
+                  <small class="settings-help">Available in active live-human Quick Match and Friend Challenge games; unavailable against AI.</small>
                 </div>
                 <div class="settings-card">
                   <h4>Learning Feel</h4>
@@ -1155,6 +1157,10 @@
                 <button class="button secondary store-sync-retry" type="button" id="storeSyncRetry" hidden>Retry Store sync</button>
                 <button class="button secondary store-inventory-open" type="button" id="storeInventoryOpen">Open inventory</button>
                 <button class="button secondary store-gift-open" type="button" id="storeGiftOpen">Gifting</button>
+                <label class="store-ambience-control" for="storeAmbienceToggle">
+                  <input id="storeAmbienceToggle" type="checkbox" />
+                  <span><strong>Store ambience</strong><small>Quiet piano lounge · off by default</small></span>
+                </label>
               </div>
             </div>
             <div class="store-balance">
@@ -1862,6 +1868,27 @@
                 </div>
               </div>
               <p id="openingExplorerDescription">Fast development, pressure on f7, and a simple castling plan.</p>
+              <section class="opening-explorer-guidance" id="openingExplorerGuidance" aria-labelledby="openingExplorerGuidanceTitle">
+                <div class="opening-explorer-guidance-head">
+                  <div>
+                    <span class="opening-explorer-guidance-eyebrow" id="openingExplorerGuidanceEyebrow">Opening guidance</span>
+                    <strong id="openingExplorerGuidanceTitle">Explore freely</strong>
+                  </div>
+                  <span class="opening-explorer-mode-badge" id="openingExplorerModeBadge">Explore</span>
+                </div>
+                <p class="opening-explorer-guidance-copy" id="openingExplorerGuidanceCopy">Try any move and compare the position with the popular line.</p>
+                <p class="opening-explorer-feedback" id="openingExplorerFeedback" aria-live="polite"></p>
+                <div class="opening-explorer-mode-switch" role="group" aria-label="Opening learning mode">
+                  <button class="opening-explorer-mode is-active" id="openingExplorerModeExplore" type="button" aria-pressed="true">Explore</button>
+                  <button class="opening-explorer-mode" id="openingExplorerModeGuided" type="button" aria-pressed="false">Guided</button>
+                  <button class="opening-explorer-mode" id="openingExplorerModeRecall" type="button" aria-pressed="false">Recall</button>
+                </div>
+                <div class="opening-explorer-hint-row" id="openingExplorerHintRow" hidden>
+                  <span id="openingExplorerHintText">Recall the next move before revealing a hint.</span>
+                  <button class="button secondary" id="openingExplorerHint" type="button">Reveal idea</button>
+                </div>
+                <div class="opening-explorer-progress" id="openingExplorerProgress" aria-label="Opening line progress"></div>
+              </section>
               <div class="opening-explorer-stats" aria-label="Reference results">
                 <span><strong id="openingExplorerWhiteRate">47%</strong><small>White wins</small></span>
                 <span><strong id="openingExplorerDrawRate">28%</strong><small>Draws</small></span>
@@ -3292,7 +3319,6 @@
               </div>
             </section>
             <div class="puzzle-board-wrap play-board-wrap cq-glass-container" aria-label="Playable chess board">
-              <div class="premove-status" id="premoveStatus" role="status" aria-live="polite" aria-atomic="true" hidden></div>
               <div class="review-eval-rail" id="reviewEvalRail" aria-label="Review evaluation bar" hidden>
                 <span class="review-eval-side review-eval-black">Black</span>
                 <span class="review-eval-fill" id="reviewEvalFill"></span>
@@ -3309,6 +3335,11 @@
               <span class="review-player-chip review-player-chip--opponent"><i class="review-player-avatar" id="reviewOpponentAvatar" aria-hidden="true">C</i><span><small>Opponent</small><strong id="reviewOpponentName">Coach</strong></span><b id="reviewOpponentRating">--</b></span>
             </div>
             <div class="play-bottom-actionbar cq-floating-toolbar" aria-label="Game controls">
+              <div class="premove-status" id="premoveStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+                <span class="premove-status-icon" aria-hidden="true">◷</span>
+                <span class="premove-status-copy"><strong>Premove queued</strong><span data-premove-status-move></span></span>
+                <button class="premove-status-cancel" type="button" id="cancelPremove" aria-label="Cancel queued premove" hidden>×</button>
+              </div>
               <div class="puzzle-actions play-actions play-primary-actions">
                 <button class="button play-start-button" type="button" id="restartGame"><span aria-hidden="true">&#9654;</span> Start Game</button>
                 <button class="button secondary play-draw-action" type="button" id="offerDraw">Agree Draw</button>
@@ -3331,7 +3362,6 @@
                     <button class="button secondary" type="button" id="returnLobby">Lobby</button>
                     <button class="button" type="button" id="exportPgn">Copy PGN</button>
                     <button class="button secondary" type="button" id="importPgn">Import PGN</button>
-                    <button class="button secondary" type="button" id="cancelPremove" hidden>Cancel Premove</button>
                   </div>
                 </details>
               </div>
@@ -4499,6 +4529,6 @@
     </div>
   </aside>
 
-  <script defer src="assets/app.js?v=review-v133-play-premove"></script>
+  <script defer src="assets/app.js?v=review-v155-legacy-music-retirement"></script>
 </body>
 </html>

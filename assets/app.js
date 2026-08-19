@@ -155,7 +155,7 @@
           ghostHeight: 0,
           pointerMode: "",
           gestureCommitted: false,
-          ghostClearTimer: 0,
+          cleanupInProgress: false,
           dragSafetyTimer: 0
         };
         const callbacks = options;
@@ -203,10 +203,6 @@
         const squareName = (square) => String(square?.dataset?.square || "");
         const canInteract = (square, event) => Boolean(square && !square.disabled && callbacks.canInteract?.(squareName(square), event) !== false);
         const clearGhost = () => {
-          if (state.ghostClearTimer) {
-            window.clearTimeout(state.ghostClearTimer);
-            state.ghostClearTimer = 0;
-          }
           if (state.ghostFrame) {
             window.cancelAnimationFrame(state.ghostFrame);
             state.ghostFrame = 0;
@@ -256,43 +252,6 @@
           document.body.appendChild(ghost);
           moveGhost(event);
         };
-        const finishGhost = (accepted, event, destinationRect = null) => {
-          if (!state.ghost) return;
-          if (!accepted) {
-            const sourceSquare = board.querySelector(`${selector}[data-square="${state.from}"]`);
-            const sourcePiece = sourceSquare?.querySelector(".piece-svg, .piece-symbol, img");
-            const rect = sourcePiece?.getBoundingClientRect();
-            if (rect && rect.width && rect.height) {
-              state.ghost.style.transition = "transform 150ms cubic-bezier(.2,.8,.2,1), opacity 150ms ease";
-              state.ghost.style.transform = `translate3d(${rect.left + (rect.width - state.ghostWidth) / 2}px, ${rect.top + (rect.height - state.ghostHeight) / 2}px, 0)`;
-              state.ghost.style.opacity = "0.3";
-              state.ghostClearTimer = window.setTimeout(() => {
-                state.ghostClearTimer = 0;
-                clearGhost();
-              }, 170);
-              return;
-            }
-          } else {
-            const snapRect = destinationRect && destinationRect.width && destinationRect.height
-              ? destinationRect
-              : null;
-            const snapX = snapRect
-              ? snapRect.left + (snapRect.width - state.ghostWidth) / 2
-              : (event?.clientX || state.ghostX) - state.ghostWidth / 2;
-            const snapY = snapRect
-              ? snapRect.top + (snapRect.height - state.ghostHeight) / 2
-              : (event?.clientY || state.ghostY) - state.ghostHeight / 2;
-            state.ghost.style.transition = "transform 130ms ease, opacity 130ms ease";
-            state.ghost.style.opacity = "0";
-            state.ghost.style.transform = `translate3d(${snapX}px, ${snapY}px, 0) scale(.94)`;
-            state.ghostClearTimer = window.setTimeout(() => {
-              state.ghostClearTimer = 0;
-              clearGhost();
-            }, 145);
-            return;
-          }
-          clearGhost();
-        };
         const emitHover = (square, event) => {
           const next = squareName(square);
           if (next === state.hover) return;
@@ -316,6 +275,50 @@
           state.startY = 0;
           state.pointerMode = "";
           if (event) callbacks.onPointerEnd?.(event, state);
+        };
+        const reportCallbackError = (error, event) => {
+          try { callbacks.onError?.(error, event, state); } catch {}
+        };
+        const cleanupInteraction = (event = null, { notifyCancel = false, suppressClick = false } = {}) => {
+          const active = state.pointerId !== null
+            || state.phase !== boardInteractionPhases.IDLE
+            || Boolean(state.from)
+            || Boolean(state.ghost)
+            || board.classList.contains("is-dragging");
+          if (state.cleanupInProgress) return false;
+          state.cleanupInProgress = true;
+          const source = state.from;
+          const pointerMode = state.pointerMode;
+          try {
+            if (notifyCancel && active) {
+              if (pointerMode === "analysis-arrow") {
+                try { callbacks.onArrowCancel?.(source, event, state); } catch (error) { reportCallbackError(error, event); }
+              }
+              try { callbacks.onCancel?.(source, event, state); } catch (error) { reportCallbackError(error, event); }
+              try { callbacks.onAnimation?.({ type: "cancel", from: source }, event, state); } catch (error) { reportCallbackError(error, event); }
+            }
+            board.classList.remove("is-dragging");
+            board.querySelectorAll(".dragging").forEach((square) => square.classList.remove("dragging"));
+            clearGhost();
+            clearLongPress();
+            clearLongPressVisual();
+            if (state.dragSafetyTimer) {
+              window.clearTimeout(state.dragSafetyTimer);
+              state.dragSafetyTimer = 0;
+            }
+            if (suppressClick) state.suppressClick = true;
+            if (active) releasePointer(event);
+            else {
+              state.pointerId = null;
+              state.from = "";
+              state.pointerMode = "";
+              if (state.phase !== boardInteractionPhases.IDLE) setPhase(boardInteractionPhases.IDLE, event);
+            }
+            if (suppressClick) armClickGuard();
+            return active;
+          } finally {
+            state.cleanupInProgress = false;
+          }
         };
         const onPointerDown = (event) => {
           const square = squareFromTarget(board, selector, event.target);
@@ -379,17 +382,12 @@
           if (state.phase === boardInteractionPhases.PRESSED && distance >= DRAG_THRESHOLD && callbacks.canDrag?.(state.from, event) !== false) {
             setPhase(boardInteractionPhases.DRAGGING, event);
             board.classList.add("is-dragging");
-            callbacks.onDragStart?.(state.from, event, state);
+            try { callbacks.onDragStart?.(state.from, event, state); } catch (error) { reportCallbackError(error, event); }
             createGhost(state.from, event);
             window.clearTimeout(state.dragSafetyTimer);
             state.dragSafetyTimer = window.setTimeout(() => {
               if (state.pointerId !== event.pointerId || state.phase !== boardInteractionPhases.DRAGGING) return;
-              callbacks.onCancel?.(state.from, event, state);
-              board.classList.remove("is-dragging");
-              clearGhost();
-              state.suppressClick = true;
-              releasePointer(event);
-              armClickGuard();
+              cleanupInteraction({ ...event, type: "drag-timeout" }, { notifyCancel: true, suppressClick: true });
             }, 12000);
           }
           if (state.phase === boardInteractionPhases.DRAGGING && event.pointerType === "touch") event.preventDefault();
@@ -406,10 +404,10 @@
               state.gestureCommitted = callbacks.onArrowEnd?.(source, squareName(destination), event, state) === true;
             } catch (error) {
               state.gestureCommitted = false;
-              callbacks.onError?.(error, event, state);
+              reportCallbackError(error, event);
+            } finally {
+              cleanupInteraction(event, { suppressClick: true });
             }
-            releasePointer(event);
-            armClickGuard();
             return;
           }
           if (state.pointerMode === "analysis-highlight") {
@@ -417,57 +415,48 @@
             try {
               callbacks.onAnalysisHighlight?.(source, event, state);
             } catch (error) {
-              callbacks.onError?.(error, event, state);
+              reportCallbackError(error, event);
+            } finally {
+              cleanupInteraction(event, { suppressClick: true });
             }
-            releasePointer(event);
-            armClickGuard();
             return;
           }
           const wasDragging = state.phase === boardInteractionPhases.DRAGGING;
-          const destinationRect = destination?.getBoundingClientRect?.() || null;
           state.suppressClick = true;
-          callbacks.onHighlight?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
-          callbacks.onAnimation?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
-          if (wasDragging) {
-            let accepted = false;
-            try {
-              accepted = callbacks.onDrop?.(source, squareName(destination), event, state) !== false;
-            } catch (error) {
-              accepted = false;
-              callbacks.onError?.(error, event, state);
-            } finally {
-              finishGhost(accepted, event, destinationRect);
-            }
+          try {
+            callbacks.onHighlight?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
+            callbacks.onAnimation?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
+            if (wasDragging) callbacks.onDrop?.(source, squareName(destination), event, state);
+            else if (!state.longPressTriggered) callbacks.onSelect?.(source, event, state);
+          } catch (error) {
+            reportCallbackError(error, event);
+          } finally {
+            // Drop acceptance belongs to the board callback; interaction
+            // cleanup is unconditional so invalid drops and thrown handlers
+            // cannot strand a ghost, capture, or source visibility state.
+            cleanupInteraction(event, { suppressClick: true });
           }
-          else if (!state.longPressTriggered) callbacks.onSelect?.(source, event, state);
-          board.classList.remove("is-dragging");
-          releasePointer(event);
-          // Some browsers dispatch the compatibility click a frame later;
-          // keep the guard alive long enough to consume it without a second
-          // chess-state transition. A new pointerdown clears it immediately.
-          armClickGuard();
         };
         const abortActivePointer = (event) => {
-          if (state.pointerId !== event.pointerId) return;
-          if (state.pointerMode === "analysis-arrow") callbacks.onArrowCancel?.(state.from, event, state);
-          callbacks.onCancel?.(state.from, event, state);
-          callbacks.onAnimation?.({ type: "cancel", from: state.from }, event, state);
-          board.classList.remove("is-dragging");
-          clearGhost();
-          state.suppressClick = true;
-          releasePointer(event);
-          armClickGuard();
+          if (state.pointerId !== null && state.pointerId !== event.pointerId) return false;
+          const notifyCancel = state.pointerId !== null || state.phase !== boardInteractionPhases.IDLE || Boolean(state.from);
+          return cleanupInteraction(event, { notifyCancel, suppressClick: true });
         };
         const onPointerCancel = (event) => abortActivePointer(event);
+        const onLostPointerCapture = (event) => {
+          if (state.pointerId !== null && state.pointerId === event.pointerId) {
+            abortActivePointer({ ...event, type: "lostpointercapture" });
+          }
+        };
         const onWindowPointerEnd = (event) => {
-          if (state.pointerId !== event.pointerId || state.phase === boardInteractionPhases.IDLE) return;
+          if (state.pointerId !== event.pointerId) return;
           // Pointer capture normally delivers this to the board. Keep a
           // window-level fallback for browsers that release capture when a
           // render replaces the square nodes during an illegal drop.
           abortActivePointer(event);
         };
         const onWindowBlur = (event) => {
-          if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE) {
+          if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE && !state.from) {
             callbacks.onLifecycleCancel?.(event, state);
             return;
           }
@@ -511,18 +500,16 @@
         };
         const cancelKeyboardInteraction = (event) => {
           const source = state.from;
-          if (state.pointerMode === "analysis-arrow") callbacks.onArrowCancel?.(source, event, state);
-          const handled = callbacks.onCancel?.(source, event, state) === true;
-          callbacks.onAnimation?.({ type: "cancel", from: source }, event, state);
-          board.classList.remove("is-dragging");
-          clearGhost();
-          clearLongPress();
-          clearLongPressVisual();
-          state.suppressClick = true;
-          // Use the shared release path so Escape also clears pointer
-          // capture, drag safety timers, coordinates, and callbacks.
-          releasePointer(event);
-          armClickGuard();
+          let handled = false;
+          try {
+            if (state.pointerMode === "analysis-arrow") callbacks.onArrowCancel?.(source, event, state);
+            handled = callbacks.onCancel?.(source, event, state) === true;
+            callbacks.onAnimation?.({ type: "cancel", from: source }, event, state);
+          } finally {
+            // Use the shared finalizer so Escape follows the same release path
+            // as pointercancel, lost capture, teardown, and rerender.
+            cleanupInteraction(event, { suppressClick: true });
+          }
           return handled;
         };
         const onKeyDown = (event) => {
@@ -557,6 +544,7 @@
         board.addEventListener("pointermove", onPointerMove, { passive: false });
         board.addEventListener("pointerup", onPointerUp, { passive: false });
         board.addEventListener("pointercancel", onPointerCancel, { passive: false });
+        board.addEventListener("lostpointercapture", onLostPointerCapture, { passive: true });
         const onPointerOver = (event) => emitHover(squareFromTarget(board, selector, event.target), event);
         const onPointerOut = (event) => {
           if (!squareFromTarget(board, selector, event.relatedTarget)) emitHover(null, event);
@@ -576,23 +564,38 @@
           board,
           state,
           cancel(event = null) {
-            if (state.pointerId === null && !state.ghost && state.phase === boardInteractionPhases.IDLE) {
+            if (state.cleanupInProgress) return false;
+            if (state.pointerId === null && state.phase === boardInteractionPhases.IDLE && !state.from) {
+              // A prior pointer release may leave only a visual ghost after
+              // the pointer has already been released. Clear it without
+              // replaying move-cancel semantics.
+              cleanupInteraction(event);
               callbacks.onLifecycleCancel?.(event, state);
-              return;
+              return true;
             }
             const pointerId = state.pointerId;
-            abortActivePointer({
+            return abortActivePointer({
               ...(event && typeof event === "object" ? event : {}),
               pointerId,
               type: event?.type || "cancel"
             });
           },
           detach() {
+            // Detach can race a route/render teardown while a piece is being
+            // dragged.  Run the same authoritative cancellation path as
+            // pointercancel before removing listeners so source-square state
+            // and any drag ghost cannot be stranded.
+            if (state.cleanupInProgress) return;
+            cleanupInteraction({ pointerId: state.pointerId, type: "detach" }, {
+              notifyCancel: state.pointerId !== null || state.phase !== boardInteractionPhases.IDLE || Boolean(state.from),
+              suppressClick: true
+            });
             callbacks.onLifecycleCancel?.({ type: "detach" }, state);
             board.removeEventListener("pointerdown", onPointerDown);
             board.removeEventListener("pointermove", onPointerMove);
             board.removeEventListener("pointerup", onPointerUp);
             board.removeEventListener("pointercancel", onPointerCancel);
+            board.removeEventListener("lostpointercapture", onLostPointerCapture);
             board.removeEventListener("pointerover", onPointerOver);
             board.removeEventListener("pointerout", onPointerOut);
             board.removeEventListener("click", onClick);
@@ -605,12 +608,6 @@
             document.removeEventListener("visibilitychange", onVisibilityChange);
             window.clearTimeout(state.suppressTimer);
             state.suppressTimer = 0;
-            window.clearTimeout(state.dragSafetyTimer);
-            state.dragSafetyTimer = 0;
-            clearLongPress();
-            clearLongPressVisual();
-            board.classList.remove("is-dragging");
-            clearGhost();
             if (!previousTouchAction && callbacks.touchAction !== false) board.style.touchAction = "";
             registrations.delete(board);
             activeRegistrations.delete(registration);
@@ -625,6 +622,7 @@
         phases: boardInteractionPhases,
         attach,
         detach(board) { registrations.get(board)?.detach(); },
+        cancel(board, event = null) { registrations.get(board)?.cancel(event); },
         cancelAll(event = null) { activeRegistrations.forEach((registration) => registration.cancel(event)); },
         getState(board) { return registrations.get(board)?.state || null; }
       });
@@ -2742,6 +2740,131 @@
       defeat: { label: "Calm Reset", category: "Ambient", rarity: "Common", cost: 70, tag: "Music Pack", accent: "#d7dde3", glow: "rgba(215, 221, 227, 0.18)", scene: "defeat", scenes: ["defeat"], tempo: 88, wave: "sine", notes: [220, 196, 174.61, 146.83], description: "A gentle reset loop for learning from losses without pressure." },
       dragon: { label: "Dragon Fire", category: "Boss Battle", rarity: "Legendary", cost: 420, tag: "Music Pack", accent: "#ff8a42", glow: "rgba(255, 138, 66, 0.34)", scene: "boss", scenes: ["boss", "game"], tempo: 160, wave: "sawtooth", notes: [196, 261.63, 392, 587.33], description: "A legendary campaign track for final boss energy." }
     };
+    // The Store deliberately exposes only this small, curated piano collection.
+    // Each recording is bundled locally so previews and ambience remain stable
+    // and do not depend on a third-party request at runtime. The source pages
+    // and exact CC0 terms are documented in docs/STORE-MUSIC-LICENSES.md.
+    const premiumPianoTracks = Object.freeze({
+      "quiet-calculation": Object.freeze({
+        value: "quiet-calculation",
+        label: "Quiet Calculation",
+        originalTitle: "Whispered",
+        artist: "Ondrosik",
+        category: "Piano",
+        mood: "Focus",
+        instrument: "Piano",
+        descriptor: "Calm",
+        rarity: "Common",
+        cost: 70,
+        accent: "#83c9d4",
+        glow: "rgba(131, 201, 212, 0.18)",
+        scene: "store",
+        scenes: ["store", "menu"],
+        durationSec: 150,
+        audioUrl: "assets/audio/quiet-calculation.mp3",
+        sourceUrl: "https://freemusicarchive.org/music/Ondrosik/whispered/whispered/",
+        license: "CC0 1.0 Universal",
+        licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+        description: "The least distracting option: a soft instrumental piano bed for calculation and longer sessions."
+      }),
+      "rising-position": Object.freeze({
+        value: "rising-position",
+        label: "Rising Position",
+        originalTitle: "breakthrough version 2025",
+        artist: "Ondrosik",
+        category: "Piano",
+        mood: "Uplifting",
+        instrument: "Piano",
+        descriptor: "Progress",
+        rarity: "Rare",
+        cost: 135,
+        accent: "#8db5ef",
+        glow: "rgba(141, 181, 239, 0.2)",
+        scene: "store",
+        scenes: ["store", "menu"],
+        durationSec: 200,
+        audioUrl: "assets/audio/rising-position.mp3",
+        sourceUrl: "https://freemusicarchive.org/music/Ondrosik/whispered/breakthrough-version-2025/",
+        license: "CC0 1.0 Universal",
+        licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+        description: "A positive, forward-moving piano cue for progress without an intrusive beat."
+      }),
+      "midnight-strategy": Object.freeze({
+        value: "midnight-strategy",
+        label: "Midnight Strategy",
+        originalTitle: "ondrik and Ivanka",
+        artist: "Ondrosik",
+        category: "Piano",
+        mood: "Emotional",
+        instrument: "Piano",
+        descriptor: "Reflective",
+        rarity: "Epic",
+        cost: 210,
+        accent: "#a99ce5",
+        glow: "rgba(169, 156, 229, 0.2)",
+        scene: "store",
+        scenes: ["store", "menu"],
+        durationSec: 218,
+        audioUrl: "assets/audio/midnight-strategy.mp3",
+        sourceUrl: "https://freemusicarchive.org/music/Ondrosik/whispered/ondrik-and-ivanka/",
+        license: "CC0 1.0 Universal",
+        licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+        description: "A deeper, emotional piano piece for reflective review and late-night study."
+      }),
+      "beyond-the-board": Object.freeze({
+        value: "beyond-the-board",
+        label: "Beyond the Board",
+        originalTitle: "Beyond (Piano Edit)",
+        artist: "Pablo Perez",
+        category: "Piano",
+        mood: "Deep Focus",
+        instrument: "Ambient Piano",
+        descriptor: "Immersive",
+        rarity: "Epic",
+        cost: 290,
+        accent: "#79b8d7",
+        glow: "rgba(121, 184, 215, 0.2)",
+        scene: "store",
+        scenes: ["store", "menu"],
+        durationSec: 266,
+        audioUrl: "assets/audio/beyond-the-board.mp3",
+        sourceUrl: "https://freemusicarchive.org/music/pablo-perez/single/beyond-piano-edit/",
+        license: "CC0 1.0 Universal",
+        licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+        description: "A longer ambient-piano journey for immersive concentration and uninterrupted board vision."
+      }),
+      "subtle-triumph": Object.freeze({
+        value: "subtle-triumph",
+        label: "The Subtle Triumph",
+        originalTitle: "The Subtle Triumph",
+        artist: "Patrick Davies",
+        category: "Piano",
+        mood: "Premium",
+        instrument: "Piano",
+        descriptor: "Achievement",
+        rarity: "Divine",
+        cost: 480,
+        accent: "#f1ca74",
+        glow: "rgba(241, 202, 116, 0.24)",
+        scene: "store",
+        scenes: ["store", "menu"],
+        durationSec: 287,
+        audioUrl: "assets/audio/subtle-triumph.mp3",
+        sourceUrl: "https://freemusicarchive.org/music/patrick-davies/single/the-subtle-triumph/",
+        license: "CC0 1.0 Universal",
+        licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+        description: "The highest-tier reward: emotional, uplifting piano that feels earned without becoming grandiose."
+      })
+    });
+    // These values belonged to the retired Store-only collection. They are
+    // kept as an explicit migration list so stale local preferences and any
+    // legacy player instance can be stopped instead of silently falling back
+    // to an old cached recording.
+    const retiredStoreMusicValues = new Set([
+      "after-last-move",
+      "quiet-strategy",
+      "golden-endgame"
+    ]);
     const audioSfxPacks = {
       classic: { label: "Classic", accent: "#e7b65d", glow: "rgba(231, 182, 93, 0.22)", wave: "triangle", pitch: 1, gain: 1, room: 0.1, pan: 0.08, noise: 0.55, description: "Warm wooden-board clicks and clean training sounds." },
       modern: { label: "Modern", accent: "#7fa650", glow: "rgba(127, 166, 80, 0.24)", wave: "sine", pitch: 1.08, gain: 0.95, room: 0.08, pan: 0.1, noise: 0.42, description: "Polished, crisp UI sounds for focused play." },
@@ -2758,32 +2881,32 @@
       fantasy: { cost: 160, rarity: "Rare", category: "Sound FX" },
       sciFi: { cost: 190, rarity: "Epic", category: "Sound FX" }
     };
-    const audioMusicStoreItems = Object.entries(audioMusicThemes).map(([value, theme]) => ({
-      id: `music-${value}`,
+    const audioMusicStoreItems = Object.values(premiumPianoTracks).map((track) => ({
+      id: `music-${track.value}`,
       type: "musicPack",
-      value,
-      name: `${theme.label} Music`,
-      cost: theme.cost,
-      tag: theme.tag,
-      rarity: theme.rarity,
-      category: theme.category,
-      scene: theme.scene,
-      scenes: theme.scenes || [theme.scene],
-      description: theme.description,
-      previewText: theme.label
+      value: track.value,
+      name: track.label,
+      cost: track.cost,
+      tag: `${track.mood} · ${track.instrument} · ${track.descriptor}`,
+      rarity: track.rarity,
+      category: track.category,
+      scene: track.scene,
+      scenes: track.scenes,
+      artist: track.artist,
+      mood: track.mood,
+      instrument: track.instrument,
+      descriptor: track.descriptor,
+      durationSec: track.durationSec,
+      audioUrl: track.audioUrl,
+      sourceUrl: track.sourceUrl,
+      license: track.license,
+      licenseUrl: track.licenseUrl,
+      description: track.description,
+      previewText: track.label
     }));
-    const audioSfxStoreItems = Object.entries(audioSfxPacks).map(([value, pack]) => ({
-      id: `sfx-${value}`,
-      type: "sfxPack",
-      value,
-      name: `${pack.label} Sound Pack`,
-      cost: sfxPackMeta[value]?.cost || 0,
-      tag: "Sound Pack",
-      rarity: sfxPackMeta[value]?.rarity || "Common",
-      category: "Sound FX",
-      description: pack.description,
-      previewText: pack.label
-    }));
+    // Sound packs remain available to the game/settings audio system, but are
+    // intentionally retired from the Store catalog.
+    const audioSfxStoreItems = [];
     const boardThemeDefinitions = {
       wood: { label: "Classic Wood", rarity: "Common", cost: 0, light: "#f0d9b5", dark: "#b58863", glow: "rgba(181, 136, 99, 0.24)", description: "Warm classic squares with excellent piece visibility." },
       walnut: { label: "Walnut Heritage", rarity: "Common", cost: 28, light: "#ead0a4", dark: "#784925", glow: "rgba(172, 105, 49, 0.3)", lightTexture: "repeating-linear-gradient(105deg, rgba(103, 57, 24, 0.1) 0 1px, transparent 1px 8px)", darkTexture: "repeating-linear-gradient(105deg, rgba(45, 20, 7, 0.16) 0 1px, transparent 1px 9px)", description: "Deep walnut grain with warm, tournament-ready contrast." },
@@ -2869,7 +2992,6 @@
       ...flexBadgeStoreItems,
       ...nameStyleStoreItems,
       ...audioMusicStoreItems,
-      ...audioSfxStoreItems,
       ...boardThemeStoreItems,
       ...premiumAvatarStoreItems,
       ...avatarEffectStoreItems,
@@ -2927,7 +3049,7 @@
         name: "Forest Defender Collection",
         rarity: "Rare",
         discount: 0.15,
-        itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald", "music-nature"],
+        itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald"],
         description: "A calm woodland setup for daily puzzles, relaxed games, and steady improvement."
       },
       {
@@ -2935,7 +3057,7 @@
         name: "Space Explorer Collection",
         rarity: "Mythic",
         discount: 0.20,
-        itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy", "music-space"],
+        itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy"],
         description: "Deep-space contrast, starlit highlights, and focused music for long study sessions."
       },
       {
@@ -2943,7 +3065,7 @@
         name: "Tournament Focus Collection",
         rarity: "Epic",
         discount: 0.15,
-        itemIds: ["board-tournament", "background-neon", "skin-cburnett", "lastmove-electric", "sfx-modern"],
+        itemIds: ["board-tournament", "background-neon", "skin-cburnett", "lastmove-electric"],
         description: "A clean competition-ready kit with crisp squares and restrained tactical feedback."
       }
     ]);
@@ -2960,8 +3082,11 @@
       "background-halloween": { unlockMethod: "Season", unlockLabel: "Halloween season", awardOnly: true },
       "background-christmas": { unlockMethod: "Season", unlockLabel: "Winter season", awardOnly: true },
       "avatar-winter-crown": { unlockMethod: "Season", unlockLabel: "Winter season", awardOnly: true },
-      "music-halloween": { unlockMethod: "Season", unlockLabel: "Halloween season", awardOnly: true },
-      "music-christmas": { unlockMethod: "Season", unlockLabel: "Winter season", awardOnly: true }
+      "music-quiet-calculation": { unlockMethod: "Coins", unlockLabel: "70 coins" },
+      "music-rising-position": { unlockMethod: "Coins", unlockLabel: "135 coins" },
+      "music-midnight-strategy": { unlockMethod: "Coins", unlockLabel: "210 coins" },
+      "music-beyond-the-board": { unlockMethod: "Coins", unlockLabel: "290 coins" },
+      "music-subtle-triumph": { unlockMethod: "Coins", unlockLabel: "480 coins" }
     });
     const storeRarityOrder = Object.freeze(["Common", "Rare", "Epic", "Legendary", "Mythic", "Divine"]);
     const storeRarityRank = Object.freeze(Object.fromEntries(storeRarityOrder.map((rarity, index) => [rarity, index])));
@@ -2989,7 +3114,7 @@
       if (item.type === "nameStyle" || item.type === "title") return "Name · Profile, matches & chat";
       if (item.type === "lastMove") return "Highlight · Play, Puzzles & Review";
       if (["avatar", "frame", "avatarEffect", "flexBadge"].includes(item.type)) return "Profile · matches & leaderboards";
-      if (item.type === "musicPack") return "Audio · menus, games & review";
+      if (item.type === "musicPack") return "Piano ambience · Store lounge & menus";
       if (item.type === "sfxPack") return "Audio · moves, captures & puzzles";
       if (item.type === "archetype") return "Coach style · board & training";
       if (item.type === "trail") return "Celebrations · wins & puzzles";
@@ -3022,9 +3147,9 @@
     // IDs are resolved against the catalog so a missing optional item never breaks Store rendering.
     const storeCollectionDefinitions = Object.freeze([
       { id: "royal-court", name: "Royal Court", description: "Warm royal finishes for milestone games.", itemIds: ["board-royalCourt", "background-royal", "skin-maestro", "name-gold", "avatar-royal-lion", "frame-crown"], reward: { type: "title", value: "Royal Collector", label: "Royal Collector title" } },
-      { id: "forest-defender", name: "Forest Defender", description: "Calm woodland color for patient, steady improvement.", itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald", "music-nature", "avatar-bat"], reward: { type: "title", value: "Forest Guardian", label: "Forest Guardian title" } },
-      { id: "samurai", name: "Samurai", description: "Disciplined red-gold accents for tactical battles.", itemIds: ["board-dragon", "background-volcano", "skin-samurai", "lastmove-fire", "music-samurai", "avatar-samurai-mask", "frame-samurai"], reward: { type: "title", value: "Samurai Focus", label: "Samurai Focus title" } },
-      { id: "space-explorer", name: "Space Explorer", description: "Deep-space contrast for long study sessions.", itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy", "music-space", "avatar-galaxy-star", "frame-galaxy"], reward: { type: "title", value: "Space Explorer", label: "Space Explorer title" } }
+      { id: "forest-defender", name: "Forest Defender", description: "Calm woodland color for patient, steady improvement.", itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald", "avatar-bat"], reward: { type: "title", value: "Forest Guardian", label: "Forest Guardian title" } },
+      { id: "samurai", name: "Samurai", description: "Disciplined red-gold accents for tactical battles.", itemIds: ["board-dragon", "background-volcano", "skin-samurai", "lastmove-fire", "avatar-samurai-mask", "frame-samurai"], reward: { type: "title", value: "Samurai Focus", label: "Samurai Focus title" } },
+      { id: "space-explorer", name: "Space Explorer", description: "Deep-space contrast for long study sessions.", itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy", "avatar-galaxy-star", "frame-galaxy"], reward: { type: "title", value: "Space Explorer", label: "Space Explorer title" } }
     ]);
     const storeCollectionByItem = new Map();
     storeCollectionDefinitions.forEach((collection) => {
@@ -3090,21 +3215,37 @@
       equip.textContent = owned ? "Equip this item" : "Buy to equip";
     }
 
-    function stopStorePreview({ silent = false } = {}) {
+    function syncStorePreviewButtons() {
+      const activeId = storePreviewState?.item?.id || "";
+      document.querySelectorAll("[data-store-preview]").forEach((button) => {
+        const isActive = button.dataset.storePreview === activeId && audioRuntime.premiumTrackMode === "preview" && audioRuntime.playing;
+        button.textContent = isActive ? "Stop preview" : "Preview";
+        button.setAttribute("aria-pressed", String(isActive));
+      });
+    }
+
+    function stopStorePreview({ silent = false, restoreAudio = true } = {}) {
       if (!storePreviewState) return;
       const previous = storePreviewState;
       storePreviewState = null;
       window.clearTimeout(previous.timer);
       storePreviewAudioOverride = null;
       const originalPrefs = previous.prefs;
-      if (previous.audio?.playing) startAudioMusic(previous.audio.scene || inferAudioScene(), previous.audio.current || originalPrefs.audio.musicPack, false);
-      else {
-        stopAudioMusic(false);
-        syncAudioSystem(originalPrefs.audio);
-      }
+      const restore = () => {
+        if (!restoreAudio) return;
+        if (previous.audio?.storeAmbienceActive && isStorePanelActive() && originalPrefs.audio.storeAmbience === true) startStoreAmbience();
+        else if (previous.audio?.playing) startAudioMusic(previous.audio.scene || inferAudioScene(), previous.audio.current || originalPrefs.audio.musicPack, false);
+        else {
+          stopAudioMusic(false);
+          syncAudioSystem(originalPrefs.audio);
+        }
+      };
+      if (audioRuntime.premiumTrackMode === "preview") stopPremiumTrack({ fadeMs: 150, onDone: restore });
+      else restore();
       refreshPurchasedCosmetics(originalPrefs);
       document.body.classList.remove("store-preview-active");
       renderStorePreviewTray();
+      syncStorePreviewButtons();
       if (!silent) {
         const status = document.getElementById("storeStatus");
         if (status) status.textContent = "Preview ended. Your equipped cosmetics are restored.";
@@ -3113,22 +3254,31 @@
 
     function startStorePreview(item) {
       if (!item) return;
-      if (storePreviewState?.item?.id === item.id) return;
-      stopStorePreview({ silent: true });
+      if (storePreviewState?.item?.id === item.id) {
+        stopStorePreview();
+        return;
+      }
+      stopStorePreview({ silent: true, restoreAudio: false });
       const prefs = cloneStorePrefs(readLearnerPrefs());
       storePreviewState = {
         item,
         prefs,
-        audio: { playing: Boolean(audioRuntime.playing), current: audioRuntime.current, scene: audioRuntime.scene },
+        audio: {
+          playing: Boolean(audioRuntime.playing),
+          current: audioRuntime.current,
+          scene: audioRuntime.scene,
+          storeAmbienceActive: Boolean(audioRuntime.storeAmbienceActive)
+        },
         timer: window.setTimeout(() => stopStorePreview({ silent: true }), 30000)
       };
       document.body.classList.add("store-preview-active");
       const previewPrefs = applyStoreItemToPrefs(item, prefs);
       if (item.type === "sfxPack") storePreviewAudioOverride = item.value;
       refreshPurchasedCosmetics(previewPrefs);
-      if (item.type === "musicPack") startAudioMusic(inferAudioScene(), item.value, false);
+      if (item.type === "musicPack") startPremiumTrack(getAudioMusicTheme(item.value), { mode: "preview", loop: false, saveChoice: false, scene: "store" });
       if (item.type === "sfxPack") playAudioCue("notification");
       renderStorePreviewTray();
+      syncStorePreviewButtons();
       const status = document.getElementById("storeStatus");
       if (status) status.textContent = `${item.name} preview is live for 30 seconds. Exit preview to restore your setup.`;
     }
@@ -3231,7 +3381,7 @@
         card.className = `store-inventory-item${isStoreItemEquipped(item) ? " is-equipped" : ""}`;
         card.append(buildStorePreview(item), createBookText("strong", "", item.name), createBookText("small", "", `${getStoreCategory(item)} · ${getStoreSurfaceLabel(item)}`));
         const actions = document.createElement("div"); actions.className = "store-inventory-item-actions";
-        const preview = createBookText("button", "button secondary", "Preview"); preview.type = "button"; preview.addEventListener("click", () => startStorePreview(item));
+        const preview = createBookText("button", "button secondary", "Preview"); preview.type = "button"; preview.dataset.storePreview = item.id; preview.addEventListener("click", () => startStorePreview(item));
         const equip = createBookText("button", "button", isStoreItemEquipped(item) ? "Equipped" : "Quick equip"); equip.type = "button"; equip.disabled = isStoreItemEquipped(item); equip.addEventListener("click", async () => { await equipStoreItem(item); renderStoreInventory(); });
         actions.append(preview, equip); card.append(actions); return card;
         }, (item) => JSON.stringify([item.id, isStoreItemEquipped(item), isStoreItemWishlisted(item, prefs), storeInventoryUi.filter, storeInventoryUi.category]));
@@ -3256,7 +3406,7 @@
       });
       const recommendations = document.getElementById("storeRecommendations");
       const recommended = getStoreRecommendations(owned);
-      if (recommendations) recommendations.replaceChildren(...(recommended.length ? recommended.map((item) => { const row = createBookText("div", "store-recommendation", ""); row.append(buildStorePreview(item), createBookText("span", "", `${item.name} · ${getStoreEstimatedDays(item)}`)); const button = createBookText("button", "button secondary", "Preview"); button.type = "button"; button.addEventListener("click", () => startStorePreview(item)); row.append(button); return row; }) : [createBookText("small", "", "Your collection is fully caught up. Check back after the next Store rotation.")]));
+      if (recommendations) recommendations.replaceChildren(...(recommended.length ? recommended.map((item) => { const row = createBookText("div", "store-recommendation", ""); row.append(buildStorePreview(item), createBookText("span", "", `${item.name} · ${getStoreEstimatedDays(item)}`)); const button = createBookText("button", "button secondary", "Preview"); button.type = "button"; button.dataset.storePreview = item.id; button.addEventListener("click", () => startStorePreview(item)); row.append(button); return row; }) : [createBookText("small", "", "Your collection is fully caught up. Check back after the next Store rotation.")]));
       const history = document.getElementById("storeCosmeticHistory");
       if (history) { const entries = [ ...(storeState.history?.unlocked || []).map((entry) => ({ ...entry, kind: "Unlocked" })), ...(storeState.history?.purchased || []).map((entry) => ({ ...entry, kind: "Purchased" })), ...(storeState.history?.equipped || []).map((entry) => ({ ...entry, kind: "Equipped" })) ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 12); history.replaceChildren(...(entries.length ? entries.map((entry) => createBookText("small", "", `${entry.kind} · ${getStoreItem(entry.itemId)?.name || entry.itemId} · ${formatStoreHistoryDate(entry.at)}`)) : [createBookText("small", "", "Your cosmetic history will appear here.")])); }
     }
@@ -3499,6 +3649,11 @@
     const savedPuzzleState = readPuzzleState();
     const puzzleStateMatchesBank = savedPuzzleState.bankVersion === puzzleBankVersion;
     let storeState = normalizeStoreState(savedPuzzleState.store);
+    if (JSON.stringify(savedPuzzleState.store?.equipped || {}) !== JSON.stringify(storeState.equipped)) {
+      // Drop retired/unknown equipped Store IDs immediately. This includes
+      // the former music packs, whose preference is migrated separately.
+      writeJsonStorage(puzzleStorageKey, { ...savedPuzzleState, store: { ...savedPuzzleState.store, ...storeState } });
+    }
     let serverStoreState = null;
     let serverStoreCatalog = new Map();
     let serverStoreReady = false;
@@ -4470,7 +4625,7 @@
       renderAnalysisOverlay({
         board,
         wrap: board,
-        arrows: tutorialLastMove?.length === 2 ? [{ id: "tutorial-last-move", from: tutorialLastMove[0], to: tutorialLastMove[1], kind: "training", color: "yellow" }] : [],
+        arrows: tutorialLastMove?.length === 2 ? [{ id: "tutorial-last-move", from: tutorialLastMove[0], to: tutorialLastMove[1], kind: "training", color: "cyan" }] : [],
         highlights: [
           ...(selectedTutorialSquare ? [{ id: "tutorial-selected", square: selectedTutorialSquare, kind: "selected", color: "blue" }] : []),
           ...legalTargets.map((square) => ({ id: `tutorial-legal:${square}`, square, kind: "legal", color: "yellow" }))
@@ -4917,11 +5072,180 @@
       { title: "Nimzo-Indian Defense", eco: "E20", description: "Pin the knight, control e4, and trade structure for active piece play.", white: 44, draw: 30, black: 26, lines: [{ label: "Rubinstein", description: "Simple development and a solid center.", moves: ["d4", "Nf6", "c4", "e6", "Nc3", "Bb4", "e3", "O-O"] }, { label: "Classical", description: "Keep the bishop pair and protect c3.", moves: ["d4", "Nf6", "c4", "e6", "Nc3", "Bb4", "Qc2"] }] }
     ]);
     const openingExplorerStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    const openingExplorerRuntime = { entry: openingExplorerCatalog[0], moves: [], moveIndex: 0, selected: "", ready: false };
+    const openingExplorerRuntime = {
+      entry: openingExplorerCatalog[0],
+      lineIndex: 0,
+      moves: [],
+      moveIndex: 0,
+      selected: "",
+      mode: "explore",
+      feedback: null,
+      recallReveal: 0,
+      ready: false
+    };
 
     function getOpeningExplorerEntries(query = "") {
       const needle = String(query || "").trim().toLowerCase();
       return needle ? openingExplorerCatalog.filter((entry) => `${entry.title} ${entry.eco}`.toLowerCase().includes(needle)) : openingExplorerCatalog;
+    }
+
+    function getOpeningExplorerLine() {
+      const lines = openingExplorerRuntime.entry?.lines || [];
+      return lines[openingExplorerRuntime.lineIndex] || lines[0] || { label: "Main line", description: "Follow the most common development plan.", moves: [] };
+    }
+
+    function normalizeOpeningMoveToken(value) {
+      return String(value || "")
+        .trim()
+        .replace(/^\d+\.(\.\.)?\s*/, "")
+        .replace(/[!?+#]+$/g, "")
+        .replace(/^0-0-0$/i, "O-O-O")
+        .replace(/^0-0$/i, "O-O");
+    }
+
+    function getOpeningExplorerExpectedMove(game = getOpeningExplorerGame()) {
+      const line = getOpeningExplorerLine();
+      const expectedSan = line.moves?.[openingExplorerRuntime.moveIndex] || "";
+      if (!expectedSan || !game) return null;
+      let legalMoves = [];
+      try { legalMoves = game.moves({ verbose: true }); } catch { legalMoves = []; }
+      const expected = legalMoves.find((move) => normalizeOpeningMoveToken(move.san) === normalizeOpeningMoveToken(expectedSan)) || null;
+      return { san: expectedSan, move: expected, side: game.turn?.() || "w" };
+    }
+
+    function getOpeningMoveWhy(san, move) {
+      const token = normalizeOpeningMoveToken(san).toUpperCase();
+      if (token === "O-O" || token === "O-O-O") return "Castle to secure your king and connect the rooks.";
+      if (/^[ED]4$/.test(token)) return "Control the center and open lines for your bishop and queen.";
+      if (/^C4$/.test(token)) return "Challenge the center from the side and give your pieces active squares.";
+      if (/^C5$/.test(token)) return "Contest the center asymmetrically and create immediate counterplay.";
+      if (/^[ED]5$/.test(token)) return "Contest the center before the opponent can build it freely.";
+      if (move?.piece === "n") return "Develop a knight toward the center and prepare safe castling.";
+      if (move?.piece === "b") return "Develop the bishop to an active diagonal and support the center.";
+      if (move?.piece === "q") return "Place the queen with purpose without losing development time.";
+      if (move?.piece === "r") return "Improve the rook after the position gives it a useful open file.";
+      if (move?.piece === "p") return "Use the pawn move to support the center and open a useful line.";
+      return "Choose the move that develops a piece, contests the center, or improves king safety.";
+    }
+
+    function getOpeningPieceLabel(piece) {
+      return ({ p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" })[String(piece || "").toLowerCase()] || "piece";
+    }
+
+    function getOpeningExplorerGuidance() {
+      const expected = getOpeningExplorerExpectedMove();
+      const done = Boolean(getOpeningExplorerLine().moves?.length && openingExplorerRuntime.moveIndex >= getOpeningExplorerLine().moves.length);
+      return {
+        line: getOpeningExplorerLine(),
+        expected,
+        done,
+        why: expected ? getOpeningMoveWhy(expected.san, expected.move) : "This line is complete. Replay it or choose another continuation.",
+        piece: expected?.move ? getOpeningPieceLabel(expected.move.piece) : "piece",
+        prefix: openingExplorerRuntime.moveIndex % 2 === 1 ? "..." : ""
+      };
+    }
+
+    function openingExplorerPrefixMatchesLine() {
+      const lineMoves = getOpeningExplorerLine().moves || [];
+      const played = openingExplorerRuntime.moves.slice(0, openingExplorerRuntime.moveIndex);
+      return played.every((san, index) => normalizeOpeningMoveToken(san) === normalizeOpeningMoveToken(lineMoves[index] || ""));
+    }
+
+    function setOpeningExplorerMode(mode) {
+      const nextMode = ["explore", "guided", "recall"].includes(mode) ? mode : "explore";
+      if (nextMode !== "explore" && !openingExplorerPrefixMatchesLine()) {
+        openingExplorerRuntime.moves = [];
+        openingExplorerRuntime.moveIndex = 0;
+        openingExplorerRuntime.feedback = { type: "info", text: "Guidance starts at the beginning of this line." };
+      } else {
+        openingExplorerRuntime.feedback = null;
+      }
+      openingExplorerRuntime.mode = nextMode;
+      openingExplorerRuntime.recallReveal = 0;
+      openingExplorerRuntime.selected = "";
+      renderOpeningExplorer();
+    }
+
+    function advanceOpeningExplorerHint() {
+      if (openingExplorerRuntime.mode !== "recall") return;
+      openingExplorerRuntime.recallReveal = Math.min(3, openingExplorerRuntime.recallReveal + 1);
+      renderOpeningExplorer();
+    }
+
+    function renderOpeningExplorerGuidance() {
+      const panel = document.getElementById("openingExplorerGuidance");
+      if (!panel) return;
+      const mode = openingExplorerRuntime.mode;
+      const guide = getOpeningExplorerGuidance();
+      const modeNames = { explore: "Explore", guided: "Guided", recall: "Recall" };
+      const title = document.getElementById("openingExplorerGuidanceTitle");
+      const copy = document.getElementById("openingExplorerGuidanceCopy");
+      const badge = document.getElementById("openingExplorerModeBadge");
+      const feedback = document.getElementById("openingExplorerFeedback");
+      const hintRow = document.getElementById("openingExplorerHintRow");
+      const hintText = document.getElementById("openingExplorerHintText");
+      const hintButton = document.getElementById("openingExplorerHint");
+      panel.dataset.mode = mode;
+      if (badge) badge.textContent = modeNames[mode];
+      ["explore", "guided", "recall"].forEach((name) => {
+        const button = document.getElementById(`openingExplorerMode${name[0].toUpperCase()}${name.slice(1)}`);
+        button?.classList.toggle("is-active", name === mode);
+        button?.setAttribute("aria-pressed", String(name === mode));
+      });
+      if (title) title.textContent = mode === "explore" ? "Explore freely" : guide.done ? "Line complete" : mode === "guided" ? `Next move: ${guide.prefix}${guide.expected?.san || "—"}` : "Recall the next move";
+      if (copy) {
+        if (mode === "explore") copy.textContent = guide.line.description || "Try any legal move and compare the position with the popular line.";
+        else if (guide.done) copy.textContent = "You completed this continuation. Reset or choose another line to keep learning.";
+        else if (mode === "guided") copy.textContent = guide.why;
+        else if (openingExplorerRuntime.recallReveal === 0) copy.textContent = "Pause and remember the next move before revealing a hint.";
+        else if (openingExplorerRuntime.recallReveal === 1) copy.textContent = `Idea: ${guide.why}`;
+        else if (openingExplorerRuntime.recallReveal === 2) copy.textContent = `Piece: move the ${guide.piece} from ${guide.expected?.move?.from || "its square"}.`;
+        else copy.textContent = `Next move: ${guide.prefix}${guide.expected?.san || "—"}. ${guide.why}`;
+      }
+      if (feedback) {
+        feedback.textContent = openingExplorerRuntime.feedback?.text || "";
+        feedback.classList.toggle("is-wrong", openingExplorerRuntime.feedback?.type === "wrong");
+        feedback.classList.toggle("is-done", guide.done || openingExplorerRuntime.feedback?.type === "done");
+      }
+      if (hintRow) hintRow.hidden = mode !== "recall" || guide.done;
+      if (hintText) {
+        hintText.textContent = openingExplorerRuntime.recallReveal === 0
+          ? "Recall the next move before revealing a hint."
+          : openingExplorerRuntime.recallReveal === 1
+            ? "Idea revealed. What piece carries it out?"
+            : openingExplorerRuntime.recallReveal === 2
+              ? "Piece revealed. Where should it go?"
+              : "Arrow revealed. Play it when you are ready.";
+      }
+      if (hintButton) {
+        hintButton.textContent = openingExplorerRuntime.recallReveal === 0 ? "Reveal idea" : openingExplorerRuntime.recallReveal === 1 ? "Reveal piece" : openingExplorerRuntime.recallReveal === 2 ? "Reveal arrow" : "Arrow shown";
+        hintButton.disabled = openingExplorerRuntime.recallReveal >= 3;
+      }
+      const progress = document.getElementById("openingExplorerProgress");
+      if (progress) {
+        progress.replaceChildren();
+        (guide.line.moves || []).forEach((san, index, moves) => {
+          const step = document.createElement("span");
+          const progressState = index < openingExplorerRuntime.moveIndex ? "complete" : index === openingExplorerRuntime.moveIndex && !guide.done ? "current" : "upcoming";
+          const displaySan = `${index % 2 ? "..." : ""}${san}`;
+          const statePrefix = progressState === "complete" ? "✓ " : progressState === "current" ? "→ " : "○ ";
+          step.className = `opening-explorer-progress-step is-${progressState}`;
+          step.textContent = `${statePrefix}${displaySan}`;
+          step.setAttribute("aria-label", `${progressState === "complete" ? "Completed" : progressState === "current" ? "Current recommended" : "Upcoming"} move ${displaySan}`);
+          step.setAttribute("aria-current", index === openingExplorerRuntime.moveIndex && !guide.done ? "step" : "false");
+          progress.appendChild(step);
+          if (index < moves.length - 1) {
+            const arrow = document.createElement("span");
+            arrow.className = "opening-explorer-progress-arrow";
+            arrow.setAttribute("aria-hidden", "true");
+            progress.appendChild(arrow);
+          }
+        });
+        const currentStep = progress.querySelector(".opening-explorer-progress-step.is-current");
+        if (currentStep && progress.scrollWidth > progress.clientWidth) {
+          progress.scrollLeft = Math.max(0, currentStep.offsetLeft - ((progress.clientWidth - currentStep.offsetWidth) / 2));
+        }
+      }
     }
 
     function toggleOpeningFavorite(title) {
@@ -4966,8 +5290,29 @@
       let nextSelection = "";
       try {
         currentGame.move({ from: openingExplorerRuntime.selected, to: squareNameValue, promotion: "q" });
+        const playedHistory = currentGame.history({ verbose: true });
+        const playedMove = playedHistory.at(-1);
+        const guidance = getOpeningExplorerGuidance();
+        const expected = guidance.expected;
+        const isLearningMode = openingExplorerRuntime.mode !== "explore";
+        const isCorrect = !isLearningMode || (expected?.move && normalizeOpeningMoveToken(playedMove?.san) === normalizeOpeningMoveToken(expected.san));
+        if (isLearningMode && !isCorrect) {
+          openingExplorerRuntime.feedback = { type: "wrong", text: `Not this step yet. Try ${guidance.prefix}${expected?.san || "the highlighted idea"}.` };
+          openingExplorerRuntime.selected = "";
+          renderOpeningExplorerBoard();
+          return;
+        }
         openingExplorerRuntime.moves = currentGame.history();
         openingExplorerRuntime.moveIndex = openingExplorerRuntime.moves.length;
+        if (isLearningMode) {
+          const nextGuide = getOpeningExplorerGuidance();
+          openingExplorerRuntime.feedback = nextGuide.done
+            ? { type: "done", text: "✓ Line complete. You can now replay it from memory." }
+            : { type: "correct", text: `✓ Good move. ${nextGuide.prefix ? "The next side" : "The next move"} is ${nextGuide.prefix}${nextGuide.expected?.san || "ready"} — ${nextGuide.why}` };
+          openingExplorerRuntime.recallReveal = 0;
+        } else {
+          openingExplorerRuntime.feedback = null;
+        }
       } catch {
         nextSelection = currentPiece?.color === currentGame.turn() ? squareNameValue : "";
       }
@@ -4975,9 +5320,13 @@
       renderOpeningExplorerBoard();
     }
 
-    function renderOpeningExplorerBoard() {
+    function renderOpeningExplorerBoard({ skipInteractionCancel = false } = {}) {
       const board = document.getElementById("openingExplorerBoard");
       if (!board) return;
+      const interactionState = boardInteractionEngine.getState(board);
+      if (!skipInteractionCancel && interactionState && (interactionState.phase === boardInteractionPhases.DRAGGING || interactionState.ghost)) {
+        boardInteractionEngine.cancel(board, { type: "opening-render" });
+      }
       const game = getOpeningExplorerGame();
       const boardRows = game?.board?.() || fenToSquares(openingExplorerStartFen.split(/\s+/)[0]).reduce((rows, piece, index) => {
         if (index % 8 === 0) rows.push([]);
@@ -4991,6 +5340,7 @@
       const legalTargets = new Set(legalMovesByTarget.keys());
       const openingHistory = game?.history?.({ verbose: true }) || [];
       const openingLastMove = openingHistory.at(-1) || null;
+      const openingGuidance = getOpeningExplorerGuidance();
       const openingCheckedKing = game && callCoachRule(game, "isCheck", "in_check")
         ? boardRows.flat().map((piece, squareIndex) => piece?.type === "k" && piece?.color === game.turn() ? squareName(squareIndex) : "").find(Boolean) || ""
         : "";
@@ -5016,6 +5366,7 @@
       });
       board.replaceChildren(fragment);
       board.dataset.moveIndex = String(openingExplorerRuntime.moveIndex);
+      board.dataset.guidanceMode = openingExplorerRuntime.mode;
       boardInteractionEngine.attach(board, {
         squareSelector: ".opening-explorer-square",
         ...createAnalysisGestureHandlers(board, "opening-user-arrow"),
@@ -5037,8 +5388,17 @@
         onLongPress(square) {
           toggleAnalysisHighlight(board, { id: `opening-user-highlight:${square}`, square, kind: "coach", color: "yellow" });
         },
-        onCancel() {
+        onCancel(source, event, state) {
           clearAnalysisUserOverlay(board);
+          if (event?.type === "opening-render") {
+            openingExplorerRuntime.selected = "";
+            return;
+          }
+          if (state?.phase !== boardInteractionPhases.IDLE) {
+            openingExplorerRuntime.selected = "";
+            renderOpeningExplorerBoard({ skipInteractionCancel: true });
+            return;
+          }
           if (!openingExplorerRuntime.selected) return;
           openingExplorerRuntime.selected = "";
           renderOpeningExplorerBoard();
@@ -5065,12 +5425,25 @@
           { id: "opening-last-to", square: openingLastMove.to, kind: "played", color: "yellow" }
         ] : [])
       ];
+      const showGuidanceArrow = openingGuidance.expected?.move && (
+        openingExplorerRuntime.mode === "guided"
+        || (openingExplorerRuntime.mode === "recall" && openingExplorerRuntime.recallReveal >= 3)
+      );
       renderAnalysisOverlay({
         board,
         wrap: board,
-        arrows: openingLastMove ? [{ id: "opening-last-move", from: openingLastMove.from, to: openingLastMove.to, kind: "played", color: "yellow" }] : [],
+        arrows: showGuidanceArrow ? [{
+          id: `opening-guidance:${openingExplorerRuntime.mode}:${openingExplorerRuntime.lineIndex}:${openingExplorerRuntime.moveIndex}`,
+          from: openingGuidance.expected.move.from,
+          to: openingGuidance.expected.move.to,
+          kind: "best",
+          color: "yellow",
+          priority: "best",
+          label: `${openingGuidance.prefix}${openingGuidance.expected.san}`
+        }] : [],
         highlights: openingHighlights
       });
+      renderOpeningExplorerGuidance();
     }
 
     function renderOpeningExplorerFavoriteState() {
@@ -5098,15 +5471,18 @@
       ].forEach(([id, value]) => document.getElementById(id)?.replaceChildren(document.createTextNode(value)));
       const lines = document.getElementById("openingExplorerLines");
       if (lines) {
-        lines.replaceChildren(...entry.lines.map((line) => {
+        lines.replaceChildren(...entry.lines.map((line, lineIndex) => {
           const button = document.createElement("button");
           button.type = "button";
-          button.className = "opening-explorer-line";
+          button.className = `opening-explorer-line${lineIndex === openingExplorerRuntime.lineIndex ? " is-active" : ""}`;
           button.append(createBookText("strong", "", line.label), createBookText("span", "", line.description), createBookText("small", "", line.moves.join(" ")));
           button.addEventListener("click", () => {
-            openingExplorerRuntime.moves = [...line.moves];
-            openingExplorerRuntime.moveIndex = line.moves.length;
+            openingExplorerRuntime.lineIndex = lineIndex;
+            openingExplorerRuntime.moves = openingExplorerRuntime.mode === "explore" ? [...line.moves] : [];
+            openingExplorerRuntime.moveIndex = openingExplorerRuntime.mode === "explore" ? line.moves.length : 0;
             openingExplorerRuntime.selected = "";
+            openingExplorerRuntime.feedback = null;
+            openingExplorerRuntime.recallReveal = 0;
             renderOpeningExplorerBoard();
           });
           return button;
@@ -5122,9 +5498,12 @@
           button.append(createBookText("strong", "", result.title), createBookText("span", "", `ECO ${result.eco}`));
           button.addEventListener("click", () => {
             openingExplorerRuntime.entry = result;
+            openingExplorerRuntime.lineIndex = 0;
             openingExplorerRuntime.moves = [];
             openingExplorerRuntime.moveIndex = 0;
             openingExplorerRuntime.selected = "";
+            openingExplorerRuntime.feedback = null;
+            openingExplorerRuntime.recallReveal = 0;
             renderOpeningExplorer();
           });
           return button;
@@ -5140,20 +5519,38 @@
       root.dataset.ready = "true";
       document.getElementById("openingExplorerSearch")?.addEventListener("input", () => renderOpeningExplorer());
       document.getElementById("openingExplorerFavorite")?.addEventListener("click", () => toggleOpeningFavorite(openingExplorerRuntime.entry.title));
+      document.getElementById("openingExplorerModeExplore")?.addEventListener("click", () => setOpeningExplorerMode("explore"));
+      document.getElementById("openingExplorerModeGuided")?.addEventListener("click", () => setOpeningExplorerMode("guided"));
+      document.getElementById("openingExplorerModeRecall")?.addEventListener("click", () => setOpeningExplorerMode("recall"));
+      document.getElementById("openingExplorerHint")?.addEventListener("click", advanceOpeningExplorerHint);
       document.getElementById("openingExplorerReset")?.addEventListener("click", () => {
         openingExplorerRuntime.moves = [];
         openingExplorerRuntime.moveIndex = 0;
         openingExplorerRuntime.selected = "";
+        openingExplorerRuntime.feedback = null;
+        openingExplorerRuntime.recallReveal = 0;
         renderOpeningExplorerBoard();
       });
       document.getElementById("openingExplorerPrev")?.addEventListener("click", () => {
-        openingExplorerRuntime.moveIndex = Math.max(0, openingExplorerRuntime.moveIndex - 1);
+        const nextIndex = Math.max(0, openingExplorerRuntime.moveIndex - 1);
+        openingExplorerRuntime.moves = openingExplorerRuntime.mode === "explore"
+          ? openingExplorerRuntime.moves
+          : (getOpeningExplorerLine().moves || []).slice(0, nextIndex);
+        openingExplorerRuntime.moveIndex = nextIndex;
         openingExplorerRuntime.selected = "";
+        openingExplorerRuntime.feedback = null;
+        openingExplorerRuntime.recallReveal = 0;
         renderOpeningExplorerBoard();
       });
       document.getElementById("openingExplorerNext")?.addEventListener("click", () => {
-        openingExplorerRuntime.moveIndex = Math.min(openingExplorerRuntime.moves.length, openingExplorerRuntime.moveIndex + 1);
+        const nextIndex = Math.min(getOpeningExplorerLine().moves?.length || openingExplorerRuntime.moves.length, openingExplorerRuntime.moveIndex + 1);
+        openingExplorerRuntime.moves = openingExplorerRuntime.mode === "explore"
+          ? openingExplorerRuntime.moves
+          : (getOpeningExplorerLine().moves || []).slice(0, nextIndex);
+        openingExplorerRuntime.moveIndex = openingExplorerRuntime.mode === "explore" ? Math.min(openingExplorerRuntime.moves.length, nextIndex) : nextIndex;
         openingExplorerRuntime.selected = "";
+        openingExplorerRuntime.feedback = null;
+        openingExplorerRuntime.recallReveal = 0;
         renderOpeningExplorerBoard();
       });
       renderOpeningExplorer();
@@ -6229,7 +6626,7 @@
 
     function normalizeStoreState(saved = {}) {
       const validIds = new Set(storeItems.map((item) => item.id));
-      const defaultOwned = ["background-classic", "board-wood", "border-classic", "archetype-balanced", "name-classic", "lastmove-classic", "music-calm", "sfx-classic", "avatarfx-none", ...pieceSetStoreItems.filter((item) => !item.cost).map((item) => item.id)];
+      const defaultOwned = ["background-classic", "board-wood", "border-classic", "archetype-balanced", "name-classic", "lastmove-classic", "avatarfx-none", ...pieceSetStoreItems.filter((item) => !item.cost).map((item) => item.id)];
       const legacyStoreIdMap = {
         "lastmove-lime": "lastmove-emerald",
         "lastmove-sky": "lastmove-royal",
@@ -6249,11 +6646,15 @@
         ? value.map((entry) => ({ itemId: String(entry?.itemId || entry?.id || ""), at: String(entry?.at || entry?.timestamp || "") }))
           .filter((entry) => entry.itemId && getStoreItem(entry.itemId)).slice(0, 30)
         : [];
+      const equipped = saved?.equipped && typeof saved.equipped === "object"
+        ? Object.fromEntries(Object.entries(saved.equipped).filter(([type, id]) => {
+          const item = getStoreItem(id);
+          return item && item.type === type && item.type !== "flexBadge";
+        }))
+        : {};
       return {
         owned: [...new Set([...defaultOwned, ...owned])],
-        equipped: saved?.equipped && typeof saved.equipped === "object"
-          ? Object.fromEntries(Object.entries(saved.equipped).filter(([type, id]) => type !== "flexBadge" && getStoreItem(id)?.type !== "flexBadge"))
-          : {},
+        equipped,
         history: {
           unlocked: normalizeHistory(saved?.history?.unlocked),
           purchased: normalizeHistory(saved?.history?.purchased),
@@ -6580,7 +6981,7 @@
     }
 
     function getAudioMusicTheme(value) {
-      return audioMusicThemes[value] || audioMusicThemes.calm;
+      return premiumPianoTracks[value] || audioMusicThemes[value] || audioMusicThemes.calm;
     }
 
     function getAudioSfxPack(value) {
@@ -6879,9 +7280,10 @@
         audioPreview.style.setProperty("--audio-preview-accent", theme.accent);
         audioPreview.style.setProperty("--audio-preview-glow", theme.glow);
         audioPreview.append(
-          createBookText("span", "audio-category", theme.category || "Music"),
+          createBookText("span", "audio-category", `${theme.category || "Piano"} · ${theme.mood || "Calm"}`),
           createBookText("span", "audio-bars", ""),
-          createBookText("span", "audio-title-preview", item.previewText || item.name)
+          createBookText("span", "audio-title-preview", item.previewText || item.name),
+          createBookText("span", "audio-artist-preview", theme.artist ? `${theme.artist} · ${theme.instrument || "Piano"}` : "Original WebAudio")
         );
         const bars = audioPreview.querySelector(".audio-bars");
         if (bars) bars.innerHTML = "<i></i><i></i><i></i><i></i>";
@@ -6988,7 +7390,8 @@
         window.setTimeout(() => document.body.classList.remove("theme-swapping"), 380);
       }
       refreshPurchasedCosmetics(nextPrefs);
-      if (item.type === "musicPack" && audioRuntime.playing) startAudioMusic(inferAudioScene(), item.value);
+      if (item.type === "musicPack" && audioRuntime.storeAmbienceActive) startStoreAmbience();
+      else if (item.type === "musicPack" && audioRuntime.playing) startAudioMusic(inferAudioScene(), item.value);
       else syncAudioSystem(nextPrefs.audio);
       playAudioCue("equip");
       recordStoreHistory("equipped", item);
@@ -7502,11 +7905,11 @@
     }
 
     function getAudioStoreCategory(item) {
-      return item.type === "sfxPack" ? "Sound FX" : getAudioMusicTheme(item.value).category;
+      return item.type === "sfxPack" ? "Sound FX" : getAudioMusicTheme(item.value).category || "Piano";
     }
 
     function getMusicCategories() {
-      return ["All", ...new Set([...Object.values(audioMusicThemes).map((theme) => theme.category), "Sound FX"].filter(Boolean))];
+      return ["All", ...new Set(audioMusicStoreItems.map((item) => getAudioStoreCategory(item)).filter(Boolean))];
     }
 
     function getFilteredMusicItems(items, prefs = readLearnerPrefs()) {
@@ -7528,7 +7931,7 @@
         ...prefs,
         musicFavorites: [...favorites].filter((value) => {
           const [type, itemValue] = String(value).split(":");
-          return (type === "musicPack" && audioMusicThemes[itemValue]) || (type === "sfxPack" && audioSfxPacks[itemValue]);
+          return (type === "musicPack" && premiumPianoTracks[itemValue]) || (type === "sfxPack" && audioSfxPacks[itemValue]);
         })
       });
       saveProgressSnapshot("music favorite");
@@ -7543,7 +7946,7 @@
       const panel = document.createElement("article");
       panel.className = "music-store-tools";
       panel.append(
-        createBookText("p", "", "Original lightweight WebAudio music packs. Preview before buying, then equip one pack for dynamic menu, game, boss, victory, and reset music.")
+        createBookText("p", "", "A small collection of real, locally bundled piano recordings. Preview before buying, then equip one for the optional Store ambience.")
       );
       const chips = document.createElement("div");
       chips.className = "music-store-categories";
@@ -7969,6 +8372,7 @@
         const actions = createBookText("div", "store-featured-actions", "");
         const previewButton = createBookText("button", "button secondary", "Preview");
         previewButton.type = "button";
+        previewButton.dataset.storePreview = selectedItem?.id || selectedPick.bundle?.id || "";
         previewButton.addEventListener("click", () => selectedItem && startStorePreview(selectedItem));
         const action = createBookText("button", details.missingItems.length ? "button" : "button secondary", details.missingItems.length ? `Buy bundle · ${formatProfileNumber(details.bundlePrice)}` : "Equip bundle");
         action.type = "button";
@@ -7999,8 +8403,9 @@
       if (earningLabel && !isOwned) facts.append(createBookText("span", "", earningLabel));
       featuredInspector.appendChild(facts);
       const actions = createBookText("div", "store-featured-actions", "");
-      const previewButton = createBookText("button", "button secondary", "Preview");
-      previewButton.type = "button";
+        const previewButton = createBookText("button", "button secondary", "Preview");
+        previewButton.type = "button";
+        previewButton.dataset.storePreview = item.id;
       previewButton.addEventListener("click", () => startStorePreview(item));
       const primary = createBookText("button", isOwned ? "button secondary" : "button", isEquipped ? "Equipped" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${formatProfileNumber(item.cost || 0)}` : getStoreUnlockLabel(item));
       primary.type = "button";
@@ -8071,7 +8476,7 @@
         Backgrounds: "Premium site backdrops for every page. Boards stay clear and readable.",
         "Chess Pieces": "Choose your style. Play in your legend. Premium themes stay readable on every board.",
         Style: "Choose the personality shown on your board. One archetype equips at a time.",
-        Music: "Preview original music and sound packs, then equip the atmosphere that fits your next game.",
+        Music: "Three carefully selected piano recordings for a quiet, premium Store lounge. Sound packs remain part of game audio, not the Store catalog.",
         Achievements: "Prestige rewards earned through milestones, campaign clears, and seasonal challenges. They are never sold for coins.",
         "Flex Badges": "Own many badges, equip one flex badge for games, matchmaking, and leaderboards.",
         "Name Styles": "Cosmetic username effects only. They never change gameplay.",
@@ -8266,6 +8671,7 @@
           actions.className = "store-card-actions";
           const temporaryPreview = createBookText("button", "button secondary", "Preview");
           temporaryPreview.type = "button";
+          temporaryPreview.dataset.storePreview = item.id;
           temporaryPreview.setAttribute("aria-label", `Preview ${item.name} temporarily`);
           temporaryPreview.addEventListener("click", () => startStorePreview(item));
           actions.append(temporaryPreview);
@@ -8346,6 +8752,7 @@
       });
       grid.replaceChildren(...nodes);
       renderStorePreviewTray();
+      syncStorePreviewButtons();
       renderStoreInventory();
       const designer = document.getElementById("pieceDesigner");
       if (designer) designer.hidden = activeStoreCategory !== "Chess Pieces";
@@ -8354,6 +8761,17 @@
 
     function setupStore() {
       setupStoreGifting();
+      const storeAmbienceToggle = document.getElementById("storeAmbienceToggle");
+      if (storeAmbienceToggle && !storeAmbienceToggle.dataset.ready) {
+        storeAmbienceToggle.dataset.ready = "true";
+        storeAmbienceToggle.addEventListener("change", () => {
+          const enabled = storeAmbienceToggle.checked;
+          writeAudioPrefs({ storeAmbience: enabled });
+          if (enabled) startStoreAmbience();
+          else stopStoreAmbience({ resume: true });
+        });
+      }
+      if (storeAmbienceToggle) storeAmbienceToggle.checked = readLearnerPrefs().audio.storeAmbience === true;
       const syncRetry = document.getElementById("storeSyncRetry");
       if (syncRetry && !syncRetry.dataset.ready) {
         syncRetry.dataset.ready = "true";
@@ -8400,6 +8818,7 @@
         });
       }
       renderStore();
+      syncStoreAmbienceForRoute();
       void refreshServerStoreState().catch(() => {});
     }
 
@@ -8476,17 +8895,79 @@
       playing: false,
       current: "calm",
       scene: "menu",
+      storeAmbienceActive: false,
+      storeResume: null,
       step: 0,
       stepTimer: 0,
       progressTimer: 0,
       startedAt: 0,
       trackLength: 18000,
+      premiumAudio: null,
+      premiumTrackId: "",
+      premiumTrackMode: "",
+      premiumGeneration: 0,
+      premiumFadeFrame: 0,
       reverb: null,
       noiseBuffer: null,
       lastCueAt: {},
       timerWarningBucket: "",
       voices: new Set()
     };
+
+    function isRetiredStoreMusicValue(value = "") {
+      const text = String(value || "").trim();
+      const normalized = text.startsWith("music-") ? text.slice(6) : text;
+      return retiredStoreMusicValues.has(normalized);
+    }
+
+    function isRetiredStoreAudioSource(source = "") {
+      const text = String(source || "").toLowerCase();
+      return [...retiredStoreMusicValues].some((value) => text.includes(`/assets/audio/${value}.mp3`) || text.includes(`${value}.mp3`));
+    }
+
+    function clearPremiumAudioElement(element = audioRuntime.premiumAudio) {
+      if (!element) return;
+      try { element.pause(); } catch {}
+      try { element.currentTime = 0; } catch {}
+      try { element.removeAttribute("src"); } catch {}
+      try { element.load(); } catch {}
+    }
+
+    function cleanupLegacyAudioElements() {
+      const authoritative = audioRuntime.premiumAudio;
+      document.querySelectorAll("audio").forEach((element) => {
+        if (element === authoritative) return;
+        // Nschess has one shared premium player. Any other audio element is a
+        // legacy Store player and must not survive a route change or refresh.
+        clearPremiumAudioElement(element);
+        element.remove();
+      });
+    }
+
+    function stopRetiredPremiumAudio() {
+      const element = audioRuntime.premiumAudio;
+      const retired = isRetiredStoreMusicValue(audioRuntime.premiumTrackId)
+        || isRetiredStoreMusicValue(audioRuntime.current)
+        || isRetiredStoreAudioSource(element?.currentSrc || element?.src || "");
+      if (!retired) return false;
+      audioRuntime.premiumGeneration += 1;
+      window.cancelAnimationFrame(audioRuntime.premiumFadeFrame);
+      audioRuntime.premiumFadeFrame = 0;
+      clearPremiumAudioElement(element);
+      audioRuntime.premiumTrackId = "";
+      audioRuntime.premiumTrackMode = "";
+      audioRuntime.playing = false;
+      audioRuntime.current = "calm";
+      audioRuntime.scene = "menu";
+      audioRuntime.storeAmbienceActive = false;
+      audioRuntime.storeResume = null;
+      window.clearInterval(audioRuntime.stepTimer);
+      window.clearInterval(audioRuntime.progressTimer);
+      audioRuntime.stepTimer = 0;
+      audioRuntime.progressTimer = 0;
+      setGain(audioRuntime.ambience, 0, 0);
+      return true;
+    }
 
     const audioManager = {
       maxVoices: 16,
@@ -8590,7 +9071,7 @@
         audioRuntime.timerWarningBucket = bucket;
       },
 
-      unlock() {
+      unlock({ autoStartMusic = false } = {}) {
         this.preload();
         if (!ensureAudioGraph()) return;
         getAudioNoiseBuffer();
@@ -8599,7 +9080,9 @@
           .then(() => {
             this.unlocked = context.state === "running";
             const audio = readLearnerPrefs().audio;
-            if (this.unlocked && audio.playing && audio.backgroundMusic && audio.ambientEnabled && !audioRuntime.playing) {
+            if (this.unlocked && isStorePanelActive() && audio.storeAmbience === true && !audioRuntime.playing) {
+              startStoreAmbience();
+            } else if (autoStartMusic && this.unlocked && !isStorePanelActive() && !storePreviewState && audio.playing && audio.backgroundMusic && audio.ambientEnabled && !audioRuntime.playing) {
               startAudioMusic(inferAudioScene(), "", false);
             }
           })
@@ -8661,6 +9144,7 @@
     function writeAudioPrefs(patch = {}) {
       const prefs = readLearnerPrefs();
       const nextAudio = { ...prefs.audio, ...patch };
+      const disablingGameMusic = Object.prototype.hasOwnProperty.call(patch, "backgroundMusic") && patch.backgroundMusic === false;
       if (Object.prototype.hasOwnProperty.call(patch, "sfx") && !Object.prototype.hasOwnProperty.call(patch, "game")) nextAudio.game = patch.sfx;
       if (Object.prototype.hasOwnProperty.call(patch, "music") && !Object.prototype.hasOwnProperty.call(patch, "ambience")) nextAudio.ambience = patch.music;
       nextAudio.game = clampNumber(nextAudio.game, 0, 100);
@@ -8670,6 +9154,10 @@
       const next = { ...prefs, audio: nextAudio };
       writeJsonStorage(learnerPrefsStorageKey, next);
       saveProgressSnapshot("audio settings");
+      // Keep the setting authoritative for callers outside the Settings page
+      // too. A game-music opt-out stops an active global/Store track, while a
+      // deliberate Store preview is allowed to finish independently.
+      if (disablingGameMusic && audioRuntime.playing && !storePreviewState) stopAudioMusic(false);
       syncAudioSystem(next.audio);
       return next.audio;
     }
@@ -8750,6 +9238,7 @@
     }
 
     function applyAudioVolumes(audio = readLearnerPrefs().audio) {
+      applyPremiumAudioVolume(audio);
       if (!audioRuntime.context) return;
       const muted = Boolean(audio.muted);
       setGain(audioRuntime.master, muted ? 0 : (audio.master || 0) / 100, 0.04);
@@ -8759,6 +9248,175 @@
       setGain(audioRuntime.notifications, (audio.notifications || 0) / 100, 0.05);
       setGain(audioRuntime.puzzle, (audio.puzzle || 0) / 100, 0.04);
       setGain(audioRuntime.coach, (audio.coach || 0) / 100, 0.06);
+    }
+
+    function ensurePremiumAudio() {
+      if (typeof document === "undefined") return audioRuntime.premiumAudio;
+      cleanupLegacyAudioElements();
+      if (audioRuntime.premiumAudio) {
+        stopRetiredPremiumAudio();
+        return audioRuntime.premiumAudio;
+      }
+      const element = document.createElement("audio");
+      // Previews use real bundled recordings. Let the media element fetch
+      // enough data for a continuous preview before the first play promise
+      // settles; metadata-only loading was the source of short/stalled starts
+      // on slower connections and mobile browsers.
+      element.preload = "auto";
+      element.setAttribute("aria-hidden", "true");
+      element.className = "store-premium-audio-runtime";
+      element.style.display = "none";
+      element.addEventListener("ended", () => {
+        if (audioRuntime.premiumTrackMode === "preview") {
+          stopStorePreview({ silent: true });
+          return;
+        }
+        if (audioRuntime.premiumTrackMode && readLearnerPrefs().audio.loop !== false) {
+          try { element.currentTime = 0; } catch {}
+          element.play().catch(() => {});
+          return;
+        }
+        audioRuntime.playing = false;
+        audioRuntime.premiumTrackId = "";
+        audioRuntime.premiumTrackMode = "";
+        window.clearInterval(audioRuntime.progressTimer);
+        audioRuntime.progressTimer = 0;
+        syncAudioSystem(readLearnerPrefs().audio);
+      });
+      document.body?.appendChild(element);
+      audioRuntime.premiumAudio = element;
+      applyPremiumAudioVolume(readLearnerPrefs().audio);
+      return element;
+    }
+
+    function applyPremiumAudioVolume(audio = readLearnerPrefs().audio) {
+      const element = audioRuntime.premiumAudio;
+      if (!element) return;
+      // A Store preview is an intentional, local activation. It must remain
+      // audible when the player has opted out of background music during
+      // games; the global mute and ambient-audio switches still silence it.
+      const previewActive = audioRuntime.premiumTrackMode === "preview";
+      const muted = Boolean(audio.muted) || audio.ambientEnabled === false || (!previewActive && audio.backgroundMusic === false);
+      const master = clampNumber(Number(audio.master) || 0, 0, 100) / 100;
+      const ambience = clampNumber(Number(audio.ambience) || 0, 0, 100) / 100;
+      element.volume = muted ? 0 : Math.min(0.18, Math.max(0, master * ambience * 0.18));
+    }
+
+    function fadePremiumAudioTo(target, duration = 160, token = audioRuntime.premiumGeneration, done) {
+      const element = audioRuntime.premiumAudio;
+      if (!element) { done?.(); return; }
+      window.cancelAnimationFrame(audioRuntime.premiumFadeFrame);
+      const start = Number(element.volume) || 0;
+      const end = clampNumber(Number(target) || 0, 0, 1);
+      if (!duration) {
+        element.volume = end;
+        done?.();
+        return;
+      }
+      const startedAt = performance.now();
+      const tick = (now) => {
+        if (token !== audioRuntime.premiumGeneration) return;
+        const progress = Math.min(1, (now - startedAt) / duration);
+        element.volume = start + (end - start) * (progress * (2 - progress));
+        if (progress < 1) audioRuntime.premiumFadeFrame = window.requestAnimationFrame(tick);
+        else done?.();
+      };
+      audioRuntime.premiumFadeFrame = window.requestAnimationFrame(tick);
+    }
+
+    function stopPremiumTrack({ fadeMs = 160, onDone } = {}) {
+      const element = audioRuntime.premiumAudio;
+      const token = ++audioRuntime.premiumGeneration;
+      window.cancelAnimationFrame(audioRuntime.premiumFadeFrame);
+      const finish = () => {
+        if (token !== audioRuntime.premiumGeneration) return;
+        if (element) {
+          try { element.pause(); } catch {}
+          try { element.currentTime = 0; } catch {}
+          element.removeAttribute("src");
+          element.load();
+        }
+        audioRuntime.premiumTrackId = "";
+        audioRuntime.premiumTrackMode = "";
+        audioRuntime.playing = false;
+        window.clearInterval(audioRuntime.progressTimer);
+        audioRuntime.progressTimer = 0;
+        onDone?.();
+        syncAudioSystem(readLearnerPrefs().audio);
+      };
+      if (!element || element.paused || !audioRuntime.premiumTrackId) {
+        finish();
+        return;
+      }
+      fadePremiumAudioTo(0, fadeMs, token, finish);
+    }
+
+    function startPremiumTrack(track, { mode = "preview", loop = false, saveChoice = false, scene = "store" } = {}) {
+      if (!track?.audioUrl) return false;
+      const element = ensurePremiumAudio();
+      if (!element) return false;
+      const sameTrack = audioRuntime.premiumTrackId === track.value && audioRuntime.premiumTrackMode === mode && !element.paused;
+      if (sameTrack) {
+        element.loop = Boolean(loop);
+        applyPremiumAudioVolume(readLearnerPrefs().audio);
+        return true;
+      }
+      const launch = () => {
+        if (audioRuntime.playing && !audioRuntime.premiumTrackId) {
+          window.clearInterval(audioRuntime.stepTimer);
+          window.clearInterval(audioRuntime.progressTimer);
+          audioRuntime.stepTimer = 0;
+          audioRuntime.progressTimer = 0;
+          audioRuntime.playing = false;
+          setGain(audioRuntime.ambience, 0, 0.08);
+        }
+        const token = audioRuntime.premiumGeneration;
+        element.src = track.audioUrl;
+        // Explicitly restart the media pipeline after swapping sources. This
+        // keeps the first preview play deterministic instead of relying on a
+        // browser-specific implicit load race.
+        element.load();
+        element.loop = Boolean(loop);
+        element.volume = 0;
+        audioRuntime.premiumTrackId = track.value;
+        audioRuntime.premiumTrackMode = mode;
+        audioRuntime.playing = true;
+        audioRuntime.current = track.value;
+        audioRuntime.scene = scene;
+        audioRuntime.startedAt = Date.now();
+        audioRuntime.trackLength = Math.max(1000, Number(track.durationSec || 0) * 1000);
+        window.clearInterval(audioRuntime.progressTimer);
+        audioRuntime.progressTimer = window.setInterval(updateAudioProgress, 250);
+        applyPremiumAudioVolume(readLearnerPrefs().audio);
+        const targetVolume = element.volume;
+        element.volume = 0;
+        Promise.resolve(element.play()).then(() => {
+          fadePremiumAudioTo(targetVolume, 220, token);
+        }).catch(() => {
+          if (token !== audioRuntime.premiumGeneration) return;
+          audioRuntime.playing = false;
+          audioRuntime.premiumTrackId = "";
+          audioRuntime.premiumTrackMode = "";
+          clearPremiumAudioElement(element);
+          window.clearInterval(audioRuntime.progressTimer);
+          audioRuntime.progressTimer = 0;
+          if (mode === "preview" && storePreviewState?.item?.value === track.value) {
+            stopStorePreview({ silent: true });
+            return;
+          }
+          renderStorePreviewTray();
+          syncStorePreviewButtons();
+          syncAudioSystem(readLearnerPrefs().audio);
+        });
+        if (saveChoice) writeAudioPrefs({ playing: true, musicPack: track.value });
+        syncAudioSystem({ ...readLearnerPrefs().audio, playing: true, musicPack: track.value });
+      };
+      if (audioRuntime.premiumTrackId && !element.paused) {
+        stopPremiumTrack({ fadeMs: 140, onDone: launch });
+      } else {
+        launch();
+      }
+      return true;
     }
 
     function connectAudioVoice(sourceNode, gain, output, options = {}) {
@@ -8898,7 +9556,11 @@
       window.clearInterval(audioRuntime.progressTimer);
       audioRuntime.stepTimer = 0;
       audioRuntime.progressTimer = 0;
+      if (audioRuntime.premiumTrackId) stopPremiumTrack({ fadeMs: 160 });
+      else if (audioRuntime.premiumAudio) clearPremiumAudioElement(audioRuntime.premiumAudio);
       audioRuntime.playing = false;
+      audioRuntime.storeAmbienceActive = false;
+      audioRuntime.storeResume = null;
       if (save) writeAudioPrefs({ playing: false });
       syncAudioSystem({ ...readLearnerPrefs().audio, playing: false });
       setGain(audioRuntime.ambience, 0, 0.1);
@@ -8907,27 +9569,10 @@
     function updateAudioProgress() {
       const bar = document.getElementById("audioProgress");
       if (!bar) return;
-      const elapsed = audioRuntime.playing ? (Date.now() - audioRuntime.startedAt) % audioRuntime.trackLength : 0;
+      const elapsed = audioRuntime.premiumAudio && audioRuntime.premiumTrackId
+        ? Number(audioRuntime.premiumAudio.currentTime || 0) * 1000
+        : audioRuntime.playing ? (Date.now() - audioRuntime.startedAt) % audioRuntime.trackLength : 0;
       bar.style.setProperty("--audio-progress", String(elapsed / audioRuntime.trackLength));
-    }
-
-    function playMusicStep() {
-      if (!audioRuntime.playing) return;
-      const prefs = readLearnerPrefs().audio;
-      if (prefs.muted || prefs.ambientEnabled === false) return;
-      const theme = getAudioMusicTheme(audioRuntime.current);
-      const beat = Math.max(160, 60000 / theme.tempo);
-      const notes = theme.notes || audioMusicThemes.calm.notes;
-      const index = audioRuntime.step % notes.length;
-      const note = notes[index];
-      const wave = theme.wave || "triangle";
-      const normalized = theme.scene === "boss" ? 0.024 : theme.scene === "victory" ? 0.022 : 0.018;
-      const sourceGain = scaleAudioSourceGain(normalized, "ambience");
-      playAudioTone(note, Math.min(0.28, beat / 1000 * 0.55), sourceGain, wave, audioRuntime.music, 0, { cutoff: 3600, reverb: 0.14 });
-      if (audioRuntime.step % 4 === 0) playAudioTone(note / 2, 0.42, sourceGain * 0.62, "sine", audioRuntime.music, 0.02, { cutoff: 1800, reverb: 0.1 });
-      if (theme.scene === "boss" && audioRuntime.step % 2 === 0) playAudioNoise(0.035, 0.006, audioRuntime.music, 0.01, { cutoff: 900, rate: 0.8 });
-      audioRuntime.step += 1;
-      if (!prefs.loop && Date.now() - audioRuntime.startedAt > audioRuntime.trackLength) nextAudioTrack();
     }
 
     function startAudioMusic(scene = inferAudioScene(), forceTrack = "", saveChoice = true) {
@@ -8940,23 +9585,93 @@
       if (!ensureAudioGraph()) return;
       const selected = forceTrack || pickAudioTrackForScene(scene, prefs);
       const theme = getAudioMusicTheme(selected);
+      if (premiumPianoTracks[selected]) {
+        window.clearInterval(audioRuntime.stepTimer);
+        window.clearInterval(audioRuntime.progressTimer);
+        audioRuntime.stepTimer = 0;
+        audioRuntime.progressTimer = 0;
+        if (!audioRuntime.premiumTrackId) {
+          audioRuntime.playing = false;
+          setGain(audioRuntime.ambience, 0, 0.08);
+        }
+        return startPremiumTrack(theme, { mode: "global", loop: prefs.audio.loop !== false, saveChoice, scene });
+      }
+      // Legacy WebAudio themes (calm, piano, lofi, battle, etc.) are retired.
+      // Keep their metadata for migration/display only; never synthesize or
+      // schedule them for playback in any route.
+      if (audioRuntime.premiumTrackId) stopPremiumTrack({ fadeMs: 0 });
       window.clearInterval(audioRuntime.stepTimer);
       window.clearInterval(audioRuntime.progressTimer);
-      audioRuntime.playing = true;
+      audioRuntime.stepTimer = 0;
+      audioRuntime.progressTimer = 0;
+      audioRuntime.playing = false;
       audioRuntime.current = selected;
       audioRuntime.scene = scene;
       audioRuntime.step = 0;
-      audioRuntime.startedAt = Date.now();
-      audioRuntime.trackLength = Math.max(12000, Math.round(16 * (60000 / theme.tempo)));
-      if (prefs.audio.crossfade) {
-        setGain(audioRuntime.music, 0.001, 0.01);
-        window.setTimeout(() => applyAudioVolumes({ ...prefs.audio, playing: true }), 90);
+      audioRuntime.startedAt = 0;
+      audioRuntime.trackLength = 18000;
+      setGain(audioRuntime.ambience, 0, 0.04);
+      if (saveChoice) writeAudioPrefs({ playing: false });
+      syncAudioSystem({ ...prefs.audio, playing: false, musicPack: selected });
+      return false;
+    }
+
+    function isStorePanelActive() {
+      return Boolean(document.getElementById("store")?.classList.contains("is-active-panel"));
+    }
+
+    function startStoreAmbience() {
+      const prefs = readLearnerPrefs();
+      if (!isStorePanelActive() || prefs.audio.storeAmbience !== true || prefs.audio.backgroundMusic === false || prefs.audio.ambientEnabled === false || prefs.audio.muted) return false;
+      const equipped = premiumPianoTracks[prefs.audio.musicPack] || premiumPianoTracks["quiet-calculation"];
+      if (audioRuntime.storeAmbienceActive && audioRuntime.playing && audioRuntime.current === equipped.value && audioRuntime.premiumTrackMode === "store") return true;
+      audioRuntime.storeResume = audioRuntime.playing && audioRuntime.premiumTrackMode !== "store"
+        ? { playing: true, current: audioRuntime.current, scene: audioRuntime.scene }
+        : null;
+      audioRuntime.storeAmbienceActive = true;
+      if (audioRuntime.playing && !audioRuntime.premiumTrackId) {
+        window.clearInterval(audioRuntime.stepTimer);
+        window.clearInterval(audioRuntime.progressTimer);
+        audioRuntime.stepTimer = 0;
+        audioRuntime.progressTimer = 0;
+        audioRuntime.playing = false;
+        setGain(audioRuntime.ambience, 0, 0.08);
       }
-      playMusicStep();
-      audioRuntime.stepTimer = window.setInterval(playMusicStep, Math.max(180, 60000 / theme.tempo));
-      audioRuntime.progressTimer = window.setInterval(updateAudioProgress, 250);
-      if (saveChoice) writeAudioPrefs({ playing: true, musicPack: selected });
-      syncAudioSystem({ ...prefs.audio, playing: true, musicPack: selected });
+      return startPremiumTrack(equipped, { mode: "store", loop: true, saveChoice: false, scene: "store" });
+    }
+
+    function stopStoreAmbience({ resume = true } = {}) {
+      if (!audioRuntime.storeAmbienceActive) return false;
+      const previous = audioRuntime.storeResume;
+      audioRuntime.storeAmbienceActive = false;
+      audioRuntime.storeResume = null;
+      const restore = () => {
+        if (resume && previous?.playing) startAudioMusic(previous.scene || "menu", previous.current || "calm", false);
+        else {
+          const prefs = readLearnerPrefs();
+          audioRuntime.current = prefs.audio.musicPack || "calm";
+          audioRuntime.scene = "menu";
+          syncAudioSystem(prefs.audio);
+        }
+      };
+      if (audioRuntime.premiumTrackId) stopPremiumTrack({ fadeMs: 160, onDone: restore });
+      else { stopAudioMusic(false); restore(); }
+      return true;
+    }
+
+    function syncStoreAmbienceForRoute() {
+      cleanupLegacyAudioElements();
+      stopRetiredPremiumAudio();
+      if (isStorePanelActive()) {
+        if (readLearnerPrefs().audio.storeAmbience === true && audioManager.unlocked) startStoreAmbience();
+        else if (!storePreviewState && (audioRuntime.playing || audioRuntime.premiumTrackId)) {
+          // Store ambience is opt-in. Never leave a persisted legacy/global
+          // loop running behind Store cards and option controls.
+          stopAudioMusic(false);
+        }
+      } else if (audioRuntime.storeAmbienceActive) {
+        stopStoreAmbience({ resume: true });
+      }
     }
 
     function nextAudioTrack() {
@@ -8972,6 +9687,7 @@
     }
 
     function setAudioScene(scene = inferAudioScene()) {
+      if (audioRuntime.storeAmbienceActive && isStorePanelActive()) return;
       if (!scene || scene === audioRuntime.scene) return;
       audioRuntime.scene = scene;
       const prefs = readLearnerPrefs().audio;
@@ -9032,8 +9748,19 @@
       if (setupAudioSystem.ready) return;
       setupAudioSystem.ready = true;
       audioManager.preload();
-      syncAudioSystem(readLearnerPrefs().audio);
-      const unlockAudio = () => audioManager.unlock();
+      const initialAudioPrefs = readLearnerPrefs().audio;
+      cleanupLegacyAudioElements();
+      stopRetiredPremiumAudio();
+      syncAudioSystem(initialAudioPrefs);
+      const isOpeningExplorerBoardEvent = (event) => {
+        const path = typeof event?.composedPath === "function" ? event.composedPath() : [];
+        if (path.some((node) => node instanceof Element && node.matches(".opening-explorer-board, .opening-explorer-square"))) return true;
+        const target = event?.target instanceof Element ? event.target : event?.target?.parentElement;
+        return Boolean(target?.closest(".opening-explorer-board, .opening-explorer-square"));
+      };
+      // Pointer/keyboard discovery only unlocks the graph. It must not emit
+      // a cue or start ambient audio until an intentional activation occurs.
+      const unlockAudio = () => audioManager.unlock({ autoStartMusic: false });
       document.addEventListener("pointerdown", unlockAudio, { capture: true, passive: true, once: true });
       document.addEventListener("keydown", unlockAudio, { capture: true, once: true });
       document.getElementById("audioPlay")?.addEventListener("click", () => {
@@ -9064,30 +9791,30 @@
         renderStore();
       });
       document.addEventListener("click", (event) => {
+        if (isOpeningExplorerBoardEvent(event)) return;
         const target = event.target instanceof Element ? event.target : event.target?.parentElement;
         if (!target?.closest("button, a, summary")) return;
         if (target.closest(".shorts-feed iframe")) return;
-        if (target.closest(".play-board-wrap, .play-board, .play-square, .piece-symbol, .piece-svg, .puzzle-square, .answer-button")) return;
+        if (target.closest(".play-board-wrap, .play-board, .play-square, .piece-symbol, .piece-svg, .puzzle-square, .opening-explorer-board, .opening-explorer-square, .answer-button")) return;
         if (target.closest("[data-site-tab], [data-home-link]")) return;
-        const cue = target.closest("[data-settings-tab], [role='tab']") ? "tab"
-          : target.closest(".video-close, [aria-haspopup='dialog']") ? "modal"
-            : "ui";
-        playAudioCue(cue);
-      }, { passive: true });
-      document.addEventListener("pointerover", (event) => {
-        if (event.pointerType === "touch") return;
-        const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-        if (target?.closest(".play-board-wrap, .play-board, .play-square, .piece-symbol, .piece-svg, .puzzle-square")) return;
-        if (!target?.closest("button, a, summary, [role='tab']")) return;
-        if (readLearnerPrefs().audio.hoverSounds === false) return;
-        playAudioCue("hover");
+          const cue = target.closest("[data-settings-tab], [role='tab']") ? "tab"
+            : target.closest(".video-close, [aria-haspopup='dialog']") ? "modal"
+              : "ui";
+          // Store controls are not an invitation to start the old global
+          // music loop. Audio starts only from the explicit player control or
+          // from an intentional Store ambience toggle.
+          if (isStorePanelActive() && !storePreviewState && !audioRuntime.storeAmbienceActive && (audioRuntime.playing || audioRuntime.premiumTrackId)) {
+            stopAudioMusic(false);
+          }
+          audioManager.unlock({ autoStartMusic: false });
+          playAudioCue(cue);
       }, { passive: true });
       window.addEventListener("hashchange", () => {
         window.setTimeout(() => setAudioScene(inferAudioScene()), 80);
       });
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden") audioManager.release();
-        else audioManager.unlock();
+        else audioManager.unlock({ autoStartMusic: false });
       });
       window.addEventListener("pagehide", () => audioManager.release(), { passive: true });
     }
@@ -13044,6 +13771,7 @@
     let matchClockState = null;
     let matchClockExpiredColor = "";
     let friendChallengeState = null;
+    let livePremovePreference = "off";
     let friendNetworkState = { directory: [], search: [], challenges: [] };
     let friendHubState = { view: "online", selectedId: "", search: "", minRating: "", maxRating: "" };
     let friendHubReady = false;
@@ -17974,11 +18702,11 @@
         const state = reviewSelfAnalysisState;
         const fen = coachGame?.fen?.() || state.baseFen || "";
         const engineMove = state.analysis?.bestMoveUci ? getMoveFromFenUci(fen, state.analysis.bestMoveUci) : null;
-        const best = engineMove ? { id: "self-analysis-best", from: engineMove.from, to: engineMove.to, promotion: engineMove.promotion || "", kind: "best", color: "green", label: state.analysis.best } : null;
+        const best = engineMove ? { id: "self-analysis-best", from: engineMove.from, to: engineMove.to, promotion: engineMove.promotion || "", kind: "best", color: "yellow", label: state.analysis.best } : null;
         const privateLine = state.analysis?.pvUci && fen ? getReviewBestLineMoves({ fenBefore: fen, pvUci: state.analysis.pvUci }).slice(0, 4).map((lineMove, index) => ({
-          id: `self-analysis-pv-${index}`, from: lineMove.from, to: lineMove.to, promotion: lineMove.promotion || "", kind: "pv", color: "blue", label: lineMove.san
+          id: `self-analysis-pv-${index}`, from: lineMove.from, to: lineMove.to, promotion: lineMove.promotion || "", kind: "pv", color: "blue", routeId: "self-analysis-pv-route", routeIndex: index, showRouteNodes: true, label: lineMove.san
         })) : [];
-        const played = coachLastMove?.from && coachLastMove?.to ? { id: "self-analysis-played", from: coachLastMove.from, to: coachLastMove.to, kind: "played", color: "yellow", label: coachLastMove.san } : null;
+        const played = coachLastMove?.from && coachLastMove?.to ? { id: "self-analysis-played", from: coachLastMove.from, to: coachLastMove.to, kind: "played", color: "cyan", label: coachLastMove.san } : null;
         return {
           arrows: [...(played ? [played] : []), ...(best ? [best] : []), ...privateLine],
           attacks: new Set(),
@@ -17992,7 +18720,7 @@
         if (!reviewRetryState.hint || !move?.bestFrom || !move?.bestTo) {
           return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
         }
-        const best = { id: "review-best-retry", from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", color: "green", label: move.best };
+        const best = { id: "review-best-retry", from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", color: "yellow", label: move.best };
         return {
           arrows: [best], attacks: getReviewMoveAttackSquares(move, true), engineSquares: new Set([best.from, best.to]), played: null, best
         };
@@ -18001,7 +18729,7 @@
         if (!reviewBestLineMove?.from || !reviewBestLineMove?.to) {
           return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
         }
-        const best = { id: "review-best-line", ...reviewBestLineMove, kind: "best", color: "green" };
+        const best = { id: "review-best-line", ...reviewBestLineMove, kind: "best", color: "yellow" };
         return {
           arrows: [best],
           attacks: new Set(),
@@ -18012,8 +18740,8 @@
       }
       const move = activeMatchReview?.moves?.[reviewReplayIndex];
       if (!move) return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
-      const played = { id: `review-played-${reviewReplayIndex}`, from: move.from, to: move.to, promotion: move.promotion || "", kind: "played", color: "yellow", label: move.san };
-      const best = { id: `review-best-${reviewReplayIndex}`, from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", color: "green", label: move.best };
+      const played = { id: `review-played-${reviewReplayIndex}`, from: move.from, to: move.to, promotion: move.promotion || "", kind: "played", color: "cyan", label: move.san };
+      const best = { id: `review-best-${reviewReplayIndex}`, from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", color: "yellow", label: move.best };
       const hasBest = Boolean(best.from && best.to);
       const showBest = hasBest && !sameReviewPath(played, best);
       const pvArrows = getReviewBestLineMoves(move).slice(0, 4).map((lineMove, index) => ({
@@ -18023,6 +18751,9 @@
         promotion: lineMove.promotion || "",
         kind: "pv",
         color: "blue",
+        routeId: `review-pv-route-${reviewReplayIndex}`,
+        routeIndex: index,
+        showRouteNodes: true,
         label: lineMove.san
       }));
       const threat = [...getReviewMoveAttackSquares(move, reviewCompareMode === "best" && hasBest)]
@@ -18037,25 +18768,76 @@
 
     const ANALYSIS_OVERLAY_NS = "http://www.w3.org/2000/svg";
     const ANALYSIS_OVERLAY_COLORS = Object.freeze({
-      green: { stroke: "rgba(127,166,80,.94)", fill: "rgba(127,166,80,.22)", glow: "rgba(127,166,80,.42)" },
-      blue: { stroke: "rgba(93,191,255,.94)", fill: "rgba(93,191,255,.18)", glow: "rgba(93,191,255,.42)" },
-      yellow: { stroke: "rgba(255,211,107,.94)", fill: "rgba(255,211,107,.19)", glow: "rgba(255,211,107,.42)" },
-      red: { stroke: "rgba(255,128,112,.94)", fill: "rgba(255,128,112,.18)", glow: "rgba(255,128,112,.42)" },
-      cyan: { stroke: "rgba(116,214,255,.96)", fill: "rgba(116,214,255,.18)", glow: "rgba(116,214,255,.44)" },
-      violet: { stroke: "rgba(197,140,255,.96)", fill: "rgba(197,140,255,.18)", glow: "rgba(197,140,255,.44)" }
+      green: { stroke: "rgba(85,201,138,.98)", fill: "rgba(85,201,138,.14)", glow: "rgba(85,201,138,.16)" },
+      blue: { stroke: "rgba(93,140,255,.98)", fill: "rgba(93,140,255,.14)", glow: "rgba(93,140,255,.16)" },
+      yellow: { stroke: "rgba(246,196,83,.99)", fill: "rgba(246,196,83,.16)", glow: "rgba(246,196,83,.17)" },
+      red: { stroke: "rgba(240,107,107,.96)", fill: "rgba(240,107,107,.13)", glow: "rgba(240,107,107,.15)" },
+      cyan: { stroke: "rgba(98,215,255,.98)", fill: "rgba(98,215,255,.14)", glow: "rgba(98,215,255,.16)" },
+      violet: { stroke: "rgba(167,139,250,.96)", fill: "rgba(167,139,250,.13)", glow: "rgba(167,139,250,.15)" },
+      neutral: { stroke: "rgba(184,191,153,.82)", fill: "rgba(184,191,153,.12)", glow: "rgba(184,191,153,.12)" }
+    });
+    const ANALYSIS_ARROW_PRIORITIES = Object.freeze({
+      best: { value: 5, opacity: 1, glowOpacity: .24, innerOpacity: .5, shaftWidth: .07, headScale: 1.06 },
+      primary: { value: 4, opacity: .96, glowOpacity: .18, innerOpacity: .44, shaftWidth: .06, headScale: 1 },
+      alternative: { value: 3, opacity: .86, glowOpacity: .14, innerOpacity: .38, shaftWidth: .055, headScale: .95 },
+      support: { value: 2, opacity: .78, glowOpacity: .09, innerOpacity: .32, shaftWidth: .052, headScale: .91 },
+      secondary: { value: 1, opacity: .68, glowOpacity: .05, innerOpacity: .24, shaftWidth: .047, headScale: .86 },
+      danger: { value: 3, opacity: .9, glowOpacity: .13, innerOpacity: .4, shaftWidth: .058, headScale: .98 }
+    });
+    const ANALYSIS_ARROW_GEOMETRY = Object.freeze({
+      viewBox: "0 0 8 8",
+      laneGap: .045,
+      depthOffset: .024,
+      startInset: Object.freeze({ min: .08, max: .12, ratio: .12 }),
+      endInset: Object.freeze({ min: .11, max: .16, ratio: .15 }),
+      marker: Object.freeze({
+        viewBox: "0 0 0.34 0.3",
+        path: "M0.015,0.045 L0.105,0.15 L0.015,0.255 L0.325,0.15 Z",
+        refX: .325,
+        refY: .15,
+        primaryWidth: .34,
+        primaryHeight: .3,
+        shadowWidth: .344,
+        shadowHeight: .31
+      })
     });
     const analysisOverlayControllers = new WeakMap();
     const analysisOverlayStates = new Set();
     let analysisOverlaySequence = 0;
+    let analysisOverlayControllerSequence = 0;
 
     function normalizeAnalysisColor(value, kind = "") {
       const explicit = String(value || "").toLowerCase();
-      if (ANALYSIS_OVERLAY_COLORS[explicit]) return explicit;
       const normalizedKind = String(kind || "").toLowerCase();
-      if (["best", "engine"].includes(normalizedKind)) return "green";
-      if (["pv", "candidate"].includes(normalizedKind)) return "blue";
-      if (["threat", "attack"].includes(normalizedKind)) return "red";
-      return "yellow";
+      const explicitColor = ({ gold: "yellow", emerald: "green", "cool-blue": "blue", "blue-violet": "violet", gray: "neutral", grey: "neutral" })[explicit] || explicit;
+      if (["best", "engine", "important"].includes(normalizedKind)) return "yellow";
+      if (["pv"].includes(normalizedKind)) return "blue";
+      if (["candidate", "alternative"].includes(normalizedKind)) return "violet";
+      if (["plan", "support", "positional", "idea"].includes(normalizedKind)) return "green";
+      if (["threat", "attack", "mistake", "danger"].includes(normalizedKind)) return "red";
+      if (["secondary", "low", "low-priority", "quiet"].includes(normalizedKind)) return "neutral";
+      if (ANALYSIS_OVERLAY_COLORS[explicitColor]) return explicitColor;
+      if (["primary"].includes(normalizedKind)) return "blue";
+      return "cyan";
+    }
+
+    function normalizeAnalysisPriority(value, kind = "") {
+      const explicit = String(value || "").toLowerCase();
+      const normalizedKind = String(kind || "").toLowerCase();
+      const key = explicit && ANALYSIS_ARROW_PRIORITIES[explicit]
+        ? explicit
+        : ["best", "engine", "important"].includes(normalizedKind)
+          ? "best"
+          : ["candidate", "alternative"].includes(normalizedKind)
+            ? "alternative"
+            : ["plan", "support", "positional", "idea"].includes(normalizedKind)
+              ? "support"
+              : ["secondary", "low", "low-priority", "quiet"].includes(normalizedKind)
+                ? "secondary"
+                : ["threat", "attack", "mistake", "danger"].includes(normalizedKind)
+                  ? "danger"
+                  : "primary";
+      return { name: key, ...ANALYSIS_ARROW_PRIORITIES[key] };
     }
 
     function analysisOverlayElement(name) {
@@ -18074,14 +18856,17 @@
         defs: null,
         highlightGroup: null,
         arrowGroup: null,
+        routeNodeGroup: null,
         markerIds: new Map(),
         arrowNodes: new Map(),
+        routeNodes: new Map(),
         highlightNodes: new Map(),
-        gradientIds: new Map(),
         baseArrows: [],
         baseHighlights: [],
         userArrows: new Map(),
         userHighlights: new Map(),
+        markerPrefix: `analysis-overlay-${++analysisOverlayControllerSequence}`,
+        drawSignature: "",
         raf: 0,
         destroyed: false
       };
@@ -18096,30 +18881,36 @@
           if (!layers[0]) {
             const svg = analysisOverlayElement("svg");
             svg.classList.add("review-arrow-layer");
-            svg.setAttribute("viewBox", "0 0 8 8");
+            svg.setAttribute("viewBox", ANALYSIS_ARROW_GEOMETRY.viewBox);
             svg.setAttribute("preserveAspectRatio", "none");
             svg.setAttribute("aria-hidden", "true");
             const defs = analysisOverlayElement("defs");
             const highlightGroup = analysisOverlayElement("g");
             const arrowGroup = analysisOverlayElement("g");
+            const routeNodeGroup = analysisOverlayElement("g");
             highlightGroup.setAttribute("data-analysis-layer", "highlights");
             arrowGroup.setAttribute("data-analysis-layer", "arrows");
-            svg.append(defs, highlightGroup, arrowGroup);
+            routeNodeGroup.setAttribute("data-analysis-layer", "route-nodes");
+            svg.append(defs, highlightGroup, arrowGroup, routeNodeGroup);
             target.appendChild(svg);
             state.svg = svg;
             state.defs = defs;
             state.highlightGroup = highlightGroup;
             state.arrowGroup = arrowGroup;
+            state.routeNodeGroup = routeNodeGroup;
           } else if (state.svg !== layers[0]) {
             state.svg = layers[0];
             state.defs = state.svg.querySelector("defs") || analysisOverlayElement("defs");
             state.highlightGroup = state.svg.querySelector('[data-analysis-layer="highlights"]') || analysisOverlayElement("g");
             state.arrowGroup = state.svg.querySelector('[data-analysis-layer="arrows"]') || analysisOverlayElement("g");
+            state.routeNodeGroup = state.svg.querySelector('[data-analysis-layer="route-nodes"]') || analysisOverlayElement("g");
             state.highlightGroup.setAttribute("data-analysis-layer", "highlights");
             state.arrowGroup.setAttribute("data-analysis-layer", "arrows");
+            state.routeNodeGroup.setAttribute("data-analysis-layer", "route-nodes");
             if (!state.defs.parentNode) state.svg.prepend(state.defs);
             if (!state.highlightGroup.parentNode) state.svg.append(state.highlightGroup);
             if (!state.arrowGroup.parentNode) state.svg.append(state.arrowGroup);
+            if (!state.routeNodeGroup.parentNode) state.svg.append(state.routeNodeGroup);
           }
           return state.svg;
         },
@@ -18134,52 +18925,291 @@
           if (state.destroyed) return;
           const arrows = [...state.baseArrows, ...state.userArrows.values()];
           const highlights = [...state.baseHighlights, ...state.userHighlights.values()];
+          const squares = [...board.querySelectorAll("[data-square]")].map((square) => square.dataset.square || "");
+          const arrowStateKey = (arrow, index) => JSON.stringify([
+            arrow?.id || "",
+            arrow?.from || "",
+            arrow?.to || "",
+            arrow?.kind || "",
+            arrow?.color || "",
+            arrow?.priority || "",
+            arrow?.label || "",
+            arrow?.routeId || arrow?.sequenceId || "",
+            arrow?.showRouteNodes === true,
+            Array.isArray(arrow?.routeNodes) ? arrow.routeNodes : [],
+            arrow?.routeNode || "",
+            index
+          ]);
+          const highlightStateKey = (highlight, index) => JSON.stringify([
+            typeof highlight === "string" ? highlight : highlight?.id || "",
+            typeof highlight === "string" ? "" : highlight?.square || "",
+            typeof highlight === "string" ? "" : highlight?.kind || "",
+            typeof highlight === "string" ? "" : highlight?.color || "",
+            index
+          ]);
+          const drawSignature = [
+            squares.join(","),
+            arrows.map(arrowStateKey).join("|"),
+            highlights.map(highlightStateKey).join("|")
+          ].join("::");
           if (!arrows.length && !highlights.length) {
+            state.drawSignature = drawSignature;
             state.svg?.remove();
             state.svg = null;
             state.arrowNodes.clear();
+            state.routeNodes.clear();
             state.highlightNodes.clear();
             return;
           }
+          if (state.drawSignature === drawSignature && state.svg?.isConnected) return;
+          state.drawSignature = drawSignature;
           const svg = controller.ensureLayer();
           if (!svg) return;
-          const squares = [...board.querySelectorAll("[data-square]")].map((square) => square.dataset.square || "");
           const point = (index) => ({ x: (index % 8) + 0.5, y: Math.floor(index / 8) + 0.5 });
-          const liveArrowIds = new Set();
-          arrows.forEach((arrow, index) => {
+          const roundBoardCoordinate = (value) => Math.round(value * 10000) / 10000;
+          const arrowGeometry = (from, to, laneOffset = 0) => {
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const length = Math.hypot(dx, dy) || 1;
+            const ux = dx / length;
+            const uy = dy / length;
+            const lateral = laneOffset * ANALYSIS_ARROW_GEOMETRY.laneGap;
+            const px = -uy * lateral;
+            const py = ux * lateral;
+            // Keep the stroke and arrowhead off the piece centers.  The
+            // geometry is expressed in the SVG's 8x8 board coordinate space,
+            // so it stays crisp and consistent at every board size/DPI.
+            const startInset = Math.min(ANALYSIS_ARROW_GEOMETRY.startInset.max, Math.max(ANALYSIS_ARROW_GEOMETRY.startInset.min, length * ANALYSIS_ARROW_GEOMETRY.startInset.ratio));
+            const endInset = Math.min(ANALYSIS_ARROW_GEOMETRY.endInset.max, Math.max(ANALYSIS_ARROW_GEOMETRY.endInset.min, length * ANALYSIS_ARROW_GEOMETRY.endInset.ratio));
+            return {
+              x1: roundBoardCoordinate(from.x + ux * startInset + px),
+              y1: roundBoardCoordinate(from.y + uy * startInset + py),
+              x2: roundBoardCoordinate(to.x - ux * endInset + px),
+              y2: roundBoardCoordinate(to.y - uy * endInset + py)
+            };
+          };
+          const arrowIdCounts = new Map();
+          const arrowEntries = arrows.map((arrow, index) => {
             const fromIndex = squares.indexOf(arrow.from);
             const toIndex = squares.indexOf(arrow.to);
-            if (fromIndex < 0 || toIndex < 0) return;
-            const id = String(arrow.id || `${arrow.kind || "arrow"}:${arrow.from}-${arrow.to}-${index}`);
+            if (fromIndex < 0 || toIndex < 0) return null;
+            const kind = String(arrow.kind || "").toLowerCase();
+            const priority = normalizeAnalysisPriority(arrow.priority, kind);
+            const baseId = String(arrow.id || `${arrow.kind || "arrow"}:${arrow.from}-${arrow.to}`);
+            const ordinal = arrowIdCounts.get(baseId) || 0;
+            arrowIdCounts.set(baseId, ordinal + 1);
+            return {
+              arrow,
+              index,
+              id: ordinal ? `${baseId}#${ordinal}` : baseId,
+              fromIndex,
+              toIndex,
+              from: point(fromIndex),
+              to: point(toIndex),
+              priority
+            };
+          }).filter(Boolean);
+          const segmentIntersects = (a, b) => {
+            const cross = (p1, p2, p3) => (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+            const onSegment = (p1, p2, p) => Math.min(p1.x, p2.x) - 0.001 <= p.x && p.x <= Math.max(p1.x, p2.x) + 0.001
+              && Math.min(p1.y, p2.y) - 0.001 <= p.y && p.y <= Math.max(p1.y, p2.y) + 0.001;
+            const ab1 = cross(a.from, a.to, b.from);
+            const ab2 = cross(a.from, a.to, b.to);
+            const ba1 = cross(b.from, b.to, a.from);
+            const ba2 = cross(b.from, b.to, a.to);
+            return (ab1 === 0 && onSegment(a.from, a.to, b.from)) || (ab2 === 0 && onSegment(a.from, a.to, b.to))
+              || (ba1 === 0 && onSegment(b.from, b.to, a.from)) || (ba2 === 0 && onSegment(b.from, b.to, a.to))
+              || ((ab1 > 0) !== (ab2 > 0) && (ba1 > 0) !== (ba2 > 0));
+          };
+          const laneOffsets = new Map();
+          if (arrowEntries.length >= 3) {
+            const parent = arrowEntries.map((_, index) => index);
+            const find = (value) => {
+              let root = value;
+              while (parent[root] !== root) root = parent[root];
+              while (parent[value] !== value) {
+                const next = parent[value];
+                parent[value] = root;
+                value = next;
+              }
+              return root;
+            };
+            const union = (left, right) => {
+              const leftRoot = find(left);
+              const rightRoot = find(right);
+              if (leftRoot !== rightRoot) parent[rightRoot] = leftRoot;
+            };
+            arrowEntries.forEach((entry, left) => {
+              arrowEntries.slice(left + 1).forEach((other, offset) => {
+                const right = left + offset + 1;
+                const sharesEndpoint = entry.arrow.from === other.arrow.from || entry.arrow.to === other.arrow.to
+                  || entry.arrow.from === other.arrow.to || entry.arrow.to === other.arrow.from;
+                if (sharesEndpoint || segmentIntersects(entry, other)) union(left, right);
+              });
+            });
+            const components = new Map();
+            arrowEntries.forEach((entry, index) => {
+              const root = find(index);
+              if (!components.has(root)) components.set(root, []);
+              components.get(root).push({ entry, index });
+            });
+            components.forEach((component) => {
+              if (component.length < 3) return;
+              component.sort((left, right) => right.entry.priority.value - left.entry.priority.value || left.entry.id.localeCompare(right.entry.id));
+              component.forEach((item, rank) => {
+                const lane = rank === 0 ? 0 : (rank % 2 === 1 ? -Math.ceil(rank / 2) : Math.ceil(rank / 2));
+                laneOffsets.set(item.entry.index, lane);
+              });
+            });
+          }
+          const liveArrowIds = new Set();
+          const setAttrIfChanged = (node, name, value) => {
+            const normalized = String(value);
+            if (node.getAttribute(name) !== normalized) node.setAttribute(name, normalized);
+          };
+          const setStyleIfChanged = (node, name, value) => {
+            const normalized = String(value);
+            if (node.style.getPropertyValue(name) !== normalized) node.style.setProperty(name, normalized);
+          };
+          arrowEntries.forEach(({ arrow, index, id, fromIndex, toIndex, from, to, priority }) => {
             liveArrowIds.add(id);
-            let line = state.arrowNodes.get(id);
-            if (!line || !line.isConnected) {
-              line = analysisOverlayElement("line");
-              state.arrowNodes.set(id, line);
-              state.arrowGroup.appendChild(line);
+            let group = state.arrowNodes.get(id);
+            if (!group || !group.isConnected || group.tagName?.toLowerCase() !== "g" || group.children.length !== 4) {
+              group?.remove?.();
+              group = analysisOverlayElement("g");
+              const glow = analysisOverlayElement("line");
+              const shadow = analysisOverlayElement("line");
+              const line = analysisOverlayElement("line");
+              const inner = analysisOverlayElement("line");
+              group.append(glow, shadow, line, inner);
+              state.arrowNodes.set(id, group);
+              state.arrowGroup.appendChild(group);
             }
+            const [glow, shadow, line, inner] = [...group.children];
             const colorName = normalizeAnalysisColor(arrow.color, arrow.kind);
             const color = ANALYSIS_OVERLAY_COLORS[colorName];
-            const from = point(fromIndex);
-            const to = point(toIndex);
+            const laneOffset = laneOffsets.get(index) || 0;
+            const geometry = arrowGeometry(from, to, laneOffset);
+            const shadowGeometry = {
+              x1: roundBoardCoordinate(geometry.x1 + ANALYSIS_ARROW_GEOMETRY.depthOffset),
+              y1: roundBoardCoordinate(geometry.y1 + ANALYSIS_ARROW_GEOMETRY.depthOffset),
+              x2: roundBoardCoordinate(geometry.x2 + ANALYSIS_ARROW_GEOMETRY.depthOffset),
+              y2: roundBoardCoordinate(geometry.y2 + ANALYSIS_ARROW_GEOMETRY.depthOffset)
+            };
             const kind = String(arrow.kind || "").toLowerCase();
-            line.setAttribute("class", `review-arrow-line ${kind === "best" || kind === "engine" ? "is-best is-engine" : kind === "candidate" || kind === "pv" ? "is-candidate" : kind === "threat" ? "is-threat" : "is-played"}`);
-            line.setAttribute("x1", String(from.x));
-            line.setAttribute("y1", String(from.y));
-            line.setAttribute("x2", String(to.x));
-            line.setAttribute("y2", String(to.y));
-            line.setAttribute("marker-end", `url(#${controller.markerFor(colorName)})`);
-            line.style.stroke = kind === "primary" && ["cyan", "violet"].includes(colorName)
-              ? `url(#${controller.primaryGradient()})`
-              : color.stroke;
-            line.dataset.arrowId = id;
-            if (arrow.label) line.setAttribute("aria-label", String(arrow.label));
+            const semanticClass = kind === "best" || kind === "engine" ? "is-best is-engine" : kind === "candidate" || kind === "pv" ? "is-candidate" : kind === "threat" ? "is-threat" : "is-played";
+            const shadowMarkerId = controller.markerFor(colorName, "shadow", priority.name, priority.headScale);
+            const primaryMarkerId = controller.markerFor(colorName, "primary", priority.name, priority.headScale);
+            const arrowSignature = [
+              geometry.x1, geometry.y1, geometry.x2, geometry.y2,
+              shadowGeometry.x1, shadowGeometry.y1, shadowGeometry.x2, shadowGeometry.y2,
+              laneOffset, colorName, priority.name, priority.opacity, priority.shaftWidth,
+              semanticClass, shadowMarkerId, primaryMarkerId, arrow.label || ""
+            ].join(":");
+            if (group.dataset.arrowSignature === arrowSignature) return;
+            setAttrIfChanged(group, "class", `review-arrow-group ${semanticClass}`);
+            setAttrIfChanged(group, "data-arrow-id", id);
+            setAttrIfChanged(group, "data-arrow-kind", kind || "annotation");
+            setAttrIfChanged(group, "data-arrow-order", index);
+            setAttrIfChanged(group, "data-arrow-lane", laneOffset);
+            setAttrIfChanged(group, "data-arrow-priority", priority.name);
+            group.dataset.arrowSignature = arrowSignature;
+            [glow, shadow, line, inner].forEach((node) => {
+              const nodeGeometry = node === shadow ? shadowGeometry : geometry;
+              const nodeClass = node === glow ? `review-arrow-glow ${semanticClass}` : node === shadow ? `review-arrow-shadow ${semanticClass}` : node === inner ? `review-arrow-inner ${semanticClass}` : `review-arrow-line ${semanticClass}`;
+              setAttrIfChanged(node, "x1", nodeGeometry.x1);
+              setAttrIfChanged(node, "y1", nodeGeometry.y1);
+              setAttrIfChanged(node, "x2", nodeGeometry.x2);
+              setAttrIfChanged(node, "y2", nodeGeometry.y2);
+              setAttrIfChanged(node, "class", nodeClass);
+              setAttrIfChanged(node, "pathLength", "1");
+              setStyleIfChanged(node, "--arrow-stroke", color.stroke);
+              setStyleIfChanged(node, "--arrow-glow", color.glow);
+              setStyleIfChanged(node, "--arrow-opacity", priority.opacity);
+              setStyleIfChanged(node, "--arrow-glow-opacity", priority.glowOpacity);
+              setStyleIfChanged(node, "--arrow-inner-opacity", priority.innerOpacity);
+              setStyleIfChanged(node, "--arrow-shaft-width", priority.shaftWidth);
+            });
+            glow.removeAttribute("marker-end");
+            setAttrIfChanged(shadow, "marker-end", `url(#${shadowMarkerId})`);
+            setAttrIfChanged(line, "marker-end", `url(#${primaryMarkerId})`);
+            inner.removeAttribute("marker-end");
+            setStyleIfChanged(glow, "stroke", color.stroke);
+            setStyleIfChanged(line, "stroke", color.stroke);
+            setStyleIfChanged(shadow, "stroke", "rgba(15, 30, 60, .38)");
+            setStyleIfChanged(inner, "stroke", "rgba(237, 252, 255, .52)");
+            if (arrow.label) setAttrIfChanged(line, "aria-label", arrow.label);
             else line.removeAttribute("aria-label");
           });
-          [...state.arrowNodes].forEach(([id, line]) => {
+          [...state.arrowNodes].forEach(([id, group]) => {
             if (!liveArrowIds.has(id)) {
-              line.remove();
+              group.remove();
               state.arrowNodes.delete(id);
+            }
+          });
+          const liveRouteNodeIds = new Set();
+          const routeGroups = new Map();
+          arrowEntries.forEach((entry) => {
+            const routeId = String(entry.arrow.routeId || entry.arrow.sequenceId || "");
+            const optedIn = entry.arrow.showRouteNodes === true
+              || Array.isArray(entry.arrow.routeNodes)
+              || entry.arrow.routeNode;
+            if (!routeId || !optedIn) return;
+            if (!routeGroups.has(routeId)) routeGroups.set(routeId, []);
+            routeGroups.get(routeId).push(entry);
+          });
+          routeGroups.forEach((entries, routeId) => {
+            if (entries.length < 2) return;
+            const endpointCounts = new Map();
+            entries.forEach((entry) => {
+              [entry.fromIndex, entry.toIndex].forEach((squareIndex) => endpointCounts.set(squareIndex, (endpointCounts.get(squareIndex) || 0) + 1));
+            });
+            const explicitSquares = entries.flatMap((entry) => {
+              const values = Array.isArray(entry.arrow.routeNodes) ? entry.arrow.routeNodes : [];
+              return values.concat(entry.arrow.routeNode || []);
+            }).filter(Boolean);
+            const explicitIndexes = explicitSquares.map((squareName) => squares.indexOf(squareName)).filter((squareIndex) => squareIndex >= 0);
+            const nodeIndexes = explicitIndexes.length
+              ? [...new Set(explicitIndexes)]
+              : [...endpointCounts.entries()].filter(([, count]) => count > 1).map(([squareIndex]) => squareIndex);
+            nodeIndexes.forEach((squareIndex) => {
+              const nodeEntry = entries.find((entry) => entry.fromIndex === squareIndex || entry.toIndex === squareIndex) || entries[0];
+              const colorName = normalizeAnalysisColor(nodeEntry.arrow.color, nodeEntry.arrow.kind);
+              const color = ANALYSIS_OVERLAY_COLORS[colorName];
+              const id = `${routeId}:${squares[squareIndex]}`;
+              liveRouteNodeIds.add(id);
+              let node = state.routeNodes.get(id);
+              if (!node || !node.isConnected || node.tagName?.toLowerCase() !== "g" || node.children.length !== 2) {
+                node?.remove?.();
+                node = analysisOverlayElement("g");
+                const rail = analysisOverlayElement("circle");
+                const core = analysisOverlayElement("circle");
+                node.append(rail, core);
+                state.routeNodes.set(id, node);
+                state.routeNodeGroup?.appendChild(node);
+              }
+              const [rail, core] = [...node.children];
+              const position = point(squareIndex);
+              node.setAttribute("class", "review-arrow-route-node");
+              node.dataset.routeId = routeId;
+              node.dataset.routeSquare = squares[squareIndex] || "";
+              rail.setAttribute("class", "review-arrow-route-node-rail");
+              rail.setAttribute("cx", String(position.x));
+              rail.setAttribute("cy", String(position.y));
+              rail.setAttribute("r", "0.075");
+              core.setAttribute("class", "review-arrow-route-node-core");
+              core.setAttribute("cx", String(position.x));
+              core.setAttribute("cy", String(position.y));
+              core.setAttribute("r", "0.041");
+              core.style.fill = color.stroke;
+              core.style.stroke = color.stroke;
+              core.style.setProperty("--route-node-color", color.stroke);
+            });
+          });
+          [...state.routeNodes].forEach(([id, node]) => {
+            if (!liveRouteNodeIds.has(id)) {
+              node.remove();
+              state.routeNodes.delete(id);
             }
           });
           const liveHighlightIds = new Set();
@@ -18215,45 +19245,32 @@
             }
           });
         },
-        markerFor(colorName) {
-          const existing = state.markerIds.get(colorName);
+        markerFor(colorName, layer = "primary", priorityName = "primary", headScale = 1) {
+          const markerKey = `${layer}:${colorName}:${priorityName}`;
+          const existing = state.markerIds.get(markerKey);
           if (existing && state.defs?.querySelector(`[id="${existing}"]`)) return existing;
-          const id = `analysis-arrow-head-${++analysisOverlaySequence}-${colorName}`;
+          const id = `${state.markerPrefix}-${layer}-${colorName}-${priorityName}`;
+          const isShadow = layer === "shadow";
           const marker = analysisOverlayElement("marker");
           marker.setAttribute("id", id);
-          marker.setAttribute("markerWidth", "0.42");
-          marker.setAttribute("markerHeight", "0.42");
-          marker.setAttribute("refX", "0.36");
-          marker.setAttribute("refY", "0.21");
+          marker.setAttribute("viewBox", ANALYSIS_ARROW_GEOMETRY.marker.viewBox);
+          const markerScale = Number.isFinite(Number(headScale)) ? Number(headScale) : 1;
+          marker.setAttribute("markerWidth", String((isShadow ? ANALYSIS_ARROW_GEOMETRY.marker.shadowWidth : ANALYSIS_ARROW_GEOMETRY.marker.primaryWidth) * markerScale));
+          marker.setAttribute("markerHeight", String((isShadow ? ANALYSIS_ARROW_GEOMETRY.marker.shadowHeight : ANALYSIS_ARROW_GEOMETRY.marker.primaryHeight) * markerScale));
+          marker.setAttribute("refX", String(ANALYSIS_ARROW_GEOMETRY.marker.refX));
+          marker.setAttribute("refY", String(ANALYSIS_ARROW_GEOMETRY.marker.refY));
           marker.setAttribute("orient", "auto");
           marker.setAttribute("markerUnits", "userSpaceOnUse");
           const path = analysisOverlayElement("path");
-          path.setAttribute("d", "M0,0 Q0.16,0.21 0,0.42 L0.42,0.21 Z");
-          path.setAttribute("fill", ANALYSIS_OVERLAY_COLORS[colorName].stroke);
+          path.setAttribute("d", ANALYSIS_ARROW_GEOMETRY.marker.path);
+          const markerColor = isShadow ? "rgba(15, 30, 60, .38)" : ANALYSIS_OVERLAY_COLORS[colorName].stroke;
+          path.setAttribute("fill", markerColor);
+          path.setAttribute("stroke", markerColor);
+          path.setAttribute("stroke-width", isShadow ? "0.006" : "0.008");
+          path.setAttribute("stroke-linejoin", "round");
           marker.appendChild(path);
           controller.ensureLayer()?.querySelector("defs")?.appendChild(marker);
-          state.markerIds.set(colorName, id);
-          return id;
-        },
-        primaryGradient() {
-          const existing = state.gradientIds.get("primary");
-          if (existing && state.defs?.querySelector(`[id="${existing}"]`)) return existing;
-          const id = `analysis-arrow-gradient-${++analysisOverlaySequence}`;
-          const gradient = analysisOverlayElement("linearGradient");
-          gradient.setAttribute("id", id);
-          gradient.setAttribute("x1", "0");
-          gradient.setAttribute("y1", "0");
-          gradient.setAttribute("x2", "1");
-          gradient.setAttribute("y2", "1");
-          const start = analysisOverlayElement("stop");
-          start.setAttribute("offset", "0%");
-          start.setAttribute("stop-color", "#74d6ff");
-          const end = analysisOverlayElement("stop");
-          end.setAttribute("offset", "100%");
-          end.setAttribute("stop-color", "#c58cff");
-          gradient.append(start, end);
-          controller.ensureLayer()?.querySelector("defs")?.appendChild(gradient);
-          state.gradientIds.set("primary", id);
+          state.markerIds.set(markerKey, id);
           return id;
         },
         render(nextArrows, nextHighlights) {
@@ -18301,8 +19318,8 @@
           state.raf = 0;
           state.svg?.remove();
           state.arrowNodes.clear();
+          state.routeNodes.clear();
           state.highlightNodes.clear();
-          state.gradientIds.clear();
           analysisOverlayStates.delete(state);
           analysisOverlayControllers.delete(board);
         }
@@ -18366,8 +19383,14 @@
     function getAnalysisGestureColor(event, secondary = false) {
       if (event?.altKey) return "blue";
       if (event?.ctrlKey || event?.metaKey) return "red";
-      if (secondary) return "yellow";
+      if (secondary) return "violet";
       return "cyan";
+    }
+
+    function getAnalysisGesturePriority(event, secondary = false) {
+      if (event?.ctrlKey || event?.metaKey) return "danger";
+      if (event?.altKey || secondary) return "alternative";
+      return "primary";
     }
 
     function createAnalysisGestureHandlers(board, prefix) {
@@ -18393,7 +19416,8 @@
             from,
             to,
             kind: "primary",
-            color: getAnalysisGestureColor(event, event?.button === 2)
+            color: getAnalysisGestureColor(event, event?.button === 2),
+            priority: getAnalysisGesturePriority(event, event?.button === 2)
           });
         },
         onArrowEnd(from, to, event) {
@@ -18405,7 +19429,8 @@
             from,
             to,
             kind: "primary",
-            color: getAnalysisGestureColor(event, event?.button === 2)
+            color: getAnalysisGestureColor(event, event?.button === 2),
+            priority: getAnalysisGesturePriority(event, event?.button === 2)
           });
           return true;
         },
@@ -18567,6 +19592,7 @@
       const boardRenderKey = [coachGameSessionId, boardFen, boardHistoryLength,
         coachSelected, coachLegalMoves.map(moveToUci).join(","),
         coachPremove ? `${coachPremove.from}-${coachPremove.to}` : "",
+        isLivePremoveEnabled() ? "premove-live" : "premove-off",
         coachThinking ? "thinking" : "ready", coachBotPaused ? "free" : "bot",
         coachPlayerColor, coachFlipped ? "flipped" : "normal",
         coachThreatMode ? "threats" : "quiet", matchClockExpiredColor,
@@ -18614,12 +19640,14 @@
         const legalMove = legalByTarget.get(squareNameValue);
         const square = boardSquares.get(squareNameValue);
         if (!square) return;
+        const premoveSource = coachPremove?.from === squareNameValue;
+        const premoveTarget = coachPremove?.to === squareNameValue;
         let className = `puzzle-square play-square ${isLightCoachSquare(squareNameValue) ? "light" : "dark"}`;
         if (piece) className += ` ${piece.color === "w" ? "white-piece" : "black-piece"}`;
-        if (squareNameValue === coachSelected || coachPremove?.from === squareNameValue) className += " selected";
-        if (coachPremove?.to === squareNameValue) className += " legal";
-        if (coachPremove?.from === squareNameValue) className += " premove-source";
-        if (coachPremove?.to === squareNameValue) className += " premove-target";
+        // Premove intent must not look like a move that can be committed now.
+        if (squareNameValue === coachSelected && !premoveSource) className += " selected";
+        if (premoveSource) className += " premove-source";
+        if (premoveTarget) className += " premove-target";
         if (legalMove) className += legalMove.captured || legalMove.flags.includes("e") ? " capture" : " legal";
         if (lastSquares.includes(squareNameValue)) className += " last-move";
         if (animateEffect && squareNameValue === coachLastMove?.to && captureEffect) className += " capture-impact";
@@ -18635,6 +19663,9 @@
         if (threatSquares.has(squareNameValue)) className += " threat";
         if (coachThinking) className += " is-ai-thinking";
         if (square.className !== className) square.className = className;
+        if (premoveSource) square.dataset.premove = "from";
+        else if (premoveTarget) square.dataset.premove = "to";
+        else delete square.dataset.premove;
         const premovePiece = Boolean(piece && isLivePremoveEnabled() && piece.color === coachPlayerColor && coachGame.turn() !== coachPlayerColor);
         const draggable = Boolean(piece && (isCoachPlayablePiece(piece) || premovePiece) && !coachThinking && !gameOver);
         if (square.draggable !== draggable) square.draggable = draggable;
@@ -18644,9 +19675,9 @@
           square.dataset.pieceKey = pieceKey;
         }
         const ariaLabel = getAccessibleSquareLabel(squareNameValue, piece, [
-          squareNameValue === coachSelected || coachPremove?.from === squareNameValue ? "selected" : "",
-          coachPremove?.from === squareNameValue ? "premove source" : "",
-          coachPremove?.to === squareNameValue ? "premove destination" : "",
+          squareNameValue === coachSelected && !premoveSource ? "selected" : "",
+          premoveSource ? "queued premove from" : "",
+          premoveTarget ? "queued premove to" : "",
           legalMove ? "legal destination" : "",
           lastSquares.includes(squareNameValue) ? "last move" : "",
           squareNameValue === checkedKing ? "in check" : "",
@@ -18759,12 +19790,14 @@
           cancelCoachPremove();
           return;
         }
-        if (coachPremove?.from && square !== coachPremove.from) {
-          queueCoachPremove(coachPremove.from, square);
-          return;
-        }
+        // A click on another one of your pieces begins a replacement
+        // premove.  It is never the destination of the existing queue.
         if (piece?.color === coachPlayerColor) {
           queueCoachPremove(square);
+          return;
+        }
+        if (coachPremove?.from && square !== coachPremove.from) {
+          queueCoachPremove(coachPremove.from, square);
           return;
         }
       }
@@ -20379,9 +21412,16 @@
     }
 
     function isLivePremoveEnabled() {
+      // Premove is a multiplayer convenience, never an AI-play shortcut.  A
+      // matched Quick Match and a direct Friend Challenge both arrive through
+      // the same remote challenge state; the AI fallback resets that state to
+      // remote=false, so it cannot accidentally expose this interaction.
+      const preference = livePremovePreference === "on";
       return Boolean(
-        friendChallengeState?.remote
+        preference
+        && friendChallengeState?.remote
         && friendChallengeState.active
+        && friendChallengeState.opponentId
         && !isFriendSpectatorMode(friendChallengeState)
         && !document.getElementById("gameReview")?.classList.contains("is-review-page")
       );
@@ -20395,9 +21435,14 @@
       if (status) {
         status.hidden = !queued;
         status.dataset.state = queued ? "ready" : "idle";
-        status.textContent = queued ? `Premove queued: ${coachPremove.from} → ${coachPremove.to}` : "";
+        status.querySelector("[data-premove-status-move]")?.replaceChildren(
+          document.createTextNode(queued ? `${coachPremove.from} → ${coachPremove.to}` : "")
+        );
       }
-      if (cancel) cancel.hidden = !queued;
+      if (cancel) {
+        cancel.hidden = !queued;
+        cancel.disabled = !queued;
+      }
     }
 
     function cancelCoachPremove(message = "Premove cancelled.") {
@@ -20414,9 +21459,14 @@
       if (!isLivePremoveEnabled() || !coachGame || coachGame.turn() === coachPlayerColor) return false;
       const piece = coachGame.get(from);
       if (!piece || piece.color !== coachPlayerColor) return false;
-      coachPremove = { from, to };
-      coachMessage = to
-        ? `Premove queued: ${from}-${to}. It will play if legal after your friend's move.`
+      const destination = String(to || "");
+      if (destination && (!/^[a-h][1-8]$/.test(destination) || destination === from)) return false;
+      if (destination && coachGame.get(destination)?.color === coachPlayerColor) return false;
+      coachPremove = { from, to: destination };
+      coachSelected = "";
+      coachLegalMoves = [];
+      coachMessage = destination
+        ? `Premove queued: ${from}-${destination}. It will play if legal after your friend's move.`
         : "Premove ready. Pick the destination square while your friend thinks.";
       renderPremoveStatus();
       scheduleCoachBoardRender();
@@ -23474,7 +24524,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v133-play-premove";
+    const routeModuleVersion = "review-v155-legacy-music-retirement";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -23779,6 +24829,7 @@
           activePanel = panel;
         }
         syncActiveRouteRuntime(config.panel, config.tab);
+        syncStoreAmbienceForRoute();
         window.__refreshVisibleSectionObserver?.();
         window.__refreshVisualEntrances?.();
         if (panelInitFrame) window.cancelAnimationFrame(panelInitFrame);
@@ -25971,12 +27022,22 @@
         music: 45, sfx: 70, muted: false, playing: false, musicPack: "calm", sfxPack: "classic",
         shuffle: false, loop: true, crossfade: true, backgroundMusic: true, pieceSounds: true, captureSounds: true,
         checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true,
-        ambientEnabled: true, hoverSounds: true
+        ambientEnabled: true, hoverSounds: true, storeAmbience: false
       };
-      const fallback = { theme: "dark", backgroundTheme: "classic", backgroundFavorites: [], board: "wood", boardFavorites: [], boardSize: "large", boardScale: 100, pieces: "classic", pieceSkin: "chessnut", pieceFinish: "classic", pieceFavorites: [], archetype: "balanced", nameStyle: "classic", nameFx: "on", nameStyleFavorites: [], musicFavorites: [], coords: "on", speed: "normal", motion: "system", pressure: "on", contrast: "normal", trail: "none", avatar: "auto", avatarFrame: "", avatarEffect: "none", avatarFavorites: [], boardBorder: "classic", lastMoveColor: "classic", lastMoveFavorites: [], title: "", audio: fallbackAudio };
+      const fallback = { theme: "dark", backgroundTheme: "classic", backgroundFavorites: [], board: "wood", boardFavorites: [], boardSize: "large", boardScale: 100, pieces: "classic", pieceSkin: "chessnut", pieceFinish: "classic", pieceFavorites: [], archetype: "balanced", nameStyle: "classic", nameFx: "on", nameStyleFavorites: [], musicFavorites: [], coords: "on", speed: "normal", motion: "system", pressure: "on", contrast: "normal", trail: "none", premove: "off", avatar: "auto", avatarFrame: "", avatarEffect: "none", avatarFavorites: [], boardBorder: "classic", lastMoveColor: "classic", lastMoveFavorites: [], title: "", audio: fallbackAudio };
       const saved = readJsonStorage(learnerPrefsStorageKey, fallback);
       const prefs = { ...fallback, ...(saved && typeof saved === "object" ? saved : {}) };
       prefs.audio = { ...fallbackAudio, ...(prefs.audio && typeof prefs.audio === "object" ? prefs.audio : {}) };
+      const savedMusicPack = String(prefs.audio.musicPack || "");
+      const retiredStoreMusicState = isRetiredStoreMusicValue(savedMusicPack);
+      if (retiredStoreMusicState) {
+        // The former Store tracks are not valid global or Store ambience
+        // choices anymore. Start silent and require an intentional new-track
+        // selection rather than reviving an obsolete cached source.
+        prefs.audio.musicPack = "calm";
+        prefs.audio.playing = false;
+        prefs.audio.storeAmbience = false;
+      }
       const legacyAvatarMap = new Map([
         [String.fromCharCode(0x2658), "\uD83D\uDEE1"],
         [String.fromCharCode(0x2655), "\uD83D\uDC51"],
@@ -26003,7 +27064,7 @@
       if (!nameStyleThemes[prefs.nameStyle]) prefs.nameStyle = "classic";
       if (!avatarEffectThemes[prefs.avatarEffect]) prefs.avatarEffect = "none";
       if (!["on", "off"].includes(prefs.nameFx)) prefs.nameFx = "on";
-      if (!audioMusicThemes[prefs.audio.musicPack]) prefs.audio.musicPack = "calm";
+      if (!audioMusicThemes[prefs.audio.musicPack] && !premiumPianoTracks[prefs.audio.musicPack]) prefs.audio.musicPack = "calm";
       const legacySfxPackMap = { arcade: "modern", crystal: "fantasy", royal: "medieval", shadow: "minimal" };
       if (legacySfxPackMap[prefs.audio.sfxPack]) prefs.audio.sfxPack = legacySfxPackMap[prefs.audio.sfxPack];
       if (!audioSfxPacks[prefs.audio.sfxPack]) prefs.audio.sfxPack = "classic";
@@ -26020,7 +27081,7 @@
       prefs.audio.shuffle = Boolean(prefs.audio.shuffle);
       prefs.audio.loop = prefs.audio.loop !== false;
       prefs.audio.crossfade = prefs.audio.crossfade !== false;
-      ["backgroundMusic", "pieceSounds", "captureSounds", "checkSound", "checkmateSound", "promotionSound", "timerWarning", "outcomeSounds", "ambientEnabled", "hoverSounds"].forEach((key) => {
+      ["backgroundMusic", "pieceSounds", "captureSounds", "checkSound", "checkmateSound", "promotionSound", "timerWarning", "outcomeSounds", "ambientEnabled", "hoverSounds", "storeAmbience"].forEach((key) => {
         prefs.audio[key] = prefs.audio[key] !== false;
       });
       prefs.lastMoveColor = normalizeLastMoveValue(prefs.lastMoveColor);
@@ -26051,7 +27112,7 @@
           return audioMusicThemes[text] ? `musicPack:${text}` : audioSfxPacks[text] ? `sfxPack:${text}` : "";
         }).filter((value) => {
           const [type, itemValue] = value.split(":");
-          return (type === "musicPack" && audioMusicThemes[itemValue]) || (type === "sfxPack" && audioSfxPacks[itemValue]);
+          return (type === "musicPack" && (premiumPianoTracks[itemValue] || audioMusicThemes[itemValue])) || (type === "sfxPack" && audioSfxPacks[itemValue]);
         }))]
         : [];
       prefs.lastMoveFavorites = Array.isArray(prefs.lastMoveFavorites)
@@ -26059,8 +27120,13 @@
         : [];
       if (!prefs.contrast) prefs.contrast = "normal";
       if (!prefs.motion) prefs.motion = "system";
+      if (!["on", "off"].includes(prefs.premove)) prefs.premove = "off";
       if (!["small", "medium", "large", "xl"].includes(prefs.boardSize)) prefs.boardSize = "large";
       prefs.boardScale = clampNumber(Number(prefs.boardScale) || 100, 82, 122);
+      if (retiredStoreMusicState) {
+        prefs.musicFavorites = prefs.musicFavorites.filter((value) => !isRetiredStoreMusicValue(value));
+        writeJsonStorage(learnerPrefsStorageKey, prefs);
+      }
       return prefs;
     }
 
@@ -26075,7 +27141,9 @@
       const keys = Array.isArray(changedPreferences)
         ? changedPreferences
         : Object.keys(changedPreferences || {});
-      return keys.some((key) => key === "pieces" || key === "pieceSkin");
+      // Premove changes whether an off-turn player piece can be picked up.
+      // It must invalidate the cached board even though its artwork is unchanged.
+      return keys.some((key) => key === "pieces" || key === "pieceSkin" || key === "premove");
     }
 
     function applyPlayBoardScale(prefs) {
@@ -26087,6 +27155,7 @@
     }
 
     function applyLearnerPrefs(prefs) {
+      livePremovePreference = prefs.premove === "on" ? "on" : "off";
       document.body.classList.toggle("theme-light", prefs.theme === "light");
       applyBackgroundTheme(prefs.backgroundTheme);
       const activePanel = document.querySelector("main > .site-panel.is-active-panel");
@@ -26154,6 +27223,7 @@
     }
 
     function applyStartupTheme(prefs = readLearnerPrefs()) {
+      livePremovePreference = prefs.premove === "on" ? "on" : "off";
       document.body.classList.toggle("theme-light", prefs.theme === "light");
       document.body.classList.toggle("reduced-motion", prefs.motion === "reduced");
       document.body.classList.toggle("high-contrast", prefs.contrast === "high");
@@ -26172,7 +27242,7 @@
         music: 45, sfx: 70, muted: false, playing: false, musicPack: "calm", sfxPack: "classic",
         shuffle: false, loop: true, crossfade: true, backgroundMusic: true, pieceSounds: true, captureSounds: true,
         checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true,
-        ambientEnabled: true, hoverSounds: true
+        ambientEnabled: true, hoverSounds: true, storeAmbience: false
       };
     }
 
@@ -26242,7 +27312,7 @@
           setSelectOptions(field, options, audio.sfxPack);
         } else if (field.tagName === "SELECT" && key === "musicPack") {
           const owned = new Set(storeState.owned || []);
-          const options = audioMusicStoreItems
+          const options = [{ value: "calm", label: "Quest Calm (built-in)" }, ...audioMusicStoreItems]
             .filter((item) => owned.has(item.id) || item.value === audio.musicPack || !item.cost)
             .map((item) => ({ value: item.value, label: `${getAudioMusicTheme(item.value).label} (${getAudioMusicTheme(item.value).category})` }));
           setSelectOptions(field, options, audio.musicPack);
@@ -26286,6 +27356,7 @@
       const next = { ...readLearnerPrefs(), ...normalizedPatch };
       writeJsonStorage(learnerPrefsStorageKey, next);
       applyLearnerPrefs(next);
+      if (normalizedPatch.premove === "off" && coachPremove) cancelCoachPremove("Premove disabled in settings.");
       syncPreferenceLocks();
       if (preferencesRequireBoardRender(patch)) {
         renderMiniBoards();
@@ -29249,7 +30320,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v133-play-premove";
+    const optionalRouteStylesheetVersion = "review-v155-legacy-music-retirement";
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
       if (!key) return Promise.resolve(false);

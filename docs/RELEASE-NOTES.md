@@ -2,14 +2,27 @@
 
 ## Build
 
-- Asset version: `review-v133-play-premove`
-- Service-worker cache: `nschess-shell-v133-play-premove`
+- Asset version: `review-v155-legacy-music-retirement`
+- Service-worker cache: `nschess-shell-v155-legacy-music-retirement`
 
 ## Board interaction polish
 
 - Drag pickup now begins at a five-pixel threshold and snaps the ghost to the legal destination.
-- Analysis boards support Ctrl/Meta-click square highlights, Escape cleanup, cyan/violet arrows, and rounded markers.
+- Analysis boards support Ctrl/Meta-click square highlights, Escape cleanup, cyan/violet arrows, and compact precision markers.
 - Local Play supports analysis gestures; live Friend and Puzzle boards remain move-only. Perf-lite and reduced-motion paths remain lightweight.
+- Premove is opt-in and applies only while waiting for a turn in an active
+  live-human Quick Match or Friend Challenge; AI fallback never exposes it.
+- Queued premoves now have distinct violet FROM/TO board markers and a
+  cancelable status rail below the board controls.
+- Premium arrows use board-relative inset geometry, compact asymmetric Precision
+  Dart heads, deterministic overlap lanes, and a reusable SVG group with one
+  crisp primary stroke plus a quiet static navy depth rail. Unchanged arrow
+  state is memoized, marker IDs are stable, and coordinates are rounded to
+  prevent idle shimmer. Connected review variations can opt into tiny
+  color-matched route waypoints, while ordinary move arrows stay clean. Core
+  board and marker sizing now lives in centralized renderer tokens.
+- Arrow colors now encode best, primary PV, alternative, support, threat, and
+  secondary priorities consistently.
 - Release status: **Staging validation required**
 
 ## Included
@@ -21,6 +34,9 @@
 - Local Play annotations now clear only after a committed move; Friend premoves
   revalidate once after an authoritative remote position advance.
 - Cache invalidation for the updated HTML, CSS, JavaScript, and route stylesheets.
+- Retired Store piano IDs are migrated to a silent valid state, stale audio
+  elements are removed, and the service-worker cache is bumped so former
+  Store recordings cannot be revived from an old shell.
 - Phase 10 stability cleanup clears drag safety timers on every release path and
   aborts active pointer state when the window blurs or the document is hidden.
 - Route transitions now cancel active board interactions through one shared
