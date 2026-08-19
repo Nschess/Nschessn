@@ -13,7 +13,10 @@ body.perf-lite :where(.piece-symbol, .styled-username, .store-preview-name-style
   opacity: 0.18 !important;
 }
 
-body.perf-lite :where(.sparkle, .piece-spark, .piece-aura, .coin-fly, .review-arrow-layer) {
+/* Keep analysis arrows available as functional feedback.  Their animation and
+   filter are already disabled in the core sheet for perf-lite; hiding the SVG
+   itself makes right-button arrows appear broken on constrained devices. */
+body.perf-lite :where(.sparkle, .piece-spark, .piece-aura, .coin-fly) {
   display: none !important;
 }
 

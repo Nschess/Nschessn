@@ -8390,6 +8390,10 @@
       box-shadow: inset 0 0 0 3px rgba(93, 191, 255, 0.58), inset 0 0 18px rgba(93, 191, 255, 0.2);
     }
 
+    .play-square.dragging > :is(.piece-svg, .piece-symbol, img) {
+      opacity: 0.18;
+    }
+
     .board-drag-ghost {
       display: block;
       transform-origin: center;
@@ -8398,6 +8402,13 @@
       filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.34)) drop-shadow(0 0 8px rgba(93, 191, 255, 0.22));
       backface-visibility: hidden;
       contain: layout paint;
+      z-index: 2147483000 !important;
+    }
+
+    body.perf-lite .board-drag-ghost,
+    body.low-performance .board-drag-ghost,
+    body.reduced-motion .board-drag-ghost {
+      filter: none;
     }
 
     :where(.puzzle-board, .opening-explorer-board).is-dragging {
@@ -10216,6 +10227,18 @@
       transform: translateX(-50%);
     }
 
+    .store-preview-audio .audio-artist-preview {
+      bottom: 5px;
+      color: var(--muted);
+      font-size: 0.62rem;
+      font-weight: 800;
+      opacity: 0.88;
+    }
+
+    .store-preview-audio .audio-title-preview {
+      bottom: 22px;
+    }
+
     .audio-bars i {
       display: block;
       width: 5px;
@@ -10229,6 +10252,9 @@
     .audio-bars i:nth-child(2) { animation-delay: 130ms; }
     .audio-bars i:nth-child(3) { animation-delay: 260ms; }
     .audio-bars i:nth-child(4) { animation-delay: 390ms; }
+
+    /* Store cards stay calm at rest; the Preview control carries the live state. */
+    .store-preview-audio .audio-bars i { animation: none; }
 
     .music-store-tools {
       grid-column: 1 / -1;
@@ -11532,11 +11558,28 @@
       z-index: 3;
       pointer-events: none;
       overflow: hidden;
+      box-sizing: border-box;
       width: 100%;
       height: 100%;
+      max-width: none;
+      max-height: none;
       display: block;
+      background: transparent !important;
       border-radius: inherit;
       contain: layout paint;
+      isolation: isolate;
+      shape-rendering: geometricPrecision;
+    }
+
+    /* Analysis SVGs belong to the board, never to the surrounding Play
+       toolbar/grid. Keep the layer paint-only so it cannot become a dark
+       block or intercept piece input when the board rerenders. */
+    .play-board > .review-arrow-layer {
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: transparent !important;
     }
 
     .analysis-square-highlight {
@@ -11563,38 +11606,132 @@
     }
 
     .premove-status {
-      position: absolute;
-      left: 10px;
-      right: 10px;
-      bottom: 10px;
-      z-index: 4;
+      position: relative;
+      width: 100%;
+      box-sizing: border-box;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      min-height: 28px;
-      padding: 6px 9px;
-      border: 1px solid rgba(174, 135, 255, 0.48);
-      border-radius: 999px;
-      background: rgba(8, 13, 24, 0.86);
-      color: #dce8ff;
-      font-size: 0.68rem;
-      font-weight: 900;
-      pointer-events: none;
-      backdrop-filter: blur(6px);
+      gap: 9px;
+      min-height: 42px;
+      margin: 0 0 9px;
+      padding: 7px 9px;
+      border: 1px solid rgba(197, 140, 255, 0.7);
+      border-radius: 12px;
+      background:
+        linear-gradient(115deg, rgba(197, 140, 255, 0.2), rgba(93, 191, 255, 0.09) 56%, transparent),
+        rgba(12, 15, 36, 0.94);
+      color: #f3edff;
+      font-size: 0.72rem;
+      font-weight: 850;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(174, 135, 255, 0.08), 0 10px 22px rgba(31, 16, 68, 0.22);
+      backdrop-filter: blur(8px) saturate(120%);
+    }
+
+    /* Author display rules override the browser's UA [hidden] rule in some
+       engines. Keep the empty premove rail out of the board until a premove
+       is actually queued. */
+    .premove-status[hidden] {
+      display: none !important;
     }
 
     .premove-status[data-state="ready"] {
-      border-color: rgba(231, 182, 93, 0.62);
-      color: #ffe7a8;
+      border-color: rgba(211, 174, 255, 0.8);
+    }
+
+    .premove-status-icon {
+      display: grid;
+      flex: 0 0 auto;
+      width: 26px;
+      height: 26px;
+      place-items: center;
+      border: 1px solid rgba(229, 212, 255, 0.5);
+      border-radius: 9px;
+      color: #fff7ff;
+      background: linear-gradient(145deg, rgba(189, 126, 255, 0.64), rgba(92, 103, 255, 0.54));
+      box-shadow: 0 0 16px rgba(174, 135, 255, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .premove-status-copy {
+      display: grid;
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: 1px;
+    }
+
+    .premove-status-copy strong {
+      color: #fffaff;
+      font-size: 0.72rem;
+      letter-spacing: 0.01em;
+    }
+
+    .premove-status-copy [data-premove-status-move] {
+      overflow: hidden;
+      color: #dcc9ff;
+      font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.66rem;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .premove-status-cancel {
+      display: grid;
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      padding: 0;
+      border: 1px solid rgba(234, 221, 255, 0.42);
+      border-radius: 9px;
+      color: #fffaff;
+      background: rgba(255, 255, 255, 0.09);
+      cursor: pointer;
+      font: inherit;
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+
+    .premove-status-cancel:hover,
+    .premove-status-cancel:focus-visible {
+      border-color: rgba(255, 255, 255, 0.84);
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
     }
 
     .play-square.premove-source {
-      box-shadow: inset 0 0 0 4px rgba(174, 135, 255, 0.92), inset 0 0 18px rgba(174, 135, 255, 0.26);
+      box-shadow: inset 0 0 0 4px rgba(211, 174, 255, 0.98), inset 0 0 0 7px rgba(93, 56, 166, 0.3), inset 0 0 26px rgba(174, 135, 255, 0.42);
     }
 
     .play-square.premove-target {
-      box-shadow: inset 0 0 0 3px rgba(231, 182, 93, 0.88), inset 0 0 18px rgba(231, 182, 93, 0.22);
+      box-shadow: inset 0 0 0 4px rgba(197, 140, 255, 0.98), inset 0 0 0 7px rgba(77, 119, 218, 0.22), inset 0 0 28px rgba(197, 140, 255, 0.46);
+    }
+
+    .play-square.premove-source::before,
+    .play-square.premove-target::before {
+      content: attr(data-premove);
+      position: absolute;
+      z-index: 3;
+      top: 4px;
+      left: 5px;
+      padding: 2px 4px;
+      border: 1px solid rgba(255, 245, 255, 0.58);
+      border-radius: 4px;
+      color: #fffaff;
+      background: rgba(59, 28, 104, 0.82);
+      box-shadow: 0 2px 7px rgba(20, 7, 48, 0.32);
+      font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: clamp(0.38rem, 1vw, 0.54rem);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      pointer-events: none;
+      text-transform: uppercase;
+    }
+
+    .play-square.premove-target::before {
+      background: rgba(57, 42, 136, 0.84);
     }
 
     body.perf-lite .analysis-square-highlight,
@@ -11603,19 +11740,95 @@
     }
 
     .review-arrow-line {
-      stroke: rgba(255, 211, 107, 0.88);
-      stroke-width: 0.12;
+      stroke: var(--arrow-stroke, #62D7FF);
+      /* The overlay uses an 8x8 board viewBox. Keep the width in board units
+         so the shaft scales with the board instead of collapsing to a
+         sub-pixel line under non-scaling-stroke. */
+      stroke-width: var(--arrow-shaft-width, 0.06);
+      stroke-opacity: var(--arrow-opacity, 0.97);
       stroke-linecap: round;
-      vector-effect: non-scaling-stroke;
-      filter: drop-shadow(0 0 8px rgba(231, 182, 93, 0.34));
-      animation: reviewArrowDraw 520ms ease both;
+      stroke-linejoin: round;
+      vector-effect: none;
+      fill: none;
+      paint-order: stroke;
+      filter: none;
+      animation: none;
+      transition: none !important;
+      pointer-events: none;
+    }
+
+    .review-arrow-group,
+    .review-arrow-glow,
+    .review-arrow-shadow,
+    .review-arrow-inner {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: none;
+      transition: none !important;
+      pointer-events: none;
+    }
+
+    .review-arrow-layer marker,
+    .review-arrow-layer marker path {
+      transition: none !important;
+    }
+
+    .review-arrow-glow {
+      display: none;
+    }
+
+    .review-arrow-shadow {
+      stroke: rgba(15, 30, 60, .38);
+      stroke-width: 0.062;
+      opacity: calc(0.24 * var(--arrow-opacity, 1));
+      filter: none;
+    }
+
+    .review-arrow-inner {
+      display: none;
+    }
+
+    .review-arrow-group.is-entering {
+      animation: none;
+    }
+
+    /* Route nodes are opt-in waypoints for connected tactical paths only.
+       They stay small enough to read as a signal marker, never a second
+       annotation layer on ordinary move arrows. */
+    .review-arrow-route-node,
+    .review-arrow-route-node-rail,
+    .review-arrow-route-node-core {
+      pointer-events: none;
+      vector-effect: none;
+    }
+
+    .review-arrow-route-node {
+      opacity: 0.82;
+    }
+
+    .review-arrow-route-node-rail {
+      fill: rgba(9, 23, 49, 0.74);
+      stroke: rgba(9, 23, 49, 0.56);
+      stroke-width: 0.012;
+    }
+
+    .review-arrow-route-node-core {
+      fill: var(--route-node-color, #62D7FF);
+      stroke: rgba(237, 252, 255, 0.52);
+      stroke-width: 0.009;
+    }
+
+    .review-arrow-line.is-played {
+      filter: none;
     }
 
     .review-arrow-line.is-best {
-      stroke: rgba(93, 191, 255, 0.92);
-      stroke-width: 0.105;
-      filter: drop-shadow(0 0 10px rgba(93, 191, 255, 0.46));
-      animation: reviewArrowDraw 520ms ease both, reviewBestArrowPulse 1.6s ease-in-out infinite;
+      stroke: var(--arrow-stroke, #F6C453);
+      stroke-width: var(--arrow-shaft-width, 0.07);
+      stroke-opacity: var(--arrow-opacity, 0.99);
+      filter: none;
+      animation: none;
     }
 
     .review-arrow-line.is-engine {
@@ -11623,14 +11836,70 @@
     }
 
     .review-arrow-line.is-candidate {
-      stroke: rgba(174, 135, 255, 0.94);
-      stroke-width: 0.1;
-      filter: drop-shadow(0 0 9px rgba(174, 135, 255, 0.42));
+      stroke: var(--arrow-stroke, #A78BFA);
+      stroke-width: var(--arrow-shaft-width, 0.055);
     }
 
     .review-arrow-line.is-threat {
       stroke-dasharray: 0.18 0.1;
-      stroke-width: 0.095;
+      stroke-width: var(--arrow-shaft-width, 0.052);
+    }
+
+    .review-arrow-line.is-best.is-engine {
+      stroke-dasharray: none;
+    }
+
+    body:is(.perf-lite, .low-performance, .reduced-motion) .review-arrow-line,
+    body:is(.perf-lite, .low-performance, .reduced-motion) .review-arrow-glow,
+    body:is(.perf-lite, .low-performance, .reduced-motion) .review-arrow-shadow {
+      animation: none;
+      filter: none;
+    }
+
+    body:is(.perf-lite, .low-performance, .reduced-motion) .review-arrow-glow {
+      display: none;
+    }
+
+    body:is(.perf-lite, .low-performance) .review-arrow-shadow {
+      opacity: 0.26;
+    }
+
+    body:is(.perf-lite, .low-performance, .reduced-motion) .review-arrow-inner {
+      opacity: 0.34;
+    }
+
+    body:is(.perf-lite, .low-performance, .reduced-motion) .review-arrow-group.is-entering {
+      animation: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .review-arrow-group.is-entering {
+        animation: none;
+      }
+    }
+
+    @media (forced-colors: active) {
+      .review-arrow-shadow,
+      .review-arrow-glow,
+      .review-arrow-inner,
+      .review-arrow-route-node {
+        display: none;
+      }
+
+      .review-arrow-line {
+        stroke: Highlight !important;
+        filter: none;
+      }
+
+      .review-arrow-layer marker path {
+        fill: Highlight !important;
+        stroke: Highlight !important;
+      }
+
+      .analysis-square-highlight {
+        fill: transparent;
+        stroke: Highlight;
+      }
     }
 
     .play-square.review-from {
@@ -11678,17 +11947,8 @@
       animation: reviewEngineTarget 1.2s ease-in-out infinite;
     }
 
-    @keyframes reviewArrowDraw {
-      from { stroke-dasharray: 120; stroke-dashoffset: 120; opacity: 0; }
-      to { stroke-dasharray: 120; stroke-dashoffset: 0; opacity: 1; }
-    }
-
     @keyframes reviewBestPulse {
       50% { filter: brightness(1.13) saturate(1.08); }
-    }
-
-    @keyframes reviewBestArrowPulse {
-      50% { opacity: 0.58; }
     }
 
     @keyframes reviewAttackPing {
@@ -12146,11 +12406,6 @@
       animation: reviewPieceLand 300ms cubic-bezier(.2, .9, .2, 1) both;
     }
 
-    .review-arrow-layer.is-best .review-arrow-line {
-      stroke: rgba(93, 191, 255, 0.92);
-      filter: drop-shadow(0 0 9px rgba(93, 191, 255, 0.38));
-    }
-
     @keyframes reviewPanelShine {
       0%, 72% { transform: translateX(-80%); opacity: 0; }
       82% { opacity: .75; }
@@ -12246,7 +12501,9 @@
       .play-square.review-attack::before,
       .play-square.review-engine-to,
       .play-square.review-from::after,
-      .play-square.review-to::after {
+      .play-square.review-to::after,
+      .review-arrow-line,
+      .review-arrow-line.is-best {
         animation: none !important;
       }
     }
@@ -15120,6 +15377,13 @@
       min-height: auto;
       padding: 0;
       accent-color: var(--gold);
+    }
+
+    .settings-help {
+      color: var(--muted);
+      font-size: 0.72rem;
+      line-height: 1.45;
+      font-weight: 650;
     }
 
     .settings-check {
@@ -36956,6 +37220,23 @@ body.post-game-dialog-open {
 #store .store-wallet .store-status { display: inline-block; margin: 0 8px 0 0; font-size: .68rem; }
 #store .store-wallet-actions { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; vertical-align: middle; }
 #store .store-wallet-actions .button { min-height: 32px; padding: 6px 10px; font-size: .68rem; }
+#store .store-ambience-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid rgba(217, 199, 162, 0.22);
+  border-radius: 999px;
+  background: rgba(217, 199, 162, 0.08);
+  color: var(--text);
+  cursor: pointer;
+}
+#store .store-ambience-control:focus-within { border-color: rgba(217, 199, 162, 0.55); box-shadow: 0 0 0 3px rgba(217, 199, 162, 0.12); }
+#store .store-ambience-control input { accent-color: #d9c7a2; margin: 0; }
+#store .store-ambience-control span { display: grid; gap: 1px; line-height: 1.05; }
+#store .store-ambience-control strong { font-size: .68rem; }
+#store .store-ambience-control small { color: var(--muted); font-size: .58rem; font-weight: 700; }
 #store .store-balance { min-width: 108px; min-height: 58px; padding: 9px 12px; }
 #store .store-balance strong { font-size: clamp(1.35rem, 2.3vw, 1.8rem); }
 #store #storeInventory {
@@ -37097,7 +37378,8 @@ body.post-game-dialog-open {
   #store .store-wallet { grid-template-columns: 1fr; gap: 9px; }
   #store .store-balance { justify-self: stretch; }
   #store .store-wallet-actions { display: flex; }
-  #store .store-wallet-actions .button { flex: 1 1 auto; }
+  #store .store-wallet-actions .button,
+  #store .store-ambience-control { flex: 1 1 auto; }
   #store .store-featured-stage { padding: 9px; }
   #store .store-featured-preview { min-height: 190px; }
   #store .store-featured-preview > .store-preview { min-height: 154px; }

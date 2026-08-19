@@ -1,5 +1,74 @@
 # Changelog
 
+## v144 - Arrow rendering stability
+
+- Simplified arrows to one crisp primary stroke plus a quiet static depth rail.
+- Memoized unchanged arrow state and stabilized marker IDs/board coordinates to prevent idle SVG shimmer.
+- Refined analysis colors for the warm wood board.
+
+## v143 - Arrow depth polish
+
+- Reduced the navy depth rail and shadow marker footprint so the layered treatment reads as lift, not a duplicate outline.
+
+## v142 - Arrow geometry tokens
+
+- Centralized Precision Dart viewBox, inset, lane, depth, and marker sizing tokens in the existing SVG renderer.
+- Kept responsive board-relative sizing and all arrow semantics unchanged.
+
+## v141 - Signal route waypoints
+
+- Added opt-in micro route nodes for connected review variations without adding markers to normal arrows.
+- Added a 150ms arrow arrival fade that is disabled in perf-lite, low-performance, reduced-motion, and forced-colors modes.
+- Kept route nodes and all arrow layers board-relative, pointer-passive, and compatible with the existing Precision Dart geometry.
+
+## v140 - Arrow color hierarchy
+
+- Added semantic gold, cyan-blue, violet, emerald, red, and neutral arrow roles.
+- Priority now controls opacity, glow strength, shaft clarity, head scale, and overlap lane order.
+
+## v139 - Precision Dart glass layers
+
+- Added a restrained color-matched outer glow behind each arrow while keeping the navy depth rail and thin inner accent.
+- Simplified performance, reduced-motion, and forced-colors modes by removing the glow layer without removing functional arrows.
+
+## v138 - Precision Dart lanes
+
+- Replaced the previous arrowhead with a smaller asymmetric faceted dart.
+- Tuned normal shafts to a 2.5–3px desktop target with a restrained navy depth rail and thin inner accent.
+- Added deterministic lateral lanes for three or more intersecting or shared-endpoint arrows.
+
+## v137 - Precision cyan arrows
+
+- Refined SVG arrowheads into compact faceted tips with a seamless shaft connection.
+- Normal annotations now use cyan/cool blue; gold remains reserved for best and important moves.
+- Reduced outline weight and removed primary glow/animation while retaining layered contrast on every board square.
+
+## v136 - Premium arrow clarity
+
+- Corrected the board-relative SVG stroke units so annotation shafts remain
+  immediately readable instead of collapsing to sub-pixel lines.
+- Added connected dark depth heads, crisp color-matched primary heads, a
+  restrained inner highlight, and a refined gold treatment for best arrows.
+- Kept overlay effects pointer-passive and legible in mobile, perf-lite,
+  reduced-motion, and forced-colors modes.
+
+## v135 - Premove real-flow feedback
+
+- Fixed the active-board invalidation missing when the Premove setting changes,
+  so off-turn pieces immediately become premove-interactable in supported live
+  human matches.
+- Added distinct violet FROM/TO queue markers and moved the cancelable
+  “Premove queued” confirmation out of the board wrapper.
+
+## v134 - Scoped premove preference and premium arrows
+
+- Premove is opt-in (disabled by default) and only available for active human
+  Quick Match/Friend Challenge games; AI fallback and spectator/review boards
+  never expose a queue.
+- Refined board-relative analysis arrows with inset geometry, crisp rounded
+  markers, and a lightweight layered depth treatment that remains visible in
+  perf-lite and reduced-motion modes.
+
 ## v133 - Play arrow lifecycle and premove reconciliation
 
 - Clear local Play analysis arrows and gesture highlights only after a real

@@ -1,14 +1,14 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v133-play-premove";
+const CACHE_NAME = "nschess-shell-v155-legacy-music-retirement";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v133-play-premove",
-  "./assets/app.js?v=review-v133-play-premove",
+  "./assets/app.css?v=review-v155-legacy-music-retirement",
+  "./assets/app.js?v=review-v155-legacy-music-retirement",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
@@ -32,8 +32,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin || url.pathname.includes("/api/")) return;
 
   const isPieceAsset = url.pathname.includes("/assets/pieces/");
+  const isStoreAudioAsset = url.pathname.includes("/assets/audio/");
   const isReviewShellAsset = ["/index.html", "/assets/app.css", "/assets/app.js"].some((path) => url.pathname.endsWith(path));
-  if (request.mode === "navigate" || isReviewShellAsset || isPieceAsset) {
+  if (request.mode === "navigate" || isReviewShellAsset || isPieceAsset || isStoreAudioAsset) {
     event.respondWith(fetch(request)
       .then((response) => {
         const copy = response.clone();
