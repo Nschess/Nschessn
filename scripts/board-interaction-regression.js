@@ -81,7 +81,13 @@ const requiredAppContracts = [
   ["Store ambience avoids route restarts", /function syncStoreAmbienceForRoute\(\)[\s\S]*?storeAmbienceActive/],
   ["Store route silences global legacy music", /function syncStoreAmbienceForRoute\(\)[\s\S]*?isStorePanelActive\(\)[\s\S]*?!storePreviewState[\s\S]*?audioRuntime\.playing \|\| audioRuntime\.premiumTrackId[\s\S]*?stopAudioMusic\(false\)/],
   ["Store ambience protects scene changes", /function setAudioScene\(scene = inferAudioScene\(\)\) \{\s*if \(audioRuntime\.storeAmbienceActive && isStorePanelActive\(\)\) return;/],
-  ["Store ambience control persists preference", /storeAmbienceToggle[\s\S]*?writeAudioPrefs\(\{ storeAmbience: enabled \}\)/]
+  ["Store ambience control persists preference", /storeAmbienceToggle[\s\S]*?writeAudioPrefs\(\{ storeAmbience: enabled \}\)/],
+  ["Store authority has explicit auth state", /let storeAuthState = \{ status: "unknown", userId: "" \};/],
+  ["Store authority resolves Supabase user", /async function getAuthoritativeStoreUser\(\)[\s\S]*?getAuthenticatedUserId\?\.\(\)[\s\S]*?setStoreAuthState\("authenticated"/],
+  ["Store does not use Friends cache as authority", /function storeServerRequiresAuthority\(\)[\s\S]*?storeAuthState\.status !== "signed_out"/],
+  ["Protected RPC validates Supabase user", /const callFriendRpc = async \(name, args = \{\}\) => \{[\s\S]*?supabase\.auth\.getUser\(\)[\s\S]*?supabase\.rpc\(name, args\)/],
+  ["Purchase hydrates returned server balance", /const purchaseResult = await getAuthProvider\(\)\.purchaseCosmetic[\s\S]*?returnedCoins[\s\S]*?refreshServerStoreState\(\{ rerender: false \}\)/],
+  ["Auth lifecycle updates Store authority", /function applyAuthenticatedAccount\(account\)[\s\S]*?setStoreAuthState\("signed_out"\)[\s\S]*?setStoreAuthState\("authenticated"/]
 ];
 requiredAppContracts.forEach(([name, pattern]) => {
   assert.match(app, pattern, `Missing board lifecycle contract: ${name}`);
