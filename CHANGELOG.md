@@ -1,5 +1,88 @@
 # Changelog
 
+## v166 - Shared manual-arrow cleanup policy
+
+- Added one position-scoped cleanup path for player-drawn arrows across all shared boards.
+- Plain right-click clears annotations while right-drag still draws/toggles routes.
+- Reset, review navigation, position loads, completion, and board teardown now
+  clear manual arrows even when the resulting position is unchanged.
+- Bumped the shell asset/cache version so the policy cannot be masked by stale service-worker assets.
+
+## v165 - Persist equipped arrow skin at startup
+
+- Hydrate the shared arrow skin before deferred board routes mount, so every mode uses the persisted skin immediately.
+
+## v164 - Unified arrow appearance authority
+
+- Removed semantic color overrides from arrow render paths; every board now resolves the equipped skin through the shared renderer.
+- Puzzle analysis arrows clear on intentional piece interaction and opponent replies.
+
+## v163 - Unified Arrow Skin source of truth
+
+- Added the free `Classic Precision` Default skin to the catalog and default
+  ownership for new users.
+- Normalized equipped-skin fallback through one runtime value backed by the
+  learner preference, so Play, AI Bots, Puzzle, Opening Explorer, and Review
+  all use the same skin.
+
+## v162 - Arrow Skin preview clarity
+
+- Store previews now use each skin’s intended semantic accent color in
+  addition to the real shared geometry, making the silhouette differences
+  legible side-by-side without turning the collection into recolors.
+
+## v161 - Distinct Arrow Skin silhouettes
+
+- Reworked all five premium Arrow Skins around distinct shared-renderer
+  geometry: segmented Arcane, solar spear Solaris, forked Voidflare, and
+  crown-spear Celestial, with Pulse remaining a slim competitive dart.
+- Added static facet details, skin-specific shaft treatments, and restrained
+  head scaling without introducing animation, glow spam, or a second renderer.
+
+## v160 - Puzzle fade-free move settling
+
+- Removed the remaining correct-move dark flash: disabled Puzzle squares no
+  longer inherit the global `opacity: .58` button treatment while the reply
+  applies.
+- Puzzle board, square, capture, check, and success-overlay transitions are
+  now disabled for the Puzzle surface; piece motion remains transform-only.
+- Puzzle analysis arrows clear immediately after a committed player move,
+  while keeping shared Play-style right-drag/toggle behavior.
+
+## v159 - Puzzle success landing and user analysis arrows
+
+- Replaced the correct-move board flash with a destination-only emerald/gold
+  success landing accent; wrapper shadows and transitions no longer run on
+  successful puzzle moves. (The landing accent was removed in v160 after the
+  remaining disabled-button opacity path was traced.)
+- Added player-only Puzzle analysis arrows through the shared SVG renderer:
+  right-drag on desktop, an opt-in Analysis toggle on touch, duplicate-route
+  toggling, and lifecycle-safe clearing.
+- Puzzle arrows never inspect or reveal the solution; recommendation arrows
+  are not generated automatically.
+
+## v158 - Puzzle arrows and Arrow Skins
+
+- Analysis-capable boards render through the existing pointer-passive SVG,
+  below piece and interaction layers; Puzzle annotations remain player-drawn.
+- Added five persistent Arrow Skins (Pulse, Arcane, Solaris, Voidflare, and
+  Celestial) with distinct compact head silhouettes and restrained palettes.
+- Store previews reuse the live arrow renderer; equipped skins persist without
+  coupling to board, piece, light/dark, or puzzle themes.
+
+## v157 - Puzzle motion stability
+
+- Removed the real puzzle destination-piece opacity fade so correct moves travel
+  with a stable transform instead of briefly dimming.
+- Disabled animated last-move filters, animated board-theme shadows, and wrapper
+  box-shadow transitions on the real puzzle board to prevent dark flashes.
+
+## v156 - Puzzle correct-move flicker fix
+
+- Removed the synchronous board layout flush from puzzle feedback restarts.
+- Made the real puzzle board use one piece-motion animation owner so correct
+  moves settle without a dark fade or competing opacity/transform effects.
+
 ## v144 - Arrow rendering stability
 
 - Simplified arrows to one crisp primary stroke plus a quiet static depth rail.

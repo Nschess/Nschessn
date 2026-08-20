@@ -2,14 +2,22 @@
 
 ## Build
 
-- Asset version: `review-v155-legacy-music-retirement`
-- Service-worker cache: `nschess-shell-v155-legacy-music-retirement`
+- Asset version: `review-v174-shared-name-style`
+- Service-worker cache: `nschess-shell-v174-shared-name-style`
 
 ## Board interaction polish
 
+- Player-drawn arrows now use one shared position-scoped cleanup policy across
+  Play, AI, Puzzle, Opening Explorer, and Review.
 - Drag pickup now begins at a five-pixel threshold and snaps the ghost to the legal destination.
 - Analysis boards support Ctrl/Meta-click square highlights, Escape cleanup, cyan/violet arrows, and compact precision markers.
-- Local Play supports analysis gestures; live Friend and Puzzle boards remain move-only. Perf-lite and reduced-motion paths remain lightweight.
+- Local Play supports analysis gestures; live Friend games remain move-only, while
+  Puzzle adds player-only arrows through a desktop right-drag or an opt-in touch
+  Analysis mode. Perf-lite and reduced-motion paths remain lightweight.
+- Correct Puzzle moves no longer animate a destination overlay or disabled
+  board surface; the shared arrow layer remains solution-independent and
+  solution-revealing recommendation arrows are never generated.
+  is generated.
 - Premove is opt-in and applies only while waiting for a turn in an active
   live-human Quick Match or Friend Challenge; AI fallback never exposes it.
 - Queued premoves now have distinct violet FROM/TO board markers and a

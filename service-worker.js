@@ -1,14 +1,14 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v155-legacy-music-retirement";
+const CACHE_NAME = "nschess-shell-v174-shared-name-style";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v155-legacy-music-retirement",
-  "./assets/app.js?v=review-v155-legacy-music-retirement",
+  "./assets/app.css?v=review-v174-shared-name-style",
+  "./assets/app.js?v=review-v174-shared-name-style",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"

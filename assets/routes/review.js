@@ -1,2 +1,2 @@
-export const features = Object.freeze(["play"]);
+export const features = Object.freeze(["preferences", "play"]);
 export const styles = Object.freeze([]);
