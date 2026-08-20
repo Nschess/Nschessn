@@ -3811,6 +3811,10 @@
     let serverStoreSyncStatus = "idle";
     let serverStoreSyncError = null;
     let serverStoreMissingIds = [];
+    // Store authority is independent from the Friends cache.  Keep an
+    // explicit session state so an authenticated Supabase user can never be
+    // downgraded to the guest/local wallet while auth is still resolving.
+    let storeAuthState = { status: "unknown", userId: "" };
     let giftInboxState = [];
     let selectedGiftItemId = "";
     let flexBadgeState = null;
@@ -6817,11 +6821,49 @@
     }
 
     function storeServerIsActive() {
-      return Boolean(serverStoreReady && getAuthProvider()?.getStoreState && getFriendCurrentUserId?.());
+      return Boolean(serverStoreReady
+        && getAuthProvider()?.getStoreState
+        && storeAuthState.status === "authenticated"
+        && storeAuthState.userId);
     }
 
     function storeServerRequiresAuthority() {
-      return Boolean(getAuthProvider()?.getStoreState && getFriendCurrentUserId?.());
+      const provider = getAuthProvider();
+      // On the secure deployment, an unresolved/error auth state must remain
+      // server-bound.  Only an explicit Supabase signed-out result may use
+      // the guest/local Store wallet.
+      return Boolean(provider?.getStoreState && storeAuthState.status !== "signed_out");
+    }
+
+    function setStoreAuthState(status = "unknown", userId = "") {
+      const nextStatus = ["unknown", "authenticated", "signed_out", "error"].includes(status) ? status : "error";
+      storeAuthState = { status: nextStatus, userId: nextStatus === "authenticated" ? String(userId || "") : "" };
+      if (nextStatus !== "authenticated") {
+        serverStoreReady = false;
+        serverStoreState = null;
+      }
+      return storeAuthState;
+    }
+
+    async function getAuthoritativeStoreUser() {
+      const provider = getAuthProvider();
+      if (!provider?.getStoreState) return null;
+      if (storeAuthState.status === "authenticated" && storeAuthState.userId) {
+        return { id: storeAuthState.userId };
+      }
+      if (storeAuthState.status === "signed_out") return null;
+      try {
+        const userId = String(await provider.getAuthenticatedUserId?.() || "").trim();
+        if (userId) {
+          setStoreAuthState("authenticated", userId);
+          return { id: userId };
+        }
+        setStoreAuthState("signed_out");
+        return null;
+      } catch (error) {
+        setStoreAuthState("error");
+        throw error;
+      }
     }
 
     function getMissingServerStoreItemIds(catalog = serverStoreCatalog) {
@@ -6913,7 +6955,9 @@
 
     async function refreshServerStoreState({ rerender = true } = {}) {
       const provider = getAuthProvider();
-      if (!provider?.getStoreState || !getFriendCurrentUserId?.()) return null;
+      if (!provider?.getStoreState) return null;
+      const user = await getAuthoritativeStoreUser();
+      if (!user) return null;
       if (serverStoreRefreshPromise) return serverStoreRefreshPromise;
       serverStoreSyncStatus = "syncing";
       serverStoreSyncError = null;
@@ -6959,6 +7003,13 @@
         serverStoreState = null;
         serverStoreSyncStatus = "error";
         serverStoreSyncError = error instanceof Error ? error : new Error(String(error?.message || error || "Store sync failed"));
+        if (new URLSearchParams(location.search).get("authDebug") === "1") {
+          console.debug("[Nschess Store] State refresh failed", {
+            code: serverStoreSyncError.code || "",
+            status: serverStoreSyncError.status || serverStoreSyncError.statusCode || 0,
+            message: serverStoreSyncError.message
+          });
+        }
         if (serverStoreSyncError.code === "STORE_CATALOG_INCOMPLETE") serverStoreMissingIds = [...new Set(serverStoreSyncError.missingIds || serverStoreMissingIds)];
         renderStoreSyncFeedback();
         if (rerender) renderStore();
@@ -6968,11 +7019,28 @@
     }
 
     async function ensureServerStoreReady() {
-      if (!storeServerRequiresAuthority()) return true;
+      const provider = getAuthProvider();
+      if (!provider?.getStoreState) return true;
+      let user = null;
+      try {
+        user = await getAuthoritativeStoreUser();
+      } catch (error) {
+        serverStoreSyncStatus = "error";
+        serverStoreSyncError = error instanceof Error ? error : new Error(String(error?.message || error || "Authentication could not be verified."));
+        renderStoreSyncFeedback();
+        return false;
+      }
+      if (!user) {
+        const status = document.getElementById("storeStatus");
+        if (status) status.textContent = "Sign in to purchase Store cosmetics.";
+        return false;
+      }
       if (storeServerIsActive()) return true;
       try {
         await refreshServerStoreState({ rerender: false });
-      } catch {
+      } catch (error) {
+        serverStoreSyncStatus = "error";
+        serverStoreSyncError = error instanceof Error ? error : new Error(String(error?.message || error || "Store sync failed."));
         renderStoreSyncFeedback();
         return false;
       }
@@ -7620,9 +7688,29 @@
           if (status) status.textContent = `Need ${formatProfileNumber(price - puzzleCoins)} more coins for ${item.name}.`;
           return;
         }
+        if (new URLSearchParams(location.search).get("authDebug") === "1") {
+          console.debug("[Nschess Store] Purchase attempt", {
+            authenticatedSession: storeAuthState.status === "authenticated",
+            authUserId: storeAuthState.userId,
+            appUserId: getFriendCurrentUserId(),
+            storeServerRequiresAuthority: storeServerRequiresAuthority(),
+            storeServerIsActive: storeServerIsActive(),
+            itemId: item.id,
+            price,
+            displayedBalance: puzzleCoins
+          });
+        }
         if (storeServerIsActive()) {
           try {
-            await getAuthProvider().purchaseCosmetic(item.id, createStoreIdempotencyKey("purchase"));
+            const purchaseResult = await getAuthProvider().purchaseCosmetic(item.id, createStoreIdempotencyKey("purchase"));
+            // The RPC is authoritative for the wallet.  Reflect its returned
+            // balance immediately, then hydrate inventory/catalog from the
+            // same server before allowing Equip to proceed.
+            const returnedCoins = Number(purchaseResult?.coins);
+            if (Number.isFinite(returnedCoins)) {
+              puzzleCoins = Math.max(0, returnedCoins);
+              serverStoreState = serverStoreState ? { ...serverStoreState, coins: puzzleCoins } : serverStoreState;
+            }
             await refreshServerStoreState({ rerender: false });
           } catch (error) {
             if (status) status.textContent = error?.message || "Purchase could not be completed.";
@@ -8619,7 +8707,9 @@
       grid.setAttribute("aria-busy", "false");
       grid.classList.remove("is-loading");
       const owned = new Set(storeState.owned);
-      balance.textContent = formatProfileNumber(puzzleCoins);
+      const serverWalletPending = storeServerRequiresAuthority() && !serverStoreState;
+      const displayedCoins = serverWalletPending ? null : puzzleCoins;
+      balance.textContent = displayedCoins === null ? "…" : formatProfileNumber(displayedCoins);
       ensureStoreCollectionRewards();
       syncPreferenceLocks();
       const prefs = readLearnerPrefs();
@@ -8627,7 +8717,7 @@
         category: activeStoreCategory,
         catalog: storeCatalogUi,
         inventory: storeInventoryUi,
-        coins: puzzleCoins,
+        coins: displayedCoins,
         owned: [...owned].sort(),
         equipped: storeState.equipped,
         state: storeState,
@@ -26366,11 +26456,28 @@
 
       const callFriendRpc = async (name, args = {}) => {
         const supabase = await getSupabaseClient();
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-        if (!sessionData.session?.user) throw new Error("Sign in to use Friendly Challenge.");
+        // getUser() validates the current authenticated identity with
+        // Supabase.  A Friends/profile cache is not authoritative for Store,
+        // wallet, or any other protected RPC.
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!userData.user) throw new Error("Sign in to use Friendly Challenge.");
         const { data, error } = await supabase.rpc(name, args);
-        if (error) throw new Error(error.message || "Friendly Challenge could not reach the server.");
+        if (error) {
+          const rpcError = new Error(error.message || "Friendly Challenge could not reach the server.");
+          ["code", "details", "hint", "status", "statusCode"].forEach((key) => {
+            if (error[key] !== undefined) rpcError[key] = error[key];
+          });
+          authDebug("Supabase RPC failed", {
+            name,
+            code: rpcError.code || "",
+            status: rpcError.status || rpcError.statusCode || 0,
+            message: rpcError.message,
+            details: rpcError.details || "",
+            hint: rpcError.hint || ""
+          });
+          throw rpcError;
+        }
         return data;
       };
 
@@ -26464,6 +26571,12 @@
         getLeaderboard: getSharedLeaderboard,
         upsertLeaderboardEntry: saveSharedLeaderboard,
         getCachedAccount: () => cachedAccount,
+        getAuthenticatedUserId: async () => {
+          const supabase = await getSupabaseClient();
+          const { data, error } = await supabase.auth.getUser();
+          if (error) throw error;
+          return String(data?.user?.id || "");
+        },
         getUserPrivacySettings: () => callFriendRpc("get_user_privacy_settings"),
         updateUserPrivacySettings: (settings = {}) => callFriendRpc("update_user_privacy_settings", {
           p_profile_visibility: String(settings.profileVisibility || "friends"),
@@ -27188,6 +27301,7 @@
 
     function applyAuthenticatedAccount(account) {
       if (!account?.username) {
+        setStoreAuthState("signed_out");
         cloudProfileReady = false;
         serverPrivacyHydratedFor = "";
         serverBlockedUserIds = new Set();
@@ -27199,8 +27313,10 @@
         stopFriendNetworkSync();
         stopTournamentNetworkSync();
         renderAuthUi(null, false);
+        renderStore();
         return;
       }
+      setStoreAuthState("authenticated", account.authUserId || account.publicId || "");
       activateSupabaseProfile(account);
       void refreshServerStoreState().catch(() => {});
       void refreshStoreGiftInbox();
@@ -27228,8 +27344,10 @@
 
     async function setupSupabaseAuthUi() {
       const provider = getAuthProvider();
+      setStoreAuthState(provider?.getStoreState ? "unknown" : "signed_out");
       renderAuthUi(null, true);
       if (!provider?.getSession) {
+        setStoreAuthState("signed_out");
         renderAuthUi(null, false);
         return;
       }
@@ -27239,6 +27357,7 @@
         }
         applyAuthenticatedAccount(await provider.getSession());
       } catch (error) {
+        setStoreAuthState("error");
         console.error("[Nschess Auth] Session initialization failed.", error);
         renderAuthUi(null, false);
         setAuthMessage("Secure account could not be reached. Refresh and try again.", "error");
