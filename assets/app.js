@@ -3815,6 +3815,7 @@
     // explicit session state so an authenticated Supabase user can never be
     // downgraded to the guest/local wallet while auth is still resolving.
     let storeAuthState = { status: "unknown", userId: "" };
+    let storeAuthResolutionPromise = null;
     let giftInboxState = [];
     let selectedGiftItemId = "";
     let flexBadgeState = null;
@@ -6852,18 +6853,34 @@
         return { id: storeAuthState.userId };
       }
       if (storeAuthState.status === "signed_out") return null;
-      try {
-        const userId = String(await provider.getAuthenticatedUserId?.() || "").trim();
-        if (userId) {
-          setStoreAuthState("authenticated", userId);
-          return { id: userId };
+      if (storeAuthResolutionPromise) return storeAuthResolutionPromise;
+      storeAuthResolutionPromise = (async () => {
+        try {
+          // An authenticated Store must never silently downgrade to the local
+          // wallet because a provider method is missing or auth is still
+          // hydrating.  Only applyAuthenticatedAccount(..., signed_out) may
+          // authorize the guest path.
+          if (typeof provider.getAuthenticatedUserId !== "function") {
+            const error = new Error("Secure Store authentication is still loading. Please try again.");
+            error.code = "STORE_AUTH_PENDING";
+            throw error;
+          }
+          const userId = String(await provider.getAuthenticatedUserId()).trim();
+          if (userId) {
+            setStoreAuthState("authenticated", userId);
+            return { id: userId };
+          }
+          const error = new Error("Secure Store authentication is still resolving. Please try again.");
+          error.code = "STORE_AUTH_PENDING";
+          throw error;
+        } catch (error) {
+          setStoreAuthState(error?.code === "STORE_AUTH_PENDING" ? "unknown" : "error");
+          throw error;
+        } finally {
+          storeAuthResolutionPromise = null;
         }
-        setStoreAuthState("signed_out");
-        return null;
-      } catch (error) {
-        setStoreAuthState("error");
-        throw error;
-      }
+      })();
+      return storeAuthResolutionPromise;
     }
 
     function getMissingServerStoreItemIds(catalog = serverStoreCatalog) {
@@ -6885,14 +6902,16 @@
       if (!status) return;
       if (!storeServerRequiresAuthority()) {
         if (retry) retry.hidden = true;
-        if (/^(Store sync failed|Syncing Store)/i.test(status.textContent || "")) {
+        if (/^(Store sync failed|Syncing Store|Checking your secure account)/i.test(status.textContent || "")) {
           status.textContent = "Pick a reward to unlock or equip.";
           status.removeAttribute("title");
         }
         return;
       }
       if (serverStoreSyncStatus === "error") {
-        const message = serverStoreSyncError?.code === "STORE_CATALOG_INCOMPLETE"
+        const message = serverStoreSyncError?.code === "STORE_AUTH_PENDING"
+          ? "Checking your secure account — Retry."
+          : serverStoreSyncError?.code === "STORE_CATALOG_INCOMPLETE"
           ? describeStoreCatalogIssue(serverStoreMissingIds)
           : "Store sync failed — Retry.";
         status.textContent = message;
@@ -6917,7 +6936,7 @@
         retry.hidden = true;
         retry.disabled = false;
       }
-      if (serverStoreSyncStatus === "ready" && /^(Store sync failed|Syncing Store)/i.test(status.textContent || "")) {
+      if (serverStoreSyncStatus === "ready" && /^(Store sync failed|Syncing Store|Checking your secure account)/i.test(status.textContent || "")) {
         status.textContent = "Pick a reward to unlock or equip.";
         status.removeAttribute("title");
       }
@@ -26997,16 +27016,19 @@
               authDebug("Auth state changed", { event, hasSession: Boolean(session) });
               if (!session) {
                 clearSession();
-                callback(null);
+                callback(null, { status: "signed_out" });
                 return;
               }
               try {
                 const account = await accountFromSession(session);
                 authDebug("Auth state account resolved", { hasUsername: Boolean(account?.username), hasEmail: Boolean(account?.email) });
-                callback(account);
+                callback(account, { status: "authenticated" });
               } catch (error) {
                 authDebug("Auth state account resolution failed", { message: error?.message || "unknown" });
-                callback(null);
+                // A profile/network failure is not proof that the session
+                // signed out. Keep Store authority unresolved so it cannot
+                // fall back to local coins while the session is retried.
+                callback(null, { status: "error", error });
               }
             }, 0);
           });
@@ -27299,9 +27321,10 @@
       }
     }
 
-    function applyAuthenticatedAccount(account) {
+    function applyAuthenticatedAccount(account, { status = "signed_out" } = {}) {
       if (!account?.username) {
-        setStoreAuthState("signed_out");
+        const nextStatus = ["unknown", "error", "signed_out"].includes(status) ? status : "error";
+        setStoreAuthState(nextStatus);
         cloudProfileReady = false;
         serverPrivacyHydratedFor = "";
         serverBlockedUserIds = new Set();
@@ -27353,9 +27376,12 @@
       }
       try {
         if (!authStateUnsubscribe && provider.onAuthStateChange) {
-          authStateUnsubscribe = await provider.onAuthStateChange((account) => applyAuthenticatedAccount(account));
+          authStateUnsubscribe = await provider.onAuthStateChange((account, result = {}) => applyAuthenticatedAccount(account, result));
         }
-        applyAuthenticatedAccount(await provider.getSession());
+        // getSession() returning null here is an explicit signed-out result;
+        // unlike an auth listener/profile error, it is safe to enable the
+        // guest/local Store wallet.
+        applyAuthenticatedAccount(await provider.getSession(), { status: "signed_out" });
       } catch (error) {
         setStoreAuthState("error");
         console.error("[Nschess Auth] Session initialization failed.", error);

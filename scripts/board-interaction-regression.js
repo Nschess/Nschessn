@@ -83,17 +83,20 @@ const requiredAppContracts = [
   ["Store ambience protects scene changes", /function setAudioScene\(scene = inferAudioScene\(\)\) \{\s*if \(audioRuntime\.storeAmbienceActive && isStorePanelActive\(\)\) return;/],
   ["Store ambience control persists preference", /storeAmbienceToggle[\s\S]*?writeAudioPrefs\(\{ storeAmbience: enabled \}\)/],
   ["Store authority has explicit auth state", /let storeAuthState = \{ status: "unknown", userId: "" \};/],
-  ["Store authority resolves Supabase user", /async function getAuthoritativeStoreUser\(\)[\s\S]*?getAuthenticatedUserId\?\.\(\)[\s\S]*?setStoreAuthState\("authenticated"/],
+  ["Store authority resolves Supabase user without guest downgrade", /async function getAuthoritativeStoreUser\(\)[\s\S]*?typeof provider\.getAuthenticatedUserId !== "function"[\s\S]*?STORE_AUTH_PENDING[\s\S]*?provider\.getAuthenticatedUserId\(\)[\s\S]*?setStoreAuthState\("authenticated"/],
   ["Store does not use Friends cache as authority", /function storeServerRequiresAuthority\(\)[\s\S]*?storeAuthState\.status !== "signed_out"/],
   ["Protected RPC validates Supabase user", /const callFriendRpc = async \(name, args = \{\}\) => \{[\s\S]*?supabase\.auth\.getUser\(\)[\s\S]*?supabase\.rpc\(name, args\)/],
   ["Purchase hydrates returned server balance", /const purchaseResult = await getAuthProvider\(\)\.purchaseCosmetic[\s\S]*?returnedCoins[\s\S]*?refreshServerStoreState\(\{ rerender: false \}\)/],
-  ["Auth lifecycle updates Store authority", /function applyAuthenticatedAccount\(account\)[\s\S]*?setStoreAuthState\("signed_out"\)[\s\S]*?setStoreAuthState\("authenticated"/]
+  ["Auth lifecycle updates Store authority", /function applyAuthenticatedAccount\(account,\s*\{ status = "signed_out" \}[\s\S]*?const nextStatus = \["unknown", "error", "signed_out"\][\s\S]*?setStoreAuthState\("authenticated"/],
+  ["Auth listener distinguishes errors from sign-out", /callback\(null, \{ status: "signed_out" \}\)[\s\S]*?callback\(account, \{ status: "authenticated" \}\)[\s\S]*?callback\(null, \{ status: "error", error \}\)/]
 ];
 requiredAppContracts.forEach(([name, pattern]) => {
   assert.match(app, pattern, `Missing board lifecycle contract: ${name}`);
 });
 const openingInteractionBody = app.slice(app.indexOf("function handleOpeningExplorerSquare("), app.indexOf("function renderOpeningExplorerBoard("));
 assert.doesNotMatch(openingInteractionBody, /playAudioCue\(/, "Opening Explorer board interaction must not dispatch audio directly");
+const storeAuthResolverBody = app.slice(app.indexOf("async function getAuthoritativeStoreUser("), app.indexOf("function getMissingServerStoreItemIds("));
+assert.doesNotMatch(storeAuthResolverBody, /setStoreAuthState\("signed_out"\)/, "Store auth resolver must not classify an unresolved user as signed out");
 const openingRenderBody = app.slice(app.indexOf("function renderOpeningExplorerBoard("), app.indexOf("function renderOpeningExplorerFavoriteState("));
 assert.doesNotMatch(openingRenderBody, /playAudioCue\(/, "Opening Explorer board rendering must not dispatch audio");
 const audioSetupBody = app.slice(app.indexOf("function setupAudioSystem("), app.indexOf("function animateCoinsToInventory("));
