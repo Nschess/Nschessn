@@ -45,6 +45,8 @@
 .friends-hub-page .friends-hub-empty strong { display:block; margin-bottom:.35rem; color:#e5ebff; }
 .friends-hub-page .friends-hub-profile { position:relative; min-height:20rem; padding:1rem; }
 .friends-hub-page .friends-hub-profile-empty { display:grid; place-items:start; align-content:center; min-height:18rem; color:#8f9bb6; text-align:left; }
+.friends-hub-page .friends-hub-profile-empty[hidden],
+.friends-hub-page .friends-hub-profile-content[hidden] { display:none !important; }
 .friends-hub-page .friends-profile-glyph { display:grid; place-items:center; width:3rem; height:3rem; margin-bottom:.8rem; border:1px solid rgba(133,117,255,.5); border-radius:.9rem; color:#d9c27c; background:rgba(109,86,237,.16); font-size:1.5rem; }
 .friends-hub-page .friends-hub-profile-empty strong { color:#ecf1ff; font-size:1.1rem; }
 .friends-hub-page .friends-hub-profile-empty p { max-width:17rem; margin:.45rem 0 0; line-height:1.5; }

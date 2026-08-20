@@ -37,7 +37,9 @@ const requiredAppContracts = [
   ["Adventure square identity", /square\.dataset\.square = name/],
   ["Play analysis opt-in", /return reviewPageActive \|\| !liveFriendGame/],
   ["Play overlay preservation", /controller\?\.render\(\[\], \[\]\)/],
-  ["Play move annotation helper", /function clearCoachTemporaryAnalysis\(\)[\s\S]*?clearAnalysisUserOverlay\(board\)/],
+  ["shared manual-arrow cleanup helper", /function clearAnalysisArrows\(reason = "manual-cleanup", board = null\)[\s\S]*?clearUserArrows\?\.\(reason\)/],
+  ["position-scoped manual arrows", /function getAnalysisBoardPositionKey\(board\)[\s\S]*?clearAnalysisArrows\("position-change", board\)/],
+  ["Play move annotation helper", /function clearCoachTemporaryAnalysis\(\)[\s\S]*?clearAnalysisArrows\("move-commit", board\)/],
   ["Committed move annotation clear", /function makeCoachMove\([\s\S]*?if \(!move\) \{[\s\S]*?return false;\s*\}\s*\n\s*clearCoachTemporaryAnalysis\(\);/],
   ["Bot move annotation clear", /const move = safeReply && coachGame\.move\([\s\S]*?if \(move\) \{\s*clearCoachTemporaryAnalysis\(\);/],
   ["Premove turn guard", /function queueCoachPremove\(from, to = ""\)[\s\S]*?coachGame\.turn\(\) === coachPlayerColor\) return false/],
@@ -116,10 +118,69 @@ assert.match(pianoMigration, /music-quiet-calculation[\s\S]*?music-rising-positi
 assert.match(pianoMigration, /music-after-last-move[\s\S]*?music-quiet-strategy[\s\S]*?music-golden-endgame/);
 assert.doesNotMatch(audioSetupBody, /startAudioMusic\(inferAudioScene\(\), "store-lounge"/, "Store ambience must not be forced by global audio unlock");
 assert.doesNotMatch(app, /finishGhost\(/, "Drag cleanup must not leave delayed ghost animation branches");
+assert.match(app, /const puzzleFeedbackFrames = new WeakMap\(\);[\s\S]*?const puzzleFeedbackTimers = new WeakMap\(\);[\s\S]*?function flashPuzzleBoard\([\s\S]*?requestAnimationFrame\([\s\S]*?puzzleFeedbackTimers/, "Puzzle feedback must restart without a forced board reflow");
+assert.doesNotMatch(app.slice(app.indexOf("function flashPuzzleBoard("), app.indexOf("function setPuzzleSolutionProgress(")), /offsetWidth/, "Puzzle feedback must not synchronously flush the board layout");
+assert.match(css, /\.real-puzzle-square:is\(\.last-move, \.capture-impact, \.promotion-bloom, \.castle-impact, \.en-passant-impact\)[\s\S]*?animation:\s*none/, "Real puzzle pieces must not run a second CSS animation over board motion");
+assert.match(app, /function animateBoardPieceTransition\(board, move, options = \{\}\)[\s\S]*?const fade = options\.fade !== false/, "Board motion must expose an explicit opacity-fade switch");
+assert.match(app, /if \(animateEffect && realPuzzleLastMove\) animateBoardPieceTransition\(board, realPuzzleLastMove, \{ fade: false \}\)/, "Real puzzle motion must remain transform-only so correct pieces do not fade");
+assert.match(css, /\.real-puzzle-square\.last-move\s*\{[\s\S]*?animation:\s*none !important[\s\S]*?filter:\s*none !important/, "Real puzzle last-move squares must not run animated filter pulses");
+assert.match(css, /body\.board-theme-animated \.real-puzzle-board-wrap\s*\{[\s\S]*?animation:\s*none !important/, "Animated board-theme shadows must not pulse the real puzzle board");
+assert.doesNotMatch(css, /\.real-puzzle-board-wrap\.is-correct\s*\{/, "Real puzzle correct feedback must not animate the board wrapper");
+assert.doesNotMatch(css, /\.puzzle-board-wrap\.is-correct\s*\{/, "Correct feedback must not add a board-level shadow layer");
+assert.doesNotMatch(app, /puzzleSuccessLanding|puzzle-success-landing/, "Correct moves must not schedule a delayed success overlay");
+assert.doesNotMatch(css, /puzzleSuccessLanding|puzzle-success-landing/, "Correct moves must not animate a destination overlay");
+assert.match(css, /\.real-puzzle-board-wrap \.real-puzzle-square:disabled\s*\{[\s\S]*?opacity:\s*1 !important/, "Disabled puzzle squares must stay fully visible while replies apply");
+assert.match(css, /\.real-puzzle-board-wrap > \.puzzle-board[\s\S]*?transition:\s*none !important/, "Puzzle board must not transition during a correct move");
+assert.match(css, /\.real-puzzle-board-wrap \.real-puzzle-square\s*\{[\s\S]*?animation:\s*none !important/, "Puzzle squares must not run capture or check animations");
+assert.match(app, /const played = commitRealPuzzlePlayerMove\(move\);[\s\S]*?clearRealPuzzleAnalysisArrows\(\);[\s\S]*?realPuzzleLastMove = played/, "Committed puzzle moves must clear analysis arrows");
+assert.match(app, /createAnalysisGestureHandlers\(board, "real-puzzle-user-arrow",[\s\S]*?priority: "support"/, "Puzzle analysis arrows must use the shared skin with a neutral priority");
+assert.doesNotMatch(app.slice(app.indexOf("function createAnalysisGestureHandlers("), app.indexOf("function clearAllAnalysisOverlays(")), /color:\s*resolveArrowColor|arrowColor/, "Analysis arrow gestures must not inject semantic colors");
+assert.match(app, /const onPointerMove = \(event\) =>[\s\S]*?setPhase\(boardInteractionPhases\.DRAGGING, event\)[\s\S]*?clearAnalysisArrows\("piece-drag-start", board\)/, "Shared drag start must clear player annotations in every board mode");
+assert.match(app, /clearAnalysisArrows\("piece-select", board\)[\s\S]*?callbacks\.onSelect/, "Shared piece selection must clear player annotations in every board mode");
+assert.match(app, /const destinationName = squareName\(destination\);[\s\S]*?clearAnalysisArrows\("plain-right-click", board\)/, "Plain right-click must clear without clearing on pointerdown");
+assert.match(app, /analysisDragged: false[\s\S]*?state\.analysisDragged = true[\s\S]*?state\.gestureCommitted = state\.analysisDragged \|\| arrowAccepted/, "Invalid analysis drags must remain distinct from plain right-click cleanup");
+const pointerDownBody = app.slice(app.indexOf("const onPointerDown = (event) =>"), app.indexOf("const onPointerMove = (event) =>"));
+assert.doesNotMatch(pointerDownBody, /clearAnalysisArrows\(/, "Manual arrows must not clear before right-drag intent is known");
+assert.match(app, /applyRealPuzzleAutoReplies\(1\)[\s\S]*?clearRealPuzzleAnalysisArrows\(\);/, "Puzzle opponent replies must leave analysis arrows cleared");
+assert.match(app, /analysisGestures\(square, event\)[\s\S]*?realPuzzleAnalysisEnabled \? "arrow" : false[\s\S]*?event\.button === 2/, "Puzzle arrows must support opt-in touch drawing and desktop right-drag");
+assert.match(app, /renderAnalysisOverlay\(\{ board, wrap: board, arrows: \[\], highlights: \[\] \}\)/, "Puzzle renderer must keep the base arrow layer solution-independent");
+assert.doesNotMatch(app, /real-puzzle-recommendation|Recommended puzzle move/, "Puzzle mode must not auto-generate solution arrows");
+assert.match(css, /\.real-puzzle-board-wrap > \.puzzle-board > \.review-arrow-layer\s*\{[\s\S]*?z-index:\s*2/, "Puzzle arrow layer must stay below pieces");
+assert.match(css, /\.real-puzzle-board-wrap \.real-puzzle-square > :is\(\.piece-svg, \.piece-symbol\)\s*\{[\s\S]*?z-index:\s*3/, "Puzzle pieces must remain above arrows");
+assert.match(app, /const arrowSkinThemes = Object\.freeze\([\s\S]*?pulse:[\s\S]*?arcane:[\s\S]*?solaris:[\s\S]*?voidflare:[\s\S]*?celestial:/, "Arrow Skin catalog must contain five distinct tiers");
+assert.match(app, /const ARROW_SKIN_DEFAULT = "default"[\s\S]*?function getEquippedArrowSkinValue\(\)[\s\S]*?normalizeArrowSkinValue\(activeArrowSkinValue\)/, "Arrow skins must have one normalized runtime source of truth");
+assert.match(app, /default:[\s\S]*?label: "Classic Precision"[\s\S]*?cost: 0[\s\S]*?glow: "rgba\(0,0,0,0\)"[\s\S]*?glowAlpha: 0/, "Default Classic Precision must be free and effect-free");
+assert.match(app, /const arrowSkinStoreItems = Object\.entries\(arrowSkinThemes\)[\s\S]*?type: "arrowSkin"/, "Default Classic Precision must be represented in the Arrow Skin catalog");
+assert.doesNotMatch(app.slice(app.indexOf("const arrowSkinStoreItems"), app.indexOf("const storeItems")), /filter\(\[value\] => value !== "default"\)/, "Default Classic Precision must not be hidden from the catalog");
+assert.match(app, /const defaultOwned = [\s\S]*?arrowSkinStoreItems\.filter\(\(item\) => !item\.cost\)/, "New users must own the free Default Arrow Skin");
+assert.match(app, /if \(type === "arrowSkin"\) return `arrowskin-\$\{normalizeArrowSkinValue\(prefs\.arrowSkin\)\}`/, "Default and purchased Arrow Skins must share the equipped preference path");
+assert.match(app, /const savedArrowSkin = saved[\s\S]*?invalidSavedArrowSkin[\s\S]*?writeJsonStorage\(learnerPrefsStorageKey, prefs\)/, "Invalid persisted Arrow Skins must be corrected and persisted as Default");
+assert.match(app, /arcane:[\s\S]*?markerDetails:[\s\S]*?shaftDasharray/, "Arcane must have segmented shaft and faceted marker details");
+assert.match(app, /solaris:[\s\S]*?markerDetails:[\s\S]*?headScale:[\s\S]*?innerVisible: true/, "Solaris must have a spearhead facet and restrained shaft accent");
+assert.match(app, /voidflare:[\s\S]*?markerDetails:[\s\S]*?shaftDasharray/, "Voidflare must have a forked marker and asymmetric shaft treatment");
+assert.match(app, /celestial:[\s\S]*?markerDetails:[\s\S]*?innerVisible: true/, "Celestial must have a crown marker and crafted shaft accent");
+assert.match(app, /const skinHeadScale = Number\.isFinite[\s\S]*?priority\.headScale \* skinHeadScale/, "Skin-specific head silhouettes must scale through the shared marker renderer");
+assert.match(app, /if \(skin\.shaftDasharray\)[\s\S]*?stroke-dasharray/, "Skin-specific shaft treatments must use shared SVG line styling");
+assert.match(app, /if \(!isShadow && Array\.isArray\(skin\.markerDetails\)\)[\s\S]*?detailPath/, "Faceted skin details must be emitted by the shared marker renderer");
+assert.match(app, /skinOverride: normalizeArrowSkinValue\(item\?\.value\)/, "Store previews must use the real renderer with an explicit skin preview override");
+assert.equal((app.match(/renderAnalysisOverlay\(\{/g) || []).length, 6, "All board modes must use the shared analysis renderer call sites");
+assert.match(app, /const arrowSkinStoreItems = Object\.entries\(arrowSkinThemes\)[\s\S]*?type: "arrowSkin"/, "Arrow skins must be first-class Store items");
+assert.match(app, /function createArrowSkinPreview\(item\)[\s\S]*?renderAnalysisOverlay\([\s\S]*?skinOverride:/, "Arrow Skin previews must reuse the SVG renderer");
+assert.match(app, /function getEquippedArrowSkin\(\)[\s\S]*?function resolveArrowSkinStyle\(/, "Arrow skins must expose the equipped-skin to resolved-style pipeline");
+assert.match(app, /const skinStyle = resolveArrowSkinStyle\(state\.skinOverride\)[\s\S]*?const color = getArrowSkinColor\("", skin\)/, "The shared SVG renderer must resolve visible style from the equipped skin");
+assert.doesNotMatch(app.slice(app.indexOf("function analysisOverlayControllerFor("), app.indexOf("function renderAnalysisOverlay(")), /arrow\?\.color|arrow\.arrowSkin|normalizeAnalysisColor\(arrow/, "Shared arrow rendering must not resolve semantic arrow colors or per-arrow skins");
+assert.match(app, /function getEquippedStoreId\(type\)[\s\S]*?type === "arrowSkin"[\s\S]*?prefs\.arrowSkin/, "Equipped Arrow Skin must derive from learner preferences");
+assert.match(app, /async function equipStoreItem\(item\)[\s\S]*?item\?\.type === "arrowSkin"[\s\S]*?isStoreItemOwned\(item\)/, "Unowned Arrow Skins must not be equip-able");
+assert.match(app, /const fallback = \{[\s\S]*?arrowSkin: "default"/, "Arrow Skin preference must have a stable free default");
+assert.match(app, /function applyLearnerPrefs\(prefs\)[\s\S]*?applyArrowSkin\(prefs\.arrowSkin\)/, "Arrow Skin preference must hydrate with every mode/theme");
+assert.match(app, /function applyStartupTheme\(prefs = readLearnerPrefs\(\)\)[\s\S]*?applyArrowSkin\(prefs\.arrowSkin\)/, "Persisted Arrow Skin must hydrate before deferred board routes mount");
 const pointerMoveBody = app.slice(app.indexOf("const onPointerMove = (event) =>"), app.indexOf("const onPointerUp = (event) =>"));
 assert.doesNotMatch(pointerMoveBody, /renderOpeningExplorerBoard|replaceChildren/, "Pointer movement must not rebuild the Opening Explorer board");
 assert.match(app, /if \(wasDragging\) callbacks\.onDrop\?[\s\S]*?finally \{[\s\S]*?cleanupInteraction\(event, \{ suppressClick: true \}\)/, "Every drop path must finish through shared cleanup");
 assert.match(app, /openingExplorerReset[\s\S]*?renderOpeningExplorerBoard\(\);[\s\S]*?openingExplorerPrev[\s\S]*?renderOpeningExplorerBoard\(\);[\s\S]*?openingExplorerNext[\s\S]*?renderOpeningExplorerBoard\(\);/, "Opening reset/Previous/Next must flow through the board cancellation boundary");
+assert.match(app, /openingExplorerReset[\s\S]*?clearAnalysisArrows\("opening-reset", document\.getElementById\("openingExplorerBoard"\)\)/, "Opening reset must clear manual arrows even when returning to the same position");
+assert.match(app, /openingExplorerPrev[\s\S]*?clearAnalysisArrows\("opening-previous", document\.getElementById\("openingExplorerBoard"\)\)/, "Opening Previous must clear manual arrows");
+assert.match(app, /openingExplorerNext[\s\S]*?clearAnalysisArrows\("opening-next", document\.getElementById\("openingExplorerBoard"\)\)/, "Opening Next must clear manual arrows");
 const makeCoachMoveBody = app.slice(app.indexOf("function makeCoachMove("), app.indexOf("function handleCoachSquare("));
 const committedClearIndex = makeCoachMoveBody.indexOf("clearCoachTemporaryAnalysis();");
 assert.ok(committedClearIndex > 0, "Play move path does not clear committed annotations");
@@ -127,6 +188,9 @@ assert.doesNotMatch(makeCoachMoveBody.slice(0, committedClearIndex), /clearCoach
 const premoveBody = app.slice(app.indexOf("function tryRunCoachPremove("), app.indexOf("function getTournamentProvider("));
 assert.match(premoveBody, /const queued = \{ \.\.\.coachPremove \};\s*coachPremove = null[\s\S]*?if \(!legalMove\) \{[\s\S]*?return false;[\s\S]*?return makeCoachMove\(/, "Premove must clear before one-shot execution and cancel invalid moves");
 assert.match(app, /function completeCoachGame\([\s\S]*?coachPremove = null/, "Game end must clear queued premoves");
+assert.match(app, /function completeCoachGame\([\s\S]*?clearAnalysisArrows\("game-complete", document\.getElementById\("coachBoard"\)\)/, "Game completion must clear manual arrows");
+assert.match(app, /function restartCoachGame\([\s\S]*?clearAnalysisArrows\("game-restart", document\.getElementById\("coachBoard"\)\)/, "Game restart must clear manual arrows");
+assert.match(app, /function showReviewPly\([\s\S]*?clearAnalysisArrows\("review-position", document\.getElementById\("coachBoard"\)\)/, "Review Previous/Next navigation must clear manual arrows");
 const coachBoardEvents = app.slice(app.indexOf("function bindCoachBoardEvents("), app.indexOf("function ensureCoachBoardSquares("));
 assert.match(coachBoardEvents, /onDrop\(from, to\)[\s\S]*?isLivePremoveEnabled\(\)[\s\S]*?return queueCoachPremove\(from, to\)[\s\S]*?makeCoachMove\(from, to\)/, "Opponent-turn drops must queue before normal move validation can reject them");
 const coachSquareHandler = app.slice(app.indexOf("function handleCoachSquare("), app.indexOf("function queueCoachReply("));
@@ -172,18 +236,12 @@ assert.match(app, /const ANALYSIS_ARROW_PRIORITIES = Object\.freeze/, "Arrow pri
 assert.match(app, /function normalizeAnalysisPriority\(value, kind = ""\)/, "Arrow priorities must normalize semantic kinds");
 assert.match(app, /right\.entry\.priority\.value - left\.entry\.priority\.value/, "Highest-priority arrows must win the natural center lane");
 assert.match(app, /const lane = rank === 0 \? 0 : \(rank % 2 === 1 \? -Math\.ceil\(rank \/ 2\) : Math\.ceil\(rank \/ 2\)\)/, "Secondary lanes must fan out deterministically around the primary route");
-assert.match(app, /green: \{ stroke: "rgba\(85,201,138/, "Plan/support arrows must use refined emerald");
-assert.match(app, /blue: \{ stroke: "rgba\(93,140,255/, "Primary PV arrows must use cool cyan-blue");
-assert.match(app, /cyan: \{ stroke: "rgba\(98,215,255/, "Default analysis arrows must use the refined cyan");
-assert.match(app, /yellow: \{ stroke: "rgba\(246,196,83/, "Best arrows must use refined gold");
-assert.match(app, /violet: \{ stroke: "rgba\(167,139,250/, "Alternative arrows must use blue-violet");
-assert.match(app, /neutral: \{ stroke: "rgba\(184,191,153/, "Low-priority arrows must have a neutral option");
+assert.match(app, /default:[\s\S]*?primaryColor: "#8AA7B5"[\s\S]*?pulse:[\s\S]*?primaryColor: "#62D7FF"[\s\S]*?arcane:[\s\S]*?primaryColor: "#B58CFF"/, "Arrow skins must own the visible arrow color");
 assert.match(css, /\.review-arrow-line[\s\S]*?stroke-width:\s*var\(--arrow-shaft-width,\s*0\.06\)[\s\S]*?vector-effect:\s*none/, "Arrow shafts must use board-scaled geometry with a readable width");
 assert.match(css, /\.review-arrow-shadow[\s\S]*?stroke-width:\s*0\.062[\s\S]*?opacity:\s*calc\(0\.24 \* var\(--arrow-opacity, 1\)\)/, "Arrow depth must remain a subtle navy rail");
 assert.match(css, /\.review-arrow-glow[\s\S]*?display:\s*none/, "Arrow glow must not create a competing repaint layer");
 assert.match(css, /body:is\(\.perf-lite, \.low-performance, \.reduced-motion\) \.review-arrow-glow[\s\S]*?display: none/, "Reduced-performance modes must simplify glow without hiding arrows");
-assert.match(app, /kind: "played", color: "cyan"/, "Normal played arrows must use the cyan annotation treatment");
-assert.match(app, /if \(secondary\) return "violet"/, "Secondary annotations must stay in the cool Nschess palette");
+assert.doesNotMatch(app.slice(app.indexOf("function getReviewOverlayData("), app.indexOf("const ANALYSIS_OVERLAY_NS")), /kind: "(?:played|best|pv|threat)"[^\n]*color:/, "Review arrows must not carry semantic color overrides");
 assert.match(app, /marker: Object\.freeze\(\{[\s\S]*?viewBox: "0 0 0\.34 0\.3"/, "Arrowheads must use the compact precision geometry");
 assert.match(app, /path: "M0\.015,0\.045 L0\.105,0\.15 L0\.015,0\.255 L0\.325,0\.15 Z"/, "Arrowheads must use the asymmetric Precision Dart profile");
 assert.match(app, /setAttrIfChanged\(group, "data-arrow-lane", laneOffset\)/, "Arrow groups must expose their deterministic overlap lane");
@@ -214,12 +272,12 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v155-legacy-music-retirement";
-const cacheVersion = "review-v155-legacy-music-retirement";
-assert.match(html, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the v155 asset version");
-assert.match(app, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Lazy route loaders do not use the v155 asset version");
-assert.match(worker, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell assets do not use the v155 asset version");
-assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker cache name is not v155");
+const cacheName = "nschess-shell-v174-shared-name-style";
+const cacheVersion = "review-v174-shared-name-style";
+assert.match(html, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the v174 asset version");
+assert.match(app, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Lazy route loaders do not use the v174 asset version");
+assert.match(worker, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell assets do not use the v174 asset version");
+assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker cache name is not v174");
 assert.match(worker, /isStoreAudioAsset[\s\S]*?assets\/audio[\s\S]*?cache\.put/, "Store piano recordings must be cacheable after first preview");
 assert.match(pianoMigration, /music-quiet-calculation[\s\S]*?music-rising-position[\s\S]*?music-midnight-strategy[\s\S]*?music-beyond-the-board[\s\S]*?music-subtle-triumph[\s\S]*?CC0 1\.0 Universal/);
 assert.match(pianoMigration, /set active = false[\s\S]*?music-calm[\s\S]*?sfx-classic/);

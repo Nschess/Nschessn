@@ -6542,9 +6542,9 @@
       font-weight: 1000;
     }
 
-    .name-style-lime { --name-glow: rgba(170, 220, 95, 0.36); color: #dfffaf; }
-    .name-style-sky { --name-glow: rgba(111, 168, 220, 0.42); color: #d9ecff; }
-    .name-style-ruby { --name-glow: rgba(255, 112, 92, 0.42); color: #ffd3ca; }
+    .name-style-lime { --name-glow: rgba(170, 220, 95, 0.36); --name-gradient: linear-gradient(90deg, #f1ffd9, #dfffaf, #aadd5f, #f1ffd9); color: #dfffaf; }
+    .name-style-sky { --name-glow: rgba(111, 168, 220, 0.42); --name-gradient: linear-gradient(90deg, #f2f9ff, #d9ecff, #6fa8dc, #f2f9ff); color: #d9ecff; }
+    .name-style-ruby { --name-glow: rgba(255, 112, 92, 0.42); --name-gradient: linear-gradient(90deg, #fff4f1, #ffd3ca, #ff705c, #fff4f1); color: #ffd3ca; }
     .name-style-royal { --name-glow: rgba(231, 182, 93, 0.48); --name-gradient: linear-gradient(90deg, #fff4c5, #e7b65d, #fff4c5); }
     .name-style-violet { --name-glow: rgba(174, 135, 255, 0.5); --name-gradient: linear-gradient(90deg, #f0e7ff, #ae87ff, #ffb3f4); }
     .name-style-gold { --name-glow: rgba(255, 211, 107, 0.76); --name-aura: rgba(255, 211, 107, 0.24); --name-gradient: linear-gradient(90deg, #fffdf1, #ffd36b, #b97816, #fff2b0, #ffd36b); }
@@ -8322,6 +8322,47 @@
     .play-square.castle-impact :is(.piece-symbol, .piece-svg),
     .play-square.en-passant-impact :is(.piece-symbol, .piece-svg) {
       animation: boardSpecialLand 150ms cubic-bezier(.2, .8, .2, 1) both;
+    }
+
+    /* Real puzzles use the board-motion transition as their single piece
+       animation owner. The shared last-move/capture effects otherwise write
+       transform and opacity at the same time, which makes a correct move
+       briefly fade or shimmer while the destination piece settles. */
+    .real-puzzle-square:is(.last-move, .capture-impact, .promotion-bloom, .castle-impact, .en-passant-impact) :is(.piece-symbol, .piece-svg) {
+      animation: none;
+    }
+
+    /* A puzzle line should settle as one crisp board state. Store-selected
+       animated highlights and board themes are useful elsewhere, but their
+       filter/shadow pulses read as a dark flash when a correct move lands. */
+    .real-puzzle-square.last-move {
+      animation: none !important;
+      filter: none !important;
+    }
+
+    /* Puzzle squares are temporarily disabled while the verified reply is
+       applied. The global disabled-button token uses opacity: .58, which
+       reads as a dark board flash after every correct move. Keep the board
+       visually stable while preserving the disabled interaction state. */
+    .real-puzzle-board-wrap .real-puzzle-square:disabled {
+      opacity: 1 !important;
+    }
+
+    /* Puzzle feedback is stateful, not an animated board surface. Avoid the
+       shared square and wrapper transitions that can create a one-frame
+       shimmer while the position advances. */
+    .real-puzzle-board-wrap,
+    .real-puzzle-board-wrap > .puzzle-board,
+    .real-puzzle-board-wrap .real-puzzle-square {
+      transition: none !important;
+    }
+
+    .real-puzzle-board-wrap .real-puzzle-square {
+      animation: none !important;
+    }
+
+    body.board-theme-animated .real-puzzle-board-wrap {
+      animation: none !important;
     }
 
     @keyframes captureImpact {
@@ -11582,6 +11623,55 @@
       background: transparent !important;
     }
 
+    /* Puzzle arrows sit above square paint but below the piece nodes and
+       legal/selection affordances.  The SVG remains pointer-transparent, so
+       the existing drag/click engine keeps ownership of every square. */
+    .real-puzzle-board-wrap > .puzzle-board > .review-arrow-layer {
+      z-index: 2;
+    }
+
+    .real-puzzle-board-wrap .real-puzzle-square > :is(.piece-svg, .piece-symbol) {
+      position: relative;
+      z-index: 3;
+    }
+
+    .real-puzzle-board-wrap .real-puzzle-square::before,
+    .real-puzzle-board-wrap .real-puzzle-square::after {
+      z-index: 4;
+    }
+
+    .store-arrow-skin-preview {
+      display: block;
+      width: 100%;
+      max-width: 188px;
+      margin-inline: auto;
+      aspect-ratio: 1;
+    }
+
+    .store-arrow-preview-board {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      grid-template-rows: repeat(8, minmax(0, 1fr));
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 10px;
+      background: #b58863;
+      box-shadow: inset 0 0 0 1px rgba(5, 12, 27, .22);
+      pointer-events: none;
+      isolation: isolate;
+    }
+
+    .store-arrow-preview-board > [data-square] {
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .store-arrow-preview-board > .light { background: #e6c895; }
+    .store-arrow-preview-board > .dark { background: #9c6b47; }
+
     .analysis-square-highlight {
       fill: rgba(174, 135, 255, 0.18);
       stroke: rgba(174, 135, 255, 0.62);
@@ -11740,7 +11830,7 @@
     }
 
     .review-arrow-line {
-      stroke: var(--arrow-stroke, #62D7FF);
+      stroke: var(--arrow-stroke, #8AA7B5);
       /* The overlay uses an 8x8 board viewBox. Keep the width in board units
          so the shaft scales with the board instead of collapsing to a
          sub-pixel line under non-scaling-stroke. */
@@ -11814,7 +11904,7 @@
     }
 
     .review-arrow-route-node-core {
-      fill: var(--route-node-color, #62D7FF);
+      fill: var(--route-node-color, #8AA7B5);
       stroke: rgba(237, 252, 255, 0.52);
       stroke-width: 0.009;
     }
@@ -11824,7 +11914,7 @@
     }
 
     .review-arrow-line.is-best {
-      stroke: var(--arrow-stroke, #F6C453);
+      stroke: var(--arrow-stroke, #8AA7B5);
       stroke-width: var(--arrow-shaft-width, 0.07);
       stroke-opacity: var(--arrow-opacity, 0.99);
       filter: none;
@@ -11836,7 +11926,7 @@
     }
 
     .review-arrow-line.is-candidate {
-      stroke: var(--arrow-stroke, #A78BFA);
+      stroke: var(--arrow-stroke, #8AA7B5);
       stroke-width: var(--arrow-shaft-width, 0.055);
     }
 
@@ -13558,26 +13648,6 @@
       margin: 0;
     }
 
-    .puzzle-board-wrap.is-correct {
-      box-shadow:
-        0 18px 42px rgba(0, 0, 0, 0.34),
-        0 0 0 2px rgba(255, 211, 107, 0.58),
-        0 0 22px rgba(255, 211, 107, 0.22);
-    }
-
-    .puzzle-board-wrap.is-correct::after {
-      content: "";
-      position: absolute;
-      inset: 3px;
-      z-index: 3;
-      border: 2px solid rgba(255, 211, 107, 0.78);
-      border-radius: 14px;
-      pointer-events: none;
-      box-shadow: 0 0 18px rgba(255, 211, 107, 0.36), inset 0 0 0 1px rgba(255, 248, 214, 0.22);
-      opacity: 0;
-      animation: puzzleBoardFeedback 360ms ease-out both;
-    }
-
     .puzzle-board-wrap.is-wrong {
       box-shadow:
         0 18px 42px rgba(0, 0, 0, 0.34),
@@ -14158,10 +14228,6 @@
       transition: none !important;
     }
 
-    body.reduced-motion .puzzle-board-wrap.is-correct::after {
-      display: none;
-    }
-
     @media (prefers-reduced-motion: reduce) {
       .progress-fill,
       .achievement-badge.unlocked,
@@ -14185,9 +14251,6 @@
         transition: none !important;
       }
 
-      .puzzle-board-wrap.is-correct::after {
-        display: none;
-      }
     }
 
     .puzzle-hint {
@@ -14380,6 +14443,25 @@
     .real-board-quick-actions .button {
       min-height: 44px;
       border-radius: 9px;
+    }
+
+    .real-puzzle-analysis-tools {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      width: min(100%, 420px);
+    }
+
+    .real-puzzle-analysis-tools .button {
+      min-height: 38px;
+      border-radius: 9px;
+      font-size: .82rem;
+    }
+
+    .real-puzzle-analysis-tools .button[aria-pressed="true"] {
+      border-color: rgba(85, 201, 138, .7);
+      color: #d7f8e4;
+      background: rgba(85, 201, 138, .12);
     }
 
     .real-puzzle-info {
@@ -34932,6 +35014,477 @@ body.post-game-dialog-open {
   #store .store-bundle-preview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Shared player identity pipeline.  Every surface keeps the equipped name,
+   title, flag and avatar treatment while allowing compact layouts to shrink. */
+.player-identity,
+.player-identity-line,
+.player-identity-copy,
+.player-identity-avatar,
+.player-identity-shell {
+  min-width: 0;
+}
+
+.player-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.player-identity-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.player-identity-line {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.player-identity-line > [data-player-country],
+.player-identity-line > [data-player-title-badge],
+.player-identity-line > .player-earned-icons,
+.player-identity-line > .player-country-flag,
+.player-identity-line > .player-title-badge {
+  flex: 0 0 auto;
+}
+
+.player-identity-line strong,
+.player-identity-line b,
+.player-identity-line [data-player-identity-name],
+.player-identity-line [data-match-name],
+.player-identity-line [data-profile-field="name"],
+.player-identity-line #loginDisplayName,
+.player-identity-line .styled-username,
+.player-identity-name,
+.leaderboard-entry-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-identity-line .styled-username,
+.player-identity-line .name-style-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-identity-avatar {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.player-identity-link {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.player-identity-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--cq-accent, #67d9ff) 72%, white);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+button.player-identity-link {
+  text-align: left;
+}
+
+.player-identity-avatar img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: inherit;
+}
+
+.player-identity-shell {
+  position: relative;
+  z-index: 0;
+  min-width: 0;
+  isolation: isolate;
+}
+
+/* Legacy seat/card rules used block/grid display and clipped the premium
+   aura. Once a node joins the shared pipeline, the identity contract wins. */
+.player-flex-name.player-identity-line,
+.match-player-name-line.player-identity-line,
+.login-pass-title.player-identity-line,
+.friends-hub-card-copy.player-identity-line,
+.friend-result-main.player-identity-line,
+.tournament-chat-line.player-identity-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: visible;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play .match-player-name-line.player-identity-line,
+#play:not(.is-review-mode) .match-player-name-line.player-identity-line {
+  display: flex !important;
+  align-items: center;
+  overflow: visible !important;
+  white-space: normal;
+}
+
+.site-header .nav-utilities .player-flex-name.player-identity-line {
+  display: flex;
+  align-items: center;
+  overflow: visible !important;
+}
+
+/* The legacy compact navbar rules intentionally flattened styled usernames
+   and hid the flag.  Once a node is rendered by the shared identity
+   pipeline, keep the compact footprint but restore the equipped cosmetics.
+   The name itself may truncate; the identity shell remains overflow-visible
+   so frames/effects are never clipped by the header. */
+.site-header .nav-utilities .player-flex-name.player-identity-line .player-country-flag,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-player-country] {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  max-width: none;
+  overflow: visible !important;
+}
+
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-player-title-badge] {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  align-items: center;
+  min-width: 0;
+  padding: 1px 4px;
+  font-size: .5rem;
+  line-height: 1;
+}
+
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-player-title-badge][hidden] {
+  display: none !important;
+}
+
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-player-identity-name].styled-username,
+.site-header .nav-utilities .player-flex-name.player-identity-line .player-identity-name.styled-username {
+  display: inline-flex !important;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden !important;
+  border: 0;
+  background: none;
+  color: var(--cq-text-primary);
+  -webkit-text-fill-color: currentColor;
+  font: inherit;
+  text-overflow: ellipsis !important;
+  text-shadow: 0 0 7px var(--name-glow, transparent);
+  white-space: nowrap;
+  animation: none;
+}
+
+/* Gradient name styles use the same shared custom properties as Profile;
+   only their compact geometry is reduced in the header. */
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-royal,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-violet,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-gold,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-fire,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-ice,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-lightning,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-emerald,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-sapphire,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-neon,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-galaxy,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-crystal,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-shadow,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-phoenix,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-holo,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-aurora,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-cosmic,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-celestial,
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-profile-field="name"].styled-username.name-style-divine {
+  background: var(--name-gradient, none) !important;
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  box-shadow: 0 0 7px var(--name-glow, transparent);
+}
+
+.site-header .nav-utilities .player-flex-name.player-identity-line [data-player-achievements-inline] {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  overflow: visible;
+}
+
+/* Compact navbar identity: the username is the only flexible text item.
+   Older rarity rules used an inset 999px shadow, border and padding on the
+   styled span.  In a narrow flex row that painted a large gold panel (and,
+   for some premium values, hid the text inside it).  Keep the equipped
+   gradient/text treatment, but make the name itself a transparent text
+   surface and keep all decoration out of layout. */
+.site-header .nav-utilities .player-flex-name.player-identity-line.player-identity-line > .styled-username.styled-username,
+.site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username.styled-username,
+.site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username.styled-username,
+.site-header .nav-utilities .player-flex-name > .player-identity-name.styled-username.styled-username {
+  display: block !important;
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  align-self: center;
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+  min-height: 0 !important;
+  height: auto;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  animation: none !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap;
+}
+
+/* Premium layers belong behind the text, never as an independent flex box.
+   The full effects remain available on larger identity variants; the
+   compact navbar keeps the same equipped gradient and a restrained glow so
+   long names stay legible at desktop and mobile widths. */
+.site-header .nav-utilities .player-flex-name.player-identity-line > .styled-username::before,
+.site-header .nav-utilities .player-flex-name.player-identity-line > .styled-username::after,
+.site-header .nav-utilities .player-flex-name > .styled-username::before,
+.site-header .nav-utilities .player-flex-name > .styled-username::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* The navbar chip is a layout container, not the name-style canvas.  The
+   legacy rarity pseudo-layer painted a full gold/cosmic panel over this
+   chip, so compact identities keep only the chip's normal surface and the
+   text-level name treatment. */
+.site-header .nav-utilities .player-flex-chip.player-identity-shell[data-name-rarity]::after,
+.site-header .nav-utilities .player-flex-chip[data-name-rarity]::after {
+  display: none !important;
+  content: none !important;
+}
+
+.site-header .nav-utilities .player-flex-name.player-identity-line > .styled-username.name-style-classic,
+.site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username.name-style-classic,
+.site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username.name-style-classic,
+.site-header .nav-utilities .player-flex-name > .player-identity-name.styled-username.name-style-classic {
+  background: none !important;
+  color: var(--cq-text-primary, var(--text)) !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none;
+}
+
+.site-header .nav-utilities .player-flex-name.player-identity-line > .styled-username:not(.name-style-classic),
+.site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username:not(.name-style-classic),
+.site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username:not(.name-style-classic),
+.site-header .nav-utilities .player-flex-name > .player-identity-name.styled-username:not(.name-style-classic) {
+  /* Compact navbar is a hard visibility boundary.  The legacy premium
+     rules used transparent text plus a pseudo-element, which Chromium can
+     rasterize as a solid gold rectangle at this small size.  Keep the
+     equipped style's colour/glow, but render the actual username as a real
+     text fill and remove all paint from the background surface. */
+  background: none !important;
+  background-image: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+  color: var(--cq-text-primary, var(--text)) !important;
+  color: color-mix(in srgb, var(--name-glow, var(--cq-text-primary, var(--text))) 68%, white) !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--name-glow, transparent) 46%, transparent);
+}
+
+/* These rules intentionally carry the live-premium selector specificity.
+   They are the final authority for the compact navbar, so the old
+   data-rarity pseudo layers cannot re-enable themselves after a rerender. */
+body:not(.name-effects-off):not(.reduced-motion) .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username::before,
+body:not(.name-effects-off):not(.reduced-motion) .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username::after,
+body.perf-lite .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username::before,
+body.perf-lite .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username::after,
+body:not(.name-effects-off):not(.reduced-motion) .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username::before,
+body:not(.name-effects-off):not(.reduced-motion) .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username::after,
+body.perf-lite .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username::before,
+body.perf-lite .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  opacity: 0 !important;
+  animation: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+body:not(.name-effects-off) .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username:not(.name-style-classic),
+body.perf-lite .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username:not(.name-style-classic),
+body:not(.name-effects-off) .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username:not(.name-style-classic),
+body.perf-lite .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username:not(.name-style-classic),
+body:not(.name-effects-off) .site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username:not(.name-style-classic),
+body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username:not(.name-style-classic) {
+  /* Use the same gradient and live text treatment as Player Pass/Profile.
+     The compact variant only reduces the footprint; it does not flatten the
+     equipped cosmetic into a solid fallback colour. */
+  background-color: transparent !important;
+  background-image: var(--name-gradient) !important;
+  background-size: 320% 100% !important;
+  background-position: 0 50%;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  color: var(--name-color, transparent) !important;
+  -webkit-text-fill-color: var(--name-color, transparent) !important;
+  font-weight: var(--name-font-weight, 1000) !important;
+  letter-spacing: var(--name-letter-spacing, 0) !important;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--name-glow) 54%, transparent)) !important;
+  text-shadow: var(--name-shadow, none) !important;
+  animation: nameLiveTextFlow var(--live-name-flow, 4.6s) linear infinite !important;
+}
+
+/* Keep the identity contract intact on phones.  The old mobile shortcut hid
+   .player-flex-main entirely, leaving only the avatar and recreating the
+   same "missing name" failure at the smallest breakpoint.  The compact
+   copy is small and flexible here; title/rating metadata stays suppressed,
+   while flag + username remain readable and ellipsize safely. */
+@media (max-width: 560px) {
+  .site-header .nav-utilities .player-flex-chip {
+    grid-template-columns: 32px minmax(0, 1fr);
+    min-width: 188px;
+    max-width: 198px;
+    padding: 4px 6px;
+  }
+
+  .site-header .nav-utilities .player-flex-main {
+    display: grid !important;
+    min-width: 0;
+    gap: 0;
+  }
+
+  .site-header .nav-utilities .player-flex-name.player-identity-line {
+    display: flex !important;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible !important;
+  }
+
+  .site-header .nav-utilities .player-flex-name.player-identity-line > .styled-username {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .site-header .nav-utilities .player-flex-title,
+  .site-header .nav-utilities .player-flex-meta,
+  .site-header .nav-utilities .player-flex-progress {
+    display: none !important;
+  }
+}
+
+.player-flex-chip.player-identity-shell[data-name-rarity],
+.match-player-card.player-identity-shell[data-name-rarity],
+.player-profile.player-identity-shell[data-name-rarity],
+.friend-result-card.player-identity-shell[data-name-rarity],
+.friends-hub-card.player-identity-shell[data-name-rarity],
+.review-player-chip.player-identity-shell[data-name-rarity],
+.match-history-item.player-identity-shell[data-name-rarity],
+.tournament-standing-row.player-identity-shell[data-name-rarity] {
+  overflow: visible;
+}
+
+.player-identity-avatar[data-avatar-frame="gold"],
+.player-identity-avatar[data-avatar-frame="crown"] {
+  border-color: var(--rank-b, #e9c66b);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--rank-b, #e9c66b) 68%, transparent), 0 5px 14px rgb(5 11 24 / 24%);
+}
+
+.player-identity-avatar[data-avatar-frame="neon"],
+.player-identity-avatar[data-avatar-frame="crystal"] {
+  border-color: #67d9ff;
+  box-shadow: 0 0 0 1px rgb(103 217 255 / 55%), 0 4px 15px rgb(50 175 255 / 22%);
+}
+
+.player-identity-avatar[data-avatar-frame="dragon"],
+.player-identity-avatar[data-avatar-frame="galaxy"],
+.player-identity-avatar[data-avatar-frame="samurai"] {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 1px rgb(167 139 250 / 48%), 0 5px 16px rgb(75 48 160 / 25%);
+}
+
+.player-identity-avatar[data-avatar-effect="glow"] {
+  filter: drop-shadow(0 0 6px rgb(103 217 255 / 28%));
+}
+
+.player-identity-avatar[data-avatar-effect="sparkle"],
+.player-identity-avatar[data-avatar-effect="aura"] {
+  filter: drop-shadow(0 0 7px rgb(245 196 83 / 25%));
+}
+
+.leaderboard-row .player-identity,
+.home-lower-ranking li .player-identity,
+.friend-result-main.player-identity-line,
+.friends-hub-card-copy.player-identity-line,
+.tournament-player > .player-identity-line,
+.review-player-chip > .player-identity-line {
+  min-width: 0;
+  width: 100%;
+}
+
+.leaderboard-row .player-identity-avatar,
+.home-lower-ranking .player-identity-avatar,
+.friend-result-avatar.player-identity-avatar,
+.tournament-avatar.player-identity-avatar,
+.review-player-avatar.player-identity-avatar {
+  overflow: visible;
+}
+
+.match-history-heading .player-identity {
+  display: inline-flex;
+  vertical-align: middle;
+  width: auto;
+  max-width: min(100%, 19rem);
+}
+
+.friends-hub-profile-top > span:nth-child(2) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.friends-hub-profile-top > span:nth-child(2).player-identity-line {
+  gap: 2px;
+}
+
+.friends-hub-profile-top .player-identity-line strong,
+.friends-hub-profile-top .player-identity-line #friendsHubProfileName {
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .player-identity { gap: 6px; }
+  .player-identity-line { gap: 4px; }
+  .match-history-heading .player-identity { max-width: 13rem; }
 }
 
 /* Homepage Daily Command Deck — isolated to the Home section. */

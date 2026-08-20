@@ -154,6 +154,7 @@
           ghostWidth: 0,
           ghostHeight: 0,
           pointerMode: "",
+          analysisDragged: false,
           gestureCommitted: false,
           cleanupInProgress: false,
           dragSafetyTimer: 0
@@ -274,6 +275,7 @@
           state.startX = 0;
           state.startY = 0;
           state.pointerMode = "";
+          state.analysisDragged = false;
           if (event) callbacks.onPointerEnd?.(event, state);
         };
         const reportCallbackError = (error, event) => {
@@ -323,9 +325,11 @@
         const onPointerDown = (event) => {
           const square = squareFromTarget(board, selector, event.target);
           if (!canInteract(square, event)) return;
-          const analysisGestures = typeof callbacks.analysisGestures === "function"
-            ? callbacks.analysisGestures(squareName(square), event, state) === true
-            : callbacks.analysisGestures === true;
+          const analysisGestureDecision = typeof callbacks.analysisGestures === "function"
+            ? callbacks.analysisGestures(squareName(square), event, state)
+            : callbacks.analysisGestures;
+          const analysisGestures = analysisGestureDecision === true || analysisGestureDecision === "arrow";
+          const forceAnalysisArrow = analysisGestureDecision === "arrow";
           const secondaryButton = event.pointerType === "mouse" && event.button === 2;
           if (event.pointerType === "mouse" && event.button !== 0 && !secondaryButton) return;
           if (secondaryButton && !analysisGestures) return;
@@ -338,8 +342,9 @@
           state.suppressTimer = 0;
           state.suppressClick = false;
           state.longPressTriggered = false;
+          state.analysisDragged = false;
           state.gestureCommitted = false;
-          state.pointerMode = analysisGestures && (secondaryButton || event.shiftKey)
+          state.pointerMode = analysisGestures && (secondaryButton || event.shiftKey || forceAnalysisArrow)
             ? "analysis-arrow"
             : analysisGestures && (event.ctrlKey || event.metaKey)
               ? "analysis-highlight"
@@ -369,7 +374,10 @@
           if (state.pointerId !== event.pointerId || state.phase === boardInteractionPhases.IDLE) return;
           const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
           if (state.pointerMode === "analysis-arrow") {
-            if (distance >= DRAG_THRESHOLD) callbacks.onArrowMove?.(state.from, squareName(square), event, state);
+            if (distance >= DRAG_THRESHOLD) {
+              state.analysisDragged = true;
+              callbacks.onArrowMove?.(state.from, squareName(square), event, state);
+            }
             if (event.pointerType === "touch" || event.buttons === 2) event.preventDefault();
             callbacks.onPointerMove?.(squareName(square), event, state);
             return;
@@ -382,6 +390,7 @@
           if (state.phase === boardInteractionPhases.PRESSED && distance >= DRAG_THRESHOLD && callbacks.canDrag?.(state.from, event) !== false) {
             setPhase(boardInteractionPhases.DRAGGING, event);
             board.classList.add("is-dragging");
+            clearAnalysisArrows("piece-drag-start", board);
             try { callbacks.onDragStart?.(state.from, event, state); } catch (error) { reportCallbackError(error, event); }
             createGhost(state.from, event);
             window.clearTimeout(state.dragSafetyTimer);
@@ -399,11 +408,14 @@
           const source = state.from;
           const destination = squareAtPoint(board, selector, event) || squareFromTarget(board, selector, event.target);
           if (state.pointerMode === "analysis-arrow") {
+            const destinationName = squareName(destination);
+            if (!state.analysisDragged) clearAnalysisArrows("plain-right-click", board);
             state.suppressClick = true;
             try {
-              state.gestureCommitted = callbacks.onArrowEnd?.(source, squareName(destination), event, state) === true;
+              const arrowAccepted = callbacks.onArrowEnd?.(source, destinationName, event, state) === true;
+              state.gestureCommitted = state.analysisDragged || arrowAccepted;
             } catch (error) {
-              state.gestureCommitted = false;
+              state.gestureCommitted = state.analysisDragged;
               reportCallbackError(error, event);
             } finally {
               cleanupInteraction(event, { suppressClick: true });
@@ -424,6 +436,7 @@
           const wasDragging = state.phase === boardInteractionPhases.DRAGGING;
           state.suppressClick = true;
           try {
+            if (!wasDragging && !state.longPressTriggered) clearAnalysisArrows("piece-select", board);
             callbacks.onHighlight?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
             callbacks.onAnimation?.({ type: wasDragging ? "drop" : "select", from: source, to: squareName(destination) }, event, state);
             if (wasDragging) callbacks.onDrop?.(source, squareName(destination), event, state);
@@ -479,7 +492,10 @@
             event.stopPropagation();
             return;
           }
-          if (canInteract(square, event)) callbacks.onSelect?.(squareName(square), event, state);
+          if (canInteract(square, event)) {
+            clearAnalysisArrows("piece-select", board);
+            callbacks.onSelect?.(squareName(square), event, state);
+          }
         };
         const onDragStart = (event) => {
           // Native HTML5 drag creates a second input pipeline. Pointer events
@@ -494,9 +510,14 @@
             event.preventDefault();
             return;
           }
-          if (!callbacks.onContextMenu) return;
+          if (!square) return;
+          const analysisBoard = callbacks.analysisGestures === true
+            || typeof callbacks.analysisGestures === "function"
+            || typeof callbacks.onContextMenu === "function";
+          if (!analysisBoard) return;
           event.preventDefault();
-          callbacks.onContextMenu(squareName(square), event, state);
+          clearAnalysisArrows("context-menu", board);
+          callbacks.onContextMenu?.(squareName(square), event, state);
         };
         const cancelKeyboardInteraction = (event) => {
           const source = state.from;
@@ -586,6 +607,7 @@
             // pointercancel before removing listeners so source-square state
             // and any drag ghost cannot be stranded.
             if (state.cleanupInProgress) return;
+            clearAnalysisArrows("board-teardown", board);
             cleanupInteraction({ pointerId: state.pointerId, type: "detach" }, {
               notifyCancel: state.pointerId !== null || state.phase !== boardInteractionPhases.IDLE || Boolean(state.from),
               suppressClick: true
@@ -647,10 +669,11 @@
       return paths;
     }
 
-    function animateBoardPieceTransition(board, move) {
+    function animateBoardPieceTransition(board, move, options = {}) {
       if (!boardMotionEnabled() || !(board instanceof HTMLElement)) return;
       const paths = getBoardMotionPaths(move);
       if (!paths.length) return;
+      const fade = options.fade !== false;
       const token = (boardMotionTokens.get(board) || 0) + 1;
       boardMotionTokens.set(board, token);
       window.requestAnimationFrame(() => {
@@ -668,12 +691,14 @@
           const dy = fromRect.top - toRect.top;
           piece.style.transition = "none";
           piece.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-          piece.style.opacity = "0.72";
+          if (fade) piece.style.opacity = "0.72";
           window.requestAnimationFrame(() => {
             if (!piece.isConnected) return;
-            piece.style.transition = "transform 150ms cubic-bezier(.2,.8,.2,1), opacity 150ms ease";
+            piece.style.transition = fade
+              ? "transform 150ms cubic-bezier(.2,.8,.2,1), opacity 150ms ease"
+              : "transform 150ms cubic-bezier(.2,.8,.2,1)";
             piece.style.transform = "translate3d(0, 0, 0)";
-            piece.style.opacity = "1";
+            if (fade) piece.style.opacity = "1";
             window.setTimeout(() => {
               if (!piece.isConnected || boardMotionTokens.get(board) !== token) return;
               piece.style.transform = previous.transform;
@@ -2904,6 +2929,127 @@
       description: track.description,
       previewText: track.label
     }));
+    // Arrow skins are cosmetic renderer profiles.  They are deliberately
+    // defined as data (rather than theme CSS) so board, piece, puzzle, and
+    // light/dark theme changes can never recolor an equipped arrow skin.
+    const arrowSkinThemes = Object.freeze({
+      default: {
+        label: "Classic Precision",
+        rarity: "Common",
+        cost: 0,
+        description: "The free baseline: simple, neutral, and immediately readable with no decorative effect.",
+        headPath: "M0.015,0.045 L0.105,0.15 L0.015,0.255 L0.325,0.15 Z",
+        shaftScale: 1,
+        primaryColor: "#8AA7B5",
+        shadow: "rgba(15, 30, 60, .38)",
+        inner: "rgba(237, 252, 255, .52)",
+        glow: "rgba(0,0,0,0)",
+        glowAlpha: 0
+      },
+      pulse: {
+        label: "Pulse",
+        rarity: "Rare",
+        cost: 150,
+        description: "Clean competitive precision: a slim cyan shaft and compact dart that stays quiet in calculation.",
+        headPath: "M0.018,0.061 L0.102,0.15 L0.018,0.239 L0.304,0.15 Z",
+        shaftScale: .95,
+        headScale: .96,
+        primaryColor: "#62D7FF",
+        shadow: "rgba(10, 37, 66, .42)",
+        inner: "rgba(239, 252, 255, .62)",
+        glowAlpha: .18
+      },
+      arcane: {
+        label: "Arcane",
+        rarity: "Epic",
+        cost: 420,
+        description: "A segmented faceted shaft, rune-cut crystal head, and controlled violet-blue identity.",
+        headPath: "M0.016,0.15 L0.069,0.026 L0.145,0.087 L0.325,0.15 L0.145,0.213 L0.069,0.274 Z",
+        markerDetails: Object.freeze([
+          Object.freeze({ d: "M0.069,0.026 L0.145,0.15 L0.069,0.274", opacity: .64 }),
+          Object.freeze({ d: "M0.145,0.087 L0.105,0.15 L0.145,0.213", opacity: .46 })
+        ]),
+        shaftDasharray: "0.13 0.055",
+        shaftScale: 1,
+        headScale: 1.04,
+        primaryColor: "#B58CFF",
+        shadow: "rgba(28, 18, 73, .46)",
+        inner: "rgba(242, 237, 255, .58)",
+        glowAlpha: .2
+      },
+      solaris: {
+        label: "Solaris",
+        rarity: "Legendary",
+        cost: 850,
+        description: "Royal Solaris: a refined gold spearhead with a quiet solar facet at its core.",
+        headPath: "M0.014,0.15 L0.078,0.042 L0.112,0.104 L0.325,0.15 L0.112,0.196 L0.078,0.258 Z",
+        markerDetails: Object.freeze([
+          Object.freeze({ d: "M0.078,0.042 L0.154,0.15 L0.078,0.258", opacity: .58 }),
+          Object.freeze({ d: "M0.112,0.104 L0.088,0.15 L0.112,0.196", opacity: .42 })
+        ]),
+        shaftScale: 1.04,
+        headScale: 1.08,
+        primaryColor: "#F6D579",
+        shadow: "rgba(63, 40, 12, .42)",
+        inner: "rgba(255, 249, 218, .7)",
+        glowAlpha: .2,
+        innerVisible: true,
+        innerWidth: .014,
+        innerOpacity: .44
+      },
+      voidflare: {
+        label: "Voidflare",
+        rarity: "Mythic",
+        cost: 1700,
+        description: "An asymmetric split geometry with indigo-violet energy and a distinctive forked head.",
+        headPath: "M0.015,0.15 L0.103,0.031 L0.14,0.103 L0.325,0.055 L0.23,0.15 L0.325,0.245 L0.14,0.197 L0.103,0.269 Z",
+        markerDetails: Object.freeze([
+          Object.freeze({ d: "M0.103,0.031 L0.23,0.15 L0.103,0.269", opacity: .5 }),
+          Object.freeze({ d: "M0.14,0.103 L0.185,0.15 L0.14,0.197", opacity: .36 })
+        ]),
+        shaftDasharray: "0.19 0.085",
+        shaftScale: .98,
+        headScale: 1.02,
+        primaryColor: "#9D83E2",
+        shadow: "rgba(5, 8, 24, .6)",
+        inner: "rgba(214, 232, 255, .5)",
+        glowAlpha: .14
+      },
+      celestial: {
+        label: "Celestial",
+        rarity: "Divine",
+        cost: 3400,
+        description: "A crafted crown-spear with an ivory-gold shaft and restrained celestial facets.",
+        headPath: "M0.012,0.15 L0.064,0.032 L0.105,0.102 L0.15,0.022 L0.194,0.109 L0.325,0.15 L0.194,0.191 L0.15,0.278 L0.105,0.198 L0.064,0.268 Z",
+        markerDetails: Object.freeze([
+          Object.freeze({ d: "M0.064,0.032 L0.15,0.15 L0.064,0.268", opacity: .54 }),
+          Object.freeze({ d: "M0.105,0.102 L0.15,0.15 L0.194,0.109", opacity: .42 })
+        ]),
+        shaftScale: 1.02,
+        headScale: 1.1,
+        primaryColor: "#F2E5B5",
+        shadow: "rgba(22, 33, 69, .44)",
+        inner: "rgba(255, 255, 244, .76)",
+        glowAlpha: .18,
+        innerVisible: true,
+        innerWidth: .012,
+        innerOpacity: .5
+      }
+    });
+    const arrowSkinStoreItems = Object.entries(arrowSkinThemes)
+      .map(([value, theme]) => ({
+        id: `arrowskin-${value}`,
+        type: "arrowSkin",
+        value,
+        name: `${theme.label} Arrow Skin`,
+        cost: theme.cost,
+        tag: "Arrow Skin",
+        category: "Arrow Skins",
+        rarity: theme.rarity,
+        rarityExact: true,
+        description: theme.description,
+        previewText: theme.label
+      }));
     // Sound packs remain available to the game/settings audio system, but are
     // intentionally retired from the Store catalog.
     const audioSfxStoreItems = [];
@@ -2992,6 +3138,7 @@
       ...flexBadgeStoreItems,
       ...nameStyleStoreItems,
       ...audioMusicStoreItems,
+      ...arrowSkinStoreItems,
       ...boardThemeStoreItems,
       ...premiumAvatarStoreItems,
       ...avatarEffectStoreItems,
@@ -3103,6 +3250,7 @@
     function normalizeStoreRarity(item = {}) {
       const explicit = storeRarityAliases[String(item.rarity || "").trim()] || String(item.rarity || "").trim();
       const explicitRank = Number.isInteger(storeRarityRank[explicit]) ? storeRarityRank[explicit] : 0;
+      if (item.rarityExact && explicit) return explicit;
       const floor = getStoreRarityFloor(item.cost);
       return storeRarityOrder[Math.max(explicitRank, storeRarityRank[floor] || 0)] || "Common";
     }
@@ -3116,6 +3264,7 @@
       if (["avatar", "frame", "avatarEffect", "flexBadge"].includes(item.type)) return "Profile · matches & leaderboards";
       if (item.type === "musicPack") return "Piano ambience · Store lounge & menus";
       if (item.type === "sfxPack") return "Audio · moves, captures & puzzles";
+      if (item.type === "arrowSkin") return "Arrows · Play, Puzzles & Game Review";
       if (item.type === "archetype") return "Coach style · board & training";
       if (item.type === "trail") return "Celebrations · wins & puzzles";
       return item.tag || "Profile";
@@ -3189,6 +3338,7 @@
       if (item.type === "backgroundTheme") next.backgroundTheme = item.value;
       if (item.type === "archetype") next.archetype = item.value;
       if (item.type === "nameStyle") { next.nameStyle = item.value; next.nameFx = "on"; }
+      if (item.type === "arrowSkin") next.arrowSkin = normalizeArrowSkinValue(item.value);
       if (item.type === "musicPack") next.audio = { ...(next.audio || {}), musicPack: item.value };
       if (item.type === "sfxPack") next.audio = { ...(next.audio || {}), sfxPack: item.value };
       if (item.type === "title") next.title = item.value;
@@ -3727,6 +3877,7 @@
     let realPuzzleMoveSans = [];
     let realPuzzleFlipped = false;
     let realPuzzleReplaying = false;
+    let realPuzzleAnalysisEnabled = false;
     const realPuzzlePhases = Object.freeze(["Loading", "PlayerTurn", "Validate", "OpponentMove", "Success", "Failed", "Completed"]);
     const realPuzzleTransitions = Object.freeze({
       Loading: new Set(["PlayerTurn", "Failed", "Success", "Completed"]),
@@ -4595,8 +4746,7 @@
               id: `tutorial-user-arrow:${selectedTutorialSquare}-${square}`,
               from: selectedTutorialSquare,
               to: square,
-              kind: "primary",
-              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "cyan"
+              kind: "primary"
             });
             selectedTutorialSquare = "";
             renderTutorialBoard();
@@ -4608,13 +4758,9 @@
           toggleAnalysisHighlight(board, { id: `tutorial-user-highlight:${square}`, square, kind: "coach", color: "blue" });
         },
         onCancel() {
-          clearAnalysisUserOverlay(board);
           if (!selectedTutorialSquare) return;
           selectedTutorialSquare = "";
           renderTutorialBoard();
-        },
-        onContextMenu() {
-          clearAnalysisUserOverlay(board);
         }
       });
       const tutorialEffectKey = tutorialLastMove?.join("-") || "";
@@ -4625,7 +4771,7 @@
       renderAnalysisOverlay({
         board,
         wrap: board,
-        arrows: tutorialLastMove?.length === 2 ? [{ id: "tutorial-last-move", from: tutorialLastMove[0], to: tutorialLastMove[1], kind: "training", color: "cyan" }] : [],
+        arrows: tutorialLastMove?.length === 2 ? [{ id: "tutorial-last-move", from: tutorialLastMove[0], to: tutorialLastMove[1], kind: "training" }] : [],
         highlights: [
           ...(selectedTutorialSquare ? [{ id: "tutorial-selected", square: selectedTutorialSquare, kind: "selected", color: "blue" }] : []),
           ...legalTargets.map((square) => ({ id: `tutorial-legal:${square}`, square, kind: "legal", color: "yellow" }))
@@ -5376,8 +5522,7 @@
               id: `opening-user-arrow:${openingExplorerRuntime.selected}-${square}`,
               from: openingExplorerRuntime.selected,
               to: square,
-              kind: "primary",
-              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "cyan"
+              kind: "primary"
             });
             openingExplorerRuntime.selected = "";
             renderOpeningExplorerBoard();
@@ -5389,7 +5534,6 @@
           toggleAnalysisHighlight(board, { id: `opening-user-highlight:${square}`, square, kind: "coach", color: "yellow" });
         },
         onCancel(source, event, state) {
-          clearAnalysisUserOverlay(board);
           if (event?.type === "opening-render") {
             openingExplorerRuntime.selected = "";
             return;
@@ -5402,9 +5546,6 @@
           if (!openingExplorerRuntime.selected) return;
           openingExplorerRuntime.selected = "";
           renderOpeningExplorerBoard();
-        },
-        onContextMenu() {
-          clearAnalysisUserOverlay(board);
         }
       });
       const openingEffectKey = openingLastMove ? `${openingExplorerRuntime.moveIndex}-${openingLastMove.from}-${openingLastMove.to}-${openingLastMove.san || ""}` : "";
@@ -5437,7 +5578,6 @@
           from: openingGuidance.expected.move.from,
           to: openingGuidance.expected.move.to,
           kind: "best",
-          color: "yellow",
           priority: "best",
           label: `${openingGuidance.prefix}${openingGuidance.expected.san}`
         }] : [],
@@ -5477,6 +5617,7 @@
           button.className = `opening-explorer-line${lineIndex === openingExplorerRuntime.lineIndex ? " is-active" : ""}`;
           button.append(createBookText("strong", "", line.label), createBookText("span", "", line.description), createBookText("small", "", line.moves.join(" ")));
           button.addEventListener("click", () => {
+            clearAnalysisArrows("opening-line-change", document.getElementById("openingExplorerBoard"));
             openingExplorerRuntime.lineIndex = lineIndex;
             openingExplorerRuntime.moves = openingExplorerRuntime.mode === "explore" ? [...line.moves] : [];
             openingExplorerRuntime.moveIndex = openingExplorerRuntime.mode === "explore" ? line.moves.length : 0;
@@ -5497,6 +5638,7 @@
           button.className = `opening-explorer-result${result.title === entry.title ? " is-active" : ""}`;
           button.append(createBookText("strong", "", result.title), createBookText("span", "", `ECO ${result.eco}`));
           button.addEventListener("click", () => {
+            clearAnalysisArrows("opening-change", document.getElementById("openingExplorerBoard"));
             openingExplorerRuntime.entry = result;
             openingExplorerRuntime.lineIndex = 0;
             openingExplorerRuntime.moves = [];
@@ -5524,6 +5666,7 @@
       document.getElementById("openingExplorerModeRecall")?.addEventListener("click", () => setOpeningExplorerMode("recall"));
       document.getElementById("openingExplorerHint")?.addEventListener("click", advanceOpeningExplorerHint);
       document.getElementById("openingExplorerReset")?.addEventListener("click", () => {
+        clearAnalysisArrows("opening-reset", document.getElementById("openingExplorerBoard"));
         openingExplorerRuntime.moves = [];
         openingExplorerRuntime.moveIndex = 0;
         openingExplorerRuntime.selected = "";
@@ -5532,6 +5675,7 @@
         renderOpeningExplorerBoard();
       });
       document.getElementById("openingExplorerPrev")?.addEventListener("click", () => {
+        clearAnalysisArrows("opening-previous", document.getElementById("openingExplorerBoard"));
         const nextIndex = Math.max(0, openingExplorerRuntime.moveIndex - 1);
         openingExplorerRuntime.moves = openingExplorerRuntime.mode === "explore"
           ? openingExplorerRuntime.moves
@@ -5543,6 +5687,7 @@
         renderOpeningExplorerBoard();
       });
       document.getElementById("openingExplorerNext")?.addEventListener("click", () => {
+        clearAnalysisArrows("opening-next", document.getElementById("openingExplorerBoard"));
         const nextIndex = Math.min(getOpeningExplorerLine().moves?.length || openingExplorerRuntime.moves.length, openingExplorerRuntime.moveIndex + 1);
         openingExplorerRuntime.moves = openingExplorerRuntime.mode === "explore"
           ? openingExplorerRuntime.moves
@@ -6249,6 +6394,7 @@
         id: String(record.id || "").trim(),
         completedAt: Number.isNaN(completedAt.getTime()) ? new Date().toISOString() : completedAt.toISOString(),
         mode: String(record.mode || "Game").trim().slice(0, 30) || "Game",
+        opponentId: String(record.opponentId || record.opponent_id || record.opponentPublicId || "").trim(),
         opponentName: String(record.opponentName || "Opponent").trim().slice(0, 48) || "Opponent",
         opponentTitle: String(record.opponentTitle || "").trim().slice(0, 48),
         opponentRating: Math.max(0, Number(record.opponentRating) || 0),
@@ -6410,8 +6556,10 @@
         const copy = document.createElement("div");
         const date = game.completedAt ? new Date(game.completedAt).toLocaleDateString() : "Recent game";
         const rating = game.opponentRating ? ` · ${formatProfileNumber(game.opponentRating)} Elo` : "";
+        const heading = createBookText("strong", "match-history-heading", `${game.mode} vs `);
+          heading.append(createPlayerIdentity({ name: game.opponentName, title: game.opponentTitle || "", avatar: game.opponentAvatar || "?", profileId: game.opponentId, isPlayer: false }, { isPlayer: false, profileId: game.opponentId, variant: "compact", showAvatar: false, showSubtitle: false, nameTag: "span", linkProfile: Boolean(game.opponentId), profileTarget: heading }), document.createTextNode(rating));
         copy.append(
-          createBookText("strong", "", `${game.mode} vs ${game.opponentName}${rating}`),
+          heading,
           createBookText("small", "", `${date} · ${game.moves || 0} moves · ${game.termination}`)
         );
         const review = game.reviewPgn ? matchReviews.find((entry) => entry?.pgn === game.reviewPgn && entry?.moves?.length && entry?.summary) : null;
@@ -6626,7 +6774,7 @@
 
     function normalizeStoreState(saved = {}) {
       const validIds = new Set(storeItems.map((item) => item.id));
-      const defaultOwned = ["background-classic", "board-wood", "border-classic", "archetype-balanced", "name-classic", "lastmove-classic", "avatarfx-none", ...pieceSetStoreItems.filter((item) => !item.cost).map((item) => item.id)];
+      const defaultOwned = ["background-classic", "board-wood", "border-classic", "archetype-balanced", "name-classic", "lastmove-classic", "avatarfx-none", ...pieceSetStoreItems.filter((item) => !item.cost).map((item) => item.id), ...arrowSkinStoreItems.filter((item) => !item.cost).map((item) => item.id)];
       const legacyStoreIdMap = {
         "lastmove-lime": "lastmove-emerald",
         "lastmove-sky": "lastmove-royal",
@@ -6980,6 +7128,31 @@
       }[value] || "rgba(231, 182, 93, 0.24)";
     }
 
+    // All identity surfaces resolve the equipped style through this small
+    // contract.  A surface may scale the result, but it must not invent a
+    // second navbar/profile cosmetic implementation.
+    function getEquippedNameStyle() {
+      const prefs = readLearnerPrefs();
+      return nameStyleThemes[prefs.nameStyle] ? prefs.nameStyle : "classic";
+    }
+
+    function resolveNameStyle(styleValue = getEquippedNameStyle()) {
+      const value = nameStyleThemes[styleValue] ? styleValue : "classic";
+      const theme = getNameStyleTheme(value);
+      const glow = getNameStyleGlow(value);
+      const premium = theme.rarity !== "Common";
+      return {
+        value,
+        theme,
+        glow,
+        gradient: "var(--name-gradient)",
+        color: premium ? "transparent" : "var(--text)",
+        shadow: premium ? `0 0 2px rgba(255, 255, 255, 0.38), 0 0 9px ${glow}, 0 0 18px color-mix(in srgb, ${glow} 58%, transparent)` : "none",
+        fontWeight: premium ? "1000" : "800",
+        letterSpacing: "0"
+      };
+    }
+
     function getAudioMusicTheme(value) {
       return premiumPianoTracks[value] || audioMusicThemes[value] || audioMusicThemes.calm;
     }
@@ -7039,10 +7212,10 @@
       applyLastMoveHighlightTheme("random");
     }
 
-    function applyNameStyleToElement(element, styleValue, text) {
+    function applyNameStyleToTextElement(element, styleValue, text) {
       if (!element) return;
-      const value = nameStyleThemes[styleValue] ? styleValue : "classic";
-      const theme = getNameStyleTheme(value);
+      const resolved = resolveNameStyle(styleValue);
+      const { value, theme } = resolved;
       if (["Legendary", "Mythic", "Divine"].includes(theme.rarity) && document.body.classList.contains("name-effects-off")) {
         const prefs = readLearnerPrefs();
         document.body.classList.remove("name-effects-off");
@@ -7051,9 +7224,12 @@
       if (text != null) element.textContent = text;
       element.dataset.nameText = element.textContent || "";
       element.classList.add("styled-username");
-      const nameGlow = getNameStyleGlow(value);
-      element.style.setProperty("--name-glow", nameGlow);
-      element.style.setProperty("--name-aura", nameGlow);
+      element.style.setProperty("--name-glow", resolved.glow);
+      element.style.setProperty("--name-aura", resolved.glow);
+      element.style.setProperty("--name-color", resolved.color);
+      element.style.setProperty("--name-shadow", resolved.shadow);
+      element.style.setProperty("--name-font-weight", resolved.fontWeight);
+      element.style.setProperty("--name-letter-spacing", resolved.letterSpacing);
       Object.keys(nameStyleThemes).forEach((key) => element.classList.remove(`name-style-${key}`));
       element.classList.add(`name-style-${value}`);
       element.dataset.nameStyle = value;
@@ -7061,13 +7237,13 @@
       element.dataset.rarity = theme.rarity;
       element.dataset.nameLive = element.classList.contains("store-preview-name-style") ? "preview" : "true";
       element.title = `${theme.label} name style`;
-      const shell = element.closest(".player-flex-chip, .match-player-card, .player-profile, .login-pass, .login-pass-hero");
+      const shell = element.closest(".player-identity-shell, .player-identity, .player-flex-chip, .match-player-card, .player-profile, .login-pass, .login-pass-hero, .leaderboard-row, .friends-hub-card, .friend-result-card, .review-player-chip, .match-history-item, .tournament-standing-row, .tournament-chat-line");
       if (shell) {
         shell.dataset.nameStyle = value;
         shell.dataset.nameEffect = theme.effect || value;
         shell.dataset.nameRarity = theme.rarity || "Common";
-        shell.style.setProperty("--name-glow", nameGlow);
-        shell.style.setProperty("--name-aura", nameGlow);
+        shell.style.setProperty("--name-glow", resolved.glow);
+        shell.style.setProperty("--name-aura", resolved.glow);
       }
     }
 
@@ -7102,12 +7278,16 @@
       ];
       document.querySelectorAll(selectors.join(",")).forEach((element) => {
         if (["INPUT", "TEXTAREA", "SELECT", "OPTION"].includes(element.tagName)) return;
+        // Remote identities are rendered from their public cosmetic payload
+        // by the shared pipeline.  The legacy global pass must not flatten
+        // them back to the signed-in player's style.
+        if (element.closest(".player-identity-line")?.dataset.identityOwner === "remote") return;
         const current = String(element.textContent || "").trim();
         const shouldUseProfileName = element.matches('[data-match-name], [data-profile-field="name"], [data-account-field="username"], #loginDisplayName, [data-user-name], [data-username-display], [data-profile-name], [data-player-name], [data-leaderboard-name], [data-match-history-name], [data-friend-name], [data-styled-username]')
           || !current
           || current === "Player"
           || current === "Guest Explorer";
-        applyNameStyleToElement(element, prefs.nameStyle, shouldUseProfileName ? text : current);
+        applyNameStyleToTextElement(element, prefs.nameStyle, shouldUseProfileName ? text : current);
       });
     }
 
@@ -7198,6 +7378,7 @@
       if (type === "backgroundTheme") return `background-${prefs.backgroundTheme || "classic"}`;
       if (type === "archetype") return `archetype-${prefs.archetype || "balanced"}`;
       if (type === "nameStyle") return `name-${prefs.nameStyle || "classic"}`;
+      if (type === "arrowSkin") return `arrowskin-${normalizeArrowSkinValue(prefs.arrowSkin)}`;
       if (type === "musicPack") return `music-${prefs.audio?.musicPack || "calm"}`;
       if (type === "sfxPack") return `sfx-${prefs.audio?.sfxPack || "classic"}`;
       if (type === "title") return prefs.title ? storeItems.find((item) => item.type === "title" && item.value === prefs.title)?.id || "" : "";
@@ -7220,7 +7401,11 @@
     const storePreviewCache = new Map();
     function buildStorePreview(item) {
       const cacheKey = item?.id || "";
-      if (cacheKey && storePreviewCache.has(cacheKey)) return storePreviewCache.get(cacheKey).cloneNode(true);
+      // Arrow previews contain generated SVG marker IDs.  Reusing a clone
+      // would duplicate those IDs when the same skin appears in cards,
+      // inventory, and recommendations, so render each preview instance.
+      const cacheable = cacheKey && item?.type !== "arrowSkin";
+      if (cacheable && storePreviewCache.has(cacheKey)) return storePreviewCache.get(cacheKey).cloneNode(true);
       const preview = document.createElement("div");
       preview.className = "store-preview";
       if (item.inlineSvg) {
@@ -7228,7 +7413,7 @@
         art.className = "store-preview-inline-svg";
         art.innerHTML = item.inlineSvg;
         preview.appendChild(art);
-        if (cacheKey) storePreviewCache.set(cacheKey, preview.cloneNode(true));
+        if (cacheable) storePreviewCache.set(cacheKey, preview.cloneNode(true));
         return preview;
       }
       if (item.type === "board") {
@@ -7272,7 +7457,7 @@
         preview.appendChild(badge);
       } else if (item.type === "nameStyle") {
         const sample = createBookText("span", "store-preview-name-style", "MateMaster");
-        applyNameStyleToElement(sample, item.value, "MateMaster");
+        applyNameStyleToTextElement(sample, item.value, "MateMaster");
         preview.appendChild(sample);
       } else if (item.type === "musicPack") {
         const theme = getAudioMusicTheme(item.value);
@@ -7288,6 +7473,8 @@
         const bars = audioPreview.querySelector(".audio-bars");
         if (bars) bars.innerHTML = "<i></i><i></i><i></i><i></i>";
         preview.appendChild(audioPreview);
+      } else if (item.type === "arrowSkin") {
+        preview.appendChild(createArrowSkinPreview(item));
       } else if (item.type === "sfxPack") {
         const pack = getAudioSfxPack(item.value);
         const audioPreview = createBookText("span", "store-preview-audio", "");
@@ -7304,7 +7491,7 @@
       } else {
         preview.appendChild(createBookText("span", "store-preview-flair", item.previewText || item.name));
       }
-      if (cacheKey) storePreviewCache.set(cacheKey, preview.cloneNode(true));
+      if (cacheable) storePreviewCache.set(cacheKey, preview.cloneNode(true));
       return preview;
     }
 
@@ -7326,6 +7513,7 @@
     }
 
     async function equipStoreItem(item) {
+      if (item?.type === "arrowSkin" && !isStoreItemOwned(item)) return false;
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
         renderStoreSyncFeedback();
         return false;
@@ -7374,6 +7562,7 @@
         nextPrefs.nameStyle = item.value;
         if (item.value !== "classic") nextPrefs.nameFx = "on";
       }
+      if (item.type === "arrowSkin") nextPrefs.arrowSkin = normalizeArrowSkinValue(item.value);
       if (item.type === "musicPack") nextPrefs.audio = { ...(nextPrefs.audio || {}), musicPack: item.value };
       if (item.type === "sfxPack") nextPrefs.audio = { ...(nextPrefs.audio || {}), sfxPack: item.value };
       if (item.type === "title") nextPrefs.title = item.value;
@@ -7395,6 +7584,9 @@
       else syncAudioSystem(nextPrefs.audio);
       playAudioCue("equip");
       recordStoreHistory("equipped", item);
+      // Keep every mounted identity in sync even when the Store inventory's
+      // quick-equip action bypasses the larger purchase flow.
+      renderPlayerIdentityExtras(getDragonProfileSnapshot());
       return true;
     }
 
@@ -7568,7 +7760,7 @@
       const style = getNameStyleTheme(item.value);
       const owned = new Set(storeState.owned || []).has(item.id);
       nameStyleStoreUi.preview = item.value;
-      applyNameStyleToElement(preview, item.value, getDragonProfileSnapshot().name || "MateMaster");
+      applyNameStyleToTextElement(preview, item.value, getDragonProfileSnapshot().name || "MateMaster");
       meta.textContent = `${style.label} | ${style.rarity} | ${style.animation} | ${item.cost ? `${formatProfileNumber(item.cost)} coins` : "Free"}${owned ? " | Owned" : " | Locked until purchased"}`;
     }
 
@@ -7983,6 +8175,7 @@
         : ["skin", "pieceFinish"].includes(item.type) ? "Chess Pieces"
         : ["avatar", "frame", "avatarEffect"].includes(item.type) ? "Avatars"
         : item.type === "archetype" ? "Style"
+        : item.type === "arrowSkin" ? "Arrow Skins"
         : item.type === "flexBadge" ? "Flex Badges"
         : item.type === "nameStyle" ? "Name Styles"
         : ["musicPack", "sfxPack"].includes(item.type) ? "Music"
@@ -8050,7 +8243,7 @@
       };
     }
     function getFeaturedStoreItems() {
-      const cosmeticTypes = new Set(["backgroundTheme", "board", "skin", "avatar", "frame", "avatarEffect", "nameStyle", "lastMove", "musicPack", "sfxPack"]);
+      const cosmeticTypes = new Set(["backgroundTheme", "board", "skin", "avatar", "frame", "avatarEffect", "nameStyle", "lastMove", "musicPack", "sfxPack", "arrowSkin"]);
       const pool = storeItems.filter((item) => cosmeticTypes.has(item.type) && getStoreUnlockMethod(item) === "Coins");
       const selected = [];
       const rotation = Math.floor(Date.now() / 86400000);
@@ -8477,6 +8670,7 @@
         "Chess Pieces": "Choose your style. Play in your legend. Premium themes stay readable on every board.",
         Style: "Choose the personality shown on your board. One archetype equips at a time.",
         Music: "Three carefully selected piano recordings for a quiet, premium Store lounge. Sound packs remain part of game audio, not the Store catalog.",
+        "Arrow Skins": "Classic Precision is the free baseline; premium skins add distinct silhouettes while staying crisp in Play, AI Bots, Puzzles, Explorer, and Review.",
         Achievements: "Prestige rewards earned through milestones, campaign clears, and seasonal challenges. They are never sold for coins.",
         "Flex Badges": "Own many badges, equip one flex badge for games, matchmaking, and leaderboards.",
         "Name Styles": "Cosmetic username effects only. They never change gameplay.",
@@ -8493,13 +8687,14 @@
         "Chess Pieces": "Piece Sets",
         Style: "Style",
         Music: "Music",
+        "Arrow Skins": "Arrow Skins",
         Achievements: "Achievements",
         Avatars: "Avatars",
         Boards: "Boards",
         Bundles: "Bundles",
         Currency: "Currency"
       };
-      const categoryOrder = ["Featured", "Boards", "Chess Pieces", "Backgrounds", "Style", "Avatars", "Bundles", "Currency", "Flex Badges", "Name Styles", "Highlights", "Music", "Profile", "Achievements"];
+      const categoryOrder = ["Featured", "Boards", "Chess Pieces", "Backgrounds", "Style", "Avatars", "Bundles", "Currency", "Flex Badges", "Name Styles", "Highlights", "Music", "Arrow Skins", "Profile", "Achievements"];
       if (!categoryOrder.includes(activeStoreCategory)) activeStoreCategory = "Featured";
       if (tabs) {
         tabs.replaceChildren(...categoryOrder.map((category) => {
@@ -8609,7 +8804,7 @@
               : item.type === "lastMove"
                 ? prefs.lastMoveFavorites.includes(item.value)
                 : ["musicPack", "sfxPack"].includes(item.type) && ((prefs.musicFavorites || []).includes(`${item.type}:${item.value}`) || (prefs.musicFavorites || []).includes(item.value));
-          card.className = `store-card${isOwned ? " is-owned" : ""}${isEquipped ? " is-equipped" : ""}${item.type === "board" ? " is-board-theme" : ""}${["skin", "pieceFinish"].includes(item.type) ? " is-piece-set" : ""}${item.type === "backgroundTheme" ? " is-background-theme" : ""}${item.type === "nameStyle" ? " is-name-style" : ""}${["avatar", "frame", "avatarEffect"].includes(item.type) ? " is-avatar-cosmetic" : ""}${item.petAvatar ? " is-pet-avatar" : ""}${item.type === "lastMove" ? " is-highlight" : ""}${["musicPack", "sfxPack"].includes(item.type) ? " is-music-pack" : ""}${isFavorite ? " is-favorite" : ""}`;
+          card.className = `store-card${isOwned ? " is-owned" : ""}${isEquipped ? " is-equipped" : ""}${item.type === "board" ? " is-board-theme" : ""}${["skin", "pieceFinish"].includes(item.type) ? " is-piece-set" : ""}${item.type === "backgroundTheme" ? " is-background-theme" : ""}${item.type === "nameStyle" ? " is-name-style" : ""}${["avatar", "frame", "avatarEffect"].includes(item.type) ? " is-avatar-cosmetic" : ""}${item.petAvatar ? " is-pet-avatar" : ""}${item.type === "lastMove" ? " is-highlight" : ""}${["musicPack", "sfxPack"].includes(item.type) ? " is-music-pack" : ""}${item.type === "arrowSkin" ? " is-arrow-skin" : ""}${isFavorite ? " is-favorite" : ""}`;
           card.dataset.rarity = displayRarity;
           card.dataset.unlockMethod = unlockMethod;
           if (hasPremiumTier) card.dataset.premiumTier = "true";
@@ -8651,7 +8846,7 @@
               if (isEquipped && item.value !== "classic") resetLastMoveHighlight();
               else buyOrEquipStoreItem(item.id);
             });
-          } else if (["musicPack", "sfxPack"].includes(item.type)) {
+          } else if (["musicPack", "sfxPack", "arrowSkin"].includes(item.type)) {
             button.textContent = isEquipped ? "Equipped" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${item.cost}` : unlockLabel;
             button.disabled = isEquipped;
             button.addEventListener("click", () => buyOrEquipStoreItem(item.id));
@@ -8745,7 +8940,7 @@
             createBookText("h3", "", item.name),
             createBookText("p", "", item.description),
             meta,
-            ["backgroundTheme", "board", "skin", "nameStyle", "lastMove", "musicPack", "sfxPack", "avatar", "frame", "avatarEffect"].includes(item.type) ? actions : button
+            ["backgroundTheme", "board", "skin", "nameStyle", "lastMove", "musicPack", "sfxPack", "arrowSkin", "avatar", "frame", "avatarEffect"].includes(item.type) ? actions : button
           );
           nodes.push(card);
         });
@@ -10248,25 +10443,9 @@
     }
 
     function applyAvatarRankBadges(profile = getDragonProfileSnapshot()) {
-      const rank = getAvatarRankBadge(profile);
-      const prefs = readLearnerPrefs();
-      const effectItem = storeItems.find((item) => item.type === "avatarEffect" && item.value === prefs.avatarEffect);
-      const frameItem = storeItems.find((item) => item.type === "frame" && item.value === prefs.avatarFrame);
-      document.querySelectorAll(".player-profile-avatar, .match-player-avatar, .login-avatar").forEach((avatar) => {
-        avatar.dataset.rankTier = rank.tier;
-        avatar.dataset.rankBadge = rank.badge;
-        avatar.dataset.avatarEffect = prefs.avatarEffect || "none";
-        avatar.dataset.avatarEffectRarity = effectItem?.rarity || "Common";
-        avatar.dataset.avatarFrame = prefs.avatarFrame || "";
-        avatar.dataset.avatarFrameRarity = frameItem?.rarity || "Common";
-        if (profile.avatarIsPet && ["Legendary", "Mythic", "Divine"].includes(profile.avatarRarity)) {
-          avatar.dataset.petRarity = profile.avatarRarity;
-          avatar.dataset.petId = profile.avatarPetId || "";
-        } else {
-          delete avatar.dataset.petRarity;
-          delete avatar.dataset.petId;
-        }
-        avatar.title = `${profile.avatarLabel || "Player avatar"} - ${rank.label}`;
+      const model = getPlayerIdentityModel(profile, { profile, isPlayer: true, variant: "standard" });
+      document.querySelectorAll(".player-profile-avatar, .match-player-avatar, .login-avatar, .player-identity-avatar[data-identity-owner=\"player\"], [data-identity-owner=\"player\"] .player-identity-avatar").forEach((avatar) => {
+        applySharedAvatarElement(avatar, model, { variant: avatar.dataset.identityVariant || "standard" });
       });
     }
 
@@ -10324,22 +10503,178 @@
       return match ? { short: match[0], full: clean, tier: match[2] } : null;
     }
 
-    function syncIdentityLine(line, nameSelector, flag, icons, title, countryCode = "") {
-      const name = line?.querySelector(nameSelector);
-      if (!name) return;
-      let flagEl = line.querySelector("[data-player-country]");
+    /**
+     * Shared player-identity model and renderer.
+     *
+     * Every surface (profile, nav, boards, social cards, rankings and review)
+     * feeds this same model so equipped presentation cosmetics cannot silently
+     * fall back to plain text in one route.  Remote/AI identities can provide
+     * their own values; the signed-in player's equipped values are the safe
+     * default when no override is supplied.
+     */
+    function getPlayerIdentityModel(source = {}, options = {}) {
+      const profile = options.profile || getDragonProfileSnapshot();
+      const prefs = options.prefs || readLearnerPrefs();
+      const isPlayer = options.isPlayer !== undefined
+        ? Boolean(options.isPlayer)
+        : source.isPlayer !== undefined ? Boolean(source.isPlayer) : true;
+      const name = String(source.name || source.displayName || source.username || options.name || (isPlayer ? profile.name : "Player")).trim() || (isPlayer ? "Guest Explorer" : "Player");
+      const requestedNameStyle = source.nameStyle || options.nameStyle || (isPlayer ? prefs.nameStyle : "classic");
+      const nameStyle = nameStyleThemes[requestedNameStyle] ? requestedNameStyle : "classic";
+      const avatar = String(source.avatar || options.avatar || (isPlayer ? profile.avatar : "?")).trim() || "?";
+      const level = String(source.level || options.level || (isPlayer ? profile.level : "")).trim();
+      const title = String(source.title ?? options.title ?? (isPlayer ? (prefs.title || profile.rank) : "")).trim();
+      const avatarProfile = isPlayer
+        ? {
+          ...profile,
+          name,
+          avatar,
+          level: level || profile.level,
+          avatarRarity: source.avatarRarity || profile.avatarRarity,
+          avatarIsPet: source.avatarIsPet ?? profile.avatarIsPet,
+          avatarPetId: source.avatarPetId || profile.avatarPetId
+        }
+        : {
+          ...profile,
+          name,
+          avatar,
+          level: level || "Level 1 Explorer",
+          avatarRarity: source.avatarRarity || "",
+          avatarIsPet: Boolean(source.avatarIsPet),
+          avatarPetId: source.avatarPetId || ""
+        };
+      const rank = getAvatarRankBadge(avatarProfile);
+      const effectValue = source.avatarEffect || options.avatarEffect || (isPlayer ? prefs.avatarEffect : "none");
+      const frameValue = source.avatarFrame || options.avatarFrame || (isPlayer ? prefs.avatarFrame : "");
+      const effectItem = storeItems.find((item) => item.type === "avatarEffect" && item.value === effectValue);
+      const frameItem = storeItems.find((item) => item.type === "frame" && item.value === frameValue);
+      const suppliedIcons = Array.isArray(source.icons) ? source.icons : null;
+      const profileId = String(source.profileId || source.publicId || source.public_id || options.profileId || "").trim();
+      return {
+        isPlayer,
+        profileId,
+        name,
+        title,
+        subtitle: String(source.subtitle ?? options.subtitle ?? level).trim(),
+        level,
+        avatar,
+        avatarImage: String(source.avatarImage || options.avatarImage || "").trim(),
+        avatarLabel: String(source.avatarLabel || options.avatarLabel || (isPlayer ? profile.avatarLabel : `${name} avatar`)).trim(),
+        avatarRarity: source.avatarRarity || profile.avatarRarity || "",
+        avatarIsPet: Boolean(source.avatarIsPet ?? profile.avatarIsPet),
+        avatarPetId: source.avatarPetId || profile.avatarPetId || "",
+        countryCode: normalizeCountryFlagValue(source.countryCode || source.countryFlag || source.country_flag || source.country || options.countryCode || (isPlayer ? readLearnerProfile().countryFlag : "")),
+        nameStyle,
+        nameStyleTheme: getNameStyleTheme(nameStyle),
+        nameFx: source.nameFx || options.nameFx || (isPlayer ? prefs.nameFx : "on"),
+        avatarFrame: frameValue && frameItem ? frameValue : "",
+        avatarFrameRarity: frameItem?.rarity || "Common",
+        avatarEffect: effectValue && effectItem ? effectValue : "none",
+        avatarEffectRarity: effectItem?.rarity || "Common",
+        rankTier: rank.tier,
+        rankBadge: rank.badge,
+        rankLabel: rank.label,
+        icons: suppliedIcons || (isPlayer ? getEarnedPlayerIcons(profile) : []),
+        variant: options.variant || "standard"
+      };
+    }
+
+    function applySharedAvatarElement(avatar, model, options = {}) {
+      if (!avatar || !model) return;
+      avatar.classList.add("player-identity-avatar");
+      avatar.dataset.identityOwner = model.isPlayer ? "player" : "remote";
+      avatar.dataset.identityVariant = options.variant || model.variant || "standard";
+      avatar.dataset.rankTier = model.rankTier || "explorer";
+      avatar.dataset.rankBadge = model.rankBadge || "1";
+      avatar.dataset.avatarEffect = model.avatarEffect || "none";
+      avatar.dataset.avatarEffectRarity = model.avatarEffectRarity || "Common";
+      avatar.dataset.avatarFrame = model.avatarFrame || "";
+      if (model.avatarIsPet && ["Legendary", "Mythic", "Divine"].includes(model.avatarRarity)) {
+        avatar.dataset.petRarity = model.avatarRarity;
+        avatar.dataset.petId = model.avatarPetId || "";
+      } else {
+        delete avatar.dataset.petRarity;
+        delete avatar.dataset.petId;
+      }
+      avatar.title = `${model.avatarLabel || "Player avatar"} - ${model.rankLabel || "Explorer Rank"}`;
+      if (model.avatarImage && typeof renderCoachAvatar === "function") {
+        renderCoachAvatar(avatar, { imageUrl: model.avatarImage, fallback: model.avatar || "?", label: `${model.name} avatar` });
+      } else if (!avatar.querySelector("img")) {
+        avatar.textContent = model.avatar || "?";
+      }
+    }
+
+    function bindPlayerIdentityProfileTarget(target, model, options = {}) {
+      if (!target || !model || options.linkProfile !== true || !model.profileId) return;
+      target.dataset.playerProfileId = model.profileId;
+      target.classList.add("player-identity-link");
+      target.__playerIdentityFallback = {
+        id: model.profileId,
+        name: model.name,
+        title: model.title,
+        country: model.countryCode,
+        avatar: model.avatar,
+        avatarImage: model.avatarImage,
+        nameStyle: model.nameStyle,
+        avatarFrame: model.avatarFrame,
+        avatarEffect: model.avatarEffect,
+        avatarRarity: model.avatarRarity
+      };
+      if (target.dataset.playerIdentityProfileBound === "true") return;
+      target.dataset.playerIdentityProfileBound = "true";
+      if (!target.matches("button, a")) {
+        target.setAttribute("role", "link");
+        if (!target.hasAttribute("tabindex")) target.tabIndex = 0;
+      }
+      const open = (event) => {
+        if (event.defaultPrevented) return;
+        if (event.type === "click" && event.button !== undefined && event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void openPublicPlayerProfile(target.dataset.playerProfileId, { fallback: target.__playerIdentityFallback });
+      };
+      target.addEventListener("click", open);
+      target.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        open(event);
+      });
+    }
+
+    function renderSharedIdentityLine(line, model, options = {}) {
+      if (!line || !model) return null;
+      const nameSelector = options.nameSelector || "[data-player-identity-name], [data-match-name], [data-profile-field=\"name\"], #loginDisplayName, strong, span";
+      const lineIsNameElement = Boolean(line.matches?.(nameSelector));
+      const name = lineIsNameElement ? line : line.querySelector(nameSelector);
+      if (!name) return null;
+      const markerScope = lineIsNameElement ? (line.parentElement || line) : line;
+      line.classList.add("player-identity-line");
+      line.dataset.identityOwner = model.isPlayer ? "player" : "remote";
+      line.dataset.identityVariant = options.variant || model.variant || "standard";
+      line.dataset.identityNameStyle = model.nameStyle;
+      line.dataset.identityNameRarity = model.nameStyleTheme.rarity || "Common";
+      if (model.profileId) line.dataset.playerProfileId = model.profileId;
+      const shell = line.closest(".player-identity, .player-flex-chip, .match-player-card, .player-profile, .login-pass, .leaderboard-row, .leaderboard-name, .friends-hub-card, .friend-result-card, .review-player-chip, .match-history-item, .tournament-standing-row, .tournament-chat-line") || line;
+      shell.classList.add("player-identity-shell");
+      shell.dataset.nameStyle = model.nameStyle;
+      shell.dataset.nameEffect = model.nameStyleTheme.effect || model.nameStyle;
+      shell.dataset.nameRarity = model.nameStyleTheme.rarity || "Common";
+      if (model.profileId) shell.dataset.playerProfileId = model.profileId;
+      applyNameStyleToTextElement(name, model.nameStyle, model.name);
+      bindPlayerIdentityProfileTarget(options.profileTarget || line, model, options);
+
+      let flagEl = markerScope.querySelector("[data-player-country]");
       if (!flagEl) {
-        flagEl = createBookText("span", "player-country-flag", flag);
+        flagEl = createBookText("span", "player-country-flag", "");
         flagEl.dataset.playerCountry = "";
         name.before(flagEl);
       }
-      flagEl.textContent = flag;
-      flagEl.dataset.countryCode = normalizeCountryFlagValue(countryCode);
-      flagEl.setAttribute("aria-label", `${getCountryFlagLabel(countryCode)} flag`);
-      flagEl.title = `${getCountryFlagLabel(countryCode)} flag`;
+      flagEl.textContent = formatCountryFlag(model.countryCode);
+      flagEl.dataset.countryCode = model.countryCode;
+      flagEl.setAttribute("aria-label", `${getCountryFlagLabel(model.countryCode)} flag`);
+      flagEl.title = `${getCountryFlagLabel(model.countryCode)} flag`;
 
-      const compactTitle = getCompactPlayerTitle(title);
-      let titleEl = line.querySelector("[data-player-title-badge]");
+      const compactTitle = getCompactPlayerTitle(model.title);
+      let titleEl = markerScope.querySelector("[data-player-title-badge]");
       if (compactTitle && !titleEl) {
         titleEl = createBookText("span", "player-title-badge", compactTitle.short);
         titleEl.dataset.playerTitleBadge = "";
@@ -10354,19 +10689,63 @@
         }
       }
 
-      let iconsEl = line.querySelector("[data-player-achievements-inline]");
+      let iconsEl = markerScope.querySelector("[data-player-achievements-inline]");
       if (!iconsEl) {
         iconsEl = createBookText("span", "player-earned-icons", "");
         iconsEl.dataset.playerAchievementsInline = "";
-        (titleEl || name).after(iconsEl);
+        name.after(iconsEl);
       }
-      iconsEl.hidden = !icons.length;
-      iconsEl.replaceChildren(...icons.map((item) => {
+      iconsEl.hidden = !model.icons.length;
+      iconsEl.replaceChildren(...model.icons.map((item) => {
         const icon = createBookText("span", "player-earned-icon", item.icon);
         icon.title = item.label;
         icon.setAttribute("aria-label", item.label);
         return icon;
       }));
+      return line;
+    }
+
+    function applyPlayerIdentity(target, source = {}, options = {}) {
+      if (!target) return null;
+      const model = getPlayerIdentityModel(source, options);
+      const line = options.line || target;
+      renderSharedIdentityLine(line, model, options);
+      const avatar = options.avatar || target.querySelector?.(options.avatarSelector || ".player-identity-avatar, .player-profile-avatar, .match-player-avatar, .login-avatar, .friend-result-avatar, .review-player-avatar");
+      if (avatar) applySharedAvatarElement(avatar, model, options);
+      return model;
+    }
+
+    function createPlayerIdentity(source = {}, options = {}) {
+      const model = getPlayerIdentityModel(source, options);
+      const variant = options.variant || model.variant || "standard";
+      const shell = createBookText("span", `player-identity player-identity--${variant}`, "");
+      shell.dataset.identityOwner = model.isPlayer ? "player" : "remote";
+      const showAvatar = options.showAvatar !== false;
+      const avatar = showAvatar ? createBookText("span", "player-identity-avatar", model.avatar || "?") : null;
+      const copy = createBookText("span", "player-identity-copy", "");
+      const line = createBookText("span", "player-identity-line", "");
+      const name = createBookText(options.nameTag || "strong", "player-identity-name", model.name);
+      name.dataset.playerIdentityName = "";
+      line.append(name);
+      copy.append(line);
+      if (model.subtitle && options.showSubtitle !== false) copy.append(createBookText("small", "player-identity-subtitle", model.subtitle));
+      if (avatar) shell.append(avatar);
+      shell.append(copy);
+      renderSharedIdentityLine(line, model, { ...options, variant, nameSelector: ".player-identity-name" });
+      if (avatar) applySharedAvatarElement(avatar, model, { ...options, variant });
+      return shell;
+    }
+
+    function syncIdentityLine(line, nameSelector, flag, icons, title, countryCode = "") {
+      const name = line?.querySelector(nameSelector);
+      if (!name) return null;
+      const model = getPlayerIdentityModel({
+        name: String(name.textContent || "").trim(),
+        title,
+        countryCode,
+        icons
+      }, { isPlayer: true, variant: "standard" });
+      return renderSharedIdentityLine(line, model, { nameSelector, variant: "standard" });
     }
 
     function getQuickPlayerStats() {
@@ -10404,7 +10783,12 @@
     const leaderboardSnapshotStorageKey = "checkmateQuest.leaderboardSnapshot.v1";
 
     function getLeaderboardAccountId(account = {}) {
-      return String(account.publicId || account.id || account.userId || account.email || "").trim().toLowerCase();
+      const explicit = String(account.publicId || account.public_id || account.id || account.userId || "").trim();
+      if (explicit) return explicit.toLowerCase();
+      // Local/offline rows do not have a public UUID.  Keep their fallback
+      // deterministic without ever placing an email address in a profile URL.
+      const username = normalizeAuthUsername(account.username || account.displayName || account.name);
+      return username ? `local-${username.toLowerCase().replace(/[^a-z0-9_-]/g, "-")}` : "";
     }
 
     function getLeaderboardProvider() {
@@ -10755,6 +11139,11 @@
             id: String(entry.id || entry.publicId || entry.public_id || `${event.code}-${entry.username || rows.length}`).toLowerCase(),
             name: normalizeAuthUsername(entry.username || "Player"),
             title: entry.title || "",
+            nameStyle: entry.nameStyle || entry.name_style || "",
+            avatarFrame: entry.avatarFrame || entry.avatar_frame || "",
+            avatarEffect: entry.avatarEffect || entry.avatar_effect || "",
+            avatarRarity: entry.avatarRarity || entry.avatar_rarity || "",
+            avatar: entry.avatar || "auto",
             flag: formatCountryFlag(entry.countryFlag || entry.country_flag || ""),
             countryCode: entry.countryFlag || entry.country_flag || "",
             icons: event.status === "completed" && Number(entry.playerRank || entry.player_rank) === 1 ? [{ icon: "T", label: "Tournament winner" }] : [],
@@ -10805,6 +11194,11 @@
             id,
             name: normalizeAuthUsername(account.username),
             title: account.title || "",
+            nameStyle: account.nameStyle || account.name_style || "",
+            avatarFrame: account.avatarFrame || account.avatar_frame || "",
+            avatarEffect: account.avatarEffect || account.avatar_effect || "",
+            avatarRarity: account.avatarRarity || account.avatar_rarity || "",
+            avatar: account.avatar || "auto",
             flag: formatCountryFlag(account.countryFlag || ""),
             countryCode: account.countryFlag || "",
             icons: Array.isArray(account.achievements) && account.achievements.length ? [{ icon: "🏆", label: account.achievements[0] }] : [],
@@ -10844,36 +11238,17 @@
         const rank = createBookText("span", "leaderboard-rank", `#${index + 1}`);
         const player = createBookText("span", "leaderboard-player", "");
         const nameLine = createBookText("span", "leaderboard-name", "");
-        const flagBadge = createBookText("span", "player-country-flag", entry.flag);
-        flagBadge.dataset.countryCode = normalizeCountryFlagValue(entry.countryCode || entry.flag);
-        flagBadge.title = `${getCountryFlagLabel(entry.countryCode || entry.flag)} flag`;
-        flagBadge.setAttribute("aria-label", flagBadge.title);
-        nameLine.append(flagBadge);
-        const name = createBookText("span", "", entry.name);
-        const compactTitle = getCompactPlayerTitle(entry.title);
-        if (compactTitle) {
-          const titleBadge = createBookText("span", "player-title-badge", compactTitle.short);
-          titleBadge.dataset.playerTitleBadge = "";
-          titleBadge.dataset.titleTier = compactTitle.tier;
-          titleBadge.title = compactTitle.full;
-          nameLine.append(titleBadge);
-        }
-        if (entry.isPlayer) {
-          name.dataset.leaderboardName = "";
-          name.dataset.userName = "";
-        }
+        const name = createBookText("span", "leaderboard-entry-name", entry.name);
+        name.dataset.leaderboardName = "";
+        name.dataset.userName = "";
         nameLine.append(name);
-        const icons = createBookText("span", "player-earned-icons", "");
-        icons.replaceChildren(...entry.icons.map((item) => {
-          const icon = createBookText("span", "player-earned-icon", item.icon);
-          icon.title = item.label;
-          icon.setAttribute("aria-label", item.label);
-          return icon;
-        }));
-        nameLine.append(icons);
+        const identity = getPlayerIdentityModel({ ...entry, name: entry.name, countryCode: entry.countryCode || entry.flag, icons: entry.icons, profileId: entry.id }, { isPlayer: Boolean(entry.isPlayer), variant: "compact", profileId: entry.id });
+        renderSharedIdentityLine(nameLine, identity, { nameSelector: ".leaderboard-entry-name", variant: "compact", linkProfile: true, profileTarget: nameLine });
+        const avatar = createBookText("span", "player-identity-avatar leaderboard-player-avatar", identity.avatar || entry.name?.slice(0, 1)?.toUpperCase() || "?");
+        applySharedAvatarElement(avatar, identity, { variant: "compact" });
         const meta = createBookText("span", "leaderboard-meta", "");
         meta.replaceChildren(...entry.meta.map((item) => createBookText("span", "", item)));
-        player.append(nameLine, meta);
+        player.append(avatar, nameLine, meta);
         const score = createBookText("span", "leaderboard-score", "");
         score.append(createBookText("strong", "", formatProfileNumber(entry.score)), createBookText("small", "", entry.primary));
         row.append(rank, player, score);
@@ -10895,21 +11270,12 @@
         row.classList.toggle("is-current", Boolean(entry.isPlayer));
         const rank = createBookText("b", "", `#${index + 1}`);
         const copy = createBookText("span", "", "");
-        const name = createBookText("strong", "", "");
-        const flag = createBookText("span", "player-country-flag", entry.flag || "");
-        flag.dataset.countryCode = normalizeCountryFlagValue(entry.countryCode || entry.flag || "");
-        flag.title = `${getCountryFlagLabel(entry.countryCode || entry.flag)} flag`;
-        flag.setAttribute("aria-label", flag.title);
-        name.append(flag, document.createTextNode(` ${entry.name}`));
-        const title = getCompactPlayerTitle(entry.title);
-        if (title) {
-          const badge = createBookText("span", "player-title-badge", title.short);
-          badge.dataset.playerTitleBadge = "";
-          badge.dataset.titleTier = title.tier;
-          badge.title = title.full;
-          name.append(" ", badge);
-        }
-        copy.append(name, createBookText("small", "", entry.meta?.[0] || "Ranked player"));
+        const name = createBookText("strong", "", entry.name);
+        name.dataset.playerIdentityName = "";
+        copy.append(name);
+        const identity = getPlayerIdentityModel({ ...entry, name: entry.name, countryCode: entry.countryCode || entry.flag, profileId: entry.id }, { isPlayer: Boolean(entry.isPlayer), variant: "compact", profileId: entry.id });
+        renderSharedIdentityLine(copy, identity, { nameSelector: "[data-player-identity-name]", variant: "compact", linkProfile: true, profileTarget: copy });
+        copy.append(createBookText("small", "", entry.meta?.[0] || "Ranked player"));
         row.append(rank, copy, createBookText("em", "home-rank-score", entry.primary));
         return row;
       }));
@@ -10958,8 +11324,7 @@
       setText("[data-leaderboard-compare-title]", comparisonTitle);
       setText("[data-leaderboard-compare-meta]", comparisonMeta);
       overview.querySelectorAll("[data-leaderboard-profile-avatar]").forEach((avatar) => {
-        avatar.textContent = profile.avatar;
-        avatar.title = `${profile.avatarLabel || "Player"} avatar`;
+        applySharedAvatarElement(avatar, getPlayerIdentityModel(profile, { profile, isPlayer: true, variant: "compact" }), { variant: "compact" });
       });
       overview.querySelectorAll("[data-leaderboard-compare-fill]").forEach((bar) => {
         bar.style.width = `${fill}%`;
@@ -11021,12 +11386,41 @@
 
     function renderPlayerIdentityExtras(profile = getDragonProfileSnapshot()) {
       const countryCode = normalizeCountryFlagValue(readLearnerProfile().countryFlag);
-      const flag = formatCountryFlag(countryCode);
       const icons = getEarnedPlayerIcons(profile);
-      document.querySelectorAll(".player-flex-name").forEach((line) => syncIdentityLine(line, '[data-profile-field="name"]', flag, icons, profile.rank, countryCode));
-      document.querySelectorAll(".match-player-name-line").forEach((line) => syncIdentityLine(line, "[data-match-name]", flag, icons, profile.rank, countryCode));
-      document.querySelectorAll(".player-profile-title").forEach((line) => syncIdentityLine(line, '[data-profile-field="name"]', flag, icons, profile.rank, countryCode));
-      document.querySelectorAll(".login-pass-title").forEach((line) => syncIdentityLine(line, "#loginDisplayName", flag, icons, profile.rank, countryCode));
+      const identity = getPlayerIdentityModel({ ...profile, countryCode, icons, isPlayer: true }, { profile, isPlayer: true });
+      document.querySelectorAll(".player-flex-chip .player-profile-avatar, .login-pass .player-profile-avatar").forEach((avatar) => {
+        applySharedAvatarElement(avatar, identity, { variant: "compact" });
+      });
+      document.querySelectorAll(".player-flex-name").forEach((line) => renderSharedIdentityLine(line, identity, { nameSelector: '[data-profile-field="name"]', variant: "compact" }));
+      document.querySelectorAll(".match-player-name-line").forEach((line) => renderSharedIdentityLine(line, identity, { nameSelector: "[data-match-name]", variant: "standard" }));
+      document.querySelectorAll(".player-profile-title").forEach((line) => {
+        const name = line.querySelector('[data-profile-field="name"]');
+        renderSharedIdentityLine(name || line, identity, { nameSelector: '[data-profile-field="name"]', variant: "large" });
+      });
+      document.querySelectorAll(".login-pass-title").forEach((line) => {
+        const name = line.querySelector("#loginDisplayName");
+        renderSharedIdentityLine(name || line, identity, { nameSelector: "#loginDisplayName", variant: "compact" });
+      });
+      document.querySelectorAll(".hero-player-card--you").forEach((card) => {
+        const name = card.querySelector('[data-profile-field="name"]');
+        renderSharedIdentityLine(name || card, identity, { nameSelector: '[data-profile-field="name"]', variant: "compact" });
+        applySharedAvatarElement(card.querySelector(".hero-player-avatar--you"), identity, { variant: "compact" });
+      });
+      document.querySelectorAll(".hero-player-card--opponent").forEach((card) => {
+        const name = card.querySelector("strong");
+        const coachIdentity = getPlayerIdentityModel({ name: name?.textContent || "Nova Rookie", title: "Coach", avatar: card.querySelector(".hero-player-avatar")?.textContent || "N", isPlayer: false }, { isPlayer: false, variant: "compact" });
+        renderSharedIdentityLine(name || card, coachIdentity, { nameSelector: "strong", variant: "compact" });
+        applySharedAvatarElement(card.querySelector(".hero-player-avatar"), coachIdentity, { variant: "compact" });
+      });
+      document.querySelectorAll(".leaderboard-summary-copy").forEach((line) => {
+        const avatar = line.closest(".leaderboard-player-summary, .leaderboard-summary")?.querySelector(".leaderboard-summary-avatar, [data-leaderboard-profile-avatar]");
+        applyPlayerIdentity(line, profile, { line, avatar, nameSelector: '[data-profile-field="name"]', variant: "compact" });
+      });
+      document.querySelectorAll(".review-player-chip").forEach((chip) => {
+        const isOpponent = chip.classList.contains("review-player-chip--opponent");
+        const nameSelector = isOpponent ? "#reviewOpponentName" : "#reviewPlayerIdentity";
+        if (!isOpponent) applyPlayerIdentity(chip, profile, { line: chip, nameSelector, avatarSelector: "#reviewPlayerAvatar", variant: "compact" });
+      });
       updateMatchQuickStats(profile);
       renderStyledUsernames(profile.name);
       applyAvatarRankBadges(profile);
@@ -13117,13 +13511,41 @@
       playAudioCue(puzzleCueMap[type] || type);
     }
 
+    const puzzleFeedbackFrames = new WeakMap();
+    const puzzleFeedbackTimers = new WeakMap();
+
     function flashPuzzleBoard(className, boardId = "puzzleBoard") {
-      const wrap = document.getElementById(boardId)?.closest(".puzzle-board-wrap");
+      const board = document.getElementById(boardId);
+      const wrap = board?.closest(".puzzle-board-wrap");
       if (!wrap) return;
+      const pendingFrame = puzzleFeedbackFrames.get(wrap);
+      if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
+      const pendingTimer = puzzleFeedbackTimers.get(wrap);
+      if (pendingTimer) window.clearTimeout(pendingTimer);
+      puzzleFeedbackFrames.delete(wrap);
+      puzzleFeedbackTimers.delete(wrap);
+      if (className === "is-correct") {
+        // Correct moves settle immediately. The old wrapper-level success
+        // animation and destination marker both introduced an avoidable
+        // opacity/paint transition after the move.
+        wrap.classList.remove("is-correct");
+        return;
+      }
       wrap.classList.remove("is-correct", "is-wrong");
-      void wrap.offsetWidth;
-      wrap.classList.add(className);
-      window.setTimeout(() => wrap.classList.remove(className), 450);
+      // Restart the short feedback pulse on a new paint boundary. A forced
+      // synchronous layout read here flushes the contained board's paint tree
+      // and can produce a one-frame dark flash in Chromium.
+      const frame = window.requestAnimationFrame(() => {
+        puzzleFeedbackFrames.delete(wrap);
+        if (!wrap.isConnected) return;
+        wrap.classList.add(className);
+        const timer = window.setTimeout(() => {
+          puzzleFeedbackTimers.delete(wrap);
+          wrap.classList.remove(className);
+        }, 450);
+        puzzleFeedbackTimers.set(wrap, timer);
+      });
+      puzzleFeedbackFrames.set(wrap, frame);
     }
 
     function setPuzzleSolutionProgress(active) {
@@ -13209,7 +13631,7 @@
       if (isCorrect) {
         puzzleLineStep += 1;
         const reply = autoPlayPuzzleReply();
-        flashPuzzleBoard("is-correct");
+        flashPuzzleBoard("is-correct", "puzzleBoard");
         playPuzzleTone("correct");
         if (puzzleLineStep >= line.length) {
           activeAnswered = true;
@@ -13504,7 +13926,7 @@
         trackProductSignal("puzzle_solved", { source: "answer", plan: activePuzzlePlan });
         publishLearningActivity("puzzle_solved", `puzzle:${currentPuzzle}`, { puzzleId: currentPuzzle, theme: puzzle.theme || puzzle.mode || "", rating: puzzle.rating || null });
         document.getElementById("feedback").textContent = `Great move! ${formatRewardText(reward)}. You improved because you found the idea: ${puzzle.feedback}`;
-        flashPuzzleBoard("is-correct");
+        flashPuzzleBoard("is-correct", "puzzleBoard");
         playPuzzleTone("correct");
         showPuzzleComplete();
         scheduleNextPuzzle();
@@ -13812,6 +14234,8 @@
     let socialPresenceSubscribing = false;
     const friendProfileCache = new Map();
     let friendProfileRequest = 0;
+    const publicProfileFallbacks = new Map();
+    let publicProfileRequest = 0;
     let socialNotificationState = [];
     let socialNotificationRefreshPromise = null;
     let socialNotificationUnsubscribe = null;
@@ -14013,6 +14437,7 @@
 
     function completeCoachGame(outcome = getCoachTerminalOutcome()) {
       if (!coachGame || !outcome) return false;
+      clearAnalysisArrows("game-complete", document.getElementById("coachBoard"));
       const gameKey = coachGame.pgn() || `session-${coachGameSessionId}-${coachGame.history().length}`;
       const signature = `${gameKey}:${outcome.result}:${outcome.termination}`;
       if (completedGameSignature === signature) return true;
@@ -14344,12 +14769,17 @@
         button.setAttribute("aria-pressed", String(coachDifficulty === bot.id));
         button.title = unlocked ? `${bot.bio} Favorite opening: ${bot.opening}.` : `Defeat ${beginnerBots[index - 1]?.name || "the previous bot"} to unlock.`;
         const copy = createBookText("span", "beginner-bot-copy", "");
+        const botName = createBookText("strong", "", `${bot.name} · ${bot.elo}`);
         copy.append(
-          createBookText("strong", "", `${bot.name} · ${bot.elo}`),
+          botName,
           createBookText("small", "", unlocked ? `${bot.personality} · ${bot.opening}` : "Locked"),
           createBookText("small", "", unlocked ? `${bot.bio} · ${wins} win${wins === 1 ? "" : "s"} · +${bot.reward} coins` : "Beat the bot before this one")
         );
-        button.append(createBookText("span", "beginner-bot-avatar", unlocked ? bot.avatar : "🔒"), copy);
+        const botIdentity = getPlayerIdentityModel({ name: `${bot.name} · ${bot.elo}`, title: bot.personality, avatar: unlocked ? bot.avatar : "🔒", isPlayer: false }, { isPlayer: false, variant: "compact" });
+        renderSharedIdentityLine(copy, botIdentity, { nameSelector: "strong", variant: "compact" });
+        const botAvatar = createBookText("span", "beginner-bot-avatar player-identity-avatar", unlocked ? bot.avatar : "🔒");
+        applySharedAvatarElement(botAvatar, botIdentity, { variant: "compact" });
+        button.append(botAvatar, copy);
         return button;
       }));
     }
@@ -14508,8 +14938,16 @@
       card.classList.toggle("is-winner", Boolean(isMate && coachGame.turn() === coachPlayerColor));
       card.classList.toggle("is-loser", Boolean(isMate && coachGame.turn() === botColor));
       const avatar = document.getElementById("aiPlayerAvatar");
-      renderCoachAvatar(avatar, { imageUrl: ai.avatarImage, fallback: ai.avatar, label: `${ai.name} avatar` });
-      document.getElementById("aiPlayerName").textContent = ai.name;
+      const aiModel = getPlayerIdentityModel({ ...ai, countryCode: ai.flag, isPlayer: false }, { isPlayer: false, variant: "compact" });
+      applySharedAvatarElement(avatar, aiModel, { variant: "compact" });
+      const aiName = document.getElementById("aiPlayerName");
+      const aiLine = aiName?.closest("strong") || aiName?.parentElement;
+      if (aiName && aiLine) {
+        const existingAiFlag = document.getElementById("aiPlayerFlag");
+        if (existingAiFlag) existingAiFlag.dataset.playerCountry = "";
+        aiName.textContent = ai.name;
+        renderSharedIdentityLine(aiLine, aiModel, { nameSelector: "#aiPlayerName", variant: "compact" });
+      }
       document.getElementById("aiPlayerTitle").textContent = ai.title;
       document.getElementById("aiPlayerRating").textContent = `${displayRating} Elo`;
       const selectedBot = getBeginnerBot();
@@ -14539,6 +14977,7 @@
       if (flag) {
         flag.textContent = formatCountryFlag(ai.flag);
         flag.dataset.countryCode = ai.flag;
+        flag.dataset.playerCountry = "";
       }
       document.getElementById("aiMoveIndicator").textContent = getCoachColorName(botColor);
       document.getElementById("aiPlayerStatus").textContent = ai.isFriend
@@ -14895,15 +15334,17 @@
       const premium = document.querySelector("[data-match-premium]");
       const premiumLabel = getPremiumMatchBadge();
 
-      card.querySelector("[data-match-avatar]").textContent = friendSelf?.avatar || profile.avatar || "\u2726";
       const matchName = friendSelf?.displayName || getPreferredPlayerName(profile);
+      const identity = getPlayerIdentityModel(friendSelf ? { ...friendSelf, name: matchName, isPlayer: true } : { ...profile, name: matchName, isPlayer: true }, { profile, isPlayer: true, variant: "standard" });
+      const matchAvatar = card.querySelector("[data-match-avatar]");
+      applySharedAvatarElement(matchAvatar, identity, { variant: "standard" });
       card.querySelector("[data-match-name]").textContent = matchName;
       card.querySelector("[data-match-level]").textContent = friendSelf?.title || profile.level || "Level 1 Explorer";
       applyAvatarRankBadges(profile);
       renderStyledUsernames(matchName);
       if (friendSelf) {
         const line = card.querySelector(".match-player-name-line");
-        syncIdentityLine(line, "[data-match-name]", formatCountryFlag(friendSelf.countryFlag), [], friendSelf.title, friendSelf.countryFlag);
+        renderSharedIdentityLine(line, identity, { nameSelector: "[data-match-name]", variant: "standard" });
         updateMatchQuickStats({ ...profile, name: matchName });
       } else {
         renderPlayerIdentityExtras(profile);
@@ -16680,6 +17121,14 @@
       setReviewDashboardText("reviewOpponentRating", `${opponentRating} Elo`);
       setReviewDashboardText("reviewPlayerAvatar", profile?.avatar || getReviewDashboardInitial(playerName, "P"));
       setReviewDashboardText("reviewOpponentAvatar", opponent?.avatar || getReviewDashboardInitial(opponentName, "C"));
+      const reviewPlayerModel = getPlayerIdentityModel({ ...profile, name: playerName, isPlayer: true }, { profile, isPlayer: true, variant: "compact" });
+      const reviewOpponentModel = getPlayerIdentityModel({ ...opponent, name: opponentName, countryCode: opponent.flag, isPlayer: false }, { isPlayer: false, variant: "compact" });
+      const reviewPlayerName = document.getElementById("reviewPlayerIdentity");
+      const reviewOpponentName = document.getElementById("reviewOpponentName");
+      if (reviewPlayerName) renderSharedIdentityLine(reviewPlayerName.parentElement, reviewPlayerModel, { nameSelector: "#reviewPlayerIdentity", variant: "compact" });
+      if (reviewOpponentName) renderSharedIdentityLine(reviewOpponentName.parentElement, reviewOpponentModel, { nameSelector: "#reviewOpponentName", variant: "compact" });
+      applySharedAvatarElement(document.getElementById("reviewPlayerAvatar"), reviewPlayerModel, { variant: "compact" });
+      applySharedAvatarElement(document.getElementById("reviewOpponentAvatar"), reviewOpponentModel, { variant: "compact" });
 
       const scoreRing = document.getElementById("reviewPlayerScoreRing");
       if (scoreRing) {
@@ -17000,6 +17449,7 @@
       document.getElementById("reviewRetry")?.setAttribute("hidden", "");
       restoreGameReviewWorkspace();
       document.getElementById("reviewEvalRail")?.setAttribute("hidden", "");
+      clearAnalysisArrows("review-exit", document.getElementById("coachBoard"));
       activeMatchReview = null;
       postGameDecisionPgn = "";
       renderPostGameFlow(true);
@@ -17321,6 +17771,7 @@
 
     function showReviewPly(index) {
       if (!activeMatchReview || !CoachChess) return;
+      clearAnalysisArrows("review-position", document.getElementById("coachBoard"));
       stopReviewBestLineReplay();
       reviewSelfAnalysisState = null;
       reviewRetryState = null;
@@ -17577,6 +18028,7 @@
     function resetReviewSelfAnalysis() {
       const state = reviewSelfAnalysisState;
       if (!state || !CoachChess) return;
+      clearAnalysisArrows("review-reset", document.getElementById("coachBoard"));
       coachGame = new CoachChess(state.baseFen);
       coachLastMove = null;
       coachSelected = "";
@@ -18702,11 +19154,11 @@
         const state = reviewSelfAnalysisState;
         const fen = coachGame?.fen?.() || state.baseFen || "";
         const engineMove = state.analysis?.bestMoveUci ? getMoveFromFenUci(fen, state.analysis.bestMoveUci) : null;
-        const best = engineMove ? { id: "self-analysis-best", from: engineMove.from, to: engineMove.to, promotion: engineMove.promotion || "", kind: "best", color: "yellow", label: state.analysis.best } : null;
+        const best = engineMove ? { id: "self-analysis-best", from: engineMove.from, to: engineMove.to, promotion: engineMove.promotion || "", kind: "best", label: state.analysis.best } : null;
         const privateLine = state.analysis?.pvUci && fen ? getReviewBestLineMoves({ fenBefore: fen, pvUci: state.analysis.pvUci }).slice(0, 4).map((lineMove, index) => ({
-          id: `self-analysis-pv-${index}`, from: lineMove.from, to: lineMove.to, promotion: lineMove.promotion || "", kind: "pv", color: "blue", routeId: "self-analysis-pv-route", routeIndex: index, showRouteNodes: true, label: lineMove.san
+          id: `self-analysis-pv-${index}`, from: lineMove.from, to: lineMove.to, promotion: lineMove.promotion || "", kind: "pv", routeId: "self-analysis-pv-route", routeIndex: index, showRouteNodes: true, label: lineMove.san
         })) : [];
-        const played = coachLastMove?.from && coachLastMove?.to ? { id: "self-analysis-played", from: coachLastMove.from, to: coachLastMove.to, kind: "played", color: "cyan", label: coachLastMove.san } : null;
+        const played = coachLastMove?.from && coachLastMove?.to ? { id: "self-analysis-played", from: coachLastMove.from, to: coachLastMove.to, kind: "played", label: coachLastMove.san } : null;
         return {
           arrows: [...(played ? [played] : []), ...(best ? [best] : []), ...privateLine],
           attacks: new Set(),
@@ -18720,7 +19172,7 @@
         if (!reviewRetryState.hint || !move?.bestFrom || !move?.bestTo) {
           return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
         }
-        const best = { id: "review-best-retry", from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", color: "yellow", label: move.best };
+        const best = { id: "review-best-retry", from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", label: move.best };
         return {
           arrows: [best], attacks: getReviewMoveAttackSquares(move, true), engineSquares: new Set([best.from, best.to]), played: null, best
         };
@@ -18729,7 +19181,7 @@
         if (!reviewBestLineMove?.from || !reviewBestLineMove?.to) {
           return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
         }
-        const best = { id: "review-best-line", ...reviewBestLineMove, kind: "best", color: "yellow" };
+        const best = { id: "review-best-line", ...reviewBestLineMove, kind: "best" };
         return {
           arrows: [best],
           attacks: new Set(),
@@ -18740,8 +19192,8 @@
       }
       const move = activeMatchReview?.moves?.[reviewReplayIndex];
       if (!move) return { arrows: [], attacks: new Set(), engineSquares: new Set(), played: null, best: null };
-      const played = { id: `review-played-${reviewReplayIndex}`, from: move.from, to: move.to, promotion: move.promotion || "", kind: "played", color: "cyan", label: move.san };
-      const best = { id: `review-best-${reviewReplayIndex}`, from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", color: "yellow", label: move.best };
+      const played = { id: `review-played-${reviewReplayIndex}`, from: move.from, to: move.to, promotion: move.promotion || "", kind: "played", label: move.san };
+      const best = { id: `review-best-${reviewReplayIndex}`, from: move.bestFrom, to: move.bestTo, promotion: move.bestPromotion || "", kind: "best", label: move.best };
       const hasBest = Boolean(best.from && best.to);
       const showBest = hasBest && !sameReviewPath(played, best);
       const pvArrows = getReviewBestLineMoves(move).slice(0, 4).map((lineMove, index) => ({
@@ -18750,7 +19202,6 @@
         to: lineMove.to,
         promotion: lineMove.promotion || "",
         kind: "pv",
-        color: "blue",
         routeId: `review-pv-route-${reviewReplayIndex}`,
         routeIndex: index,
         showRouteNodes: true,
@@ -18759,7 +19210,7 @@
       const threat = [...getReviewMoveAttackSquares(move, reviewCompareMode === "best" && hasBest)]
         .filter((square) => square && square !== move.to)
         .slice(0, 1)
-        .map((square) => ({ id: `review-threat-${reviewReplayIndex}`, from: move.to, to: square, kind: "threat", color: "red" }));
+        .map((square) => ({ id: `review-threat-${reviewReplayIndex}`, from: move.to, to: square, kind: "threat" }));
       const arrows = [played, ...(showBest ? [best] : []), ...pvArrows, ...threat];
       const attacks = getReviewMoveAttackSquares(move, reviewCompareMode === "best" && hasBest);
       const engineSquares = new Set(showBest || reviewCompareMode === "best" ? [best.from, best.to].filter(Boolean) : []);
@@ -18776,6 +19227,71 @@
       violet: { stroke: "rgba(167,139,250,.96)", fill: "rgba(167,139,250,.13)", glow: "rgba(167,139,250,.15)" },
       neutral: { stroke: "rgba(184,191,153,.82)", fill: "rgba(184,191,153,.12)", glow: "rgba(184,191,153,.12)" }
     });
+    const ARROW_SKIN_DEFAULT = "default";
+    let activeArrowSkinValue = ARROW_SKIN_DEFAULT;
+
+    function normalizeArrowSkinValue(value) {
+      const normalized = String(value || ARROW_SKIN_DEFAULT).trim().toLowerCase();
+      return arrowSkinThemes[normalized] ? normalized : ARROW_SKIN_DEFAULT;
+    }
+
+    function getEquippedArrowSkinValue() {
+      return normalizeArrowSkinValue(activeArrowSkinValue);
+    }
+
+    // Arrow appearance has one authority.  Semantic move meaning (best/PV,
+    // threat, candidate, etc.) still affects priority and lane ordering, but
+    // it must never replace the equipped skin's visible material or color.
+    function getEquippedArrowSkin() {
+      const name = getEquippedArrowSkinValue();
+      return { name, theme: getArrowSkinTheme(name) };
+    }
+
+    function resolveArrowSkinStyle(value = "") {
+      const equipped = getEquippedArrowSkin();
+      const name = value ? normalizeArrowSkinValue(value) : equipped.name;
+      const theme = value ? getArrowSkinTheme(name) : equipped.theme;
+      return {
+        name,
+        theme,
+        primaryColor: theme.primaryColor || arrowSkinThemes[ARROW_SKIN_DEFAULT].primaryColor
+      };
+    }
+
+    function getArrowSkinTheme(value = getEquippedArrowSkinValue()) {
+      return arrowSkinThemes[normalizeArrowSkinValue(value)] || arrowSkinThemes[ARROW_SKIN_DEFAULT];
+    }
+
+    function rgbaForArrowSkin(value, alpha = 1) {
+      const source = String(value || "").trim();
+      const match = source.match(/^#([0-9a-f]{6})$/i);
+      if (!match) return source;
+      const hex = match[1];
+      const red = Number.parseInt(hex.slice(0, 2), 16);
+      const green = Number.parseInt(hex.slice(2, 4), 16);
+      const blue = Number.parseInt(hex.slice(4, 6), 16);
+      return `rgba(${red},${green},${blue},${Math.max(0, Math.min(1, Number(alpha) || 0))})`;
+    }
+
+    function getArrowSkinColor(_semanticColorName, skin = getArrowSkinTheme()) {
+      const skinColor = skin.primaryColor || arrowSkinThemes[ARROW_SKIN_DEFAULT].primaryColor;
+      return {
+        stroke: skinColor,
+        fill: rgbaForArrowSkin(skinColor, .14),
+        glow: skin.glow || rgbaForArrowSkin(skinColor, skin.glowAlpha ?? .16)
+      };
+    }
+
+    function applyArrowSkin(value) {
+      const normalized = normalizeArrowSkinValue(value);
+      const changed = activeArrowSkinValue !== normalized;
+      activeArrowSkinValue = normalized;
+      if (document.body) document.body.dataset.arrowSkin = normalized;
+      if (changed) {
+        analysisOverlayStates.forEach((state) => analysisOverlayControllers.get(state.board)?.schedule());
+      }
+      return normalized;
+    }
     const ANALYSIS_ARROW_PRIORITIES = Object.freeze({
       best: { value: 5, opacity: 1, glowOpacity: .24, innerOpacity: .5, shaftWidth: .07, headScale: 1.06 },
       primary: { value: 4, opacity: .96, glowOpacity: .18, innerOpacity: .44, shaftWidth: .06, headScale: 1 },
@@ -18844,6 +19360,22 @@
       return document.createElementNS(ANALYSIS_OVERLAY_NS, name);
     }
 
+    // Manual arrows are position-scoped.  Derive one lightweight signature
+    // from the board's square/piece state so every board mode can share the
+    // same position-change cleanup without teaching the overlay about chess
+    // rules or mode-specific state.
+    function getAnalysisBoardPositionKey(board) {
+      if (!(board instanceof HTMLElement)) return "";
+      const squares = [...board.querySelectorAll("[data-square]")];
+      if (!squares.length) return "";
+      return squares.map((square) => {
+        const piece = square.querySelector("[data-piece]")?.dataset.piece
+          || square.querySelector(".piece-symbol")?.dataset.symbol
+          || "";
+        return `${square.dataset.square || ""}:${piece}`;
+      }).join("|");
+    }
+
     function analysisOverlayControllerFor(board, target = board) {
       if (!(board instanceof HTMLElement) || !(target instanceof HTMLElement)) return null;
       const existing = analysisOverlayControllers.get(board);
@@ -18865,6 +19397,9 @@
         baseHighlights: [],
         userArrows: new Map(),
         userHighlights: new Map(),
+        skinOverride: "",
+        positionKey: "",
+        lastManualClearReason: "",
         markerPrefix: `analysis-overlay-${++analysisOverlayControllerSequence}`,
         drawSignature: "",
         raf: 0,
@@ -18925,13 +19460,13 @@
           if (state.destroyed) return;
           const arrows = [...state.baseArrows, ...state.userArrows.values()];
           const highlights = [...state.baseHighlights, ...state.userHighlights.values()];
+          const skinStyle = resolveArrowSkinStyle(state.skinOverride);
           const squares = [...board.querySelectorAll("[data-square]")].map((square) => square.dataset.square || "");
           const arrowStateKey = (arrow, index) => JSON.stringify([
             arrow?.id || "",
             arrow?.from || "",
             arrow?.to || "",
             arrow?.kind || "",
-            arrow?.color || "",
             arrow?.priority || "",
             arrow?.label || "",
             arrow?.routeId || arrow?.sequenceId || "",
@@ -19086,8 +19621,6 @@
               state.arrowGroup.appendChild(group);
             }
             const [glow, shadow, line, inner] = [...group.children];
-            const colorName = normalizeAnalysisColor(arrow.color, arrow.kind);
-            const color = ANALYSIS_OVERLAY_COLORS[colorName];
             const laneOffset = laneOffsets.get(index) || 0;
             const geometry = arrowGeometry(from, to, laneOffset);
             const shadowGeometry = {
@@ -19098,13 +19631,17 @@
             };
             const kind = String(arrow.kind || "").toLowerCase();
             const semanticClass = kind === "best" || kind === "engine" ? "is-best is-engine" : kind === "candidate" || kind === "pv" ? "is-candidate" : kind === "threat" ? "is-threat" : "is-played";
-            const shadowMarkerId = controller.markerFor(colorName, "shadow", priority.name, priority.headScale);
-            const primaryMarkerId = controller.markerFor(colorName, "primary", priority.name, priority.headScale);
+            const skinName = skinStyle.name;
+            const skin = skinStyle.theme;
+            const color = getArrowSkinColor("", skin);
+            const skinHeadScale = Number.isFinite(Number(skin.headScale)) ? Number(skin.headScale) : 1;
+            const shadowMarkerId = controller.markerFor("skin", "shadow", priority.name, priority.headScale * skinHeadScale, skinName);
+            const primaryMarkerId = controller.markerFor("skin", "primary", priority.name, priority.headScale * skinHeadScale, skinName);
             const arrowSignature = [
               geometry.x1, geometry.y1, geometry.x2, geometry.y2,
               shadowGeometry.x1, shadowGeometry.y1, shadowGeometry.x2, shadowGeometry.y2,
-              laneOffset, colorName, priority.name, priority.opacity, priority.shaftWidth,
-              semanticClass, shadowMarkerId, primaryMarkerId, arrow.label || ""
+              laneOffset, skinName, priority.name, priority.opacity, priority.shaftWidth,
+              semanticClass, skinName, skin.shaftScale, skin.headScale || 1, skin.shaftDasharray || "", skin.innerVisible === true, skin.innerWidth || "", skin.innerOpacity || "", shadowMarkerId, primaryMarkerId, arrow.label || ""
             ].join(":");
             if (group.dataset.arrowSignature === arrowSignature) return;
             setAttrIfChanged(group, "class", `review-arrow-group ${semanticClass}`);
@@ -19128,16 +19665,29 @@
               setStyleIfChanged(node, "--arrow-opacity", priority.opacity);
               setStyleIfChanged(node, "--arrow-glow-opacity", priority.glowOpacity);
               setStyleIfChanged(node, "--arrow-inner-opacity", priority.innerOpacity);
-              setStyleIfChanged(node, "--arrow-shaft-width", priority.shaftWidth);
+              setStyleIfChanged(node, "--arrow-shaft-width", priority.shaftWidth * (skin.shaftScale || 1));
             });
+            if (skin.shaftDasharray) setStyleIfChanged(line, "stroke-dasharray", skin.shaftDasharray);
+            else line.style.removeProperty("stroke-dasharray");
+            if (skin.shaftLinecap) setStyleIfChanged(line, "stroke-linecap", skin.shaftLinecap);
+            else line.style.removeProperty("stroke-linecap");
+            if (skin.innerVisible === true) {
+              setStyleIfChanged(inner, "display", "block");
+              setStyleIfChanged(inner, "stroke-width", skin.innerWidth || ".012");
+              setStyleIfChanged(inner, "stroke-opacity", skin.innerOpacity ?? priority.innerOpacity);
+            } else {
+              setStyleIfChanged(inner, "display", "none");
+              inner.style.removeProperty("stroke-width");
+              inner.style.removeProperty("stroke-opacity");
+            }
             glow.removeAttribute("marker-end");
             setAttrIfChanged(shadow, "marker-end", `url(#${shadowMarkerId})`);
             setAttrIfChanged(line, "marker-end", `url(#${primaryMarkerId})`);
             inner.removeAttribute("marker-end");
             setStyleIfChanged(glow, "stroke", color.stroke);
             setStyleIfChanged(line, "stroke", color.stroke);
-            setStyleIfChanged(shadow, "stroke", "rgba(15, 30, 60, .38)");
-            setStyleIfChanged(inner, "stroke", "rgba(237, 252, 255, .52)");
+            setStyleIfChanged(shadow, "stroke", skin.shadow || "rgba(15, 30, 60, .38)");
+            setStyleIfChanged(inner, "stroke", skin.inner || "rgba(237, 252, 255, .52)");
             if (arrow.label) setAttrIfChanged(line, "aria-label", arrow.label);
             else line.removeAttribute("aria-label");
           });
@@ -19173,9 +19723,7 @@
               ? [...new Set(explicitIndexes)]
               : [...endpointCounts.entries()].filter(([, count]) => count > 1).map(([squareIndex]) => squareIndex);
             nodeIndexes.forEach((squareIndex) => {
-              const nodeEntry = entries.find((entry) => entry.fromIndex === squareIndex || entry.toIndex === squareIndex) || entries[0];
-              const colorName = normalizeAnalysisColor(nodeEntry.arrow.color, nodeEntry.arrow.kind);
-              const color = ANALYSIS_OVERLAY_COLORS[colorName];
+              const color = getArrowSkinColor("", skinStyle.theme);
               const id = `${routeId}:${squares[squareIndex]}`;
               liveRouteNodeIds.add(id);
               let node = state.routeNodes.get(id);
@@ -19245,11 +19793,13 @@
             }
           });
         },
-        markerFor(colorName, layer = "primary", priorityName = "primary", headScale = 1) {
-          const markerKey = `${layer}:${colorName}:${priorityName}`;
+        markerFor(_colorName, layer = "primary", priorityName = "primary", headScale = 1, skinName = resolveArrowSkinStyle().name) {
+          const normalizedSkin = normalizeArrowSkinValue(skinName);
+          const skin = getArrowSkinTheme(normalizedSkin);
+          const markerKey = `${normalizedSkin}:${layer}:${priorityName}`;
           const existing = state.markerIds.get(markerKey);
           if (existing && state.defs?.querySelector(`[id="${existing}"]`)) return existing;
-          const id = `${state.markerPrefix}-${layer}-${colorName}-${priorityName}`;
+          const id = `${state.markerPrefix}-${normalizedSkin}-${layer}-${priorityName}`;
           const isShadow = layer === "shadow";
           const marker = analysisOverlayElement("marker");
           marker.setAttribute("id", id);
@@ -19262,18 +19812,41 @@
           marker.setAttribute("orient", "auto");
           marker.setAttribute("markerUnits", "userSpaceOnUse");
           const path = analysisOverlayElement("path");
-          path.setAttribute("d", ANALYSIS_ARROW_GEOMETRY.marker.path);
-          const markerColor = isShadow ? "rgba(15, 30, 60, .38)" : ANALYSIS_OVERLAY_COLORS[colorName].stroke;
+          path.setAttribute("d", skin.headPath || ANALYSIS_ARROW_GEOMETRY.marker.path);
+          const markerColor = isShadow ? (skin.shadow || "rgba(15, 30, 60, .38)") : getArrowSkinColor("", skin).stroke;
           path.setAttribute("fill", markerColor);
           path.setAttribute("stroke", markerColor);
           path.setAttribute("stroke-width", isShadow ? "0.006" : "0.008");
           path.setAttribute("stroke-linejoin", "round");
           marker.appendChild(path);
+          if (!isShadow && Array.isArray(skin.markerDetails)) {
+            skin.markerDetails.forEach((detail) => {
+              if (!detail?.d) return;
+              const detailPath = analysisOverlayElement("path");
+              detailPath.setAttribute("d", detail.d);
+              detailPath.setAttribute("fill", detail.fill || "none");
+              detailPath.setAttribute("stroke", detail.stroke || markerColor);
+              detailPath.setAttribute("stroke-width", String(detail.strokeWidth || "0.012"));
+              detailPath.setAttribute("stroke-linecap", "round");
+              detailPath.setAttribute("stroke-linejoin", "round");
+              detailPath.setAttribute("opacity", String(detail.opacity ?? .48));
+              marker.appendChild(detailPath);
+            });
+          }
           controller.ensureLayer()?.querySelector("defs")?.appendChild(marker);
           state.markerIds.set(markerKey, id);
           return id;
         },
-        render(nextArrows, nextHighlights) {
+        render(nextArrows, nextHighlights, options = {}) {
+          const positionKey = getAnalysisBoardPositionKey(board);
+          if (state.positionKey && positionKey && state.positionKey !== positionKey) {
+            clearAnalysisArrows("position-change", board);
+          }
+          if (positionKey) state.positionKey = positionKey;
+          const requestedSkinOverride = options && Object.prototype.hasOwnProperty.call(options, "skinOverride")
+            ? String(options.skinOverride || "").trim()
+            : "";
+          state.skinOverride = requestedSkinOverride ? normalizeArrowSkinValue(requestedSkinOverride) : "";
           state.baseArrows = (Array.isArray(nextArrows) ? nextArrows : []).map((arrow, index) => typeof arrow === "string" ? null : ({ ...arrow, id: arrow.id || `base-arrow-${index}` })).filter(Boolean);
           state.baseHighlights = (Array.isArray(nextHighlights) ? nextHighlights : []).map((highlight, index) => typeof highlight === "string" ? { id: `base-highlight-${highlight}-${index}`, square: highlight } : ({ ...highlight, id: highlight.id || `base-highlight-${highlight.square}-${index}` })).filter((highlight) => highlight?.square);
           controller.schedule();
@@ -19306,6 +19879,13 @@
           state.userHighlights.clear();
           controller.schedule();
         },
+        clearUserArrows(reason = "manual-cleanup") {
+          const hadUserArrows = state.userArrows.size > 0;
+          state.lastManualClearReason = String(reason || "manual-cleanup");
+          if (hadUserArrows) state.userArrows.clear();
+          if (hadUserArrows) controller.schedule();
+          return hadUserArrows;
+        },
         clearAll() {
           state.baseArrows = [];
           state.baseHighlights = [];
@@ -19329,11 +19909,39 @@
       return controller;
     }
 
-    function renderAnalysisOverlay({ board, arrows = [], highlights = [], wrap = null } = {}) {
+    function renderAnalysisOverlay({ board, arrows = [], highlights = [], wrap = null, skinOverride = "" } = {}) {
       if (!(board instanceof HTMLElement)) return null;
       const target = wrap instanceof HTMLElement ? wrap : board;
       const controller = analysisOverlayControllerFor(board, target);
-      return controller?.render(arrows, highlights) || null;
+      return controller?.render(arrows, highlights, { skinOverride }) || null;
+    }
+
+    // Store previews use the same board-relative SVG renderer as live boards.
+    // The miniature squares only provide geometry; no second arrow system or
+    // placeholder image is introduced for the catalog.
+    function createArrowSkinPreview(item) {
+      const preview = document.createElement("span");
+      preview.className = "store-arrow-skin-preview";
+      preview.setAttribute("aria-hidden", "true");
+      const board = document.createElement("span");
+      board.className = "store-arrow-preview-board";
+      const files = "abcdefgh";
+      for (let rank = 8; rank >= 1; rank -= 1) {
+        for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
+          const square = document.createElement("span");
+          square.dataset.square = `${files[fileIndex]}${rank}`;
+          square.className = ((fileIndex + rank) % 2 === 0) ? "light" : "dark";
+          board.appendChild(square);
+        }
+      }
+      preview.appendChild(board);
+      renderAnalysisOverlay({
+        board,
+        wrap: board,
+        skinOverride: normalizeArrowSkinValue(item?.value),
+        arrows: [{ id: `store-preview-${item?.value || "default"}`, from: "b7", to: "g3", kind: "primary", priority: "primary" }]
+      });
+      return preview;
     }
 
     function addAnalysisArrow(board, arrow) {
@@ -19350,26 +19958,33 @@
       analysisOverlayControllers.get(board)?.clearItem(id);
     }
 
-    function clearAnalysisUserOverlay(board) {
-      const controller = analysisOverlayControllers.get(board);
-      if (!controller) return false;
-      const hadUserOverlay = controller.state.userArrows.size > 0 || controller.state.userHighlights.size > 0;
-      controller.clearUser();
-      return hadUserOverlay;
+    // One cleanup policy for every shared analysis board.  It intentionally
+    // clears only player arrows; system/guidance arrows remain in baseArrows
+    // until the next position render replaces them.
+    function clearAnalysisArrows(reason = "manual-cleanup", board = null) {
+      const targets = board instanceof HTMLElement
+        ? [board]
+        : [...analysisOverlayStates].map((state) => state.board);
+      let cleared = false;
+      targets.forEach((target) => {
+        const controller = analysisOverlayControllers.get(target);
+        if (controller?.clearUserArrows?.(reason)) cleared = true;
+      });
+      return cleared;
     }
 
-    // User arrows/highlights are temporary annotations for the local Play
-    // position.  They belong to a committed move transition, not to a board
-    // rerender or an aborted pointer gesture.  Review and live Friend boards
-    // own separate state (and live Friend games are intentionally move-only),
-    // so never clear their overlays from the Play move path.
+    // Player arrows are temporary annotations for the local board position.
+    // They belong to a committed move transition, not to a board rerender or
+    // an aborted pointer gesture.  Review and live Friend boards own separate
+    // state (and live Friend games are intentionally move-only), so never
+    // clear their arrows from the Play move path.
     function clearCoachTemporaryAnalysis() {
       const board = document.getElementById("coachBoard");
       if (!board) return false;
       const reviewPageActive = Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
       const liveFriendGame = Boolean(friendChallengeState?.remote && friendChallengeState.active);
       if (reviewPageActive || reviewSelfAnalysisState || reviewRetryState || liveFriendGame) return false;
-      return clearAnalysisUserOverlay(board);
+      return clearAnalysisArrows("move-commit", board);
     }
 
     function clearAnalysisOverlay(board, { includeUser = true } = {}) {
@@ -19380,21 +19995,19 @@
       controller.destroy();
     }
 
-    function getAnalysisGestureColor(event, secondary = false) {
-      if (event?.altKey) return "blue";
-      if (event?.ctrlKey || event?.metaKey) return "red";
-      if (secondary) return "violet";
-      return "cyan";
-    }
-
     function getAnalysisGesturePriority(event, secondary = false) {
       if (event?.ctrlKey || event?.metaKey) return "danger";
       if (event?.altKey || secondary) return "alternative";
       return "primary";
     }
 
-    function createAnalysisGestureHandlers(board, prefix) {
+    function createAnalysisGestureHandlers(board, prefix, options = {}) {
       const previewId = `${prefix}-preview`;
+      const arrowPriority = options.priority || null;
+      const notifyChange = () => {
+        try { options.onChange?.(); } catch {}
+      };
+      const resolveArrowPriority = (event, secondary = false) => arrowPriority || getAnalysisGesturePriority(event, secondary);
       const clearPreview = () => clearAnalysisOverlayItem(board, previewId);
       const toggleMatchingArrow = (from, to) => {
         const controller = analysisOverlayControllers.get(board);
@@ -19416,22 +20029,24 @@
             from,
             to,
             kind: "primary",
-            color: getAnalysisGestureColor(event, event?.button === 2),
-            priority: getAnalysisGesturePriority(event, event?.button === 2)
+            priority: resolveArrowPriority(event, event?.button === 2)
           });
         },
         onArrowEnd(from, to, event) {
           clearPreview();
           if (!from || !to || from === to) return false;
-          if (toggleMatchingArrow(from, to)) return true;
+          if (toggleMatchingArrow(from, to)) {
+            notifyChange();
+            return true;
+          }
           addAnalysisArrow(board, {
             id: `${prefix}-${from}-${to}-${++analysisOverlaySequence}`,
             from,
             to,
             kind: "primary",
-            color: getAnalysisGestureColor(event, event?.button === 2),
-            priority: getAnalysisGesturePriority(event, event?.button === 2)
+            priority: resolveArrowPriority(event, event?.button === 2)
           });
+          notifyChange();
           return true;
         },
         onAnalysisHighlight(square, event) {
@@ -19526,16 +20141,10 @@
           let handled = false;
           if (from) board.querySelector(`[data-square="${from}"]`)?.classList.remove("dragging");
           if (isLivePremoveEnabled()) handled = cancelCoachPremove() || handled;
-          // Aborting a piece drag must not erase already-committed analysis
-          // annotations on the local Play board.  Review keeps its familiar
-          // Escape/abort cleanup; arrow previews are cleared by onArrowCancel.
-          const reviewPageActive = Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
-          if (reviewPageActive && !isLivePremoveEnabled()) handled = clearAnalysisUserOverlay(board) || handled;
           return handled;
         },
         onContextMenu() {
           if (isLivePremoveEnabled()) cancelCoachPremove();
-          else clearAnalysisUserOverlay(board);
         },
         onLifecycleCancel() {
           // Route changes, blur, hidden-tab transitions, and detach can occur
@@ -19551,8 +20160,7 @@
               id: `review-user-arrow:${coachSelected}-${square}`,
               from: coachSelected,
               to: square,
-              kind: "primary",
-              color: event.altKey ? "blue" : event.ctrlKey ? "red" : "cyan"
+              kind: "primary"
             });
             coachSelected = "";
             coachLegalMoves = [];
@@ -19886,6 +20494,7 @@
 
     function restartCoachGame() {
       if (!CoachChess) return;
+      clearAnalysisArrows("game-restart", document.getElementById("coachBoard"));
       coachMoveToken += 1;
       window.clearInterval(reviewReplayTimer);
       reviewSelfAnalysisState = null;
@@ -20012,7 +20621,9 @@
         if (message instanceof Element) return message;
         const line = document.createElement("p");
         if (String(message.userId || message.user_id || "") === getFriendCurrentUserId()) line.className = "is-self";
-        line.append(createBookText("strong", "", message.username || "Player"), document.createTextNode(` ${message.body || ""}`));
+        const sender = createBookText("strong", "", message.username || "Player");
+        line.append(sender, document.createTextNode(` ${message.body || ""}`));
+        renderSharedIdentityLine(line, getPlayerIdentityModel({ name: message.username || "Player", isPlayer: String(message.userId || message.user_id || "") === getFriendCurrentUserId() }, { isPlayer: String(message.userId || message.user_id || "") === getFriendCurrentUserId(), variant: "compact" }), { nameSelector: "strong", variant: "compact" });
         return line;
       }));
     }
@@ -20541,6 +21152,10 @@
         name: String(row.display_name || row.displayName || row.username || row.name || "Player"),
         username: String(row.username || row.display_name || row.displayName || row.name || "Player"),
         title: String(row.title || "Chess Player"),
+        nameStyle: String(row.name_style || row.nameStyle || ""),
+        avatarFrame: String(row.avatar_frame || row.avatarFrame || ""),
+        avatarEffect: String(row.avatar_effect || row.avatarEffect || ""),
+        avatarRarity: String(row.avatar_rarity || row.avatarRarity || ""),
         rating: Number(row.rating) || 450,
         avatar: String(row.avatar || "auto"),
         country: String(row.country_flag || row.country || ""),
@@ -20605,7 +21220,8 @@
           : "Connect a friend to play";
       avatars.replaceChildren(...visible.map((friend) => {
         const avatarText = friend.avatar && friend.avatar !== "auto" ? friend.avatar.slice(0, 2) : friend.name.slice(0, 1).toUpperCase();
-        const avatar = createBookText("span", "", avatarText);
+        const avatar = createBookText("span", "player-identity-avatar", avatarText);
+        applySharedAvatarElement(avatar, getPlayerIdentityModel({ ...friend, countryCode: friend.country || friend.countryCode, isPlayer: false }, { isPlayer: false, variant: "compact" }), { variant: "compact" });
         avatar.title = `${friend.name} - ${friend.online ? "Online" : "Offline"}`;
         avatar.setAttribute("aria-label", avatar.title);
         return avatar;
@@ -20830,10 +21446,14 @@
       const avatar = createBookText("span", "friend-result-avatar", friend.avatar || friend.name.slice(0, 1));
       const main = document.createElement("span");
       main.className = "friend-result-main";
+      const friendName = createBookText("strong", "", friend.name);
       main.append(
-        createBookText("strong", "", friend.name),
+        friendName,
         createBookText("small", "", `${friend.title} • ${friend.rating} Elo • ${friend.online ? "Online" : "Offline"}`)
       );
+        const friendIdentity = getPlayerIdentityModel({ ...friend, countryCode: friend.country || friend.countryCode, profileId: friend.id, isPlayer: false }, { isPlayer: false, variant: "compact", profileId: friend.id });
+        renderSharedIdentityLine(main, friendIdentity, { nameSelector: "strong", variant: "compact", linkProfile: true, profileTarget: main });
+      applySharedAvatarElement(avatar, friendIdentity, { variant: "compact" });
       const dot = document.createElement("span");
       dot.className = `friend-status-dot${friend.online ? "" : " is-offline"}`;
       dot.title = friend.online ? "Online" : "Offline";
@@ -21868,11 +22488,13 @@
         const player = document.createElement("span");
         player.className = "tournament-player";
         const playerCopy = document.createElement("span");
-        playerCopy.append(
-          createBookText("strong", "", `${formatCountryFlag(entry.countryFlag || "")} ${entry.username || "Player"}`.trim()),
-          createBookText("small", "", `${entry.title || "Chess Player"} • ${Math.max(400, Number(entry.rating) || 450)} Elo`)
-        );
-        player.append(createTournamentAvatar(entry), playerCopy);
+        const tournamentName = createBookText("strong", "", entry.username || "Player");
+        playerCopy.append(tournamentName, createBookText("small", "", `${entry.title || "Chess Player"} • ${Math.max(400, Number(entry.rating) || 450)} Elo`));
+        const tournamentIdentity = getPlayerIdentityModel({ name: entry.username || "Player", title: entry.title || "", countryCode: entry.countryFlag || "", avatar: entry.avatar || "?", profileId: entry.id, isPlayer: entry.id === currentUserId }, { isPlayer: entry.id === currentUserId, variant: "compact", profileId: entry.id });
+        renderSharedIdentityLine(playerCopy, tournamentIdentity, { nameSelector: "strong", variant: "compact", linkProfile: true, profileTarget: playerCopy });
+        const tournamentAvatar = createTournamentAvatar(entry);
+        applySharedAvatarElement(tournamentAvatar, tournamentIdentity, { variant: "compact" });
+        player.append(tournamentAvatar, playerCopy);
         const stats = document.createElement("span");
         stats.className = "tournament-standing-stats";
         const stat = (label, value) => stats.append(createBookText("span", "", `${label} ${value}`));
@@ -21931,7 +22553,9 @@
         if (message.userId !== currentUserId && isNschessUserBlocked(message.userId, message.username)) return;
         const line = document.createElement("p");
         line.className = message.userId === currentUserId ? "is-self" : "";
-        line.append(createBookText("strong", "", message.username || "Player"), document.createTextNode(` ${message.body || ""}`));
+        const chatName = createBookText("strong", "", message.username || "Player");
+        line.append(chatName, document.createTextNode(` ${message.body || ""}`));
+        renderSharedIdentityLine(line, getPlayerIdentityModel({ name: message.username || "Player", isPlayer: message.userId === currentUserId }, { isPlayer: message.userId === currentUserId, variant: "compact" }), { nameSelector: "strong", variant: "compact" });
         if (message.userId !== currentUserId) {
           const actions = document.createElement("span");
           actions.className = "tournament-message-actions";
@@ -22524,6 +23148,7 @@
 
     function undoCoachMove() {
       if (!coachGame || coachThinking || !coachGame.history().length) return;
+      clearAnalysisArrows("move-undo", document.getElementById("coachBoard"));
       coachMoveToken += 1;
       coachGame.undo();
       if (coachGame.turn() === getCoachBotColor()) coachGame.undo();
@@ -22553,6 +23178,7 @@
         return;
       }
 
+      clearAnalysisArrows("review-replay", document.getElementById("coachBoard"));
       coachMoveToken += 1;
       coachGame = new CoachChess(coachReplayFen);
       coachSelected = "";
@@ -22603,6 +23229,7 @@
         const next = new CoachChess();
         const loaded = typeof next.loadPgn === "function" ? next.loadPgn(pgn) : next.load_pgn?.(pgn);
         if (loaded === false) throw new Error("PGN rejected");
+        clearAnalysisArrows("review-import", document.getElementById("coachBoard"));
         coachMoveToken += 1;
         coachGame = next;
         coachSelected = "";
@@ -23375,6 +24002,8 @@
       const puzzle = realPuzzleBank[realPuzzleIndex];
       realPuzzleTransitionId += 1;
       cancelPendingRealPuzzleReply();
+      boardInteractionEngine.cancel(document.getElementById("realPuzzleBoard"), { type: "puzzle-reset" });
+      clearRealPuzzleAnalysisArrows();
       clearRealPuzzleBoardPieces();
       realPuzzleCompletionTransitionId = -1;
       setRealPuzzlePhase("Loading");
@@ -23525,9 +24154,41 @@
       }));
     }
 
+    function syncRealPuzzleAnalysisControls() {
+      const toggle = document.getElementById("realPuzzleAnalysisToggle");
+      if (toggle) {
+        toggle.setAttribute("aria-pressed", String(realPuzzleAnalysisEnabled));
+        toggle.textContent = realPuzzleAnalysisEnabled ? "Analysis: On" : "Analysis: Off";
+      }
+      const clear = document.getElementById("realPuzzleAnalysisClear");
+      if (clear) clear.disabled = !Boolean(analysisOverlayControllers.get(document.getElementById("realPuzzleBoard"))?.state.userArrows.size);
+    }
+
+    function clearRealPuzzleAnalysisArrows() {
+      const board = document.getElementById("realPuzzleBoard");
+      if (board) clearAnalysisArrows("puzzle-position", board);
+      syncRealPuzzleAnalysisControls();
+    }
+
+    function setRealPuzzleAnalysisEnabled(enabled) {
+      realPuzzleAnalysisEnabled = Boolean(enabled);
+      syncRealPuzzleAnalysisControls();
+    }
+
     function bindRealPuzzleBoardEvents(board) {
+      const analysisHandlers = createAnalysisGestureHandlers(board, "real-puzzle-user-arrow", {
+        priority: "support",
+        onChange: syncRealPuzzleAnalysisControls
+      });
       boardInteractionEngine.attach(board, {
         squareSelector: ".real-puzzle-square",
+        ...analysisHandlers,
+        analysisGestures(square, event) {
+          // Desktop keeps the established right-button gesture. Touch needs
+          // an explicit opt-in so ordinary tap/drag-to-move remains intact.
+          if (event?.pointerType === "touch") return realPuzzleAnalysisEnabled ? "arrow" : false;
+          return event?.pointerType === "mouse" && event.button === 2;
+        },
         canDrag(from) { return Boolean(board.querySelector(`[data-square="${from}"]`)?.draggable); },
         onDragStart(from, event) {
           if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
@@ -23545,8 +24206,11 @@
         onCancel(from) {
           if (from) board.querySelector(`[data-square="${from}"]`)?.classList.remove("dragging");
         },
-        onSelect(square) { handleRealPuzzleSquare(square); }
+        onSelect(square) {
+          handleRealPuzzleSquare(square);
+        }
       });
+      syncRealPuzzleAnalysisControls();
     }
 
     function ensureRealPuzzleBoardSquares(board, squareNames) {
@@ -23629,11 +24293,19 @@
         square.disabled = realPuzzlePhase !== "PlayerTurn" || realPuzzleReplaying;
         square.draggable = Boolean(piece && piece.color === realPuzzleGame?.turn() && !square.disabled);
       });
-      if (animateEffect && realPuzzleLastMove) animateBoardPieceTransition(board, realPuzzleLastMove);
+      if (animateEffect && realPuzzleLastMove) animateBoardPieceTransition(board, realPuzzleLastMove, { fade: false });
+      // Puzzle arrows are player annotations only.  Keep the shared renderer
+      // mounted with an empty base layer so user arrows survive board paints,
+      // without ever consulting the puzzle solution for a recommendation.
+      renderAnalysisOverlay({ board, wrap: board, arrows: [], highlights: [] });
+      syncRealPuzzleAnalysisControls();
     }
 
     function renderRealPuzzle() {
       if (!document.getElementById("realPuzzleBoard")) return;
+      // A new/loading puzzle starts with a clean calculation canvas.  Normal
+      // board paints during the current line intentionally retain annotations.
+      clearRealPuzzleAnalysisArrows();
       window.clearTimeout(realPuzzleAutoNextTimer);
       realPuzzleAutoNextTimer = 0;
       if (!CoachChess && realPuzzleBank[realPuzzleIndex]?.fen) {
@@ -23744,6 +24416,7 @@
       if (!puzzle || realPuzzleCompletionTransitionId === completionId || realPuzzlePhase === "Completed") return;
       realPuzzleCompletionTransitionId = completionId;
       cancelPendingRealPuzzleReply();
+      clearRealPuzzleAnalysisArrows();
       const startedAt = realPuzzleStartedAt || Date.now();
       const seconds = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
       const firstSolve = !realPuzzleSolved.has(puzzle.id);
@@ -23832,6 +24505,9 @@
         renderRealPuzzleBoard();
         return;
       }
+      // Match the Play board: annotations belong to the position being
+      // calculated and disappear as soon as the player commits a move.
+      clearRealPuzzleAnalysisArrows();
       realPuzzleLastMove = played;
       realPuzzleMoveSans.push(played.san);
       playPuzzleTone("correct");
@@ -23854,6 +24530,7 @@
         renderRealPuzzleBoard();
         return;
       }
+      clearRealPuzzleAnalysisArrows();
       document.getElementById("realPuzzleMoves").textContent = realPuzzleMoveSans.join(" ");
       if (realPuzzleStep >= realPuzzleLine.length) {
         setRealPuzzlePhase("Success");
@@ -24016,6 +24693,10 @@
       document.getElementById("realPuzzleBoardRestart")?.addEventListener("click", () => realPuzzleManager.restart());
       document.getElementById("realPuzzleHintButton")?.addEventListener("click", showRealPuzzleHint);
       document.getElementById("realPuzzleReplay")?.addEventListener("click", replayRealPuzzleSolution);
+      document.getElementById("realPuzzleAnalysisToggle")?.addEventListener("click", () => {
+        setRealPuzzleAnalysisEnabled(!realPuzzleAnalysisEnabled);
+      });
+      document.getElementById("realPuzzleAnalysisClear")?.addEventListener("click", clearRealPuzzleAnalysisArrows);
       document.getElementById("realPuzzleFlip")?.addEventListener("click", () => {
         realPuzzleFlipped = !realPuzzleFlipped;
         renderRealPuzzleBoard();
@@ -24524,7 +25205,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v155-legacy-music-retirement";
+    const routeModuleVersion = "review-v174-shared-name-style";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -24655,6 +25336,11 @@
         if (!cleanHash || cleanHash === "top") return null;
         if (cleanHash === "admin") return { tab: "admin", panel: "admin", focus: "admin" };
         if (cleanHash === "friends") return { tab: "friends", panel: "friends", focus: "friends" };
+        if (cleanHash.startsWith("profile-")) {
+          let profileId = cleanHash.slice("profile-".length);
+          try { profileId = decodeURIComponent(profileId); } catch {}
+          return profileId ? { tab: "friends", panel: "friends", focus: "friends", profileId } : null;
+        }
         if (cleanHash === "game-review") return { tab: "gameReview", panel: "gameReview", focus: "gameReview" };
         if (cleanHash === "tournaments" || /(^|[?&])(mode=tournament|tournament=)/.test(rawHash)) {
           return { tab: "tournaments", panel: "play", focus: "tournamentLobby" };
@@ -24836,6 +25522,13 @@
         panelInitFrame = window.requestAnimationFrame(() => {
           panelInitFrame = 0;
           initializePanelFeatures(config.panel, config.tab);
+          if (config.profileId) {
+            window.requestAnimationFrame(() => {
+              if (window.location.hash.replace(/^#/, "").split("?")[0] !== `profile-${encodeURIComponent(config.profileId)}`) return;
+              const fallback = publicProfileFallbacks.get(config.profileId) || { id: config.profileId, name: "Player" };
+              void openPublicPlayerProfile(config.profileId, { fallback, updateRoute: false });
+            });
+          }
           if (config.panel === "store") {
             // The wallet/inventory is server-authoritative. Refresh on every
             // Store visit so a purchase, gift claim, or reward made elsewhere
@@ -25692,6 +26385,11 @@
         return {
           publicId: String(row.public_id || row.publicId || row.id || ""),
           username: normalizeAuthUsername(row.username),
+          nameStyle: String(row.name_style || row.nameStyle || ""),
+          avatarFrame: String(row.avatar_frame || row.avatarFrame || ""),
+          avatarEffect: String(row.avatar_effect || row.avatarEffect || ""),
+          avatarRarity: String(row.avatar_rarity || row.avatarRarity || ""),
+          avatar: String(row.avatar || "auto"),
           countryFlag: normalizeCountryFlagValue(row.country_flag || row.countryFlag || ""),
           title: String(row.title || ""),
           puzzleRating: Math.max(400, Number(row.puzzle_rating || row.puzzleRating) || rating),
@@ -25713,16 +26411,16 @@
       const getSupabaseLeaderboard = async (options = {}) => {
         const limit = Math.max(1, Math.min(100, Number(options.limit) || 100));
         try {
-          const rows = await request("rest/v1", `leaderboard_entries?select=public_id,username,country_flag,title,puzzle_rating,game_rating,achievements,statistics,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+          const rows = await request("rest/v1", `leaderboard_entries?select=public_id,username,avatar,country_flag,title,name_style,avatar_frame,avatar_effect,avatar_rarity,puzzle_rating,game_rating,achievements,statistics,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
           return { entries: (Array.isArray(rows) ? rows : []).map(toLeaderboardEntry).filter((entry) => entry.publicId && entry.username) };
         } catch (leaderboardError) {
           authDebug("Leaderboard table unavailable; using shared profile recovery", { message: leaderboardError?.message || "unknown" });
           let rows;
           try {
-            rows = await request("rest/v1", `profiles?select=public_id,username,country_flag,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+            rows = await request("rest/v1", `profiles?select=public_id,username,avatar,country_flag,title,name_style,avatar_frame,avatar_effect,avatar_rarity,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
           } catch (profileError) {
             try {
-              rows = await request("rest/v1", `profiles?select=public_id,username,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+              rows = await request("rest/v1", `profiles?select=public_id,username,avatar,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
             } catch (legacyProfileError) {
               const error = new Error(`Shared leaderboard and profile recovery failed: ${legacyProfileError?.message || profileError?.message || leaderboardError?.message || "unknown error"}`);
               error.code = legacyProfileError?.code || profileError?.code || leaderboardError?.code || "LEADERBOARD_REQUEST_FAILED";
@@ -26438,11 +27136,15 @@
       if (authenticated) {
         if (name) name.textContent = account.username;
         if (level) level.textContent = account.profileData?.title || getDragonProfileSnapshot().rank || "Chess learner";
-        return;
+      } else {
+        if (name) name.textContent = "Guest Explorer";
+        if (level) level.textContent = "Sign in to save progress";
+        if (avatar) avatar.textContent = String.fromCodePoint(0x265F);
       }
-      if (name) name.textContent = "Guest Explorer";
-      if (level) level.textContent = "Sign in to save progress";
-      if (avatar) avatar.textContent = String.fromCodePoint(0x265F);
+      const profile = getDragonProfileSnapshot();
+      const model = getPlayerIdentityModel({ ...profile, ...(account?.profileData || {}), name: account?.username || profile.name || "Guest Explorer", isPlayer: true }, { profile, isPlayer: true, variant: "standard" });
+      if (name) renderSharedIdentityLine(name, model, { nameSelector: '[data-profile-field="name"]', variant: "standard" });
+      if (avatar) applySharedAvatarElement(avatar, model, { variant: "standard" });
     }
 
     function renderAuthUi(account = null, loading = false) {
@@ -26468,8 +27170,10 @@
       const name = document.getElementById("authAccountName");
       const title = document.getElementById("authAccountTitle");
       const email = document.getElementById("authAccountEmail");
-      if (avatar) avatar.textContent = profile.avatar || getDragonProfileSnapshot().avatar || "♟";
+      const accountIdentity = getPlayerIdentityModel({ ...profile, name: account.username || "Chess Player", isPlayer: true }, { profile: getDragonProfileSnapshot(), isPlayer: true, variant: "compact" });
+      if (avatar) applySharedAvatarElement(avatar, accountIdentity, { variant: "compact" });
       if (name) name.textContent = account.username || "Chess Player";
+      if (name) renderSharedIdentityLine(name, accountIdentity, { nameSelector: "#authAccountName", variant: "compact" });
       if (title) title.textContent = profile.title || getDragonProfileSnapshot().rank || "Chess learner";
       if (email) email.textContent = account.email || "Connected account";
       if (new URLSearchParams(location.search).get("authDebug") === "1") {
@@ -27024,7 +27728,7 @@
         checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true,
         ambientEnabled: true, hoverSounds: true, storeAmbience: false
       };
-      const fallback = { theme: "dark", backgroundTheme: "classic", backgroundFavorites: [], board: "wood", boardFavorites: [], boardSize: "large", boardScale: 100, pieces: "classic", pieceSkin: "chessnut", pieceFinish: "classic", pieceFavorites: [], archetype: "balanced", nameStyle: "classic", nameFx: "on", nameStyleFavorites: [], musicFavorites: [], coords: "on", speed: "normal", motion: "system", pressure: "on", contrast: "normal", trail: "none", premove: "off", avatar: "auto", avatarFrame: "", avatarEffect: "none", avatarFavorites: [], boardBorder: "classic", lastMoveColor: "classic", lastMoveFavorites: [], title: "", audio: fallbackAudio };
+      const fallback = { theme: "dark", backgroundTheme: "classic", backgroundFavorites: [], board: "wood", boardFavorites: [], boardSize: "large", boardScale: 100, pieces: "classic", pieceSkin: "chessnut", pieceFinish: "classic", pieceFavorites: [], archetype: "balanced", nameStyle: "classic", nameFx: "on", nameStyleFavorites: [], musicFavorites: [], arrowSkin: "default", coords: "on", speed: "normal", motion: "system", pressure: "on", contrast: "normal", trail: "none", premove: "off", avatar: "auto", avatarFrame: "", avatarEffect: "none", avatarFavorites: [], boardBorder: "classic", lastMoveColor: "classic", lastMoveFavorites: [], title: "", audio: fallbackAudio };
       const saved = readJsonStorage(learnerPrefsStorageKey, fallback);
       const prefs = { ...fallback, ...(saved && typeof saved === "object" ? saved : {}) };
       prefs.audio = { ...fallbackAudio, ...(prefs.audio && typeof prefs.audio === "object" ? prefs.audio : {}) };
@@ -27062,6 +27766,9 @@
       if (!["classic", "crystal", "marble", "obsidian"].includes(prefs.pieceFinish)) prefs.pieceFinish = "classic";
       if (!archetypeThemes[prefs.archetype]) prefs.archetype = "balanced";
       if (!nameStyleThemes[prefs.nameStyle]) prefs.nameStyle = "classic";
+      const savedArrowSkin = saved && typeof saved === "object" && Object.prototype.hasOwnProperty.call(saved, "arrowSkin") ? saved.arrowSkin : null;
+      prefs.arrowSkin = normalizeArrowSkinValue(prefs.arrowSkin);
+      const invalidSavedArrowSkin = savedArrowSkin !== null && normalizeArrowSkinValue(savedArrowSkin) !== savedArrowSkin;
       if (!avatarEffectThemes[prefs.avatarEffect]) prefs.avatarEffect = "none";
       if (!["on", "off"].includes(prefs.nameFx)) prefs.nameFx = "on";
       if (!audioMusicThemes[prefs.audio.musicPack] && !premiumPianoTracks[prefs.audio.musicPack]) prefs.audio.musicPack = "calm";
@@ -27123,8 +27830,8 @@
       if (!["on", "off"].includes(prefs.premove)) prefs.premove = "off";
       if (!["small", "medium", "large", "xl"].includes(prefs.boardSize)) prefs.boardSize = "large";
       prefs.boardScale = clampNumber(Number(prefs.boardScale) || 100, 82, 122);
-      if (retiredStoreMusicState) {
-        prefs.musicFavorites = prefs.musicFavorites.filter((value) => !isRetiredStoreMusicValue(value));
+      if (retiredStoreMusicState || invalidSavedArrowSkin) {
+        if (retiredStoreMusicState) prefs.musicFavorites = prefs.musicFavorites.filter((value) => !isRetiredStoreMusicValue(value));
         writeJsonStorage(learnerPrefsStorageKey, prefs);
       }
       return prefs;
@@ -27212,6 +27919,7 @@
         document.body.classList.toggle(`avatar-effect-${effect}`, prefs.avatarEffect === effect && effect !== "none");
       });
       applyLastMoveHighlightTheme(prefs.lastMoveColor);
+      applyArrowSkin(prefs.arrowSkin);
       applyBoardBorderTheme(prefs.boardBorder);
       applyPieceSetTheme(prefs.pieceSkin);
       applyArchetypeTheme(prefs.archetype);
@@ -27230,6 +27938,10 @@
       document.body.classList.toggle("no-pressure", prefs.pressure !== "off");
       document.body.classList.toggle("low-performance", (navigator.hardwareConcurrency || 4) <= 2 || (navigator.deviceMemory && navigator.deviceMemory <= 2));
       applyBackgroundTheme(prefs.backgroundTheme);
+      // Hydrate the shared arrow renderer before any deferred board route is
+      // mounted.  This prevents a persisted premium skin from briefly (or
+      // permanently) falling back to Classic in Opening, Puzzle, or Review.
+      applyArrowSkin(prefs.arrowSkin);
     }
 
     function setupLearnerPreferences() {
@@ -30320,7 +31032,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v155-legacy-music-retirement";
+    const optionalRouteStylesheetVersion = "review-v174-shared-name-style";
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
       if (!key) return Promise.resolve(false);
@@ -30807,11 +31519,18 @@
         createBookText("time", "social-activity-card__time", formatSocialActivityTime(activity.createdAt))
       );
       const copyNode = card.querySelector(".social-activity-card__copy");
-      copyNode?.append(createBookText("strong", "", copy.title), createBookText("small", "", copy.detail));
+      if (copyNode) {
+        const titleNode = createBookText("strong", "", "");
+        const actorIdentity = createPlayerIdentity({ name: activity.actorUsername, avatar: activity.actorAvatar, profileId: activity.actorId, isPlayer: activity.actorId === getFriendCurrentUserId() }, { isPlayer: activity.actorId === getFriendCurrentUserId(), profileId: activity.actorId, variant: "compact", showAvatar: false, showSubtitle: false, nameTag: "span", linkProfile: Boolean(activity.actorId), profileTarget: copyNode });
+        const actorPrefix = `${activity.actorUsername || "Chess player"}`;
+        titleNode.append(actorIdentity, document.createTextNode(copy.title.startsWith(actorPrefix) ? copy.title.slice(actorPrefix.length) : ` ${copy.title}`));
+        copyNode.append(titleNode, createBookText("small", "", copy.detail));
+      }
+      applySharedAvatarElement(card.querySelector(".friend-result-avatar"), getPlayerIdentityModel({ name: activity.actorUsername, avatar: activity.actorAvatar, profileId: activity.actorId, isPlayer: activity.actorId === getFriendCurrentUserId() }, { isPlayer: activity.actorId === getFriendCurrentUserId(), profileId: activity.actorId, variant: "compact" }), { variant: "compact" });
       card.addEventListener("click", () => {
         if (activity.actorId) {
           const friend = (friendNetworkState.directory || []).find((item) => item.id === activity.actorId);
-          if (friend) setFriendHubProfile(friend);
+          void openPublicPlayerProfile(activity.actorId, { fallback: friend || { id: activity.actorId, name: activity.actorUsername, avatar: activity.actorAvatar } });
         }
       });
       return card;
@@ -30969,6 +31688,25 @@
       ].filter(Boolean) : profile.private ? [createBookText("small", "", "This player keeps profile details private.")] : []));
     }
 
+    function mergePublicProfileIdentity(friend = {}, profile = null) {
+      const payload = profile && typeof profile === "object"
+        ? { ...profile, ...(profile.profile && typeof profile.profile === "object" ? profile.profile : {}) }
+        : {};
+      return normalizeFriendRecord({
+        ...friend,
+        public_id: friend.id || payload.public_id || payload.publicId,
+        username: payload.username || payload.display_name || payload.displayName || friend.name,
+        title: payload.title || friend.title,
+        avatar: payload.avatar || friend.avatar,
+        country_flag: payload.country_flag || payload.countryFlag || payload.country || friend.country,
+        name_style: payload.name_style || payload.nameStyle || friend.nameStyle,
+        avatar_frame: payload.avatar_frame || payload.avatarFrame || friend.avatarFrame,
+        avatar_effect: payload.avatar_effect || payload.avatarEffect || friend.avatarEffect,
+        avatar_rarity: payload.avatar_rarity || payload.avatarRarity || friend.avatarRarity,
+        rating: payload.rating || friend.rating
+      });
+    }
+
     function setFriendHubProfile(friend = null) {
       const empty = document.getElementById("friendsHubProfileEmpty");
       const content = document.getElementById("friendsHubProfileContent");
@@ -30980,18 +31718,24 @@
         saveFriendHubState({ selectedId: "" });
         return;
       }
+      const cachedProfile = friendProfileCache.get(friend.id) || null;
+      friend = mergePublicProfileIdentity(friend, cachedProfile);
       const avatar = document.getElementById("friendsHubProfileAvatar");
       const status = document.getElementById("friendsHubProfileStatus");
       const name = document.getElementById("friendsHubProfileName");
       const meta = document.getElementById("friendsHubProfileMeta");
       const bio = document.getElementById("friendsHubProfileBio");
       const favorite = document.getElementById("friendsHubProfileFavorite");
-      const cachedProfile = friendProfileCache.get(friend.id) || null;
       const favorites = readFriendHubFavorites();
+      const isOwner = Boolean(friend.id && getFriendCurrentUserId() && String(friend.id) === String(getFriendCurrentUserId()));
+      content.dataset.profileOwner = String(isOwner);
       if (avatar) avatar.textContent = friend.avatar && friend.avatar !== "auto" ? friend.avatar.slice(0, 2) : friend.name.slice(0, 1).toUpperCase();
       if (status) status.textContent = friendPresenceLabel(friend);
       if (name) name.textContent = friend.name;
       if (meta) meta.textContent = `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo${cachedProfile?.country || friend.country ? ` · ${cachedProfile?.country || friend.country}` : ""}`;
+      const friendIdentity = getPlayerIdentityModel({ ...friend, countryCode: cachedProfile?.country || friend.country, profileId: friend.id, isPlayer: false }, { isPlayer: false, variant: "standard", profileId: friend.id });
+      if (name) renderSharedIdentityLine(name.parentElement, friendIdentity, { nameSelector: "#friendsHubProfileName", variant: "standard" });
+      applySharedAvatarElement(avatar, friendIdentity, { variant: "standard" });
       if (bio) bio.textContent = friend.inGame ? "Currently playing a live game." : friend.online ? "Ready for a focused game?" : "Invite them when they are back online.";
       renderFriendProfileDetails(cachedProfile);
       const add = document.getElementById("friendsHubProfileAdd");
@@ -31000,11 +31744,11 @@
       const block = document.getElementById("friendsHubProfileBlock");
       const report = document.getElementById("friendsHubProfileReport");
       const isFriend = friend.requestStatus === "accepted";
-      if (add) { add.hidden = isFriend || friend.requestDirection === "outgoing"; add.textContent = friend.requestDirection === "outgoing" ? "Request pending" : "Add Friend"; add.disabled = friend.requestDirection === "outgoing"; add.onclick = () => void setFriendRequest(friend, "send"); }
+      if (add) { add.hidden = isOwner || isFriend || friend.requestDirection === "outgoing"; add.textContent = friend.requestDirection === "outgoing" ? "Request pending" : "Add Friend"; add.disabled = friend.requestDirection === "outgoing"; add.onclick = () => void setFriendRequest(friend, "send"); }
       if (remove) { remove.hidden = !isFriend; remove.onclick = () => void setFriendRequest(friend, "remove"); }
       if (watch) { watch.hidden = !friend.inGame; watch.onclick = async () => { try { const code = await getFriendProvider()?.getActiveFriendGame?.(friend.id); if (code) await openFriendSpectator(code); else document.getElementById("friendsHubStatus").textContent = "That game is no longer available to watch."; } catch (error) { document.getElementById("friendsHubStatus").textContent = error?.message || "Spectating is unavailable."; } }; }
-      if (block) block.onclick = () => { blockNschessUser({ id: friend.id, name: friend.name }); setFriendHubProfile(null); renderFriendsHub(); };
-      if (report) report.onclick = () => openSafetyReport({ userId: friend.id, username: friend.name, contextType: "profile", contextId: friend.id });
+      if (block) { block.hidden = isOwner; block.onclick = () => { blockNschessUser({ id: friend.id, name: friend.name }); setFriendHubProfile(null); renderFriendsHub(); }; }
+      if (report) { report.hidden = isOwner; report.onclick = () => openSafetyReport({ userId: friend.id, username: friend.name, contextType: "profile", contextId: friend.id }); }
       if (favorite) {
         favorite.textContent = favorites.has(friend.id) ? "★ Favorited" : "☆ Favorite";
         favorite.classList.toggle("is-active", favorites.has(friend.id));
@@ -31018,9 +31762,9 @@
         };
       }
       const challenge = document.getElementById("friendsHubProfileChallenge");
-      if (challenge) challenge.onclick = () => openFriendChallengeForPlayer(friend);
+      if (challenge) { challenge.hidden = isOwner; challenge.onclick = () => openFriendChallengeForPlayer(friend); }
       const message = document.getElementById("friendsHubProfileMessage");
-      if (message) message.onclick = async () => {
+      if (message) { message.hidden = isOwner; message.onclick = async () => {
         try {
           const conversationId = await getFriendProvider()?.getOrCreateConversation?.(friend.id);
           if (!conversationId) throw new Error("Messaging is unavailable.");
@@ -31033,20 +31777,61 @@
         } catch (error) {
           document.getElementById("friendsHubStatus").textContent = error?.message || "Messaging is unavailable.";
         }
-      };
+      }; }
       empty.hidden = true;
       content.hidden = false;
       saveFriendHubState({ selectedId: friend.id });
       const requestId = ++friendProfileRequest;
       const cached = friendProfileCache.get(friend.id);
       if (!cached && getFriendProvider()?.getSocialPlayerProfile) {
+        if (status) status.textContent = "Loading public profile…";
         void getFriendProvider().getSocialPlayerProfile(friend.id).then((profile) => {
-          if (requestId !== friendProfileRequest || friendHubState.selectedId !== friend.id || !profile) return;
+          if (requestId !== friendProfileRequest || friendHubState.selectedId !== friend.id) return;
+          if (!profile || profile.notFound || profile.not_found) {
+            if (status) status.textContent = "Profile not found";
+            renderFriendProfileDetails({ private: true });
+            return;
+          }
           friendProfileCache.set(friend.id, profile);
-          renderFriendProfileDetails(profile);
-          if (profile.presenceStatus) { const next = normalizeFriendRecord({ ...friend, online: profile.online, presence_status: profile.presenceStatus, last_seen_at: profile.lastSeen }); applyFriendPresenceRow({ public_id: friend.id, online: next.online, presence_status: next.presenceStatus, last_seen_at: next.lastSeenAt }); }
-        }).catch(() => {});
+          const enrichedFriend = mergePublicProfileIdentity(friend, profile);
+          setFriendHubProfile(enrichedFriend);
+          if (profile.presenceStatus) { const next = normalizeFriendRecord({ ...enrichedFriend, online: profile.online, presence_status: profile.presenceStatus, last_seen_at: profile.lastSeen }); applyFriendPresenceRow({ public_id: friend.id, online: next.online, presence_status: next.presenceStatus, last_seen_at: next.lastSeenAt }); }
+        }).catch(() => {
+          if (requestId !== friendProfileRequest || friendHubState.selectedId !== friend.id) return;
+          if (status) status.textContent = "Public profile unavailable";
+        });
       }
+    }
+
+    async function openPublicPlayerProfile(target, { fallback = null, updateRoute = true } = {}) {
+      const source = target && typeof target === "object" ? target : { id: target };
+      const id = String(source.id || source.publicId || source.public_id || "").trim();
+      if (!id) return false;
+      const safeFallback = mergePublicProfileIdentity({
+        id,
+        name: source.name || source.username || fallback?.name || fallback?.username || "Player",
+        title: source.title || fallback?.title || "Chess Player",
+        avatar: source.avatar || fallback?.avatar || "auto",
+        country: source.country || source.countryCode || fallback?.country || fallback?.countryCode || "",
+        nameStyle: source.nameStyle || fallback?.nameStyle || "",
+        avatarFrame: source.avatarFrame || fallback?.avatarFrame || "",
+        avatarEffect: source.avatarEffect || fallback?.avatarEffect || "",
+        avatarRarity: source.avatarRarity || fallback?.avatarRarity || "",
+        rating: source.rating || fallback?.rating || 450
+      });
+      publicProfileFallbacks.set(id, safeFallback);
+      const routeHash = `#profile-${encodeURIComponent(id)}`;
+      if (updateRoute && window.location.hash !== routeHash) {
+        window.location.hash = routeHash;
+        return true;
+      }
+      const requestId = ++publicProfileRequest;
+      setFriendHubProfile(safeFallback);
+      // setFriendHubProfile owns the privacy-safe RPC fetch and cache.  Keep
+      // this request token so a rapid series of profile clicks cannot leave a
+      // stale route selection mounted after navigation.
+      await Promise.resolve();
+      return requestId === publicProfileRequest;
     }
 
     function createFriendsHubCard(friend, mode = "friend") {
@@ -31055,11 +31840,15 @@
       const main = document.createElement("button");
       main.type = "button";
       main.className = "friends-hub-card-main";
-      main.addEventListener("click", () => { rememberRecentFriendPlayer(friend); setFriendHubProfile(friend); });
+      main.addEventListener("click", () => { rememberRecentFriendPlayer(friend); void openPublicPlayerProfile(friend, { fallback: friend }); });
       const avatar = createBookText("span", "friend-result-avatar", friend.avatar && friend.avatar !== "auto" ? friend.avatar.slice(0, 2) : friend.name.slice(0, 1).toUpperCase());
       const copy = document.createElement("span");
       copy.className = "friends-hub-card-copy";
-      copy.append(createBookText("strong", "", friend.name), createBookText("small", "", `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo · ${friendPresenceLabel(friend)}${friend.mutualFriendsCount ? ` · ${friend.mutualFriendsCount} mutual` : ""}`));
+      const friendName = createBookText("strong", "", friend.name);
+      copy.append(friendName, createBookText("small", "", `${friend.title || "Chess Player"} · ${friend.rating || 450} Elo · ${friendPresenceLabel(friend)}${friend.mutualFriendsCount ? ` · ${friend.mutualFriendsCount} mutual` : ""}`));
+        const friendIdentity = getPlayerIdentityModel({ ...friend, countryCode: friend.country || friend.countryCode, profileId: friend.id, isPlayer: false }, { isPlayer: false, variant: "compact", profileId: friend.id });
+        renderSharedIdentityLine(copy, friendIdentity, { nameSelector: "strong", variant: "compact" });
+      applySharedAvatarElement(avatar, friendIdentity, { variant: "compact" });
       const dot = createBookText("span", friendPresenceClass(friend), "");
       dot.setAttribute("aria-label", friendPresenceLabel(friend));
       main.append(avatar, copy, dot);
@@ -31159,7 +31948,11 @@
       const line = document.createElement("div");
       line.className = `friends-hub-conversation-message${isSelf ? " is-self" : ""}${normalized.status === "sending" ? " is-sending" : ""}${normalized.status === "failed" ? " is-failed" : ""}`;
       line.dataset.messageId = normalized.id || normalized.localId;
-      line.append(createBookText("small", "", normalized.sender_username || "Player"), document.createTextNode(normalized.body));
+      const senderLine = createBookText("span", "player-identity-line", "");
+      const senderName = createBookText("strong", "", normalized.sender_username || "Player");
+      senderLine.append(senderName);
+      renderSharedIdentityLine(senderLine, getPlayerIdentityModel({ name: normalized.sender_username || "Player", isPlayer: normalized.sender_id === getFriendCurrentUserId() }, { isPlayer: normalized.sender_id === getFriendCurrentUserId(), variant: "compact" }), { nameSelector: "strong", variant: "compact" });
+      line.append(senderLine, document.createTextNode(normalized.body));
       const footer = createBookText("small", "friends-hub-message-meta", `${new Date(normalized.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${messageDeliveryLabel(normalized) ? ` · ${messageDeliveryLabel(normalized)}` : ""}`);
       line.append(footer);
       if (normalized.status === "failed") {
@@ -31306,7 +32099,11 @@
       const avatar = createBookText("span", "friend-result-avatar", conversation.participantAvatar !== "auto" ? conversation.participantAvatar.slice(0, 2) : conversation.participantName.slice(0, 1).toUpperCase());
       const copy = document.createElement("span");
       copy.className = "friends-hub-card-copy";
-      copy.append(createBookText("strong", "", conversation.participantName), createBookText("small", "", conversation.lastBody || "No messages yet"));
+      const participantName = createBookText("strong", "", conversation.participantName);
+      copy.append(participantName, createBookText("small", "", conversation.lastBody || "No messages yet"));
+      const participantIdentity = getPlayerIdentityModel({ name: conversation.participantName, avatar: conversation.participantAvatar, profileId: conversation.participantId, isPlayer: false }, { isPlayer: false, profileId: conversation.participantId, variant: "compact" });
+      renderSharedIdentityLine(copy, participantIdentity, { nameSelector: "strong", variant: "compact", linkProfile: Boolean(conversation.participantId), profileTarget: copy });
+      applySharedAvatarElement(avatar, participantIdentity, { variant: "compact" });
       main.append(avatar, copy);
       const actions = document.createElement("span");
       actions.className = "friends-hub-card-actions";
@@ -31698,7 +32495,10 @@
       const runPlayerSearch = () => { saveFriendHubState({ minRating: minRating?.value || "", maxRating: maxRating?.value || "" }); return searchFriendPlayers(input?.value || "", { minRating: minRating?.value, maxRating: maxRating?.value }).then(renderFriendsHub); };
       document.getElementById("friendHubSearchButton")?.addEventListener("click", () => friendHubState.view === "messages" ? renderFriendsHub() : void runPlayerSearch());
       [minRating, maxRating].forEach((field) => field?.addEventListener("change", () => { if (friendHubState.view !== "messages") void runPlayerSearch(); }));
-      document.getElementById("friendsHubProfileClose")?.addEventListener("click", () => setFriendHubProfile(null));
+      document.getElementById("friendsHubProfileClose")?.addEventListener("click", () => {
+        setFriendHubProfile(null);
+        if (String(window.location.hash || "").replace(/^#/, "").startsWith("profile-")) window.location.hash = "#friends";
+      });
       renderFriendsHub();
       void refreshFriendNetwork(true).then(renderFriendsHub);
       void refreshSocialNotifications().then(renderFriendsHub);
