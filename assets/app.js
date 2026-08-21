@@ -7137,6 +7137,10 @@
         puzzleCoins = serverStoreState.coins;
         storeState = { ...storeState, owned, equipped };
         syncServerEquippedPreferences(equipped);
+        // Re-apply the shared identity pipeline after authoritative Store
+        // hydration so navbar/home surfaces cannot remain on a stale Classic
+        // style when their local preference was already current.
+        renderPlayerIdentityExtras(getDragonProfileSnapshot());
         savePuzzleState();
         renderStoreSyncFeedback();
         if (rerender) {
