@@ -27535,12 +27535,12 @@
         },
         startOAuthLogin: async (providerName) => {
           const oauthProvider = String(providerName || "").toLowerCase();
-          if (!new Set(["google", "facebook"]).has(oauthProvider)) {
+          if (oauthProvider !== "google") {
             const error = new Error("That social sign-in provider is unavailable.");
             error.code = "AUTH_OAUTH_PROVIDER_UNSUPPORTED";
             throw error;
           }
-          warmResourceOrigins(oauthProvider === "google" ? "https://accounts.google.com" : "https://www.facebook.com");
+          warmResourceOrigins("https://accounts.google.com");
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
           const redirectTo = await getAuthRedirectUrl("oauth");
@@ -27549,7 +27549,6 @@
           return data;
         },
         startGoogleLogin: () => getAuthProvider()?.startOAuthLogin?.("google"),
-        startFacebookLogin: () => getAuthProvider()?.startOAuthLogin?.("facebook"),
         consumeOAuthRedirect: async () => {
           const supabase = await getSupabaseClient();
           const { data, error } = await supabase.auth.getSession();
@@ -28315,27 +28314,26 @@
           button.disabled = Boolean(pending);
           button.setAttribute("aria-busy", String(Boolean(pending && ownProvider === providerName)));
           if (label) label.textContent = pending && ownProvider === providerName
-            ? `Connecting to ${providerName === "facebook" ? "Facebook" : "Google"}…`
+            ? "Connecting to Google…"
             : button.dataset.authOauthDefaultLabel || label.textContent || "";
         });
       };
 
-      const oauthErrorMessage = (providerName, error) => {
-        const providerLabel = providerName === "facebook" ? "Facebook" : "Google";
+      const oauthErrorMessage = (error) => {
         const code = String(error?.code || "");
         const message = String(error?.message || "");
         if (/AUTH_REDIRECT_(ORIGIN_UNTRUSTED|ORIGINS_UNAVAILABLE|POLICY_UNAVAILABLE)/.test(code)) {
           return "Social sign-in must start from an approved Nschess address.";
         }
         if (/provider.*(not enabled|disabled|unsupported)|unsupported provider|provider is not enabled/i.test(message)) {
-          return `${providerLabel} sign-in is not enabled yet. Use email and password, or try again after it is configured.`;
+          return "Google sign-in is not enabled yet. Use email and password, or try again after it is configured.";
         }
-        return `${providerLabel} sign-in could not start. Try again or use email and password.`;
+        return "Google sign-in could not start. Try again or use email and password.";
       };
 
       socialButtons.forEach((button) => button.addEventListener("click", async () => {
         const providerName = String(button.dataset.authOauthProvider || "").toLowerCase();
-        if (!new Set(["google", "facebook"]).has(providerName) || pendingOAuthProvider) return;
+        if (providerName !== "google" || pendingOAuthProvider) return;
         const provider = getAuthProvider();
         if (!hasSafeAuthTransport()) {
           setAuthMessage("Please use the secure site link before using social sign-in.", "error");
@@ -28348,12 +28346,12 @@
         pendingOAuthProvider = providerName;
         setOAuthButtonsPending(providerName, true);
         try {
-          setAuthMessage(`Opening ${providerName === "facebook" ? "Facebook" : "Google"} sign-in…`);
+          setAuthMessage("Opening Google sign-in…");
           await provider.startOAuthLogin(providerName);
         } catch (error) {
           pendingOAuthProvider = "";
           setOAuthButtonsPending("", false);
-          setAuthMessage(oauthErrorMessage(providerName, error), "error");
+          setAuthMessage(oauthErrorMessage(error), "error");
         }
       }));
 
