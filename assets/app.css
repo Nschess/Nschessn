@@ -2856,6 +2856,75 @@
       display: none;
     }
 
+    .auth-social {
+      display: grid;
+      gap: 10px;
+    }
+
+    .auth-social-divider {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 0.69rem;
+      font-weight: 800;
+      letter-spacing: 0.045em;
+      text-transform: lowercase;
+    }
+
+    .auth-social-divider::before,
+    .auth-social-divider::after {
+      content: "";
+      height: 1px;
+      flex: 1;
+      background: color-mix(in srgb, var(--line) 76%, transparent);
+    }
+
+    .auth-social-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .auth-oauth-button {
+      position: relative;
+      display: inline-flex;
+      min-width: 0;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .auth-oauth-icon {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+    }
+
+    .auth-oauth-button[aria-busy="true"] {
+      cursor: progress;
+    }
+
+    .auth-oauth-button[aria-busy="true"]::after {
+      content: "";
+      width: 13px;
+      height: 13px;
+      flex: 0 0 auto;
+      border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: authOAuthSpinner 620ms linear infinite;
+    }
+
+    .auth-oauth-button[aria-busy="true"] .auth-oauth-icon {
+      display: none;
+    }
+
+    @keyframes authOAuthSpinner {
+      to { transform: rotate(360deg); }
+    }
+
     .auth-field {
       display: grid;
       gap: 5px;
@@ -28023,18 +28092,18 @@
       box-shadow: inset 0 1px 0 var(--cq-highlight), 0 10px 22px color-mix(in srgb, var(--cq-accent-primary) 24%, transparent);
     }
 
-    #login :is(.login-card-actions .button.secondary, .login-actions .button.secondary, #authGoogleLogin) {
+    #login :is(.login-card-actions .button.secondary, .login-actions .button.secondary, .auth-oauth-button) {
       border-color: var(--cq-border);
       color: var(--cq-text-primary);
       background: color-mix(in srgb, var(--cq-surface-input) 84%, transparent);
       box-shadow: inset 0 1px 0 var(--cq-highlight);
     }
 
-    #login :is(.login-card-actions .button, .login-actions .button, .auth-form > .button, #authGoogleLogin):hover:not(:disabled) {
+    #login :is(.login-card-actions .button, .login-actions .button, .auth-form > .button, .auth-oauth-button):hover:not(:disabled) {
       transform: translateY(-1px);
     }
 
-    #login :is(.login-card-actions .button, .login-actions .button, .auth-form > .button, #authGoogleLogin):focus-visible {
+    #login :is(.login-card-actions .button, .login-actions .button, .auth-form > .button, .auth-oauth-button):focus-visible {
       border-color: var(--cq-border-strong);
       box-shadow: var(--cq-focus-ring), inset 0 1px 0 var(--cq-highlight);
     }
@@ -28352,7 +28421,14 @@
     }
     #login .auth-field small { color: var(--cq-text-subtle); font-size: 0.62rem; line-height: 1.35; }
     #login .auth-form > .button:not(.secondary),
-    #login #authGoogleLogin { width: 100%; min-height: 42px; justify-content: center; font-size: 0.74rem; }
+    #login .auth-oauth-button { width: 100%; min-height: 42px; justify-content: center; font-size: 0.74rem; }
+    #login .auth-social { gap: 9px; }
+    #login .auth-social-divider { font-size: 0.62rem; }
+    #login .auth-oauth-button { padding-inline: 9px; }
+
+    @media (max-width: 440px) {
+      #login .auth-social-actions { grid-template-columns: 1fr; }
+    }
     #login .auth-security { display: grid; gap: 5px; margin: 0; padding: 9px 10px 9px 25px; border: 1px solid var(--cq-border); border-radius: 13px; color: var(--cq-text-subtle); background: var(--cq-surface-input); font-size: 0.62rem; line-height: 1.36; }
     #login .auth-status,
     #login .auth-note { margin: 0; color: var(--cq-text-muted); font-size: 0.68rem; line-height: 1.45; }

@@ -9517,7 +9517,10 @@
       }
       renderStore();
       syncStoreAmbienceForRoute();
-      void refreshServerStoreState().catch(() => {});
+      // Route activation and authenticated-session hydration own the single
+      // authoritative Store refresh. Calling it again from this one-time UI
+      // setup can race just after navigation and used to leave an otherwise
+      // idle Store issuing a second RPC while the player starts scrolling.
     }
 
     const audioCueProfiles = Object.freeze({
@@ -25838,7 +25841,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v174-shared-name-style";
+    const routeModuleVersion = "review-v175-social-oauth";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -26844,13 +26847,19 @@
         });
       };
 
-      const getAuthRedirectUrl = () => {
-        const isLocal = ["localhost", "127.0.0.1", "::1"].includes(host);
-        if (isLocal) {
-          const path = location.pathname.endsWith("/") ? location.pathname : location.pathname.replace(/\/[^/]*$/, "/");
-          return `${window.location.origin}${path || "/"}`;
+      const getAuthRedirectUrl = async (flow = "session") => {
+        const policy = window.NschessAuthRedirectPolicy;
+        if (typeof policy?.createTrustedRedirectUrl !== "function") {
+          const error = new Error("Secure redirect protection is unavailable. Refresh and try again.");
+          error.code = "AUTH_REDIRECT_POLICY_UNAVAILABLE";
+          throw error;
         }
-        return new URL("./", window.location.href).href;
+        const config = await getConfig();
+        return policy.createTrustedRedirectUrl({
+          currentOrigin: window.location.origin,
+          allowedOrigins: config.authRedirectOrigins,
+          flow
+        });
       };
 
       clearLegacyAuthStorage();
@@ -26868,12 +26877,16 @@
           configPromise = fetch("/api/auth-config", { cache: "no-store" })
             .then(async (response) => {
               const payload = await response.json().catch(() => ({}));
-              if (!response.ok || !payload.url || !payload.anonKey) {
+              const policy = window.NschessAuthRedirectPolicy;
+              const authRedirectOrigins = typeof policy?.trustedOrigins === "function"
+                ? policy.trustedOrigins(payload.authRedirectOrigins)
+                : [];
+              if (!response.ok || !payload.url || !payload.anonKey || !authRedirectOrigins.length) {
                 const error = new Error(payload.error || "Supabase authentication is unavailable.");
-                error.code = payload.code || "SUPABASE_NOT_CONFIGURED";
+                error.code = payload.code || (!authRedirectOrigins.length ? "AUTH_REDIRECT_ORIGINS_UNAVAILABLE" : "SUPABASE_NOT_CONFIGURED");
                 throw error;
               }
-              return payload;
+              return { ...payload, authRedirectOrigins };
             })
             .catch((error) => {
               configPromise = null;
@@ -26956,11 +26969,21 @@
         writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), currentEmail: "", rememberEmail: "" });
       };
 
+      const safeAuthMetadataUsername = (user) => {
+        const metadata = user?.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
+        const candidates = [metadata.username, metadata.preferred_username, metadata.user_name, metadata.full_name, metadata.name];
+        for (const candidate of candidates) {
+          const normalized = String(candidate || "").normalize("NFKD").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 20);
+          if (normalized.length >= 3) return normalized;
+        }
+        return `player_${String(user?.id || "").replace(/-/g, "").slice(0, 12)}`;
+      };
+
       const getProfile = async (user, accessToken = "") => {
         const fallback = {
           authUserId: String(user?.id || ""),
           publicId: String(user?.id || ""),
-          username: normalizeAuthUsername(user?.user_metadata?.username) || `player_${String(user?.id || "").replace(/-/g, "").slice(0, 12)}`,
+          username: safeAuthMetadataUsername(user),
           email: normalizeAuthEmail(user?.email),
           joinDate: user?.created_at || "",
           profileData: normalizeSupabaseProfileData()
@@ -27443,7 +27466,7 @@
         register: async ({ username, email, password }) => {
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
-          const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: getAuthRedirectUrl() } });
+          const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: await getAuthRedirectUrl() } });
           if (error) throw emailError(error);
           const user = payload?.user || null;
           if (!user || (Array.isArray(user.identities) && user.identities.length === 0)) throw new Error("That email already has a Player Pass.");
@@ -27460,12 +27483,12 @@
         },
         resetPassword: async (email) => {
           const supabase = await getSupabaseClient();
-          const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: getAuthRedirectUrl() });
+          const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: await getAuthRedirectUrl() });
           if (error) throw emailError(error);
         },
         resendConfirmation: async (email) => {
           const supabase = await getSupabaseClient();
-          const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: getAuthRedirectUrl() } });
+          const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: await getAuthRedirectUrl() } });
           if (error) throw emailError(error);
         },
         logout: async () => {
@@ -27510,13 +27533,23 @@
           clearSession();
           return true;
         },
-        startGoogleLogin: async () => {
-          warmResourceOrigins("https://accounts.google.com");
+        startOAuthLogin: async (providerName) => {
+          const oauthProvider = String(providerName || "").toLowerCase();
+          if (!new Set(["google", "facebook"]).has(oauthProvider)) {
+            const error = new Error("That social sign-in provider is unavailable.");
+            error.code = "AUTH_OAUTH_PROVIDER_UNSUPPORTED";
+            throw error;
+          }
+          warmResourceOrigins(oauthProvider === "google" ? "https://accounts.google.com" : "https://www.facebook.com");
           const supabase = await getSupabaseClient();
           startSessionRefresh(supabase);
-          const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: getAuthRedirectUrl() } });
+          const redirectTo = await getAuthRedirectUrl("oauth");
+          const { data, error } = await supabase.auth.signInWithOAuth({ provider: oauthProvider, options: { redirectTo } });
           if (error) throw error;
+          return data;
         },
+        startGoogleLogin: () => getAuthProvider()?.startOAuthLogin?.("google"),
+        startFacebookLogin: () => getAuthProvider()?.startOAuthLogin?.("facebook"),
         consumeOAuthRedirect: async () => {
           const supabase = await getSupabaseClient();
           const { data, error } = await supabase.auth.getSession();
@@ -27891,6 +27924,18 @@
       renderHomeDashboard();
       renderLeaderboards();
       renderAuthUi(account, false);
+      // `auth=oauth` is only an internal return marker; remove it after the
+      // Supabase session has been resolved so refreshes do not re-enter the
+      // OAuth callback path.  No arbitrary destination is ever retained.
+      if (new URLSearchParams(location.search).get("auth") === "oauth") {
+        const cleanUrl = new URL(location.href);
+        cleanUrl.searchParams.delete("auth");
+        cleanUrl.searchParams.delete("code");
+        cleanUrl.searchParams.delete("error");
+        cleanUrl.searchParams.delete("error_code");
+        cleanUrl.searchParams.delete("error_description");
+        history.replaceState(history.state, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+      }
     }
 
     async function setupSupabaseAuthUi() {
@@ -27999,7 +28044,7 @@
       const rememberMe = document.getElementById("authRememberMe");
       const forgotButton = document.getElementById("authForgotPassword");
       const resendConfirmationButton = document.getElementById("authResendConfirmation");
-      const googleButton = document.getElementById("authGoogleLogin");
+      const socialButtons = [...document.querySelectorAll("[data-auth-oauth-provider]")];
       const panelLogoutButton = document.getElementById("authPanelLogout");
       const panelLogoutAllButton = document.getElementById("authPanelLogoutAll");
       if (!registerForm || !loginForm) return;
@@ -28261,19 +28306,56 @@
         }
       });
 
-      googleButton?.addEventListener("click", async () => {
+      let pendingOAuthProvider = "";
+      const setOAuthButtonsPending = (providerName = "", pending = false) => {
+        socialButtons.forEach((button) => {
+          const ownProvider = String(button.dataset.authOauthProvider || "").toLowerCase();
+          const label = button.querySelector("[data-auth-oauth-label]");
+          if (!button.dataset.authOauthDefaultLabel && label) button.dataset.authOauthDefaultLabel = label.textContent || "";
+          button.disabled = Boolean(pending);
+          button.setAttribute("aria-busy", String(Boolean(pending && ownProvider === providerName)));
+          if (label) label.textContent = pending && ownProvider === providerName
+            ? `Connecting to ${providerName === "facebook" ? "Facebook" : "Google"}…`
+            : button.dataset.authOauthDefaultLabel || label.textContent || "";
+        });
+      };
+
+      const oauthErrorMessage = (providerName, error) => {
+        const providerLabel = providerName === "facebook" ? "Facebook" : "Google";
+        const code = String(error?.code || "");
+        const message = String(error?.message || "");
+        if (/AUTH_REDIRECT_(ORIGIN_UNTRUSTED|ORIGINS_UNAVAILABLE|POLICY_UNAVAILABLE)/.test(code)) {
+          return "Social sign-in must start from an approved Nschess address.";
+        }
+        if (/provider.*(not enabled|disabled|unsupported)|unsupported provider|provider is not enabled/i.test(message)) {
+          return `${providerLabel} sign-in is not enabled yet. Use email and password, or try again after it is configured.`;
+        }
+        return `${providerLabel} sign-in could not start. Try again or use email and password.`;
+      };
+
+      socialButtons.forEach((button) => button.addEventListener("click", async () => {
+        const providerName = String(button.dataset.authOauthProvider || "").toLowerCase();
+        if (!new Set(["google", "facebook"]).has(providerName) || pendingOAuthProvider) return;
         const provider = getAuthProvider();
-        if (!provider?.startGoogleLogin) {
-          setAuthMessage("Google login is ready after Supabase is connected.", "error");
+        if (!hasSafeAuthTransport()) {
+          setAuthMessage("Please use the secure site link before using social sign-in.", "error");
           return;
         }
-        try {
-          setAuthMessage("Opening Google sign-in...");
-          await provider.startGoogleLogin();
-        } catch (error) {
-          setAuthMessage(error?.message || "Google sign-in is unavailable right now.", "error");
+        if (!provider?.startOAuthLogin) {
+          setAuthMessage("Social sign-in is unavailable. Refresh the secure site and try again.", "error");
+          return;
         }
-      });
+        pendingOAuthProvider = providerName;
+        setOAuthButtonsPending(providerName, true);
+        try {
+          setAuthMessage(`Opening ${providerName === "facebook" ? "Facebook" : "Google"} sign-in…`);
+          await provider.startOAuthLogin(providerName);
+        } catch (error) {
+          pendingOAuthProvider = "";
+          setOAuthButtonsPending("", false);
+          setAuthMessage(oauthErrorMessage(providerName, error), "error");
+        }
+      }));
 
       setAuthMessage(getAuthProvider() && !hasSafeAuthTransport()
         ? "Use the secure site link before logging in."
@@ -31705,7 +31787,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v174-shared-name-style";
+    const optionalRouteStylesheetVersion = "review-v175-social-oauth";
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
       if (!key) return Promise.resolve(false);
@@ -33820,6 +33902,13 @@
     setupNetworkStatus();
     setupServiceWorker();
     setupSiteTabs();
+    const oauthReturnParams = new URLSearchParams(location.search);
+    if (oauthReturnParams.get("auth") === "oauth") {
+      // The shared provider below always hydrates the callback session. Error
+      // callbacks additionally surface the existing login UI instead of
+      // leaving a silent, generic home-screen failure.
+      if (oauthReturnParams.has("error")) location.hash = "#login";
+    }
     primeHomeRankings();
     void setupSupabaseAuthUi();
     setupSiteSearch();

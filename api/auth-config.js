@@ -1,9 +1,9 @@
-const { getSupabaseConfig } = require("./_supabase");
+const { getSupabaseConfig, getAuthRedirectOrigins } = require("./_supabase");
 
 module.exports = (_request, response) => {
   try {
     const { url, anonKey } = getSupabaseConfig();
-    response.status(200).setHeader("Cache-Control", "no-store").json({ url, anonKey });
+    response.status(200).setHeader("Cache-Control", "no-store").json({ url, anonKey, authRedirectOrigins: getAuthRedirectOrigins() });
   } catch (error) {
     response.status(503).setHeader("Cache-Control", "no-store").json({
       error: error?.message || "Supabase is unavailable.",
