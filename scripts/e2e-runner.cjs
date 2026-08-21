@@ -696,7 +696,6 @@ async function runOAuthButtonTests(browser, baseUrl) {
       window.CheckmateQuestAuthProvider?.startOAuthLogin
       && window.CheckmateQuestSupabaseClient?.client?.auth?.signInWithOAuth
       && document.getElementById("authGoogleLogin")
-      && document.getElementById("authFacebookLogin")
     ), null, { timeout: 15000 });
   };
   const intercept = async (result) => page.evaluate((nextResult) => {
@@ -732,27 +731,16 @@ async function runOAuthButtonTests(browser, baseUrl) {
     await runProvider("google");
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitForOauthUi();
-    await intercept({ data: { url: "https://provider.example/redirect" }, error: null });
-    const facebook = page.locator('[data-auth-oauth-provider="facebook"]');
-    await facebook.click({ noWaitAfter: true });
-    await page.waitForFunction(() => document.getElementById("authFacebookLogin")?.getAttribute("aria-busy") === "true", null, { timeout: 3000 });
-    const facebookCalls = await page.evaluate(() => window.__nschessOauthCalls || []);
-    assert(facebookCalls.length === 1 && facebookCalls[0].provider === "facebook", "Facebook button did not start exactly one Facebook Supabase OAuth request.");
-    assert(facebookCalls[0].options?.redirectTo === `${baseUrl}/?auth=oauth`, `Facebook redirect was not the reviewed local root: ${facebookCalls[0].options?.redirectTo || "missing"}`);
-
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await waitForOauthUi();
     await intercept({ data: null, error: { code: "provider_disabled", message: "Provider is not enabled" } });
     await page.locator('[data-auth-oauth-provider="google"]').click({ noWaitAfter: true });
     await page.waitForFunction(() => document.getElementById("authStatus")?.classList.contains("is-error"), null, { timeout: 4000 });
     const errorState = await page.evaluate(() => ({
       text: document.getElementById("authStatus")?.textContent || "",
-      googleDisabled: document.getElementById("authGoogleLogin")?.disabled,
-      facebookDisabled: document.getElementById("authFacebookLogin")?.disabled
+      googleDisabled: document.getElementById("authGoogleLogin")?.disabled
     }));
     assert(/not enabled yet/i.test(errorState.text), `OAuth provider failure was not safely explained: ${errorState.text}`);
-    assert(!errorState.googleDisabled && !errorState.facebookDisabled, "OAuth buttons remained locked after provider failure.");
-    pass("browser: Google/Facebook OAuth buttons use the shared Supabase provider, trusted redirect, pending lock, and safe failure UI");
+    assert(!errorState.googleDisabled, "Google OAuth button remained locked after provider failure.");
+    pass("browser: Google OAuth button uses the shared Supabase provider, trusted redirect, pending lock, and safe failure UI");
   } finally {
     await context.close();
   }

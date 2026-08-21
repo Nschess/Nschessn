@@ -2882,7 +2882,7 @@
 
     .auth-social-actions {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
       gap: 8px;
     }
 
@@ -28426,9 +28426,6 @@
     #login .auth-social-divider { font-size: 0.62rem; }
     #login .auth-oauth-button { padding-inline: 9px; }
 
-    @media (max-width: 440px) {
-      #login .auth-social-actions { grid-template-columns: 1fr; }
-    }
     #login .auth-security { display: grid; gap: 5px; margin: 0; padding: 9px 10px 9px 25px; border: 1px solid var(--cq-border); border-radius: 13px; color: var(--cq-text-subtle); background: var(--cq-surface-input); font-size: 0.62rem; line-height: 1.36; }
     #login .auth-status,
     #login .auth-note { margin: 0; color: var(--cq-text-muted); font-size: 0.68rem; line-height: 1.45; }
