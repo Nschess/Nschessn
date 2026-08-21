@@ -6991,17 +6991,29 @@
       box-shadow: 0 0 0 1px rgba(158, 231, 255, 0.2), 0 16px 38px rgba(0, 0, 0, 0.27), 0 0 38px rgba(255, 248, 214, 0.25);
     }
 
-    .player-flex-chip[data-name-rarity],
-    .match-player-card[data-name-rarity],
-    .player-profile[data-name-rarity] {
+    .player-flex-chip[data-name-rarity="Legendary"],
+    .player-flex-chip[data-name-rarity="Mythic"],
+    .player-flex-chip[data-name-rarity="Divine"],
+    .match-player-card[data-name-rarity="Legendary"],
+    .match-player-card[data-name-rarity="Mythic"],
+    .match-player-card[data-name-rarity="Divine"],
+    .player-profile[data-name-rarity="Legendary"],
+    .player-profile[data-name-rarity="Mythic"],
+    .player-profile[data-name-rarity="Divine"] {
       position: relative;
       isolation: isolate;
       overflow: hidden;
     }
 
-    .player-flex-chip[data-name-rarity] > *,
-    .match-player-card[data-name-rarity] > *,
-    .player-profile[data-name-rarity] > * {
+    .player-flex-chip[data-name-rarity="Legendary"] > *,
+    .player-flex-chip[data-name-rarity="Mythic"] > *,
+    .player-flex-chip[data-name-rarity="Divine"] > *,
+    .match-player-card[data-name-rarity="Legendary"] > *,
+    .match-player-card[data-name-rarity="Mythic"] > *,
+    .match-player-card[data-name-rarity="Divine"] > *,
+    .player-profile[data-name-rarity="Legendary"] > *,
+    .player-profile[data-name-rarity="Mythic"] > *,
+    .player-profile[data-name-rarity="Divine"] > * {
       position: relative;
       z-index: 1;
     }
@@ -35384,7 +35396,10 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
   letter-spacing: var(--name-letter-spacing, 0) !important;
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--name-glow) 54%, transparent)) !important;
   text-shadow: var(--name-shadow, none) !important;
-  animation: nameLiveTextFlow var(--live-name-flow, 4.6s) linear infinite !important;
+  /* Compact identities use the same static text treatment as the shared
+     renderer.  Do not introduce a navbar-only animation that makes the same
+     equipped style diverge from Profile/Player Pass. */
+  animation: none !important;
 }
 
 /* Keep the identity contract intact on phones.  The old mobile shortcut hid

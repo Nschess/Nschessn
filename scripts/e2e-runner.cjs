@@ -322,6 +322,10 @@ async function auditIdentity(page, label, expectedStyle = "") {
       const gradientText = Boolean(name && style && (style.backgroundClip === "text" || style.webkitBackgroundClip === "text") && style.backgroundImage && style.backgroundImage !== "none");
       return {
         text: String(name?.textContent || "").trim(),
+        className: name?.className || "",
+        nameStyle: name?.dataset?.nameStyle || "",
+        nameRarity: name?.dataset?.rarity || "",
+        nameLive: name?.dataset?.nameLive || "",
         owner: line.dataset.identityOwner || "",
         style: line.dataset.identityNameStyle || "",
         visible: Boolean(name && rect?.width > 0 && rect?.height > 0 && style.visibility !== "hidden" && Number(style.opacity) > 0 && (gradientText || !String(style.color).includes("rgba(0, 0, 0, 0)"))),
@@ -344,6 +348,90 @@ async function auditIdentity(page, label, expectedStyle = "") {
   if (expectedStyle) assert(audit.currentStyles.every((style) => style === expectedStyle), `${label}: expected equipped Name Style ${expectedStyle}, found ${audit.currentStyles.join(", ")}; stored=${audit.storedNameStyle}; identities=${JSON.stringify(audit.names.filter((item) => item.owner === "player"))}.`);
   assert(audit.width <= audit.viewport + 4, `${label}: horizontal overflow detected (${audit.width}px > ${audit.viewport}px).`);
   return audit;
+}
+
+async function readIdentityVisualState(page) {
+  return page.evaluate(() => {
+    const visible = (element) => {
+      const rect = element?.getBoundingClientRect?.();
+      const style = element ? getComputedStyle(element) : null;
+      return Boolean(element && rect?.width > 0 && rect?.height > 0 && style?.visibility !== "hidden" && Number(style?.opacity || 0) > 0);
+    };
+    const read = (line) => {
+      // Do not use a selector list with a generic `span` fallback here.  CSS
+      // querySelector returns the first matching node in document order, so a
+      // country-flag span can win over the actual username even when the name
+      // selector appears first in the list.  Identity renderers mark the
+      // username explicitly; use those markers in priority order and only
+      // retain semantic fallbacks for legacy surfaces.
+      const lineIsName = line.matches("[data-player-identity-name], [data-match-name], [data-profile-field=\"name\"], #loginDisplayName");
+      const name = lineIsName ? line : line.querySelector("[data-player-identity-name]")
+        || line.querySelector("[data-match-name]")
+        || line.querySelector("[data-profile-field=\"name\"]")
+        || line.querySelector("#loginDisplayName")
+        || line.querySelector("strong");
+      const style = name ? getComputedStyle(name) : null;
+      const shell = line.closest(".player-identity-shell") || line;
+      const shellStyle = getComputedStyle(shell);
+      return {
+        text: String(name?.textContent || "").trim(),
+        className: name?.className || "",
+        nameDatasetStyle: name?.dataset?.nameStyle || "",
+        nameDatasetRarity: name?.dataset?.rarity || "",
+        nameDatasetLive: name?.dataset?.nameLive || "",
+        style: line.dataset.identityNameStyle || "",
+        visible: visible(name),
+        backgroundImage: style?.backgroundImage || "",
+        backgroundClip: style?.backgroundClip || style?.webkitBackgroundClip || "",
+        color: style?.color || "",
+        textFill: style?.webkitTextFillColor || "",
+        textShadow: style?.textShadow || "",
+        fontWeight: style?.fontWeight || "",
+        letterSpacing: style?.letterSpacing || "",
+        animationName: style?.animationName || "",
+        animationDuration: style?.animationDuration || "",
+        wrapperBackground: shellStyle?.backgroundColor || "",
+        wrapperOverflow: shellStyle?.overflow || "",
+        wrapperIsName: shell === name,
+        nameOverflowsWrapper: Boolean(name && shell && shellStyle?.display !== "contents" && (() => {
+          const nameRect = name.getBoundingClientRect();
+          const shellRect = shell.getBoundingClientRect();
+          return nameRect.left < shellRect.left - 1.5
+            || nameRect.right > shellRect.right + 1.5
+            || nameRect.top < shellRect.top - 1.5
+            || nameRect.bottom > shellRect.bottom + 1.5;
+        })())
+      };
+    };
+    const lines = [...document.querySelectorAll(".player-identity-line")].filter(visible);
+    const player = lines.filter((line) => line.dataset.identityOwner === "player").map(read);
+    const remote = lines.filter((line) => line.dataset.identityOwner === "remote").map(read);
+    return { player, remote, viewport: window.innerWidth, scrollWidth: document.documentElement.scrollWidth };
+  });
+}
+
+function assertIdentityVisualConsistency(state, label, expectedStyle = "") {
+  assert(state.player.length > 0, `${label}: no visible current-player identity was mounted.`);
+  assert(state.player.every((item) => item.text && item.visible), `${label}: a current-player name is empty or hidden: ${JSON.stringify(state.player)}`);
+  const styles = [...new Set(state.player.map((item) => item.style).filter(Boolean))];
+  assert(styles.length === 1, `${label}: current-player Name Styles disagree: ${styles.join(", ")}`);
+  if (expectedStyle) assert(styles[0] === expectedStyle, `${label}: expected ${expectedStyle}, found ${styles[0]}.`);
+  const tokenKeys = ["backgroundImage", "backgroundClip", "color", "textFill", "textShadow", "fontWeight", "letterSpacing", "animationName", "animationDuration"];
+  const baseline = state.player[0];
+  state.player.slice(1).forEach((item) => tokenKeys.forEach((key) => assert(item[key] === baseline[key], `${label}: ${key} differs between mounted current-player identities (baseline=${JSON.stringify(baseline[key])}, current=${JSON.stringify(item[key])}).`)));
+  assert(state.player.every((item) => {
+    const hasDecorativeEffect = item.backgroundImage !== "none"
+      || item.textShadow !== "none"
+      || item.animationName !== "none";
+    // Cards such as Player Pass and the compact profile intentionally use
+    // overflow clipping for their own scroll/rounded-surface behavior. That
+    // is only a cosmetic regression when the styled name actually extends
+    // beyond that shell (or the shell itself is the styled name). Verify the
+    // rendered geometry rather than rejecting every intentional scroll card.
+    return !hasDecorativeEffect || !item.nameOverflowsWrapper || item.wrapperIsName;
+  }), `${label}: identity effect may be clipped by a hidden overflow wrapper: ${JSON.stringify(state.player)}.`);
+  assert(state.scrollWidth <= state.viewport + 4, `${label}: identity layout overflows viewport (${state.scrollWidth}px > ${state.viewport}px).`);
+  return state;
 }
 
 async function auditVisibleBoards(page, label) {
@@ -489,6 +577,21 @@ async function waitForAuthHydration(page, label) {
   }
 }
 
+async function waitForAuthenticatedHydration(page, label) {
+  try {
+    await page.waitForFunction(() => {
+      const state = document.documentElement.dataset.authState;
+      return state === "authenticated" && !document.getElementById("authAccountPanel")?.hidden;
+    }, null, { timeout: 15000 });
+  } catch (error) {
+    const snapshot = await readAuthRuntimeSnapshot(page);
+    throw new Error(`${label} authenticated state did not settle: ${JSON.stringify({ timeout: error.message, snapshot })}`);
+  }
+  const snapshot = await readAuthRuntimeSnapshot(page);
+  assert(snapshot.session?.present && snapshot.supabaseClientReady && snapshot.accountName.trim() && snapshot.accountName.trim() !== "Guest Explorer", `${label} resolved without a live authenticated Supabase session: ${JSON.stringify(snapshot)}`);
+  return snapshot;
+}
+
 async function waitForStoreHydration(page, label) {
   try {
     await page.waitForFunction(() => {
@@ -518,6 +621,9 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
     const cachedAuth = await readAuthRuntimeSnapshot(cachedPage);
     await cachedContext.close();
     if (cachedAuth.authState === "authenticated"
+      && cachedAuth.session?.present
+      && cachedAuth.supabaseClientReady
+      && cachedAuth.accountHidden === false
       && cachedAuth.accountEmail.trim().toLowerCase() === String(email).trim().toLowerCase()
       && cachedAuth.accountName.trim()
       && cachedAuth.accountName.trim() !== "Guest Explorer") return statePath;
@@ -544,7 +650,11 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
     if (!(await loginTab.isVisible().catch(() => false))) {
       throw new Error(`E2E auth login control is unavailable; refusing to wait on the authenticated signal. ${JSON.stringify({ snapshot: initialSnapshot, trace })}`);
     }
-    await loginTab.click();
+    // The auth tab only toggles local markup; waiting for a navigation after
+    // this click can hang when Supabase is still hydrating.  Trigger the
+    // semantic click without Playwright's navigation wait, then continue to
+    // the form readiness check below.
+    await loginTab.click({ noWaitAfter: true, timeout: 10000 });
     await page.locator("#authLoginEmail").fill(email);
     await page.locator("#authLoginPassword").fill(password);
     await page.locator("#authLoginForm button[type=submit]").click();
@@ -623,7 +733,7 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
   const context = await browser.newContext({ storageState: primaryState, viewport: { width: 1366, height: 900 }, serviceWorkers: "allow" });
   const page = await context.newPage();
   await gotoHash(page, baseUrl, "#login");
-  await waitForAuthHydration(page, "primary");
+  await waitForAuthenticatedHydration(page, "primary");
   await waitForStoreHydration(page, "primary");
   const auth = await readAuthRuntimeSnapshot(page);
   assert(auth.authState === "authenticated"
@@ -639,7 +749,7 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
   const modes = ["#play", "#bots", "#puzzles", "#openings", "#gameReview", "#leaderboards", "#friends", "#store"];
   for (const hash of modes) {
     await gotoHash(page, baseUrl, hash);
-    await waitForAuthHydration(page, `primary ${hash}`);
+    await waitForAuthenticatedHydration(page, `primary ${hash}`);
     await waitForStoreHydration(page, `primary ${hash}`);
     await auditIdentity(page, `authenticated${hash}`, expectedStyle);
   }
@@ -649,7 +759,7 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
     const secondContext = await browser.newContext({ storageState: secondState, viewport: { width: 390, height: 844 }, serviceWorkers: "allow" });
     const secondPage = await secondContext.newPage();
     await gotoHash(secondPage, baseUrl, "#login");
-    await waitForAuthHydration(secondPage, "secondary");
+    await waitForAuthenticatedHydration(secondPage, "secondary");
     await waitForStoreHydration(secondPage, "secondary");
     const secondExpectedStyle = String(process.env.E2E_SECOND_EXPECTED_NAME_STYLE || "").trim();
     await auditIdentity(secondPage, "second-account mobile identity", secondExpectedStyle);
@@ -740,8 +850,21 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         localFallback: false,
         owned: true
       })}`);
+      // The purchase RPC and the follow-up authoritative inventory/equip
+      // refresh are separate requests.  Waiting a fixed 2.5s here allowed a
+      // slow refresh to be interrupted by the reload below, leaving a validly
+      // purchased item unequipped and producing a misleading ALREADY_OWNED
+      // status.  Wait on the actual pending DOM state instead of wall-clock
+      // timing so the proof covers the complete purchase → equip flow.
+      await page.waitForFunction((id) => {
+        const card = document.querySelector(`[data-store-item-id="${CSS.escape(id)}"]`);
+        const action = card?.querySelector("[data-store-item-action]");
+        return Boolean(card && !card.classList.contains("is-pending") && action && !action.disabled);
+      }, purchaseId, { timeout: 15000 });
       await page.reload({ waitUntil: "domcontentloaded" });
       await gotoHash(page, baseUrl, "#store");
+      await waitForAuthHydration(page, "Store refresh auth");
+      await waitForStoreHydration(page, "Store refresh state");
       let refreshedCard = page.locator(`[data-store-item-id="${purchaseId}"]`).first();
       if (await refreshedCard.count() === 0 && /^lastmove-/.test(purchaseId)) {
         await page.locator(".store-category-tab").filter({ hasText: "Highlights" }).first().click();
@@ -768,7 +891,10 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         page.on("request", onEquipRequest);
         page.on("response", onEquipResponse);
         await refreshedCard.locator("[data-store-item-action]").first().click();
-        await page.waitForTimeout(1000);
+        await page.waitForFunction((id) => {
+          const card = document.querySelector(`[data-store-item-id="${CSS.escape(id)}"]`);
+          return Boolean(card?.classList.contains("is-equipped") || /equipped/i.test(card?.textContent || ""));
+        }, purchaseId, { timeout: 15000 }).catch(() => {});
         page.off("request", onEquipRequest);
         page.off("response", onEquipResponse);
         if (!(await refreshedCard.evaluate((element) => element.classList.contains("is-equipped") || /equipped/i.test(element.textContent || "")))) {
@@ -823,6 +949,147 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
   await context.close();
 }
 
+async function runDeepAuthenticatedQa(browser, baseUrl, primaryState) {
+  if (!primaryState) {
+    skip("browser: deep authenticated QA", "dedicated E2E credentials are not configured");
+    return;
+  }
+  const routes = [
+    ["home", "#top"], ["profile", "#login"], ["play", "#play"], ["bots", "#bots"],
+    ["puzzles", "#puzzles"], ["learn", "#tutorial"], ["videos", "#videos"],
+    ["friends", "#friends"], ["history", "#history"], ["leaderboards", "#leaderboards"], ["tournaments", "#play?mode=tournament"],
+    ["openings", "#openings"], ["review", "#gameReview"], ["store", "#store"]
+  ];
+  const expectedStyle = String(process.env.E2E_EXPECTED_NAME_STYLE || "").trim();
+  const viewports = [[1366, 900], [1024, 800], [768, 900], [390, 844]];
+  for (const [width, height] of viewports) {
+    const context = await browser.newContext({ storageState: primaryState, viewport: { width, height }, serviceWorkers: "allow" });
+    const page = await context.newPage();
+    for (const [label, hash] of routes) {
+      await gotoHash(page, baseUrl, hash);
+      await waitForAuthenticatedHydration(page, `deep ${label}@${width}`);
+      await waitForStoreHydration(page, `deep ${label}@${width}`);
+      const state = await readIdentityVisualState(page);
+      assertIdentityVisualConsistency(state, `deep ${label}@${width}`, expectedStyle);
+    }
+    await context.close();
+    pass(`browser: deep identity route audit @ ${width}px (${routes.length} routes)`);
+  }
+
+  const context = await browser.newContext({ storageState: primaryState, viewport: { width: 1366, height: 900 }, serviceWorkers: "allow" });
+  const page = await context.newPage();
+  await gotoHash(page, baseUrl, "#store");
+  await waitForAuthHydration(page, "deep store");
+  await waitForStoreHydration(page, "deep store");
+  const storeState = await page.evaluate(async () => {
+    const client = window.CheckmateQuestSupabaseClient?.client;
+    const result = await client?.rpc?.("get_store_state");
+    const value = Array.isArray(result?.data) ? result.data[0] : result?.data;
+    return { error: result?.error?.message || "", catalog: Array.isArray(value?.catalog) ? value.catalog : [], inventory: Array.isArray(value?.inventory) ? value.inventory : [] };
+  });
+  assert(!storeState.error, `deep Store state RPC failed: ${storeState.error}`);
+  const catalogCounts = new Map();
+  storeState.catalog.forEach((item) => { const id = String(item.item_id || item.itemId || ""); catalogCounts.set(id, (catalogCounts.get(id) || 0) + 1); });
+  const duplicateCatalogIds = [...catalogCounts.entries()].filter(([, count]) => count > 1).map(([id, count]) => `${id}×${count}`);
+  const expectedCatalog = JSON.parse(fs.readFileSync(path.join(root, "supabase", "store-catalog.json"), "utf8"));
+  const expectedCatalogIds = new Set(expectedCatalog.map((item) => String(item.item_id || item.itemId || "")));
+  const liveCatalogIds = new Set(storeState.catalog.map((item) => String(item.item_id || item.itemId || "")));
+  const extraCatalogIds = [...liveCatalogIds].filter((id) => !expectedCatalogIds.has(id));
+  const missingCatalogIds = [...expectedCatalogIds].filter((id) => !liveCatalogIds.has(id));
+  assert(storeState.catalog.length >= expectedCatalog.length, `deep Store catalog is smaller than the checked-in catalog (${storeState.catalog.length}/${expectedCatalog.length}); duplicates=${duplicateCatalogIds.join(",")}; extra=${extraCatalogIds.join(",")}; missing=${missingCatalogIds.join(",")}`);
+  assert(missingCatalogIds.length === 0, `deep Store catalog is missing expected IDs: ${missingCatalogIds.join(",")}`);
+  const ownedIds = new Set(storeState.inventory.map((item) => String(item.itemId || item.item_id || "")));
+  const tabCount = await page.locator(".store-category-tab").count();
+  const visibleIds = new Set();
+  for (let index = 0; index < tabCount; index += 1) {
+    const tab = page.locator(".store-category-tab").nth(index);
+    await tab.click();
+    await page.waitForTimeout(90);
+    (await page.locator(".store-card[data-store-item-id]").evaluateAll((cards) => cards.map((card) => card.dataset.storeItemId))).forEach((id) => visibleIds.add(id));
+  }
+  const missingUiIds = expectedCatalog.map((item) => String(item.item_id || item.itemId || "")).filter((id) => !visibleIds.has(id));
+  assert(missingUiIds.length === 0, `deep Store UI is missing catalog items: ${missingUiIds.slice(0, 12).join(", ")}${missingUiIds.length > 12 ? "…" : ""}`);
+  const byType = new Map();
+  expectedCatalog.forEach((item) => { if (!byType.has(item.item_type)) byType.set(item.item_type, item); });
+  for (const [type, item] of byType) {
+    let card = page.locator(`[data-store-item-id="${String(item.item_id).replace(/"/g, "\\\"")}"]`).first();
+    if (await card.count() !== 1) {
+      for (let index = 0; index < tabCount && await card.count() !== 1; index += 1) {
+        await page.locator(".store-category-tab").nth(index).click();
+        await page.waitForTimeout(70);
+        card = page.locator(`[data-store-item-id="${String(item.item_id).replace(/"/g, "\\\"")}"]`).first();
+      }
+    }
+    assert(await card.count() === 1, `deep Store representative ${type} (${item.item_id}) is not rendered.`);
+    assert(await card.locator(".store-preview").count() === 1, `deep Store representative ${type} has no renderer preview.`);
+    assert(await card.locator("[data-store-item-action]").count() === 1, `deep Store representative ${type} has no action.`);
+  }
+  pass(`browser: Store catalog UI audit (${expectedCatalog.length}/${storeState.catalog.length} expected IDs; ${extraCatalogIds.length} server-only row${extraCatalogIds.length === 1 ? "" : "s"}, ${byType.size} cosmetic types)`);
+
+  await page.locator(".store-category-tab").filter({ hasText: "Name Styles" }).click();
+  await page.waitForTimeout(120);
+  const nameCards = page.locator('.store-card[data-store-item-id^="name-"]');
+  assert(await nameCards.count() >= 2, "deep Name Style Store category did not render at least two styles.");
+  for (const card of await nameCards.all()) {
+    const preview = card.locator(".store-preview-name-style");
+    assert(await preview.count() === 1 && await preview.isVisible(), "deep Name Style preview is missing or hidden.");
+    const previewText = await preview.textContent();
+    assert(String(previewText || "").trim().length > 0, "deep Name Style preview has no visible text.");
+  }
+  pass(`browser: all visible Name Style previews use the shared text renderer (${await nameCards.count()})`);
+
+  const ownedNameIds = storeState.inventory.map((item) => String(item.itemId || item.item_id || "")).filter((id) => id.startsWith("name-"));
+  const switchIds = [...new Set(["name-classic", ...ownedNameIds])].slice(0, 2);
+  if (switchIds.length >= 2) {
+    const first = switchIds[0];
+    const second = switchIds[1];
+    const equipNameStyle = async (itemId) => {
+      await page.locator(`[data-store-item-id="${itemId}"] [data-store-item-action]`).click();
+      await page.waitForFunction((style) => [...document.querySelectorAll('.player-identity-line[data-identity-owner="player"]')].some((line) => line.dataset.identityNameStyle === style), itemId.replace(/^name-/, ""), { timeout: 10000 }).catch(() => {});
+    };
+    await equipNameStyle(first);
+    const firstStyle = first.replace(/^name-/, "");
+    assertIdentityVisualConsistency(await readIdentityVisualState(page), `deep mounted Name Style ${firstStyle}`, firstStyle);
+    await equipNameStyle(second);
+    const secondStyle = second.replace(/^name-/, "");
+    assertIdentityVisualConsistency(await readIdentityVisualState(page), `deep mounted Name Style ${secondStyle}`, secondStyle);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForAuthHydration(page, "deep Name Style refresh");
+    await waitForStoreHydration(page, "deep Name Style refresh");
+    assertIdentityVisualConsistency(await readIdentityVisualState(page), "deep Name Style refresh persistence", secondStyle);
+    if (second !== "name-sky" && ownedNameIds.includes("name-sky")) {
+      await page.locator('.store-category-tab').filter({ hasText: "Name Styles" }).click();
+      await page.waitForTimeout(100);
+      await page.locator('[data-store-item-id="name-sky"] [data-store-item-action]').click();
+      await page.waitForTimeout(500);
+    }
+    pass(`browser: mounted Name Style switch, computed tokens, and refresh persistence (${firstStyle} → ${secondStyle})`);
+  } else skip("browser: mounted Name Style switch", "the disposable account does not own two Name Styles");
+
+  await gotoHash(page, baseUrl, "#store");
+  await waitForAuthHydration(page, "deep Store scroll");
+  await waitForStoreHydration(page, "deep Store scroll");
+  let scrollNetworkRequests = 0;
+  const onScrollRequest = (request) => { if (/supabase|rest\/v1|rpc\//i.test(request.url())) scrollNetworkRequests += 1; };
+  page.on("request", onScrollRequest);
+  const scrollAudit = await page.evaluate(async () => {
+    const grid = document.getElementById("storeGrid");
+    if (!grid) return { mutations: -1, requests: -1 };
+    let mutations = 0;
+    const observer = new MutationObserver((records) => { mutations += records.reduce((sum, record) => sum + record.addedNodes.length + record.removedNodes.length, 0); });
+    observer.observe(grid, { childList: true, subtree: true });
+    for (let index = 0; index < 8; index += 1) window.scrollTo(0, index * 420);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    observer.disconnect();
+    return { mutations };
+  });
+  page.off("request", onScrollRequest);
+  assert(scrollAudit.mutations === 0, `Store scrolling mutated ${scrollAudit.mutations} DOM nodes.`);
+  assert(scrollNetworkRequests === 0, `Store scrolling issued ${scrollNetworkRequests} network requests.`);
+  pass("browser: Store scrolling causes no catalog rebuild or network churn");
+  await context.close();
+}
+
 async function runVisualSmokeTests(browser, baseUrl) {
   for (const [width, height] of [[1366, 900], [1024, 800], [768, 900], [390, 844]]) {
     const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
@@ -866,6 +1133,11 @@ async function runBrowserTests() {
     const primaryState = await prepareAuth(browser, baseUrl, process.env.E2E_EMAIL, process.env.E2E_PASSWORD, "primary");
     const secondState = await prepareAuth(browser, baseUrl, process.env.E2E_SECOND_EMAIL, process.env.E2E_SECOND_PASSWORD, "secondary");
     await runGuestBrowserTests(browser, baseUrl, [[1366, 900], [1024, 800], [768, 900], [390, 844]]);
+    // Run the deep route/Store audit before the focused authenticated suite's
+    // logout check.  The logout test intentionally invalidates the disposable
+    // session server-side; reusing that state afterward would turn the deep
+    // audit into a Guest Explorer run even though the account setup is valid.
+    await runDeepAuthenticatedQa(browser, baseUrl, primaryState);
     await runAuthenticatedBrowserTests(browser, baseUrl, primaryState, secondState);
   } finally {
     if (browser) await browser.close();
