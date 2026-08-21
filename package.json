@@ -1,0 +1,17 @@
+{
+  "name": "nschess-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Nschess static site and authenticated browser verification harness",
+  "scripts": {
+    "test:affected": "node scripts/e2e-runner.cjs affected",
+    "test:full": "node scripts/e2e-runner.cjs full --required",
+    "test:e2e": "node scripts/e2e-runner.cjs e2e",
+    "test:visual": "node scripts/e2e-runner.cjs visual",
+    "test:store-preflight": "node scripts/store-preflight.cjs",
+    "build": "node scripts/build-pages.js"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

@@ -8,6 +8,15 @@ dist/
 data/lichess_db_puzzle.csv
 .vercel
 .env*
+!.env.example
+!.env.e2e.example
+.playwright/
+node_modules/
+test-results/
+playwright-report/
+e2e-artifacts/
+debug.log
+e2e-account-setup.sql
 # Android local SDK state, build outputs, and signing material. Never commit upload keys.
 android/.gradle/
 android/build/
