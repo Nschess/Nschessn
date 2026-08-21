@@ -52,6 +52,14 @@ clients cannot define prices, unlock methods, or giftable items. Wallet reward c
 also server-bounded by source, idempotency, rate limits, and a daily budget; direct profile
 wallet updates are not granted to authenticated clients.
 
+The checked-in export is generated from the frontend `storeItems` definitions rather than
+a hand-maintained subset. After applying the latest Store catalog migration, run
+`node scripts/export-store-catalog.js` and then
+`node scripts/sync-production-store-catalog.js --apply` from a secure admin shell with
+only the server-only `SUPABASE_SERVICE_ROLE_KEY` environment variable. The sync script
+prints before/after ID, price, type, unlock-method, and metadata mismatches and performs
+no wallet or inventory writes.
+
 Apply `supabase/migrations/20260812_activity_feed.sql` after the Store migration
 to enable the server-owned realtime activity feed. It adds `social_activity`,
 activity privacy, idempotent learning-event publishing, and server triggers for
@@ -91,6 +99,52 @@ node scripts/verify-site.js
 node scripts/build-pages.js
 node scripts/check-deploy-assets.js dist
 ```
+
+### Authenticated browser verification
+
+The repository includes a Playwright harness for repeatable, real-user checks
+without using a personal account. Create dedicated test accounts in the target
+Supabase project, copy `.env.e2e.example` to `.env.e2e`, and fill in only those
+test credentials. `.env.e2e`, Playwright storage state, screenshots, and test
+artifacts are ignored by Git.
+
+```powershell
+npm install
+npm run test:affected
+npm run test:full
+```
+
+`test:affected` maps changed application files to the relevant static and
+browser checks. `test:full` requires `E2E_EMAIL`/`E2E_PASSWORD`, runs the full
+regression/build/deploy suite, authenticates automatically, and verifies
+session/logout, Store pending and duplicate-click behavior, wallet/ownership
+updates (when `E2E_PURCHASE_ITEM_ID` is configured), shared Name Style identity
+surfaces, board/puzzle interaction, and 1366/1024/768/390px layouts. The first
+visual review can generate baselines with `E2E_UPDATE_SNAPSHOTS=1`; future runs
+compare the navbar screenshots and fail on drift. Never put real-user
+credentials or service-role keys in `.env.e2e`. A valid saved browser state is
+reused on later runs and is refreshed through the login form only when it has
+expired.
+
+For a local E2E URL, the harness first reuses a public Supabase URL/key from
+the process environment, local project env files, or the linked
+`supabase/.temp/project-ref`. Set only the missing public value in `.env.e2e`;
+never use a service-role key. The local E2E server exposes the public values
+only through its development `/api/auth-config` response; if a value is still
+missing, it fails with `E2E_SUPABASE_NOT_CONFIGURED` instead of silently
+running as Guest Explorer. `test:full` also runs a read-only Store preflight:
+it reports the 207-item catalog budget and the authenticated account's
+authoritative `public.profiles.coins` balance before any optional purchase
+test.
+
+If a dedicated account is not already available, run the single generated
+SQL block in the ignored `e2e-account-setup.sql` file in the production
+Supabase SQL Editor. It creates/resets only the generated `nschess-e2e-*`
+account, confirms it, provisions an isolated test wallet, and equips a test
+cosmetic. It never uses a service-role key in the browser and refuses to
+reset an account with cross-user gift relationships. The local `.env.e2e`
+already contains the matching generated credentials; no personal account is
+used.
 
 ## Chess piece assets
 

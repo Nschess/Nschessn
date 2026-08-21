@@ -9066,6 +9066,8 @@
     .store-card {
       position: relative;
       overflow: hidden;
+      content-visibility: auto;
+      contain-intrinsic-size: 360px 410px;
       display: grid;
       grid-template-rows: auto auto minmax(3.2em, auto) auto auto;
       gap: 11px;
@@ -11662,6 +11664,28 @@
       box-shadow: inset 0 0 0 1px rgba(5, 12, 27, .22);
       pointer-events: none;
       isolation: isolate;
+    }
+
+    /* A purchase is network-bound, but the clicked control should still feel
+       immediate. Keep the pending treatment static and lightweight. */
+    .store-card.is-pending {
+      cursor: wait;
+      filter: saturate(.96);
+    }
+
+    .store-primary-action.is-pending {
+      cursor: wait;
+      opacity: .7;
+      transition: none;
+    }
+
+    body.store-is-scrolling .store-card::before,
+    body.store-is-scrolling .store-card .store-preview,
+    body.store-is-scrolling .store-card .store-preview::before,
+    body.store-is-scrolling .store-card.is-piece-set::before,
+    body.store-is-scrolling .store-card.is-name-style::before {
+      animation-play-state: paused !important;
+      transition: none !important;
     }
 
     .store-arrow-preview-board > [data-square] {
@@ -37877,7 +37901,7 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
 #store .store-catalog-tools-heading { align-items: center; }
 #store .store-catalog-tools .store-filter-row { align-items: center; }
 #store .store-catalog-tools .store-collection-progress-item { min-height: 0; }
-#store .store-card { content-visibility: visible; contain: none; contain-intrinsic-size: auto; }
+#store .store-card { content-visibility: auto; contain-intrinsic-size: 360px 410px; }
 #store .store-category-header { padding: 2px 1px; }
 #store .store-category-header h3 { font-size: 1rem; }
 #store .store-category-header p { font-size: .68rem; }
@@ -37942,4 +37966,71 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
   #store .store-grid > .store-card { flex-basis: 100%; max-width: 100%; }
   #store .store-inventory-page:not([hidden]),
   #store .store-gift-panel:not([hidden]) { inset: 8px; width: auto; max-height: calc(100vh - 16px); }
+}
+
+/* Final identity authority: cosmetics belong to the username text itself.
+   This intentionally comes last so legacy card/navbar rules cannot turn a
+   decorative layer into a flex item or flatten a remote user's style. */
+.player-identity-line .styled-username,
+.player-identity-line.styled-username,
+.player-identity-line .name-style-text,
+.site-header .nav-utilities .player-flex-name.player-identity-line .styled-username {
+  position: relative;
+  z-index: 1;
+  display: inline-block !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  font-weight: var(--name-font-weight, 800) !important;
+  letter-spacing: var(--name-letter-spacing, 0) !important;
+  line-height: 1.15;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: var(--name-shadow, none) !important;
+  animation: nameGradientFlow 4.6s linear infinite !important;
+}
+
+.player-identity-line .styled-username:not(.name-style-classic),
+.player-identity-line.styled-username:not(.name-style-classic),
+.site-header .nav-utilities .player-flex-name.player-identity-line .styled-username:not(.name-style-classic) {
+  background-image: var(--name-gradient) !important;
+  background-size: 220% 100% !important;
+  background-position: 0 50%;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  color: var(--name-color, transparent) !important;
+  -webkit-text-fill-color: var(--name-color, transparent) !important;
+  filter: none !important;
+}
+
+.player-identity-line .styled-username.name-style-classic,
+.player-identity-line.styled-username.name-style-classic,
+.site-header .nav-utilities .player-flex-name.player-identity-line .styled-username.name-style-classic {
+  background-image: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+  color: var(--name-color, var(--text)) !important;
+  -webkit-text-fill-color: var(--name-color, var(--text)) !important;
+  text-shadow: none !important;
+  animation: none !important;
+}
+
+.player-identity-line::before,
+.player-identity-line::after,
+.player-identity-line > .styled-username::before,
+.player-identity-line > .styled-username::after {
+  pointer-events: none;
+}
+
+body:is(.reduced-motion, .low-performance, .perf-lite, .name-effects-off) .player-identity-line .styled-username,
+body:is(.reduced-motion, .low-performance, .perf-lite, .name-effects-off) .player-identity-line.styled-username,
+body:is(.reduced-motion, .low-performance, .perf-lite, .name-effects-off) .site-header .nav-utilities .player-flex-name.player-identity-line .styled-username {
+  animation: none !important;
 }

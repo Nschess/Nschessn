@@ -85,14 +85,21 @@ const requiredAppContracts = [
   ["Store authority has explicit auth state", /let storeAuthState = \{ status: "unknown", userId: "" \};/],
   ["Store authority resolves Supabase user without guest downgrade", /async function getAuthoritativeStoreUser\(\)[\s\S]*?typeof provider\.getAuthenticatedUserId !== "function"[\s\S]*?STORE_AUTH_PENDING[\s\S]*?provider\.getAuthenticatedUserId\(\)[\s\S]*?setStoreAuthState\("authenticated"/],
   ["Store does not use Friends cache as authority", /function storeServerRequiresAuthority\(\)[\s\S]*?storeAuthState\.status !== "signed_out"/],
+  ["Store purchase diagnostics are reason-coded", /const storePurchaseDiagnosticMessages = Object\.freeze\([\s\S]*?NO_ITEM:[\s\S]*?AUTH_PENDING:[\s\S]*?AUTH_ERROR:[\s\S]*?SERVER_NOT_READY:[\s\S]*?SERVER_ITEM_MISSING:[\s\S]*?ALREADY_OWNED:[\s\S]*?INSUFFICIENT_BALANCE:[\s\S]*?RPC_FAILED:[\s\S]*?INVENTORY_REFRESH_FAILED:/],
+  ["Store purchase reports exact failures", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?reportStorePurchaseDiagnostic\("NO_ITEM"[\s\S]*?reportStorePurchaseDiagnostic\("RPC_FAILED"[\s\S]*?reportStorePurchaseDiagnostic\("INVENTORY_REFRESH_FAILED"/],
   ["Protected RPC validates Supabase user", /const callFriendRpc = async \(name, args = \{\}\) => \{[\s\S]*?supabase\.auth\.getUser\(\)[\s\S]*?supabase\.rpc\(name, args\)/],
-  ["Purchase hydrates returned server balance", /const purchaseResult = await getAuthProvider\(\)\.purchaseCosmetic[\s\S]*?returnedCoins[\s\S]*?refreshServerStoreState\(\{ rerender: false \}\)/],
+  ["Purchase hydrates returned server balance", /purchaseResult = await getAuthProvider\(\)\.purchaseCosmetic[\s\S]*?returnedCoins[\s\S]*?refreshServerStoreState\(\{ rerender: false \}\)/],
+  ["Store actions lock duplicate clicks", /const storeActionLocks = new Set\(\)[\s\S]*?async function runStoreItemAction\(itemId\)[\s\S]*?storeActionLocks\.has\(id\)[\s\S]*?setStoreItemPending\(id, true\)/],
+  ["Store purchase patches mounted cards", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?refreshStoreItemCards\(\[previouslyEquippedId, item\.id\]\)/],
+  ["Store purchase does not rebuild catalog", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?refreshStoreItemCards\(\[previouslyEquippedId, item\.id\]\)[\s\S]*?renderBeginnerProgress\(\)/],
   ["Auth lifecycle updates Store authority", /function applyAuthenticatedAccount\(account,\s*\{ status = "signed_out" \}[\s\S]*?const nextStatus = \["unknown", "error", "signed_out"\][\s\S]*?setStoreAuthState\("authenticated"/],
   ["Auth listener distinguishes errors from sign-out", /callback\(null, \{ status: "signed_out" \}\)[\s\S]*?callback\(account, \{ status: "authenticated" \}\)[\s\S]*?callback\(null, \{ status: "error", error \}\)/]
 ];
 requiredAppContracts.forEach(([name, pattern]) => {
   assert.match(app, pattern, `Missing board lifecycle contract: ${name}`);
 });
+const storePurchaseBody = app.slice(app.indexOf("async function buyOrEquipStoreItem("), app.indexOf("async function runStoreItemAction("));
+assert.doesNotMatch(storePurchaseBody, /renderStore\(\)/, "Store purchase must not rebuild the full catalog");
 const openingInteractionBody = app.slice(app.indexOf("function handleOpeningExplorerSquare("), app.indexOf("function renderOpeningExplorerBoard("));
 assert.doesNotMatch(openingInteractionBody, /playAudioCue\(/, "Opening Explorer board interaction must not dispatch audio directly");
 const storeAuthResolverBody = app.slice(app.indexOf("async function getAuthoritativeStoreUser("), app.indexOf("function getMissingServerStoreItemIds("));
@@ -290,6 +297,16 @@ assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 assert.match(worker, /isStoreAudioAsset[\s\S]*?assets\/audio[\s\S]*?cache\.put/, "Store piano recordings must be cacheable after first preview");
 assert.match(pianoMigration, /music-quiet-calculation[\s\S]*?music-rising-position[\s\S]*?music-midnight-strategy[\s\S]*?music-beyond-the-board[\s\S]*?music-subtle-triumph[\s\S]*?CC0 1\.0 Universal/);
 assert.match(pianoMigration, /set active = false[\s\S]*?music-calm[\s\S]*?sfx-classic/);
+assert.match(app, /const sourceNameStyle = source\.nameStyle \|\| source\.name_style \|\| source\.equippedNameStyle/, "Identity model must accept the authoritative remote Name Style payload");
+assert.match(app, /const isLoopback = \["localhost", "127\.0\.0\.1", "::1"\]\.includes\(host\)/, "Local E2E auth must not silently downgrade loopback sessions to Guest Explorer");
+assert.match(app, /const nameStyle = isPlayer[\s\S]*?getEquippedNameStyle\(\)[\s\S]*?nameStyleThemes\[requestedNameStyle\]/, "Current-user identities must resolve through getEquippedNameStyle");
+assert.match(app, /function refreshMountedPlayerIdentities\([\s\S]*?\.player-identity-line\[data-identity-owner="player"\][\s\S]*?applyNameStyleToTextElement/, "Mounted current-user identities must refresh through the shared renderer");
+const identityCompatibilityBody = app.slice(app.indexOf("function renderStyledUsernames("), app.indexOf("function refreshMountedPlayerIdentities("));
+const identityCompatibilitySelectors = identityCompatibilityBody.slice(identityCompatibilityBody.indexOf("const selectors"), identityCompatibilityBody.indexOf("document.querySelectorAll"));
+assert.doesNotMatch(identityCompatibilitySelectors, /data-friend-name|data-chat-name|\.friend-name|\.chat-author|\.tournament-name/, "Legacy global styling must not overwrite remote identity cosmetics");
+assert.match(app, /function normalizeDirectMessage\([\s\S]*?sender_name_style: String\(/, "Direct messages must retain sender Name Style metadata");
+assert.match(app, /function createTournamentPairingIdentity\([\s\S]*?renderSharedIdentityLine/, "Tournament pairings must use the shared identity renderer");
+assert.match(css, /Final identity authority: cosmetics belong to the username text itself/, "Identity CSS must keep effects on the text node");
 [
   ["index.html", html],
   ["assets/app.js", app],

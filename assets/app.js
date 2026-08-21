@@ -3484,6 +3484,32 @@
       return Number.isFinite(date.getTime()) ? date.toLocaleDateString([], { month: "short", day: "numeric" }) : "Recently";
     }
 
+    function renderStoreInventorySummary(prefs = readLearnerPrefs()) {
+      const inventory = document.getElementById("storeInventory");
+      if (!inventory) return;
+      const inventoryItems = [
+        `Archetype: ${getArchetypeTheme(prefs.archetype).label}`,
+        `Board: ${getBoardTheme(prefs.board).label}`,
+        `Pieces: ${getPieceSetTheme(prefs.pieceSkin).name}`,
+        `Background: ${getBackgroundTheme(prefs.backgroundTheme).label}`,
+        `Flex badge: ${getEquippedFlexBadgeTheme().label}`,
+        `Name style: ${getNameStyleTheme(prefs.nameStyle).label}`,
+        `Badges owned: ${normalizeFlexBadgeState(flexBadgeState).badges.length}`,
+        prefs.title ? `Title: ${prefs.title}` : "Title: Explorer",
+        prefs.avatar && prefs.avatar !== "auto" ? "Avatar: custom" : "Avatar: level based",
+        `Frame: ${prefs.avatarFrame || "none"}`,
+        `Avatar FX: ${avatarEffectThemes[prefs.avatarEffect]?.label || "No Effect"}`,
+        `Last move: ${getLastMoveHighlightTheme(prefs.lastMoveColor).label}`,
+        `Board border: ${getBoardBorderTheme(prefs.boardBorder).label}`,
+        `Trail: ${prefs.trail || "none"}`
+      ];
+      const equippedBorderPreview = createBookText("span", "store-equipped-border-preview", "");
+      equippedBorderPreview.setAttribute("aria-hidden", "true");
+      equippedBorderPreview.title = `${getBoardBorderTheme(prefs.boardBorder).label} board border`;
+      applyBoardBorderPreview(equippedBorderPreview, prefs.boardBorder);
+      inventory.replaceChildren(...inventoryItems.map((item) => createBookText("span", "game-unlock", item)), equippedBorderPreview);
+    }
+
     function renderStoreInventory() {
       const panel = document.getElementById("storeInventoryPage");
       const tools = document.getElementById("storeInventoryTools");
@@ -3824,6 +3850,15 @@
     let storeRenderSignature = "";
     let storeFeaturedSelection = "";
     let storeInventoryUi = { filter: "owned", query: "", category: "all" };
+    // Store actions are intentionally scoped per item.  This gives the
+    // clicked control immediate feedback and prevents a rapid double click
+    // from issuing two server purchases while the authoritative RPC is in
+    // flight.
+    const storeActionLocks = new Set();
+    const storeBundleActionLocks = new Set();
+    let deferredCosmeticRefreshFrame = 0;
+    let storeScrollPerfReady = false;
+    let storeScrollPerfTimer = 0;
     let currentPuzzle = puzzleStateMatchesBank ? Math.max(0, Math.min(puzzles.length - 1, Number(savedPuzzleState.currentPuzzle) || 0)) : 0;
     let activePuzzlePlan = puzzleStateMatchesBank && puzzlePlanOptions.includes(savedPuzzleState.activePlan) ? savedPuzzleState.activePlan : "main";
     if (activePuzzlePlan === "all") activePuzzlePlan = "main";
@@ -6402,6 +6437,12 @@
         opponentId: String(record.opponentId || record.opponent_id || record.opponentPublicId || "").trim(),
         opponentName: String(record.opponentName || "Opponent").trim().slice(0, 48) || "Opponent",
         opponentTitle: String(record.opponentTitle || "").trim().slice(0, 48),
+        opponentNameStyle: String(record.opponentNameStyle || record.opponent_name_style || record.nameStyle || record.name_style || "").trim(),
+        opponentNameFx: String(record.opponentNameFx || record.opponent_name_fx || record.nameFx || record.name_fx || "").trim(),
+        opponentAvatar: String(record.opponentAvatar || record.opponent_avatar || "").trim(),
+        opponentAvatarFrame: String(record.opponentAvatarFrame || record.opponent_avatar_frame || record.avatarFrame || record.avatar_frame || "").trim(),
+        opponentAvatarEffect: String(record.opponentAvatarEffect || record.opponent_avatar_effect || record.avatarEffect || record.avatar_effect || "").trim(),
+        opponentCountryCode: String(record.opponentCountryCode || record.opponent_country_code || record.countryCode || record.country_flag || "").trim(),
         opponentRating: Math.max(0, Number(record.opponentRating) || 0),
         result,
         side: record.side === "Black" ? "Black" : "White",
@@ -6562,7 +6603,18 @@
         const date = game.completedAt ? new Date(game.completedAt).toLocaleDateString() : "Recent game";
         const rating = game.opponentRating ? ` · ${formatProfileNumber(game.opponentRating)} Elo` : "";
         const heading = createBookText("strong", "match-history-heading", `${game.mode} vs `);
-          heading.append(createPlayerIdentity({ name: game.opponentName, title: game.opponentTitle || "", avatar: game.opponentAvatar || "?", profileId: game.opponentId, isPlayer: false }, { isPlayer: false, profileId: game.opponentId, variant: "compact", showAvatar: false, showSubtitle: false, nameTag: "span", linkProfile: Boolean(game.opponentId), profileTarget: heading }), document.createTextNode(rating));
+          heading.append(createPlayerIdentity({
+            name: game.opponentName,
+            title: game.opponentTitle || "",
+            nameStyle: game.opponentNameStyle || "",
+            nameFx: game.opponentNameFx || "",
+            avatar: game.opponentAvatar || "?",
+            avatarFrame: game.opponentAvatarFrame || "",
+            avatarEffect: game.opponentAvatarEffect || "",
+            countryCode: game.opponentCountryCode || "",
+            profileId: game.opponentId,
+            isPlayer: false
+          }, { isPlayer: false, profileId: game.opponentId, variant: "compact", showAvatar: false, showSubtitle: false, nameTag: "span", linkProfile: Boolean(game.opponentId), profileTarget: heading }), document.createTextNode(rating));
         copy.append(
           heading,
           createBookText("small", "", `${date} · ${game.moves || 0} moves · ${game.termination}`)
@@ -6839,11 +6891,44 @@
     function setStoreAuthState(status = "unknown", userId = "") {
       const nextStatus = ["unknown", "authenticated", "signed_out", "error"].includes(status) ? status : "error";
       storeAuthState = { status: nextStatus, userId: nextStatus === "authenticated" ? String(userId || "") : "" };
+      document.documentElement.dataset.storeSyncStatus = nextStatus === "authenticated" ? "syncing" : nextStatus;
       if (nextStatus !== "authenticated") {
         serverStoreReady = false;
         serverStoreState = null;
       }
       return storeAuthState;
+    }
+
+    const storePurchaseDiagnosticMessages = Object.freeze({
+      NO_ITEM: "Store item is unavailable.",
+      AUTH_PENDING: "Secure Store authentication is still resolving.",
+      AUTH_ERROR: "Secure Store authentication could not be verified.",
+      SERVER_NOT_READY: "The Store server is not ready.",
+      SERVER_ITEM_MISSING: "This Store item is missing from the server catalog.",
+      ALREADY_OWNED: "This Store item is already owned.",
+      INSUFFICIENT_BALANCE: "The authoritative Store balance is too low.",
+      RPC_FAILED: "The purchase request was rejected by the Store server.",
+      INVENTORY_REFRESH_FAILED: "The purchase result could not be refreshed from the Store server.",
+      LOCAL_FALLBACK: "This environment is using the local Store wallet."
+    });
+
+    function reportStorePurchaseDiagnostic(code, details = {}, fallbackMessage = "") {
+      const diagnostic = Object.prototype.hasOwnProperty.call(storePurchaseDiagnosticMessages, code) ? code : "SERVER_NOT_READY";
+      const message = fallbackMessage || storePurchaseDiagnosticMessages[diagnostic];
+      const status = document.getElementById("storeStatus");
+      if (status) {
+        status.dataset.purchaseDiagnostic = diagnostic;
+        status.textContent = `${message} [${diagnostic}]`;
+      }
+      console.info("[Nschess Store diagnostic]", diagnostic, details);
+      return diagnostic;
+    }
+
+    function getStoreReadinessDiagnostic() {
+      if (storeAuthState.status === "unknown") return "AUTH_PENDING";
+      if (storeAuthState.status === "error") return "AUTH_ERROR";
+      if (serverStoreSyncError?.code === "STORE_CATALOG_INCOMPLETE") return "SERVER_ITEM_MISSING";
+      return "SERVER_NOT_READY";
     }
 
     async function getAuthoritativeStoreUser() {
@@ -6899,6 +6984,7 @@
     function renderStoreSyncFeedback() {
       const status = document.getElementById("storeStatus");
       const retry = document.getElementById("storeSyncRetry");
+      document.documentElement.dataset.storeSyncStatus = serverStoreSyncStatus;
       if (!status) return;
       if (!storeServerRequiresAuthority()) {
         if (retry) retry.hidden = true;
@@ -6967,6 +7053,47 @@
       return row ? Math.max(0, Number(row.cost_coins ?? row.costCoins) || 0) : Math.max(0, Number(item.cost) || 0);
     }
 
+    // The server inventory is authoritative after a fresh session.  Mirror
+    // only the equipped cosmetic values that are represented by the shared
+    // local preference shape so every mounted identity/board surface resolves
+    // the same item after refresh.
+    function syncServerEquippedPreferences(equipped = {}) {
+      const current = readLearnerPrefs();
+      const next = { ...current, audio: { ...(current.audio || {}) } };
+      let changed = false;
+      Object.entries(equipped || {}).forEach(([type, itemId]) => {
+        const item = getStoreItem(itemId);
+        if (!item) return;
+        const set = (field, value) => {
+          if (value === undefined || value === null || next[field] === value) return;
+          next[field] = value;
+          changed = true;
+        };
+        if (type === "board") set("board", item.value);
+        else if (type === "skin") set("pieceSkin", item.value);
+        else if (type === "pieceFinish") set("pieceFinish", item.value);
+        else if (type === "trail") set("trail", item.value);
+        else if (type === "avatar") set("avatar", item.value);
+        else if (type === "avatarEffect") set("avatarEffect", item.value);
+        else if (type === "frame") set("avatarFrame", item.value);
+        else if (type === "lastMove") set("lastMoveColor", normalizeLastMoveValue(item.value));
+        else if (type === "boardBorder") set("boardBorder", item.value);
+        else if (type === "backgroundTheme") set("backgroundTheme", item.value);
+        else if (type === "archetype") set("archetype", item.value);
+        else if (type === "nameStyle") {
+          set("nameStyle", item.value);
+          if (item.value !== "classic") set("nameFx", "on");
+        } else if (type === "arrowSkin") set("arrowSkin", normalizeArrowSkinValue(item.value));
+        else if (type === "musicPack") set("audio", { ...next.audio, musicPack: item.value });
+        else if (type === "sfxPack") set("audio", { ...next.audio, sfxPack: item.value });
+        else if (type === "title") set("title", item.value);
+      });
+      if (!changed) return false;
+      writeJsonStorage(learnerPrefsStorageKey, next);
+      refreshPurchasedCosmetics(next, { deferBoardSurfaces: true });
+      return true;
+    }
+
     function createStoreIdempotencyKey(prefix = "store") {
       const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       return `${prefix}:${random}`;
@@ -7009,6 +7136,7 @@
         serverStoreSyncError = null;
         puzzleCoins = serverStoreState.coins;
         storeState = { ...storeState, owned, equipped };
+        syncServerEquippedPreferences(equipped);
         savePuzzleState();
         renderStoreSyncFeedback();
         if (rerender) {
@@ -7301,6 +7429,7 @@
 
     function applyNameStyleToTextElement(element, styleValue, text) {
       if (!element) return;
+      if (element.matches?.("[data-player-country], .player-country-flag, [data-player-title-badge], .player-title-badge, [data-player-achievements-inline], .player-earned-icons")) return;
       const resolved = resolveNameStyle(styleValue);
       const { value, theme } = resolved;
       if (["Legendary", "Mythic", "Divine"].includes(theme.rarity) && document.body.classList.contains("name-effects-off")) {
@@ -7335,46 +7464,47 @@
     }
 
     function renderStyledUsernames(name = "") {
-      const prefs = readLearnerPrefs();
+      const equippedStyle = getEquippedNameStyle();
       const profile = getDragonProfileSnapshot();
       const text = name || profile.name || "Guest Explorer";
+      // This is intentionally a compatibility pass for static, signed-in
+      // fields only.  Remote/social names must be styled by the identity
+      // renderer with the owner's public cosmetic payload; applying the
+      // viewer's preference to broad `.friend-name`/`.chat-author` selectors
+      // was the source of cross-surface flattening.
       const selectors = [
         '[data-profile-field="name"]',
         '[data-account-field="username"]',
         "#loginDisplayName",
-        "[data-match-name]",
-        "[data-user-name]",
-        "[data-username-display]",
-        "[data-profile-name]",
-        "[data-player-name]",
-        "[data-opponent-name]",
-        "[data-friend-name]",
-        "[data-match-history-name]",
-        "[data-leaderboard-name]",
-        "[data-matchmaking-name]",
-        "[data-tournament-name]",
-        "[data-chat-name]",
-        ".player-display-name",
-        ".profile-display-name",
-        ".friend-name",
-        ".chat-author",
-        ".match-history-name",
-        ".matchmaking-name",
-        ".tournament-name",
         "[data-styled-username]"
       ];
       document.querySelectorAll(selectors.join(",")).forEach((element) => {
         if (["INPUT", "TEXTAREA", "SELECT", "OPTION"].includes(element.tagName)) return;
-        // Remote identities are rendered from their public cosmetic payload
-        // by the shared pipeline.  The legacy global pass must not flatten
-        // them back to the signed-in player's style.
-        if (element.closest(".player-identity-line")?.dataset.identityOwner === "remote") return;
+        const owner = element.closest(".player-identity-line")?.dataset.identityOwner;
+        if (owner === "remote") return;
         const current = String(element.textContent || "").trim();
-        const shouldUseProfileName = element.matches('[data-match-name], [data-profile-field="name"], [data-account-field="username"], #loginDisplayName, [data-user-name], [data-username-display], [data-profile-name], [data-player-name], [data-leaderboard-name], [data-match-history-name], [data-friend-name], [data-styled-username]')
+        const shouldUseProfileName = element.matches('[data-profile-field="name"], [data-account-field="username"], #loginDisplayName, [data-styled-username]')
           || !current
           || current === "Player"
           || current === "Guest Explorer";
-        applyNameStyleToTextElement(element, prefs.nameStyle, shouldUseProfileName ? text : current);
+        applyNameStyleToTextElement(element, equippedStyle, shouldUseProfileName ? text : current);
+      });
+    }
+
+    function refreshMountedPlayerIdentities(profile = getDragonProfileSnapshot()) {
+      const identity = getPlayerIdentityModel({ ...profile, isPlayer: true }, { profile, isPlayer: true });
+      document.querySelectorAll('.player-identity-line[data-identity-owner="player"]').forEach((line) => {
+        const name = line.matches?.('[data-player-identity-name], [data-match-name], [data-profile-field="name"], #loginDisplayName')
+          ? line
+          : line.querySelector('[data-player-identity-name], [data-match-name], [data-profile-field="name"], #loginDisplayName');
+        if (!name) return;
+        applyNameStyleToTextElement(name, identity.nameStyle, name.dataset.nameText || name.textContent || identity.name);
+        line.dataset.identityNameStyle = identity.nameStyle;
+        line.dataset.identityNameRarity = identity.nameStyleTheme.rarity || "Common";
+        const shell = line.closest(".player-identity-shell") || line;
+        shell.dataset.nameStyle = identity.nameStyle;
+        shell.dataset.nameEffect = identity.nameStyleTheme.effect || identity.nameStyle;
+        shell.dataset.nameRarity = identity.nameStyleTheme.rarity || "Common";
       });
     }
 
@@ -7582,20 +7712,156 @@
       return preview;
     }
 
-    function refreshPurchasedCosmetics(prefs = readLearnerPrefs()) {
+    function getStoreActionPresentation(item) {
+      const owned = isStoreItemOwned(item, new Set(storeState.owned));
+      const isEquipped = isStoreItemEquipped(item);
+      const unlockMethod = getStoreUnlockMethod(item);
+      const unlockLabel = getStoreUnlockLabel(item);
+      const buyLabel = unlockMethod === "Coins" ? `Buy ${formatProfileNumber(item.cost || 0)}` : unlockLabel;
+      let label = "Equip";
+      let disabled = false;
+      if (item.type === "nameStyle" || item.type === "lastMove") {
+        label = isEquipped && item.value !== "classic" ? "Unequip" : isEquipped ? "Default" : owned ? "Equip" : buyLabel;
+        disabled = isEquipped && item.value === "classic";
+      } else if (["musicPack", "sfxPack", "arrowSkin"].includes(item.type)) {
+        label = isEquipped ? "Equipped" : owned ? "Equip" : buyLabel;
+        disabled = isEquipped;
+      } else {
+        label = isEquipped ? "Equipped" : owned ? "Equip" : unlockMethod !== "Coins" ? unlockLabel : ["skin", "musicPack"].includes(item.type) ? buyLabel : `Unlock ${formatProfileNumber(item.cost || 0)}`;
+        disabled = isEquipped;
+      }
+      return { label, disabled, owned, isEquipped, secondary: owned || unlockMethod !== "Coins" };
+    }
+
+    function setStoreItemPending(itemId, pending) {
+      const id = String(itemId || "");
+      if (!id) return;
+      document.querySelectorAll("[data-store-item-id]").forEach((card) => {
+        if (card.dataset.storeItemId !== id) return;
+        card.classList.toggle("is-pending", pending);
+        card.setAttribute("aria-busy", String(pending));
+      });
+      document.querySelectorAll("[data-store-item-action]").forEach((button) => {
+        if (button.dataset.storeItemAction !== id) return;
+        button.classList.toggle("is-pending", pending);
+        button.setAttribute("aria-busy", String(pending));
+        if (pending) {
+          button.disabled = true;
+          button.textContent = "Processing…";
+        } else {
+          button.removeAttribute("aria-busy");
+        }
+      });
+      const status = document.getElementById("storeStatus");
+      if (status && status.dataset.storePendingItem === id) {
+        if (pending) status.setAttribute("aria-busy", "true");
+        else {
+          status.removeAttribute("aria-busy");
+          delete status.dataset.storePendingItem;
+        }
+      }
+    }
+
+    function refreshStoreActionButtons(itemIds = []) {
+      const ids = new Set(itemIds.filter(Boolean).map(String));
+      if (!ids.size) return;
+      document.querySelectorAll("[data-store-item-action]").forEach((button) => {
+        const id = String(button.dataset.storeItemAction || "");
+        if (!ids.has(id) || storeActionLocks.has(id)) return;
+        const item = getStoreItem(id);
+        if (!item) return;
+        const next = getStoreActionPresentation(item);
+        button.classList.toggle("secondary", next.secondary);
+        button.disabled = next.disabled;
+        button.textContent = next.label;
+        button.classList.remove("is-pending");
+        button.removeAttribute("aria-busy");
+      });
+    }
+
+    function refreshStoreItemCards(itemIds = []) {
+      const ids = new Set(itemIds.filter(Boolean).map(String));
+      if (!ids.size) return;
+      const prefs = readLearnerPrefs();
+      ids.forEach((id) => {
+        const item = getStoreItem(id);
+        if (!item) return;
+        const next = getStoreActionPresentation(item);
+        document.querySelectorAll("[data-store-item-id]").forEach((card) => {
+          if (card.dataset.storeItemId !== id) return;
+          card.classList.toggle("is-owned", next.owned);
+          card.classList.toggle("is-equipped", next.isEquipped);
+          card.setAttribute("aria-busy", String(storeActionLocks.has(id)));
+          const badge = card.querySelector("[data-store-item-badge]");
+          if (badge) {
+            badge.classList.remove("is-equipped", "is-owned", "is-locked");
+            badge.classList.add(next.isEquipped ? "is-equipped" : next.owned ? "is-owned" : "is-locked");
+            badge.textContent = next.isEquipped ? "✓ Equipped" : next.owned ? "✓ Owned" : `Unlock: ${getStoreUnlockMethodLabel(item)}`;
+          }
+          const meta = card.querySelector("[data-store-item-meta]");
+          if (meta) meta.textContent = next.owned ? `Owned · ${getStoreUnlockMethodLabel(item)}` : `Unlock: ${getStoreUnlockMethodLabel(item)} · ${getStoreUnlockLabel(item)}`;
+        });
+        document.querySelectorAll("[data-store-featured-status]").forEach((featuredStatus) => {
+          if (featuredStatus.dataset.storeFeaturedStatus !== id) return;
+          featuredStatus.textContent = next.isEquipped ? "Equipped" : next.owned ? "Owned" : `${formatProfileNumber(item.cost || 0)} coins`;
+        });
+      });
+      refreshStoreActionButtons([...ids]);
+      const balance = document.getElementById("storeCoinBalance");
+      if (balance) balance.textContent = formatProfileNumber(puzzleCoins);
+      renderStoreInventorySummary(prefs);
+      const inventoryPanel = document.getElementById("storeInventoryPage");
+      if (inventoryPanel && !inventoryPanel.hidden) renderStoreInventory();
+      renderStorePreviewTray();
+      syncStorePreviewButtons();
+    }
+
+    function setStoreBundlePending(bundleId, pending) {
+      const id = String(bundleId || "");
+      if (!id) return;
+      document.querySelectorAll("[data-store-bundle-id]").forEach((card) => {
+        if (card.dataset.storeBundleId !== id) return;
+        card.classList.toggle("is-pending", pending);
+        card.setAttribute("aria-busy", String(pending));
+        const action = card.querySelector("[data-store-bundle-action]");
+        if (!action) return;
+        action.classList.toggle("is-pending", pending);
+        action.setAttribute("aria-busy", String(pending));
+        action.disabled = pending;
+        if (pending) action.textContent = "Processing…";
+      });
+    }
+
+    function refreshStoreBundleCard(bundleId) {
+      const id = String(bundleId || "");
+      const bundle = storeBundles.find((entry) => entry.id === id);
+      const current = [...document.querySelectorAll("[data-store-bundle-id]")].find((card) => card.dataset.storeBundleId === id);
+      if (!bundle || !current) return;
+      current.replaceWith(buildStoreBundleCard(bundle));
+    }
+
+    function refreshPurchasedCosmetics(prefs = readLearnerPrefs(), options = {}) {
       applyLearnerPrefs(prefs);
       syncPreferenceLocks();
       if (typeof syncSettingsProfileFields === "function") syncSettingsProfileFields();
-      renderMiniBoards();
-      buildHeroBoard();
-      renderAdventureMission();
-      renderPuzzle();
-      renderCoachBoard();
-      if (document.getElementById("realPuzzleBoard") && typeof renderRealPuzzleBoard === "function") renderRealPuzzleBoard();
-      if (document.getElementById("tutorialBoard")) renderBeginnerTutorial(false);
+      const refreshBoardSurfaces = () => {
+        deferredCosmeticRefreshFrame = 0;
+        renderMiniBoards();
+        buildHeroBoard();
+        renderAdventureMission();
+        renderPuzzle();
+        renderCoachBoard();
+        if (document.getElementById("realPuzzleBoard") && typeof renderRealPuzzleBoard === "function") renderRealPuzzleBoard();
+        if (document.getElementById("tutorialBoard")) renderBeginnerTutorial(false);
+      };
+      if (options.deferBoardSurfaces) {
+        if (deferredCosmeticRefreshFrame) cancelAnimationFrame(deferredCosmeticRefreshFrame);
+        deferredCosmeticRefreshFrame = requestAnimationFrame(refreshBoardSurfaces);
+      } else refreshBoardSurfaces();
       renderPlayerProfile();
       renderFlexBadgeTargets(prefs);
       renderStyledUsernames();
+      refreshMountedPlayerIdentities(getDragonProfileSnapshot());
       renderInGamePlayerCard();
     }
 
@@ -7665,7 +7931,9 @@
         document.body.classList.add("theme-swapping");
         window.setTimeout(() => document.body.classList.remove("theme-swapping"), 380);
       }
-      refreshPurchasedCosmetics(nextPrefs);
+      // Keep the Store interaction responsive: identity/settings surfaces can
+      // update immediately, while board previews refresh on the next frame.
+      refreshPurchasedCosmetics(nextPrefs, { deferBoardSurfaces: true });
       if (item.type === "musicPack" && audioRuntime.storeAmbienceActive) startStoreAmbience();
       else if (item.type === "musicPack" && audioRuntime.playing) startAudioMusic(inferAudioScene(), item.value);
       else syncAudioSystem(nextPrefs.audio);
@@ -7679,9 +7947,23 @@
 
     async function buyOrEquipStoreItem(itemId) {
       const item = getStoreItem(itemId);
-      if (!item) return;
+      if (!item) {
+        reportStorePurchaseDiagnostic("NO_ITEM", { itemId });
+        return;
+      }
+      const previouslyEquippedId = getEquippedStoreId(item.type);
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
         renderStoreSyncFeedback();
+        reportStorePurchaseDiagnostic(getStoreReadinessDiagnostic(), {
+          itemId: item.id,
+          authState: storeAuthState.status,
+          authUserId: storeAuthState.userId,
+          serverErrorCode: serverStoreSyncError?.code || "",
+          serverErrorStatus: serverStoreSyncError?.status || serverStoreSyncError?.statusCode || 0,
+          serverErrorMessage: serverStoreSyncError?.message || "",
+          serverErrorDetails: serverStoreSyncError?.details || "",
+          serverErrorHint: serverStoreSyncError?.hint || ""
+        });
         return;
       }
       const owned = new Set(storeState.owned);
@@ -7690,11 +7972,14 @@
       const unlockMethod = getStoreUnlockMethod(item);
       const unlockMethodLabel = getStoreUnlockMethodLabel(item);
       const alreadyOwned = isFlexBadge ? userOwnsFlexBadge(item.value) : owned.has(item.id);
+      if (alreadyOwned) {
+        reportStorePurchaseDiagnostic("ALREADY_OWNED", { itemId: item.id });
+      }
       if (!alreadyOwned) {
         if (storeServerIsActive()) {
           const validation = validateServerStoreItem(item, { purchase: true });
           if (!validation.ok) {
-            if (status) status.textContent = validation.message;
+            reportStorePurchaseDiagnostic("SERVER_ITEM_MISSING", { itemId: item.id, message: validation.message }, validation.message);
             return;
           }
         }
@@ -7704,7 +7989,12 @@
         }
         const price = storeServerIsActive() ? getStoreServerCost(item) : item.cost;
         if (puzzleCoins < price) {
-          if (status) status.textContent = `Need ${formatProfileNumber(price - puzzleCoins)} more coins for ${item.name}.`;
+          reportStorePurchaseDiagnostic("INSUFFICIENT_BALANCE", {
+            itemId: item.id,
+            price,
+            displayedBalance: puzzleCoins,
+            serverBalance: serverStoreState?.coins ?? null
+          }, `Need ${formatProfileNumber(price - puzzleCoins)} more coins for ${item.name}.`);
           return;
         }
         if (new URLSearchParams(location.search).get("authDebug") === "1") {
@@ -7720,22 +8010,41 @@
           });
         }
         if (storeServerIsActive()) {
+          let purchaseResult;
           try {
-            const purchaseResult = await getAuthProvider().purchaseCosmetic(item.id, createStoreIdempotencyKey("purchase"));
-            // The RPC is authoritative for the wallet.  Reflect its returned
-            // balance immediately, then hydrate inventory/catalog from the
-            // same server before allowing Equip to proceed.
-            const returnedCoins = Number(purchaseResult?.coins);
-            if (Number.isFinite(returnedCoins)) {
-              puzzleCoins = Math.max(0, returnedCoins);
-              serverStoreState = serverStoreState ? { ...serverStoreState, coins: puzzleCoins } : serverStoreState;
-            }
+            purchaseResult = await getAuthProvider().purchaseCosmetic(item.id, createStoreIdempotencyKey("purchase"));
+          } catch (error) {
+            reportStorePurchaseDiagnostic("RPC_FAILED", {
+              itemId: item.id,
+              code: error?.code || "",
+              status: error?.status || error?.statusCode || 0,
+              message: error?.message || "",
+              details: error?.details || "",
+              hint: error?.hint || ""
+            }, error?.message || "Purchase could not be completed.");
+            return;
+          }
+          // The RPC is authoritative for the wallet. Reflect its returned
+          // balance immediately, then hydrate inventory/catalog from the same
+          // server before allowing Equip to proceed.
+          const returnedCoins = Number(purchaseResult?.coins);
+          if (Number.isFinite(returnedCoins)) {
+            puzzleCoins = Math.max(0, returnedCoins);
+            serverStoreState = serverStoreState ? { ...serverStoreState, coins: puzzleCoins } : serverStoreState;
+          }
+          try {
             await refreshServerStoreState({ rerender: false });
           } catch (error) {
-            if (status) status.textContent = error?.message || "Purchase could not be completed.";
+            reportStorePurchaseDiagnostic("INVENTORY_REFRESH_FAILED", {
+              itemId: item.id,
+              code: error?.code || "",
+              status: error?.status || error?.statusCode || 0,
+              message: error?.message || ""
+            }, error?.message || "Purchase completed, but Store inventory could not be refreshed.");
             return;
           }
         } else {
+          reportStorePurchaseDiagnostic("LOCAL_FALLBACK", { itemId: item.id, price, provider: Boolean(getAuthProvider()?.getStoreState) });
           puzzleCoins -= price;
           if (isFlexBadge) unlockFlexBadge(item.value);
           else {
@@ -7750,10 +8059,45 @@
       }
       if (!await equipStoreItem(item)) return;
       savePuzzleState();
-      renderStore();
+      // The catalog, filters, search, and scroll container stay mounted. Only
+      // the affected item(s), wallet, inventory summary, and featured action
+      // are patched in place.
+      refreshStoreItemCards([previouslyEquippedId, item.id]);
       renderBeginnerProgress();
-      if (item.type === "nameStyle") renderStyledUsernames();
-      if (status) status.textContent = `${item.name} equipped. Looking sharp.`;
+      if (item.type === "nameStyle") {
+        renderStyledUsernames();
+        refreshMountedPlayerIdentities(getDragonProfileSnapshot());
+      }
+      if (status) {
+        status.removeAttribute("data-purchase-diagnostic");
+        status.textContent = `${item.name} equipped. Looking sharp.`;
+      }
+    }
+
+    async function runStoreItemAction(itemId) {
+      const item = getStoreItem(itemId);
+      if (!item) return buyOrEquipStoreItem(itemId);
+      const id = String(item.id);
+      // A second click while the server-authoritative transaction is in flight
+      // is ignored rather than becoming a second purchase request.
+      if (storeActionLocks.has(id)) return;
+      storeActionLocks.add(id);
+      setStoreItemPending(id, true);
+      const status = document.getElementById("storeStatus");
+      if (status) {
+        status.dataset.storePendingItem = id;
+        status.setAttribute("aria-busy", "true");
+        status.textContent = `Processing ${item.name}…`;
+      }
+      try {
+        return await buyOrEquipStoreItem(id);
+      } finally {
+        storeActionLocks.delete(id);
+        setStoreItemPending(id, false);
+        // Re-read the authoritative local mirror after either success or a
+        // rejected request so the button never remains stale.
+        refreshStoreItemCards([id]);
+      }
     }
 
     function renderPieceDesigner(preferredValue = "") {
@@ -7800,7 +8144,7 @@
 
       buy.hidden = isOwned;
       buy.textContent = item?.cost ? `Buy ${formatProfileNumber(item.cost)}` : "Unlock free";
-      buy.onclick = () => item && buyOrEquipStoreItem(item.id);
+      buy.onclick = () => item && runStoreItemAction(item.id);
 
       equip.hidden = false;
       equip.disabled = !isOwned || isEquipped;
@@ -8420,7 +8764,7 @@
       return preview;
     }
 
-    async function buyOrEquipStoreBundle(bundleId) {
+    async function performStoreBundleAction(bundleId) {
       const bundle = storeBundles.find((entry) => entry.id === bundleId);
       if (!bundle) return;
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
@@ -8433,7 +8777,7 @@
       if (!details.missingItems.length) {
         await Promise.all(details.items.map((item) => equipStoreItem(item)));
         savePuzzleState();
-        renderStore();
+        refreshStoreItemCards(details.items.map((item) => item.id));
         if (status) status.textContent = `${bundle.name} equipped. Every included cosmetic is ready.`;
         return;
       }
@@ -8476,15 +8820,32 @@
       await Promise.all(details.items.map((item) => equipStoreItem(item)));
       playAudioCue("purchase");
       showCelebration("Bundle unlocked!", `-${formatProfileNumber(bundlePrice)} coins · Save ${formatProfileNumber(details.savings)}`, bundle.name);
-      renderStore();
+      refreshStoreItemCards(details.items.map((item) => item.id));
       renderBeginnerProgress();
       if (status) status.textContent = `${bundle.name} unlocked and equipped. You saved ${formatProfileNumber(details.savings)} coins.`;
+    }
+
+    async function runStoreBundleAction(bundleId) {
+      const id = String(bundleId || "");
+      if (!id || storeBundleActionLocks.has(id)) return;
+      const bundle = storeBundles.find((entry) => entry.id === id);
+      if (!bundle) return;
+      storeBundleActionLocks.add(id);
+      setStoreBundlePending(id, true);
+      try {
+        return await performStoreBundleAction(id);
+      } finally {
+        storeBundleActionLocks.delete(id);
+        refreshStoreBundleCard(id);
+        setStoreBundlePending(id, false);
+      }
     }
 
     function buildStoreBundleCard(bundle, owned = new Set(storeState.owned)) {
       const details = getStoreBundleDetails(bundle, owned);
       const card = document.createElement("article");
       card.className = `store-card store-bundle-card${details.missingItems.length ? "" : " is-owned"}`;
+      card.dataset.storeBundleId = bundle.id;
       card.dataset.rarity = bundle.rarity || "Epic";
       card.append(
         buildStoreBundlePreview(details.items),
@@ -8518,9 +8879,10 @@
       const action = document.createElement("button");
       action.type = "button";
       action.className = details.missingItems.length ? "button" : "button secondary";
+      action.dataset.storeBundleAction = bundle.id;
       action.textContent = details.missingItems.length ? `Buy bundle · ${formatProfileNumber(details.bundlePrice)}` : "Equip bundle";
       action.setAttribute("aria-label", `${details.missingItems.length ? "Buy" : "Equip"} ${bundle.name}`);
-      action.addEventListener("click", () => buyOrEquipStoreBundle(bundle.id));
+      action.addEventListener("click", () => runStoreBundleAction(bundle.id));
       card.append(included, pricing, action);
       return card;
     }
@@ -8676,7 +9038,7 @@
         previewButton.addEventListener("click", () => selectedItem && startStorePreview(selectedItem));
         const action = createBookText("button", details.missingItems.length ? "button" : "button secondary", details.missingItems.length ? `Buy bundle · ${formatProfileNumber(details.bundlePrice)}` : "Equip bundle");
         action.type = "button";
-        action.addEventListener("click", () => buyOrEquipStoreBundle(selectedPick.bundle.id));
+        action.addEventListener("click", () => runStoreBundleAction(selectedPick.bundle.id));
         actions.append(previewButton, action);
         featuredInspector.appendChild(actions);
         return;
@@ -8695,7 +9057,11 @@
       featuredInspector.append(heading, createBookText("p", "store-featured-description", item.description || "A cosmetic finish for your Nschess identity."));
       const facts = createBookText("div", "store-featured-facts", "");
       facts.append(
-        createBookText("span", "", isEquipped ? "Equipped" : isOwned ? "Owned" : `${formatProfileNumber(item.cost || 0)} coins`),
+        (() => {
+          const status = createBookText("span", "", isEquipped ? "Equipped" : isOwned ? "Owned" : `${formatProfileNumber(item.cost || 0)} coins`);
+          status.dataset.storeFeaturedStatus = item.id;
+          return status;
+        })(),
         createBookText("span", "", `Unlock: ${unlockMethod}`),
         createBookText("span", "", `Appears in ${getStoreSurfaceLabel(item)}`)
       );
@@ -8709,8 +9075,10 @@
       previewButton.addEventListener("click", () => startStorePreview(item));
       const primary = createBookText("button", isOwned ? "button secondary" : "button", isEquipped ? "Equipped" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${formatProfileNumber(item.cost || 0)}` : getStoreUnlockLabel(item));
       primary.type = "button";
+      primary.classList.add("store-primary-action");
+      primary.dataset.storeItemAction = item.id;
       primary.disabled = isEquipped;
-      primary.addEventListener("click", () => buyOrEquipStoreItem(item.id));
+      primary.addEventListener("click", () => runStoreItemAction(item.id));
       actions.append(previewButton, primary);
       featuredInspector.appendChild(actions);
     }
@@ -8914,6 +9282,7 @@
                 ? prefs.lastMoveFavorites.includes(item.value)
                 : ["musicPack", "sfxPack"].includes(item.type) && ((prefs.musicFavorites || []).includes(`${item.type}:${item.value}`) || (prefs.musicFavorites || []).includes(item.value));
           card.className = `store-card${isOwned ? " is-owned" : ""}${isEquipped ? " is-equipped" : ""}${item.type === "board" ? " is-board-theme" : ""}${["skin", "pieceFinish"].includes(item.type) ? " is-piece-set" : ""}${item.type === "backgroundTheme" ? " is-background-theme" : ""}${item.type === "nameStyle" ? " is-name-style" : ""}${["avatar", "frame", "avatarEffect"].includes(item.type) ? " is-avatar-cosmetic" : ""}${item.petAvatar ? " is-pet-avatar" : ""}${item.type === "lastMove" ? " is-highlight" : ""}${["musicPack", "sfxPack"].includes(item.type) ? " is-music-pack" : ""}${item.type === "arrowSkin" ? " is-arrow-skin" : ""}${isFavorite ? " is-favorite" : ""}`;
+          card.dataset.storeItemId = item.id;
           card.dataset.rarity = displayRarity;
           card.dataset.unlockMethod = unlockMethod;
           if (hasPremiumTier) card.dataset.premiumTier = "true";
@@ -8931,7 +9300,10 @@
           meta.append(createBookText("span", "store-surface", `Appears in ${surfaceLabel}`));
           if (earningLabel) meta.append(createBookText("span", "store-earn-time", earningLabel));
           const unlockMeta = meta.querySelectorAll("span")[1];
-          if (unlockMeta) unlockMeta.textContent = isOwned ? `${isFavorite ? "Owned | Favorite" : "Owned"} · ${unlockMethodLabel}` : `Unlock: ${unlockMethodLabel} · ${unlockLabel}`;
+          if (unlockMeta) {
+            unlockMeta.dataset.storeItemMeta = item.id;
+            unlockMeta.textContent = isOwned ? `${isFavorite ? "Owned | Favorite" : "Owned"} · ${unlockMethodLabel}` : `Unlock: ${unlockMethodLabel} · ${unlockLabel}`;
+          }
           if (hasPremiumTier) {
             const tierSignal = createBookText("span", "store-tier-signal", "\u2726");
             tierSignal.setAttribute("role", "img");
@@ -8941,36 +9313,40 @@
           const button = document.createElement("button");
           button.type = "button";
           button.className = isOwned || unlockMethod !== "Coins" ? "button secondary" : "button";
+          button.classList.add("store-primary-action");
+          button.dataset.storeItemAction = item.id;
           if (item.type === "nameStyle") {
             button.textContent = isEquipped && item.value !== "classic" ? "Unequip" : isEquipped ? "Default" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${item.cost}` : unlockLabel;
             button.disabled = isEquipped && item.value === "classic";
             button.addEventListener("click", () => {
               if (isEquipped && item.value !== "classic") resetNameStyle();
-              else buyOrEquipStoreItem(item.id);
+              else runStoreItemAction(item.id);
             });
           } else if (item.type === "lastMove") {
             button.textContent = isEquipped && item.value !== "classic" ? "Unequip" : isEquipped ? "Default" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${item.cost}` : unlockLabel;
             button.disabled = isEquipped && item.value === "classic";
             button.addEventListener("click", () => {
               if (isEquipped && item.value !== "classic") resetLastMoveHighlight();
-              else buyOrEquipStoreItem(item.id);
+              else runStoreItemAction(item.id);
             });
           } else if (["musicPack", "sfxPack", "arrowSkin"].includes(item.type)) {
             button.textContent = isEquipped ? "Equipped" : isOwned ? "Equip" : unlockMethod === "Coins" ? `Buy ${item.cost}` : unlockLabel;
             button.disabled = isEquipped;
-            button.addEventListener("click", () => buyOrEquipStoreItem(item.id));
+            button.addEventListener("click", () => runStoreItemAction(item.id));
           } else {
             button.textContent = isEquipped ? "Equipped" : isOwned ? "Equip" : unlockMethod !== "Coins" ? unlockLabel : ["skin", "musicPack"].includes(item.type) ? `Buy ${item.cost}` : `Unlock ${item.cost}`;
             button.disabled = isEquipped;
-            button.addEventListener("click", () => buyOrEquipStoreItem(item.id));
+            button.addEventListener("click", () => runStoreItemAction(item.id));
           }
           const preview = buildStorePreview(item);
           const previewUnlockLabel = isOwned ? `\u2713 Owned · ${unlockMethodLabel}` : `Unlock: ${unlockMethodLabel}`;
-          preview.appendChild(createBookText(
+          const previewBadge = createBookText(
             "span",
             `store-preview-badge ${isEquipped ? "is-equipped" : isOwned ? "is-owned" : "is-locked"}`,
             isEquipped ? "\u2713 Equipped" : previewUnlockLabel
-          ));
+          );
+          previewBadge.dataset.storeItemBadge = item.id;
+          preview.appendChild(previewBadge);
           const actions = document.createElement("div");
           actions.className = "store-card-actions";
           const temporaryPreview = createBookText("button", "button secondary", "Preview");
@@ -9063,7 +9439,21 @@
       if (activeStoreCategory === "Chess Pieces") renderPieceDesigner();
     }
 
+    function setupStoreScrollPerformance() {
+      if (storeScrollPerfReady) return;
+      storeScrollPerfReady = true;
+      // Store cards contain cosmetic preview effects. Pause only those
+      // decorative animations while the document is scrolling; the shared
+      // listener is passive and installed once for the Store route.
+      window.addEventListener("scroll", () => {
+        document.body.classList.add("store-is-scrolling");
+        window.clearTimeout(storeScrollPerfTimer);
+        storeScrollPerfTimer = window.setTimeout(() => document.body.classList.remove("store-is-scrolling"), 120);
+      }, { passive: true });
+    }
+
     function setupStore() {
+      setupStoreScrollPerformance();
       setupStoreGifting();
       const storeAmbienceToggle = document.getElementById("storeAmbienceToggle");
       if (storeAmbienceToggle && !storeAmbienceToggle.dataset.ready) {
@@ -10624,12 +11014,22 @@
     function getPlayerIdentityModel(source = {}, options = {}) {
       const profile = options.profile || getDragonProfileSnapshot();
       const prefs = options.prefs || readLearnerPrefs();
+      const sourceNameStyle = source.nameStyle || source.name_style || source.equippedNameStyle || source.equipped_name_style;
+      const optionNameStyle = options.nameStyle || options.name_style || options.equippedNameStyle || options.equipped_name_style;
       const isPlayer = options.isPlayer !== undefined
         ? Boolean(options.isPlayer)
         : source.isPlayer !== undefined ? Boolean(source.isPlayer) : true;
       const name = String(source.name || source.displayName || source.username || options.name || (isPlayer ? profile.name : "Player")).trim() || (isPlayer ? "Guest Explorer" : "Player");
-      const requestedNameStyle = source.nameStyle || options.nameStyle || (isPlayer ? prefs.nameStyle : "classic");
-      const nameStyle = nameStyleThemes[requestedNameStyle] ? requestedNameStyle : "classic";
+      // The signed-in player has exactly one equipped cosmetic source.  Auth
+      // profile payloads and cached surface models can contain an older
+      // name_style value; allowing that value to win made the navbar/profile
+      // resolve Classic while a later board surface showed Sky.  Remote
+      // identities still use their own public style, but every current-player
+      // identity must resolve through getEquippedNameStyle().
+      const requestedNameStyle = sourceNameStyle || optionNameStyle || "classic";
+      const nameStyle = isPlayer
+        ? getEquippedNameStyle()
+        : (nameStyleThemes[requestedNameStyle] ? requestedNameStyle : "classic");
       const avatar = String(source.avatar || options.avatar || (isPlayer ? profile.avatar : "?")).trim() || "?";
       const level = String(source.level || options.level || (isPlayer ? profile.level : "")).trim();
       const title = String(source.title ?? options.title ?? (isPlayer ? (prefs.title || profile.rank) : "")).trim();
@@ -10653,8 +11053,8 @@
           avatarPetId: source.avatarPetId || ""
         };
       const rank = getAvatarRankBadge(avatarProfile);
-      const effectValue = source.avatarEffect || options.avatarEffect || (isPlayer ? prefs.avatarEffect : "none");
-      const frameValue = source.avatarFrame || options.avatarFrame || (isPlayer ? prefs.avatarFrame : "");
+      const effectValue = source.avatarEffect || source.avatar_effect || options.avatarEffect || options.avatar_effect || (isPlayer ? prefs.avatarEffect : "none");
+      const frameValue = source.avatarFrame || source.avatar_frame || options.avatarFrame || options.avatar_frame || (isPlayer ? prefs.avatarFrame : "");
       const effectItem = storeItems.find((item) => item.type === "avatarEffect" && item.value === effectValue);
       const frameItem = storeItems.find((item) => item.type === "frame" && item.value === frameValue);
       const suppliedIcons = Array.isArray(source.icons) ? source.icons : null;
@@ -10675,7 +11075,7 @@
         countryCode: normalizeCountryFlagValue(source.countryCode || source.countryFlag || source.country_flag || source.country || options.countryCode || (isPlayer ? readLearnerProfile().countryFlag : "")),
         nameStyle,
         nameStyleTheme: getNameStyleTheme(nameStyle),
-        nameFx: source.nameFx || options.nameFx || (isPlayer ? prefs.nameFx : "on"),
+        nameFx: source.nameFx || source.name_fx || options.nameFx || options.name_fx || (isPlayer ? prefs.nameFx : "on"),
         avatarFrame: frameValue && frameItem ? frameValue : "",
         avatarFrameRarity: frameItem?.rarity || "Common",
         avatarEffect: effectValue && effectItem ? effectValue : "none",
@@ -10755,6 +11155,7 @@
       const lineIsNameElement = Boolean(line.matches?.(nameSelector));
       const name = lineIsNameElement ? line : line.querySelector(nameSelector);
       if (!name) return null;
+      name.dataset.playerIdentityName = "";
       const markerScope = lineIsNameElement ? (line.parentElement || line) : line;
       line.classList.add("player-identity-line");
       line.dataset.identityOwner = model.isPlayer ? "player" : "remote";
@@ -11532,6 +11933,7 @@
       });
       updateMatchQuickStats(profile);
       renderStyledUsernames(profile.name);
+      refreshMountedPlayerIdentities(profile);
       applyAvatarRankBadges(profile);
     }
 
@@ -11793,8 +12195,23 @@
       setContent("[data-profile-match-history]", records.slice(0, 6).map((game) => {
         const resultLabel = game.result === "win" ? "Win" : game.result === "loss" ? "Loss" : game.result === "draw" ? "Draw" : "Aborted";
         const row = createBookText("div", `profile-match-row is-${game.result}`, "");
-        row.append(createBookText("span", "profile-match-result", resultLabel), createBookText("div", "profile-match-opponent", ""), createBookText("time", "", formatAccountDate(game.completedAt)));
-        row.querySelector(".profile-match-opponent").append(createBookText("strong", "", game.opponentName), createBookText("small", "", `${game.mode} · ${game.moves} moves`));
+        const opponent = createBookText("div", "profile-match-opponent", "");
+        const opponentName = createBookText("strong", "", game.opponentName);
+        opponent.append(opponentName, createBookText("small", "", `${game.mode} · ${game.moves} moves`));
+        const opponentModel = getPlayerIdentityModel({
+          name: game.opponentName,
+          title: game.opponentTitle || "",
+          nameStyle: game.opponentNameStyle || "",
+          nameFx: game.opponentNameFx || "",
+          avatar: game.opponentAvatar || "?",
+          avatarFrame: game.opponentAvatarFrame || "",
+          avatarEffect: game.opponentAvatarEffect || "",
+          countryCode: game.opponentCountryCode || "",
+          profileId: game.opponentId,
+          isPlayer: false
+        }, { isPlayer: false, profileId: game.opponentId, variant: "compact" });
+        renderSharedIdentityLine(opponent, opponentModel, { nameSelector: "strong", variant: "compact", linkProfile: Boolean(game.opponentId), profileTarget: opponent });
+        row.append(createBookText("span", "profile-match-result", resultLabel), opponent, createBookText("time", "", formatAccountDate(game.completedAt)));
         return row;
       }));
       document.querySelectorAll("[data-profile-history-count]").forEach((target) => { target.textContent = records.length ? `${formatProfileNumber(records.length)} completed` : "No completed games"; });
@@ -12783,8 +13200,25 @@
         const copy = createBookText("div", "", "");
         const rating = game.opponentRating ? ` · ${formatProfileNumber(game.opponentRating)} Elo` : "";
         const meta = [game.side, game.moves ? `${game.moves} moves` : "", game.termination].filter(Boolean).join(" · ");
+        const heading = createBookText("strong", "home-game-heading", "");
+        heading.append(document.createTextNode(`${resultLabels[game.result] || "Game"} vs `));
+        const opponentName = createBookText("span", "home-game-opponent-name", game.opponentName || "Opponent");
+        heading.append(opponentName, document.createTextNode(rating));
+        const opponentModel = getPlayerIdentityModel({
+          name: game.opponentName,
+          title: game.opponentTitle || "",
+          nameStyle: game.opponentNameStyle || "",
+          nameFx: game.opponentNameFx || "",
+          avatar: game.opponentAvatar || "?",
+          avatarFrame: game.opponentAvatarFrame || "",
+          avatarEffect: game.opponentAvatarEffect || "",
+          countryCode: game.opponentCountryCode || "",
+          profileId: game.opponentId,
+          isPlayer: false
+        }, { isPlayer: false, profileId: game.opponentId, variant: "compact" });
+        renderSharedIdentityLine(heading, opponentModel, { nameSelector: ".home-game-opponent-name", variant: "compact", linkProfile: Boolean(game.opponentId), profileTarget: heading });
         copy.append(
-          createBookText("strong", "", `${resultLabels[game.result] || "Game"} vs ${game.opponentName}${rating}`),
+          heading,
           createBookText("p", "", `${game.mode} · ${meta}`)
         );
         const link = createBookText("a", "home-lower-row-action", ">");
@@ -14924,7 +15358,7 @@
 
     function setupAiBotRoster() {
       const roster = document.getElementById("aiBotRoster"); const search = document.getElementById("aiBotSearch"); const filter = document.getElementById("aiBotFilter"); if (!roster || !search || !filter || roster.dataset.ready) return; roster.dataset.ready = "true"; const categories = ["Beginner", "Intermediate", "Advanced", "Master"];
-      const render = () => { const query = search.value.trim().toLowerCase(); const matches = beginnerBots.filter((bot) => { const words = [bot.name, bot.elo, bot.personality, bot.opening, bot.bio, bot.style, bot.category].join(" ").toLowerCase(); return (filter.value === "All" || bot.category === filter.value) && (!query || words.includes(query)); }); if (!matches.length) { roster.replaceChildren(createBookText("p", "ai-bot-empty", "No bots match those filters.")); return; } const groups = categories.map((category) => { const bots = matches.filter((bot) => bot.category === category); if (!bots.length) return null; const section = document.createElement("section"); section.className = "ai-bot-category"; const head = document.createElement("div"); head.className = "ai-bot-category-head"; head.append(createBookText("h3", "", category), createBookText("span", "", String(bots.length) + " bots")); const grid = document.createElement("div"); grid.className = "ai-bot-grid"; bots.forEach((bot) => { const card = document.createElement("article"); card.className = "ai-bot-card"; const avatar = document.createElement("img"); avatar.className = "ai-bot-avatar"; avatar.src = getAiBotAvatarImage(bot, beginnerBots.indexOf(bot)); avatar.alt = ""; avatar.loading = "lazy"; avatar.decoding = "async"; avatar.style.setProperty("--ai-bot-hue", String((beginnerBots.indexOf(bot) * 47 + 194) % 360)); const copy = document.createElement("div"); copy.className = "ai-bot-card-copy"; const meta = document.createElement("div"); meta.className = "ai-bot-card-meta"; const elo = createBookText("span", "", String(bot.elo) + " Elo"); const difficulty = createBookText("span", "ai-bot-difficulty", bot.category); difficulty.dataset.difficulty = bot.category.toLowerCase(); const personality = createBookText("span", "", bot.personality); meta.append(elo, difficulty, personality); copy.append(createBookText("strong", "", bot.name), meta, createBookText("p", "", bot.bio), createBookText("span", "ai-bot-card-style", "Style: " + bot.style)); const play = createBookText("button", "button", "Play"); play.type = "button"; play.dataset.aiBotPlay = bot.id; play.setAttribute("aria-label", "Play " + bot.name + ", " + bot.elo + " Elo"); card.append(avatar, copy, play); grid.append(card); }); section.append(head, grid); return section; }).filter(Boolean); roster.replaceChildren(...groups); };
+      const render = () => { const query = search.value.trim().toLowerCase(); const matches = beginnerBots.filter((bot) => { const words = [bot.name, bot.elo, bot.personality, bot.opening, bot.bio, bot.style, bot.category].join(" ").toLowerCase(); return (filter.value === "All" || bot.category === filter.value) && (!query || words.includes(query)); }); if (!matches.length) { roster.replaceChildren(createBookText("p", "ai-bot-empty", "No bots match those filters.")); return; } const groups = categories.map((category) => { const bots = matches.filter((bot) => bot.category === category); if (!bots.length) return null; const section = document.createElement("section"); section.className = "ai-bot-category"; const head = document.createElement("div"); head.className = "ai-bot-category-head"; head.append(createBookText("h3", "", category), createBookText("span", "", String(bots.length) + " bots")); const grid = document.createElement("div"); grid.className = "ai-bot-grid"; bots.forEach((bot) => { const card = document.createElement("article"); card.className = "ai-bot-card"; const avatar = document.createElement("img"); avatar.className = "ai-bot-avatar"; avatar.src = getAiBotAvatarImage(bot, beginnerBots.indexOf(bot)); avatar.alt = ""; avatar.loading = "lazy"; avatar.decoding = "async"; avatar.style.setProperty("--ai-bot-hue", String((beginnerBots.indexOf(bot) * 47 + 194) % 360)); const copy = document.createElement("div"); copy.className = "ai-bot-card-copy"; const meta = document.createElement("div"); meta.className = "ai-bot-card-meta"; const elo = createBookText("span", "", String(bot.elo) + " Elo"); const difficulty = createBookText("span", "ai-bot-difficulty", bot.category); difficulty.dataset.difficulty = bot.category.toLowerCase(); const personality = createBookText("span", "", bot.personality); meta.append(elo, difficulty, personality); const nameLine = createBookText("span", "ai-bot-card-name-line", ""); const botName = createBookText("strong", "", bot.name); nameLine.append(botName); const botIdentity = getPlayerIdentityModel({ name: bot.name, title: bot.personality, avatar: bot.avatar, isPlayer: false }, { isPlayer: false, variant: "compact" }); renderSharedIdentityLine(nameLine, botIdentity, { nameSelector: "strong", variant: "compact" }); copy.append(nameLine, meta, createBookText("p", "", bot.bio), createBookText("span", "ai-bot-card-style", "Style: " + bot.style)); const play = createBookText("button", "button", "Play"); play.type = "button"; play.dataset.aiBotPlay = bot.id; play.setAttribute("aria-label", "Play " + bot.name + ", " + bot.elo + " Elo"); card.append(avatar, copy, play); grid.append(card); }); section.append(head, grid); return section; }).filter(Boolean); roster.replaceChildren(...groups); };
       search.addEventListener("input", render); filter.addEventListener("change", render); roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => selectAiBot(button.dataset.aiBotPlay)); }); render();
     }
     function selectBeginnerBot(botId) { const bot = getBeginnerBot(botId); if (!bot || !isBeginnerBotUnlocked(bot.id)) return; selectAiBot(bot.id); }
@@ -18894,6 +19328,12 @@
         mode: "AI game",
         opponentName: opponent.name || "Coach",
         opponentTitle: opponent.title || "AI opponent",
+        opponentNameStyle: opponent.nameStyle || opponent.name_style || "",
+        opponentNameFx: opponent.nameFx || opponent.name_fx || "",
+        opponentAvatar: opponent.avatar || "",
+        opponentAvatarFrame: opponent.avatarFrame || opponent.avatar_frame || "",
+        opponentAvatarEffect: opponent.avatarEffect || opponent.avatar_effect || "",
+        opponentCountryCode: opponent.countryCode || opponent.countryFlag || opponent.country_flag || "",
         opponentRating: Math.max(400, Number(opponent.rating) || Number(getCoachConfig().elo) || 450),
         result: draw ? "draw" : playerWon ? "win" : "loss",
         side: getCoachColorName(coachPlayerColor),
@@ -20729,10 +21169,23 @@
       messages.replaceChildren(...(rows.length ? rows : [createBookText("p", "", "Say good luck before the next move.")]).map((message) => {
         if (message instanceof Element) return message;
         const line = document.createElement("p");
-        if (String(message.userId || message.user_id || "") === getFriendCurrentUserId()) line.className = "is-self";
+        const senderId = String(message.userId || message.user_id || "");
+        const isSelf = senderId === getFriendCurrentUserId();
+        if (isSelf) line.className = "is-self";
         const sender = createBookText("strong", "", message.username || "Player");
         line.append(sender, document.createTextNode(` ${message.body || ""}`));
-        renderSharedIdentityLine(line, getPlayerIdentityModel({ name: message.username || "Player", isPlayer: String(message.userId || message.user_id || "") === getFriendCurrentUserId() }, { isPlayer: String(message.userId || message.user_id || "") === getFriendCurrentUserId(), variant: "compact" }), { nameSelector: "strong", variant: "compact" });
+        const senderProfile = isSelf ? getFriendMatchProfiles(state).self : getFriendMatchProfiles(state).opponent;
+        renderSharedIdentityLine(line, getPlayerIdentityModel({
+          name: message.username || "Player",
+          nameStyle: message.nameStyle || message.name_style || message.senderNameStyle || message.sender_name_style || senderProfile?.nameStyle || "",
+          nameFx: message.nameFx || message.name_fx || message.senderNameFx || message.sender_name_fx || senderProfile?.nameFx || "",
+          avatarFrame: message.avatarFrame || message.avatar_frame || senderProfile?.avatarFrame || "",
+          avatarEffect: message.avatarEffect || message.avatar_effect || senderProfile?.avatarEffect || "",
+          countryCode: message.countryCode || message.country_flag || senderProfile?.countryFlag || "",
+          avatar: message.avatar || senderProfile?.avatar || "?",
+          profileId: senderId,
+          isPlayer: isSelf
+        }, { isPlayer: isSelf, variant: "compact" }), { nameSelector: "strong", variant: "compact" });
         return line;
       }));
     }
@@ -20825,6 +21278,11 @@
         avatarImage,
         countryFlag: normalizeCountryFlagValue(source.countryFlag || source.country_flag || fallback.countryFlag || ""),
         title: String(source.title || fallback.title || "Chess Player").trim() || "Chess Player",
+        nameStyle: String(source.nameStyle || source.name_style || fallback.nameStyle || fallback.name_style || "").trim(),
+        nameFx: String(source.nameFx || source.name_fx || fallback.nameFx || fallback.name_fx || "").trim(),
+        avatarFrame: String(source.avatarFrame || source.avatar_frame || fallback.avatarFrame || fallback.avatar_frame || "").trim(),
+        avatarEffect: String(source.avatarEffect || source.avatar_effect || fallback.avatarEffect || fallback.avatar_effect || "").trim(),
+        avatarRarity: String(source.avatarRarity || source.avatar_rarity || fallback.avatarRarity || fallback.avatar_rarity || "").trim(),
         rating: Math.max(400, Number(source.rating) || Number(fallback.rating) || 450),
         online: Boolean(source.online)
       };
@@ -21040,6 +21498,12 @@
           mode: remote.gameType === "rated" ? "Rated online" : "Online game",
           opponentName: opponent?.displayName || next.targetName || "Friend",
           opponentTitle: opponent?.title || "Chess Player",
+          opponentNameStyle: opponent?.nameStyle || "",
+          opponentNameFx: opponent?.nameFx || "",
+          opponentAvatar: opponent?.avatar || "",
+          opponentAvatarFrame: opponent?.avatarFrame || "",
+          opponentAvatarEffect: opponent?.avatarEffect || "",
+          opponentCountryCode: opponent?.countryFlag || "",
           opponentRating: opponent?.rating,
           result: playerResult,
           side: getCoachColorName(next.color),
@@ -22356,6 +22820,39 @@
       return avatar;
     }
 
+    function createTournamentPairingIdentity(pairing = {}, color = "white") {
+      const side = color === "black" ? "black" : "white";
+      const prefix = side === "white" ? "white" : "black";
+      const name = pairing[`${prefix}Name`] || pairing[`${prefix}_name`] || (side === "white" ? "White" : "Black");
+      const line = createBookText("span", "tournament-pairing-player", "");
+      const nameElement = createBookText("strong", "tournament-pairing-name", name);
+      line.append(nameElement);
+      renderSharedIdentityLine(line, getPlayerIdentityModel({
+        name,
+        nameStyle: pairing[`${prefix}NameStyle`] || pairing[`${prefix}_name_style`] || "",
+        nameFx: pairing[`${prefix}NameFx`] || pairing[`${prefix}_name_fx`] || "",
+        avatarFrame: pairing[`${prefix}AvatarFrame`] || pairing[`${prefix}_avatar_frame`] || "",
+        avatarEffect: pairing[`${prefix}AvatarEffect`] || pairing[`${prefix}_avatar_effect`] || "",
+        countryCode: pairing[`${prefix}CountryCode`] || pairing[`${prefix}_country_code`] || pairing[`${prefix}CountryFlag`] || pairing[`${prefix}_country_flag`] || "",
+        avatar: pairing[`${prefix}Avatar`] || pairing[`${prefix}_avatar`] || "?",
+        profileId: pairing[`${prefix}Id`] || pairing[`${prefix}_id`] || "",
+        isPlayer: String(pairing[`${prefix}Id`] || pairing[`${prefix}_id`] || "") === getFriendCurrentUserId()
+      }, { isPlayer: String(pairing[`${prefix}Id`] || pairing[`${prefix}_id`] || "") === getFriendCurrentUserId(), variant: "compact" }), {
+        nameSelector: ".tournament-pairing-name",
+        variant: "compact",
+        linkProfile: Boolean(pairing[`${prefix}Id`] || pairing[`${prefix}_id`]),
+        profileTarget: line
+      });
+      return line;
+    }
+
+    function createTournamentPairingPlayers(pairing = {}, { includeRound = true } = {}) {
+      const players = createBookText("span", "tournament-pairing-players", "");
+      if (includeRound) players.append(document.createTextNode(`R${pairing.round || pairing.round_no || 0} · `));
+      players.append(createTournamentPairingIdentity(pairing, "white"), document.createTextNode(" vs "), createTournamentPairingIdentity(pairing, "black"));
+      return players;
+    }
+
     function scheduleTournamentLaunch(event) {
       const pairing = event?.myPairing;
       if (!pairing?.id || pairing.status !== "active" || !pairing.challengeCode) {
@@ -22410,8 +22907,8 @@
         pairings.slice(0, 12).forEach((pairing) => {
           const match = document.createElement("div");
           match.className = `tournament-bracket-match${pairing.status === "active" ? " is-live" : ""}`;
-          const white = createBookText("span", "", pairing.whiteName || "White");
-          const black = createBookText("span", "", pairing.blackName || "Black");
+          const white = createTournamentPairingIdentity(pairing, "white");
+          const black = createTournamentPairingIdentity(pairing, "black");
           const result = pairing.result && pairing.result !== "pending" ? pairing.result : pairing.status === "active" ? "Live" : "—";
           match.append(white, black, createBookText("small", "", result));
           column.append(match);
@@ -22599,7 +23096,19 @@
         const playerCopy = document.createElement("span");
         const tournamentName = createBookText("strong", "", entry.username || "Player");
         playerCopy.append(tournamentName, createBookText("small", "", `${entry.title || "Chess Player"} • ${Math.max(400, Number(entry.rating) || 450)} Elo`));
-        const tournamentIdentity = getPlayerIdentityModel({ name: entry.username || "Player", title: entry.title || "", countryCode: entry.countryFlag || "", avatar: entry.avatar || "?", profileId: entry.id, isPlayer: entry.id === currentUserId }, { isPlayer: entry.id === currentUserId, variant: "compact", profileId: entry.id });
+        const tournamentIdentity = getPlayerIdentityModel({
+          name: entry.username || "Player",
+          title: entry.title || "",
+          nameStyle: entry.nameStyle || entry.name_style || "",
+          nameFx: entry.nameFx || entry.name_fx || "",
+          countryCode: entry.countryFlag || entry.country_flag || "",
+          avatar: entry.avatar || "?",
+          avatarFrame: entry.avatarFrame || entry.avatar_frame || "",
+          avatarEffect: entry.avatarEffect || entry.avatar_effect || "",
+          avatarRarity: entry.avatarRarity || entry.avatar_rarity || "",
+          profileId: entry.id,
+          isPlayer: entry.id === currentUserId
+        }, { isPlayer: entry.id === currentUserId, variant: "compact", profileId: entry.id });
         renderSharedIdentityLine(playerCopy, tournamentIdentity, { nameSelector: "strong", variant: "compact", linkProfile: true, profileTarget: playerCopy });
         const tournamentAvatar = createTournamentAvatar(entry);
         applySharedAvatarElement(tournamentAvatar, tournamentIdentity, { variant: "compact" });
@@ -22627,7 +23136,7 @@
       else activePairings.slice(0, 8).forEach((pairing) => {
         const row = document.createElement("div");
         row.className = `tournament-pairing-row${pairing.id === event.myPairing?.id ? " is-self" : ""}`;
-        const players = createBookText("span", "", `R${pairing.round} • ${pairing.whiteName || "White"} vs ${pairing.blackName || "Black"}`);
+        const players = createTournamentPairingPlayers(pairing);
         const state = createBookText("span", "tournament-status is-running", pairing.id === event.myPairing?.id ? "Your game" : "Live");
         row.append(players, state);
         games.append(row);
@@ -22644,7 +23153,7 @@
       else completedPairings.slice(0, 8).forEach((pairing) => {
         const row = document.createElement("div");
         row.className = "tournament-pairing-row";
-        row.append(createBookText("span", "", `R${pairing.round} • ${pairing.whiteName || "White"} vs ${pairing.blackName || "Black"}`), createBookText("span", "", pairing.result === "pending" ? pairing.status : pairing.result));
+        row.append(createTournamentPairingPlayers(pairing), createBookText("span", "", pairing.result === "pending" ? pairing.status : pairing.result));
         pairings.append(row);
       });
 
@@ -22664,7 +23173,18 @@
         line.className = message.userId === currentUserId ? "is-self" : "";
         const chatName = createBookText("strong", "", message.username || "Player");
         line.append(chatName, document.createTextNode(` ${message.body || ""}`));
-        renderSharedIdentityLine(line, getPlayerIdentityModel({ name: message.username || "Player", isPlayer: message.userId === currentUserId }, { isPlayer: message.userId === currentUserId, variant: "compact" }), { nameSelector: "strong", variant: "compact" });
+        const chatPlayer = event.standings.find((entry) => String(entry.id || entry.playerId || entry.player_id || "") === String(message.userId || "")) || {};
+        renderSharedIdentityLine(line, getPlayerIdentityModel({
+          name: message.username || "Player",
+          nameStyle: message.nameStyle || message.name_style || chatPlayer.nameStyle || chatPlayer.name_style || "",
+          nameFx: message.nameFx || message.name_fx || chatPlayer.nameFx || chatPlayer.name_fx || "",
+          avatarFrame: message.avatarFrame || message.avatar_frame || chatPlayer.avatarFrame || chatPlayer.avatar_frame || "",
+          avatarEffect: message.avatarEffect || message.avatar_effect || chatPlayer.avatarEffect || chatPlayer.avatar_effect || "",
+          countryCode: message.countryCode || message.country_flag || chatPlayer.countryFlag || chatPlayer.country_flag || "",
+          avatar: message.avatar || chatPlayer.avatar || "?",
+          profileId: message.userId,
+          isPlayer: message.userId === currentUserId
+        }, { isPlayer: message.userId === currentUserId, variant: "compact" }), { nameSelector: "strong", variant: "compact" });
         if (message.userId !== currentUserId) {
           const actions = document.createElement("span");
           actions.className = "tournament-message-actions";
@@ -26268,7 +26788,11 @@
 
     function createSupabaseAuthProvider(baseProvider = null) {
       const host = String(location.hostname || "").toLowerCase();
-      if (location.protocol !== "https:" || host.endsWith(".github.io")) return baseProvider;
+      // Supabase supports loopback origins for local development and E2E.
+      // Keep insecure remote HTTP and GitHub Pages on the safe fallback, but
+      // do not silently downgrade localhost into Guest Explorer.
+      const isLoopback = ["localhost", "127.0.0.1", "::1"].includes(host);
+      if ((location.protocol !== "https:" && !isLoopback) || host.endsWith(".github.io")) return baseProvider;
       let configPromise = null;
       let cachedAccount = null;
       let supabaseClientPromise = null;
@@ -26537,13 +27061,13 @@
       const getSupabaseLeaderboard = async (options = {}) => {
         const limit = Math.max(1, Math.min(100, Number(options.limit) || 100));
         try {
-          const rows = await request("rest/v1", `leaderboard_entries?select=public_id,username,avatar,country_flag,title,name_style,avatar_frame,avatar_effect,avatar_rarity,puzzle_rating,game_rating,achievements,statistics,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+          const rows = await request("rest/v1", `leaderboard_entries?select=public_id,username,country_flag,title,puzzle_rating,game_rating,achievements,statistics,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
           return { entries: (Array.isArray(rows) ? rows : []).map(toLeaderboardEntry).filter((entry) => entry.publicId && entry.username) };
         } catch (leaderboardError) {
           authDebug("Leaderboard table unavailable; using shared profile recovery", { message: leaderboardError?.message || "unknown" });
           let rows;
           try {
-            rows = await request("rest/v1", `profiles?select=public_id,username,avatar,country_flag,title,name_style,avatar_frame,avatar_effect,avatar_rarity,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
+            rows = await request("rest/v1", `profiles?select=public_id,username,avatar,country_flag,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
           } catch (profileError) {
             try {
               rows = await request("rest/v1", `profiles?select=public_id,username,avatar,title,rating,wins,losses,draws,updated_at&order=updated_at.desc,public_id.asc&limit=${limit}`, { cache: "no-store" });
@@ -32043,6 +32567,11 @@
         conversation_id: String(source.conversation_id || source.conversationId || ""),
         sender_id: String(source.sender_id || source.senderId || ""),
         sender_username: String(source.sender_username || source.senderUsername || "Player"),
+        sender_name_style: String(source.sender_name_style || source.senderNameStyle || source.name_style || source.nameStyle || ""),
+        sender_name_fx: String(source.sender_name_fx || source.senderNameFx || source.name_fx || source.nameFx || ""),
+        sender_avatar_frame: String(source.sender_avatar_frame || source.senderAvatarFrame || source.avatar_frame || source.avatarFrame || ""),
+        sender_avatar_effect: String(source.sender_avatar_effect || source.senderAvatarEffect || source.avatar_effect || source.avatarEffect || ""),
+        sender_country_code: String(source.sender_country_code || source.senderCountryCode || source.country_flag || source.countryCode || ""),
         body: String(source.body || ""),
         created_at: String(source.created_at || source.createdAt || new Date().toISOString()),
         status: String(source.status || "sent"),
@@ -32056,6 +32585,11 @@
         participantId: String(row.participant_id || row.participantId || ""),
         participantName: String(row.participant_username || row.participantUsername || "Chess player"),
         participantAvatar: String(row.participant_avatar || row.participantAvatar || "auto"),
+        participantNameStyle: String(row.participant_name_style || row.participantNameStyle || row.name_style || row.nameStyle || ""),
+        participantNameFx: String(row.participant_name_fx || row.participantNameFx || row.name_fx || row.nameFx || ""),
+        participantAvatarFrame: String(row.participant_avatar_frame || row.participantAvatarFrame || row.avatar_frame || row.avatarFrame || ""),
+        participantAvatarEffect: String(row.participant_avatar_effect || row.participantAvatarEffect || row.avatar_effect || row.avatarEffect || ""),
+        participantCountryCode: String(row.participant_country_code || row.participantCountryCode || row.country_flag || row.countryCode || ""),
         participantOnline: Boolean(row.participant_online ?? row.participantOnline),
         presenceStatus: String(row.presence_status || row.presenceStatus || (row.participant_online ? "online" : "offline")),
         lastSeenAt: String(row.last_seen_at || row.lastSeenAt || ""),
@@ -32096,7 +32630,19 @@
       const senderLine = createBookText("span", "player-identity-line", "");
       const senderName = createBookText("strong", "", normalized.sender_username || "Player");
       senderLine.append(senderName);
-      renderSharedIdentityLine(senderLine, getPlayerIdentityModel({ name: normalized.sender_username || "Player", isPlayer: normalized.sender_id === getFriendCurrentUserId() }, { isPlayer: normalized.sender_id === getFriendCurrentUserId(), variant: "compact" }), { nameSelector: "strong", variant: "compact" });
+      const conversation = messagingCurrentConversation();
+      const participant = conversation && normalized.sender_id === conversation.participantId ? conversation : null;
+      renderSharedIdentityLine(senderLine, getPlayerIdentityModel({
+        name: normalized.sender_username || "Player",
+        nameStyle: normalized.sender_name_style || participant?.participantNameStyle,
+        nameFx: normalized.sender_name_fx || participant?.participantNameFx,
+        avatarFrame: normalized.sender_avatar_frame || participant?.participantAvatarFrame,
+        avatarEffect: normalized.sender_avatar_effect || participant?.participantAvatarEffect,
+        countryCode: normalized.sender_country_code || participant?.participantCountryCode,
+        avatar: participant?.participantAvatar || "?",
+        profileId: normalized.sender_id,
+        isPlayer: isSelf
+      }, { isPlayer: isSelf, variant: "compact" }), { nameSelector: "strong", variant: "compact" });
       line.append(senderLine, document.createTextNode(normalized.body));
       const footer = createBookText("small", "friends-hub-message-meta", `${new Date(normalized.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${messageDeliveryLabel(normalized) ? ` · ${messageDeliveryLabel(normalized)}` : ""}`);
       line.append(footer);
@@ -32246,7 +32792,17 @@
       copy.className = "friends-hub-card-copy";
       const participantName = createBookText("strong", "", conversation.participantName);
       copy.append(participantName, createBookText("small", "", conversation.lastBody || "No messages yet"));
-      const participantIdentity = getPlayerIdentityModel({ name: conversation.participantName, avatar: conversation.participantAvatar, profileId: conversation.participantId, isPlayer: false }, { isPlayer: false, profileId: conversation.participantId, variant: "compact" });
+      const participantIdentity = getPlayerIdentityModel({
+        name: conversation.participantName,
+        nameStyle: conversation.participantNameStyle,
+        nameFx: conversation.participantNameFx,
+        avatar: conversation.participantAvatar,
+        avatarFrame: conversation.participantAvatarFrame,
+        avatarEffect: conversation.participantAvatarEffect,
+        countryCode: conversation.participantCountryCode,
+        profileId: conversation.participantId,
+        isPlayer: false
+      }, { isPlayer: false, profileId: conversation.participantId, variant: "compact" });
       renderSharedIdentityLine(copy, participantIdentity, { nameSelector: "strong", variant: "compact", linkProfile: Boolean(conversation.participantId), profileTarget: copy });
       applySharedAvatarElement(avatar, participantIdentity, { variant: "compact" });
       main.append(avatar, copy);
