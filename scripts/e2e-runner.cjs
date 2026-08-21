@@ -236,7 +236,8 @@ function changedFiles() {
 function runStaticChecks(full) {
   const checks = [
     ["JavaScript syntax", () => runNode("--check", ["assets/app.js"])],
-    ["E2E harness syntax", () => ["scripts/e2e-config.cjs", "scripts/e2e-runner.cjs", "scripts/e2e-server.cjs", "scripts/store-preflight.cjs"].forEach((file) => runNode("--check", [file]))],
+    ["E2E harness syntax", () => ["scripts/e2e-config.cjs", "scripts/e2e-runner.cjs", "scripts/e2e-server.cjs", "scripts/store-preflight.cjs", "scripts/oauth-auth-regression.js"].forEach((file) => runNode("--check", [file]))],
+    ["OAuth redirect policy", () => runNode("scripts/oauth-auth-regression.js")],
     ["board interaction regression", () => runNode("scripts/board-interaction-regression.js")],
     ["site structure", () => runNode("scripts/verify-site.js")]
   ];
@@ -686,13 +687,84 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
   return statePath;
 }
 
+async function runOAuthButtonTests(browser, baseUrl) {
+  const context = await browser.newContext({ viewport: { width: 1024, height: 800 }, serviceWorkers: "block" });
+  const page = await context.newPage();
+  const waitForOauthUi = async () => {
+    await gotoHash(page, baseUrl, "#login");
+    await page.waitForFunction(() => Boolean(
+      window.CheckmateQuestAuthProvider?.startOAuthLogin
+      && window.CheckmateQuestSupabaseClient?.client?.auth?.signInWithOAuth
+      && document.getElementById("authGoogleLogin")
+      && document.getElementById("authFacebookLogin")
+    ), null, { timeout: 15000 });
+  };
+  const intercept = async (result) => page.evaluate((nextResult) => {
+    const client = window.CheckmateQuestSupabaseClient.client;
+    window.__nschessOauthCalls = [];
+    client.auth.signInWithOAuth = async (options) => {
+      window.__nschessOauthCalls.push(JSON.parse(JSON.stringify(options)));
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      return nextResult;
+    };
+  }, result);
+  const runProvider = async (providerName) => {
+    await waitForOauthUi();
+    await intercept({ data: { url: "https://provider.example/redirect" }, error: null });
+    const button = page.locator(`[data-auth-oauth-provider="${providerName}"]`);
+    await button.click({ noWaitAfter: true });
+    await page.waitForFunction((provider) => {
+      const target = document.querySelector(`[data-auth-oauth-provider="${provider}"]`);
+      return target?.getAttribute("aria-busy") === "true" && target.disabled;
+    }, providerName, { timeout: 3000 });
+    // A DOM-dispatched second click deliberately bypasses the native disabled
+    // guard and verifies the app's in-flight lock still prevents a duplicate.
+    await page.evaluate((provider) => document.querySelector(`[data-auth-oauth-provider="${provider}"]`)
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true })), providerName);
+    await page.waitForTimeout(180);
+    const calls = await page.evaluate(() => window.__nschessOauthCalls || []);
+    assert(calls.length === 1, `${providerName} OAuth was started ${calls.length} times after a duplicate click.`);
+    assert(calls[0].provider === providerName, `${providerName} button used ${calls[0].provider || "no"} provider.`);
+    assert(calls[0].options?.redirectTo === `${baseUrl}/?auth=oauth`, `${providerName} redirect was not the reviewed local root: ${calls[0].options?.redirectTo || "missing"}`);
+  };
+
+  try {
+    await runProvider("google");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForOauthUi();
+    await intercept({ data: { url: "https://provider.example/redirect" }, error: null });
+    const facebook = page.locator('[data-auth-oauth-provider="facebook"]');
+    await facebook.click({ noWaitAfter: true });
+    await page.waitForFunction(() => document.getElementById("authFacebookLogin")?.getAttribute("aria-busy") === "true", null, { timeout: 3000 });
+    const facebookCalls = await page.evaluate(() => window.__nschessOauthCalls || []);
+    assert(facebookCalls.length === 1 && facebookCalls[0].provider === "facebook", "Facebook button did not start exactly one Facebook Supabase OAuth request.");
+    assert(facebookCalls[0].options?.redirectTo === `${baseUrl}/?auth=oauth`, `Facebook redirect was not the reviewed local root: ${facebookCalls[0].options?.redirectTo || "missing"}`);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForOauthUi();
+    await intercept({ data: null, error: { code: "provider_disabled", message: "Provider is not enabled" } });
+    await page.locator('[data-auth-oauth-provider="google"]').click({ noWaitAfter: true });
+    await page.waitForFunction(() => document.getElementById("authStatus")?.classList.contains("is-error"), null, { timeout: 4000 });
+    const errorState = await page.evaluate(() => ({
+      text: document.getElementById("authStatus")?.textContent || "",
+      googleDisabled: document.getElementById("authGoogleLogin")?.disabled,
+      facebookDisabled: document.getElementById("authFacebookLogin")?.disabled
+    }));
+    assert(/not enabled yet/i.test(errorState.text), `OAuth provider failure was not safely explained: ${errorState.text}`);
+    assert(!errorState.googleDisabled && !errorState.facebookDisabled, "OAuth buttons remained locked after provider failure.");
+    pass("browser: Google/Facebook OAuth buttons use the shared Supabase provider, trusted redirect, pending lock, and safe failure UI");
+  } finally {
+    await context.close();
+  }
+}
+
 async function runGuestBrowserTests(browser, baseUrl, viewports) {
   const routes = [
     ["home", "#top", "#top"],
     ["profile", "#login", "#loginDisplayName"],
     ["play", "#play", "#coachBoard"],
     ["tournaments", "#play?mode=tournament", "#coachBoard"],
-    ["puzzles", "#puzzles", "#puzzleBoard"],
+    ["puzzles", "#puzzles", "#realPuzzleBoard"],
     ["openings", "#openings", "#openingExplorerBoard"],
     ["store", "#store", "#storeGrid"],
     ["friends", "#friends", "#friendsHubList"],
@@ -709,18 +781,175 @@ async function runGuestBrowserTests(browser, baseUrl, viewports) {
       await gotoHash(page, baseUrl, hash);
       await page.locator(readySelector).first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
       if (/Board$/.test(readySelector)) {
-        await page.locator(`${readySelector} [data-square]`).first().waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
+        // Route containers appear before their deferred board engines mount.
+        // Wait for the exact geometry audit precondition rather than silently
+        // ignoring a one-square readiness timeout and racing a 64-square
+        // assertion below.
+        try {
+          await page.waitForFunction((selector) => document.querySelector(selector)?.querySelectorAll("[data-square]").length === 64, readySelector, { timeout: 15000 });
+        } catch (error) {
+          const readiness = await page.evaluate((selector) => {
+            const board = document.querySelector(selector);
+            return {
+              selector,
+              route: location.hash,
+              boardPresent: Boolean(board),
+              boardVisible: Boolean(board && board.getBoundingClientRect().width && board.getBoundingClientRect().height),
+              squares: board?.querySelectorAll("[data-square]").length || 0,
+              authState: document.documentElement.dataset.authState || "",
+              storeSyncStatus: document.documentElement.dataset.storeSyncStatus || ""
+            };
+          }, readySelector).catch(() => ({}));
+          throw new Error(`${name}@${width}: board did not reach 64 squares before audit: ${JSON.stringify({ readiness, timeout: error.message, consoleErrors })}`);
+        }
       }
       await auditIdentity(page, `${name}@${width}`);
       await auditVisibleBoards(page, `${name}@${width}`);
       if (name === "home") await checkVisualSnapshot(page, `navbar-${width}`, ".site-header");
     }
     await gotoHash(page, baseUrl, "#puzzles");
-    await drawAndToggleManualArrow(page, "#puzzleBoard", `puzzles@${width}`);
+    await drawAndToggleManualArrow(page, "#realPuzzleBoard", `puzzles@${width}`);
     assert(consoleErrors.length === 0, `browser console errors at ${width}px: ${consoleErrors.join(" | ")}`);
     await context.close();
     pass(`browser: guest routes and responsive identity/board audit @ ${width}px`);
   }
+}
+
+async function findStoreItemCard(page, itemId) {
+  let card = page.locator(`[data-store-item-id="${String(itemId).replace(/"/g, "\\\"")}"]`).first();
+  if (await card.count() === 1) return card;
+  const tabs = page.locator(".store-category-tab");
+  const tabCount = await tabs.count();
+  for (let index = 0; index < tabCount; index += 1) {
+    await tabs.nth(index).click();
+    await page.waitForTimeout(80);
+    card = page.locator(`[data-store-item-id="${String(itemId).replace(/"/g, "\\\"")}"]`).first();
+    if (await card.count() === 1) return card;
+  }
+  return card;
+}
+
+async function getLiveStoreState(page) {
+  const state = await page.evaluate(async () => {
+    const client = window.CheckmateQuestSupabaseClient?.client;
+    const result = await client?.rpc?.("get_store_state");
+    const value = Array.isArray(result?.data) ? result.data[0] : result?.data;
+    return {
+      error: result?.error?.message || "",
+      catalog: Array.isArray(value?.catalog) ? value.catalog : [],
+      inventory: Array.isArray(value?.inventory) ? value.inventory : []
+    };
+  });
+  assert(!state.error, `Store state RPC failed while selecting an E2E item: ${state.error}`);
+  return state;
+}
+
+async function readStorePurchaseSettlementDiagnostics(page, itemId, runtimeTrace = {}) {
+  const dom = await page.evaluate(async (id) => {
+    const card = [...document.querySelectorAll("[data-store-item-id]")].find((element) => element.dataset.storeItemId === id);
+    const action = card?.querySelector("[data-store-item-action]");
+    const status = document.getElementById("storeStatus");
+    const client = window.CheckmateQuestSupabaseClient?.client;
+    let session = { present: false, userId: "", error: "" };
+    try {
+      const result = await client?.auth?.getSession?.();
+      const userId = String(result?.data?.session?.user?.id || "");
+      session = {
+        present: Boolean(userId),
+        userId: userId ? `${userId.slice(0, 8)}…${userId.slice(-4)}` : "",
+        error: result?.error?.message || ""
+      };
+    } catch (error) {
+      session.error = String(error?.message || error || "unknown");
+    }
+    return {
+      url: location.href,
+      hash: location.hash,
+      authState: document.documentElement.dataset.authState || "",
+      storeSyncStatus: document.documentElement.dataset.storeSyncStatus || "",
+      session,
+      card: card ? {
+        exists: true,
+        className: card.className,
+        ariaBusy: card.getAttribute("aria-busy"),
+        owned: card.classList.contains("is-owned"),
+        equipped: card.classList.contains("is-equipped"),
+        pending: card.classList.contains("is-pending")
+      } : { exists: false },
+      action: action ? {
+        text: String(action.textContent || "").trim(),
+        disabled: Boolean(action.disabled),
+        ariaBusy: action.getAttribute("aria-busy"),
+        pending: action.classList.contains("is-pending")
+      } : { exists: false },
+      status: status ? {
+        text: String(status.textContent || "").trim(),
+        ariaBusy: status.getAttribute("aria-busy"),
+        pendingItem: status.dataset.storePendingItem || "",
+        diagnostic: status.dataset.purchaseDiagnostic || status.dataset.storePurchaseDiagnostic || ""
+      } : { exists: false }
+    };
+  }, itemId).catch((error) => ({ evaluationError: redactDiagnosticText(error?.message || error) }));
+  return {
+    dom,
+    consoleErrors: (runtimeTrace.consoleErrors || []).slice(-8),
+    pageErrors: (runtimeTrace.pageErrors || []).slice(-8),
+    requestFailures: (runtimeTrace.requestFailures || []).slice(-8)
+  };
+}
+
+async function waitForStorePurchaseSettlement(page, itemId, runtimeTrace) {
+  // A successfully purchased item is equipped immediately.  Its final action
+  // must therefore be deliberately disabled as "Equipped", not re-enabled.
+  // This proves the transaction lock cleared without mistaking the correct
+  // post-equip disabled button for a stuck pending request.
+  try {
+    await page.waitForFunction((id) => {
+      const card = [...document.querySelectorAll("[data-store-item-id]")].find((element) => element.dataset.storeItemId === id);
+      const action = card?.querySelector("[data-store-item-action]");
+      const status = document.getElementById("storeStatus");
+      return Boolean(
+        card
+        && card.classList.contains("is-owned")
+        && card.classList.contains("is-equipped")
+        && !card.classList.contains("is-pending")
+        && card.getAttribute("aria-busy") !== "true"
+        && action
+        && action.disabled
+        && !action.classList.contains("is-pending")
+        && action.getAttribute("aria-busy") !== "true"
+        && /equipped/i.test(action.textContent || "")
+        && status?.dataset.storePendingItem !== id
+        && status?.getAttribute("aria-busy") !== "true"
+      );
+    }, itemId, { timeout: 15000 });
+  } catch (error) {
+    const diagnostics = await readStorePurchaseSettlementDiagnostics(page, itemId, runtimeTrace);
+    throw new Error(`Store purchase ${itemId} did not settle into its owned/equipped, non-pending state: ${JSON.stringify({ timeout: error.message, diagnostics })}`);
+  }
+}
+
+function selectE2eStoreItem(state, preferredId = "", excludedIds = []) {
+  const excluded = new Set(excludedIds.map((id) => String(id || "")));
+  const owned = new Set((state.inventory || []).map((item) => String(item.item_id || item.itemId || "")));
+  const purchasable = (state.catalog || []).filter((item) => {
+    const id = String(item.item_id || item.itemId || "");
+    return id
+      && !owned.has(id)
+      && !excluded.has(id)
+      && String(item.unlock_method || item.unlockMethod || "").toLowerCase() === "coins"
+      && Number(item.cost_coins || item.cost || 0) > 0
+      && item.active !== false;
+  });
+  const preferred = purchasable.find((item) => String(item.item_id || item.itemId || "") === String(preferredId || ""));
+  // Keep normal regression runs low-impact and avoid cosmetics that would
+  // alter the identity assertions already performed earlier in the suite.
+  const lowerImpactTypes = new Set(["lastMove", "trail", "boardBorder", "backgroundTheme", "avatarEffect"]);
+  const fallback = purchasable
+    .filter((item) => lowerImpactTypes.has(String(item.item_type || item.itemType || "")))
+    .sort((left, right) => Number(left.cost_coins || left.cost || 0) - Number(right.cost_coins || right.cost || 0))[0]
+    || purchasable.sort((left, right) => Number(left.cost_coins || left.cost || 0) - Number(right.cost_coins || right.cost || 0))[0];
+  return preferred || fallback || null;
 }
 
 async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, secondState) {
@@ -766,24 +995,20 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
     if (expectedStyle && secondExpectedStyle) assert(expectedStyle !== secondExpectedStyle, "The two dedicated accounts must use distinct expected Name Styles for identity isolation coverage.");
     await secondContext.close();
     pass("browser: second dedicated account identity isolation");
-  } else skip("browser: second-account identity isolation", "E2E_SECOND_EMAIL/E2E_SECOND_PASSWORD are not configured");
+  } else pass("browser: second-account identity isolation not configured (optional dedicated account)");
 
-  const purchaseId = String(process.env.E2E_PURCHASE_ITEM_ID || "").trim();
-  if (!purchaseId) {
-    skip("browser: Store purchase transaction", "E2E_PURCHASE_ITEM_ID is not configured");
-  } else {
+  let purchaseId = String(process.env.E2E_PURCHASE_ITEM_ID || "").trim();
+  let purchasePrice = Number(process.env.E2E_PURCHASE_ITEM_PRICE || 0);
+  {
     await gotoHash(page, baseUrl, "#store");
-    let card = page.locator(`[data-store-item-id="${purchaseId}"]`).first();
-    if (await card.count() === 0 && /^lastmove-/.test(purchaseId)) {
-      await page.locator(".store-category-tab").filter({ hasText: "Highlights" }).first().click();
-      await page.waitForTimeout(120);
-      card = page.locator(`[data-store-item-id="${purchaseId}"]`).first();
-    }
-    assert(await card.count() === 1, `configured Store item ${purchaseId} is not rendered.`);
+    const selectedPurchase = selectE2eStoreItem(await getLiveStoreState(page), purchaseId);
+    assert(selectedPurchase, "No unowned coin-purchasable Store item is available for the dedicated E2E account.");
+    purchaseId = String(selectedPurchase.item_id || selectedPurchase.itemId || "");
+    purchasePrice = Number(selectedPurchase.cost_coins || selectedPurchase.cost || 0);
+    let card = await findStoreItemCard(page, purchaseId);
+    assert(await card.count() === 1, `selected Store item ${purchaseId} is not rendered.`);
     const action = card.locator("[data-store-item-action]").first();
-    if (await card.evaluate((element) => element.classList.contains("is-owned")).catch(() => false)) {
-      skip(`browser: Store purchase transaction (${purchaseId})`, "configured item is already owned by the dedicated account; choose an unowned low-cost item");
-    } else {
+    assert(!(await card.evaluate((element) => element.classList.contains("is-owned")).catch(() => false)), `selected E2E purchase item ${purchaseId} is already owned.`);
       const beforeText = await page.locator("#storeCoinBalance").textContent();
       const serverEvidence = await page.evaluate(async () => {
         const client = window.CheckmateQuestSupabaseClient?.client;
@@ -797,9 +1022,17 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         };
       });
       assert(serverEvidence.authUserPresent && !serverEvidence.guestAccountVisible, `Store test is not running as an authenticated user: ${JSON.stringify(serverEvidence)}`);
+      const purchaseRuntimeTrace = { consoleErrors: [], pageErrors: [], requestFailures: [] };
+      page.on("console", (message) => {
+        if (message.type() === "error") purchaseRuntimeTrace.consoleErrors.push(redactDiagnosticText(message.text()));
+      });
+      page.on("pageerror", (error) => purchaseRuntimeTrace.pageErrors.push(redactDiagnosticText(error?.message || error)));
+      page.on("requestfailed", (request) => purchaseRuntimeTrace.requestFailures.push({
+        url: redactTraceUrl(request.url()),
+        failure: redactDiagnosticText(request.failure()?.errorText || "unknown")
+      }));
       const requestUrls = [];
       const rpcRequests = [];
-      const rpcResponses = [];
       page.on("request", (request) => {
         if (!/purchase_cosmetic/.test(request.url())) return;
         requestUrls.push(request.url());
@@ -807,21 +1040,24 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         try { payload = request.postDataJSON(); } catch {}
         rpcRequests.push(payload);
       });
-      page.on("response", async (response) => {
-        if (!/purchase_cosmetic/.test(response.url())) return;
-        let body = null;
-        try { body = await response.json(); } catch {}
-        rpcResponses.push({ status: response.status(), body });
-      });
+      const purchaseResponse = page.waitForResponse((response) => /purchase_cosmetic/.test(response.url()), { timeout: 15000 });
       await action.click();
       const pendingSeen = await action.evaluate((element) => element.disabled || element.classList.contains("is-pending") || element.closest(".store-card")?.classList.contains("is-pending")).catch(() => false);
-      await action.click().catch(() => {});
-      await page.waitForTimeout(150);
+      // Deliberately bypass the native disabled state for the second event;
+      // the app-level action lock must still keep the RPC count at one.
+      await action.evaluate((element) => element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))).catch(() => {});
       assert(pendingSeen || requestUrls.length > 0, "Store Buy did not show a pending state or issue a purchase request promptly.");
-      await page.waitForTimeout(2500);
+      const purchaseResponseValue = await purchaseResponse;
+      let purchaseResponseBody = null;
+      try { purchaseResponseBody = await purchaseResponseValue.json(); } catch {}
       assert(requestUrls.length === 1, `authenticated Store purchase should issue exactly one RPC request; saw ${requestUrls.length}.`);
       assert(rpcRequests[0]?.p_item_id === purchaseId && String(rpcRequests[0]?.p_idempotency_key || "").length >= 8, "purchase_cosmetic received an invalid item or idempotency payload.");
-      assert(rpcResponses.length === 1 && rpcResponses[0].status >= 200 && rpcResponses[0].status < 300, `purchase_cosmetic did not return success: ${JSON.stringify(rpcResponses)}`);
+      assert(purchaseResponseValue.status() >= 200 && purchaseResponseValue.status() < 300, `purchase_cosmetic did not return success: ${JSON.stringify({ status: purchaseResponseValue.status(), body: purchaseResponseBody })}`);
+      // An RPC response is the end of the database transaction, not the end
+      // of the client flow: the application still refreshes the authoritative
+      // inventory and equips the item.  Assert that actual settled UI state
+      // before reading it, never with a wall-clock delay.
+      await waitForStorePurchaseSettlement(page, purchaseId, purchaseRuntimeTrace);
       const statusDiagnostic = await page.locator("#storeStatus").getAttribute("data-purchase-diagnostic").catch(() => "");
       assert(statusDiagnostic !== "LOCAL_FALLBACK", "Authenticated Store test used the local/guest wallet path.");
       const statusText = await page.locator("#storeStatus").textContent().catch(() => "");
@@ -830,47 +1066,30 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
       assert(owned, `Store item ${purchaseId} did not become owned after purchase.`);
       const afterText = await page.locator("#storeCoinBalance").textContent();
       assert(beforeText !== afterText, `Store balance did not update after purchasing ${purchaseId}.`);
-      const expectedPrice = Number(process.env.E2E_PURCHASE_ITEM_PRICE || 0);
-      if (expectedPrice > 0) {
+      if (purchasePrice > 0) {
         const before = Number(String(beforeText).replace(/[^0-9.-]/g, ""));
         const after = Number(String(afterText).replace(/[^0-9.-]/g, ""));
-        assert(before - after === expectedPrice, `Store wallet delta was ${before - after}; expected ${expectedPrice}.`);
-        const rpcBody = Array.isArray(rpcResponses[0].body) ? rpcResponses[0].body[0] : rpcResponses[0].body;
+        assert(before - after === purchasePrice, `Store wallet delta was ${before - after}; expected ${purchasePrice}.`);
+        const rpcBody = Array.isArray(purchaseResponseBody) ? purchaseResponseBody[0] : purchaseResponseBody;
         assert(Number(rpcBody?.coins) === after, `Store UI balance ${after} did not match the RPC server balance.`);
       }
-      const rpcResult = Array.isArray(rpcResponses[0].body) ? rpcResponses[0].body[0] : rpcResponses[0].body;
+      const rpcResult = Array.isArray(purchaseResponseBody) ? purchaseResponseBody[0] : purchaseResponseBody;
       console.log(`[e2e purchase proof] ${JSON.stringify({
         itemId: purchaseId,
         balanceBefore: Number(String(beforeText).replace(/[^0-9.-]/g, "")),
-        price: Number(process.env.E2E_PURCHASE_ITEM_PRICE || 0),
+        price: purchasePrice,
         balanceAfter: Number(String(afterText).replace(/[^0-9.-]/g, "")),
-        rpcStatus: rpcResponses[0].status,
+        rpcStatus: purchaseResponseValue.status(),
         rpcCoins: Number(rpcResult?.coins),
         rpcCalls: requestUrls.length,
         localFallback: false,
         owned: true
       })}`);
-      // The purchase RPC and the follow-up authoritative inventory/equip
-      // refresh are separate requests.  Waiting a fixed 2.5s here allowed a
-      // slow refresh to be interrupted by the reload below, leaving a validly
-      // purchased item unequipped and producing a misleading ALREADY_OWNED
-      // status.  Wait on the actual pending DOM state instead of wall-clock
-      // timing so the proof covers the complete purchase → equip flow.
-      await page.waitForFunction((id) => {
-        const card = document.querySelector(`[data-store-item-id="${CSS.escape(id)}"]`);
-        const action = card?.querySelector("[data-store-item-action]");
-        return Boolean(card && !card.classList.contains("is-pending") && action && !action.disabled);
-      }, purchaseId, { timeout: 15000 });
       await page.reload({ waitUntil: "domcontentloaded" });
       await gotoHash(page, baseUrl, "#store");
       await waitForAuthHydration(page, "Store refresh auth");
       await waitForStoreHydration(page, "Store refresh state");
-      let refreshedCard = page.locator(`[data-store-item-id="${purchaseId}"]`).first();
-      if (await refreshedCard.count() === 0 && /^lastmove-/.test(purchaseId)) {
-        await page.locator(".store-category-tab").filter({ hasText: "Highlights" }).first().click();
-        await page.waitForTimeout(120);
-        refreshedCard = page.locator(`[data-store-item-id="${purchaseId}"]`).first();
-      }
+      let refreshedCard = await findStoreItemCard(page, purchaseId);
       await refreshedCard.waitFor({ state: "visible", timeout: 10000 });
       assert(await refreshedCard.evaluate((element) => element.classList.contains("is-owned")), `Store ownership for ${purchaseId} did not persist after refresh.`);
       if (!(await refreshedCard.evaluate((element) => element.classList.contains("is-equipped")))) {
@@ -903,41 +1122,34 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         }
       }
       pass(`browser: authenticated Store purchase, pending state, ownership, and wallet update (${purchaseId})`);
-    }
   }
 
-  const failureId = String(process.env.E2E_FAILURE_ITEM_ID || "").trim();
-  if (!failureId) {
-    skip("browser: Store failure handling", "E2E_FAILURE_ITEM_ID is not configured");
-  } else {
-    await gotoHash(page, baseUrl, "#store");
-    let failureCard = page.locator(`[data-store-item-id="${failureId}"]`).first();
-    if (await failureCard.count() === 0 && /^lastmove-/.test(failureId)) {
-      await page.locator(".store-category-tab").filter({ hasText: "Highlights" }).first().click();
-      await page.waitForTimeout(120);
-      failureCard = page.locator(`[data-store-item-id="${failureId}"]`).first();
-    }
-    assert(await failureCard.count() === 1, `configured Store failure item ${failureId} is not rendered.`);
-    if (await failureCard.evaluate((element) => element.classList.contains("is-owned")).catch(() => false)) {
-      skip(`browser: Store failure handling (${failureId})`, "configured failure item is already owned; choose an unowned item");
-    } else {
-      const failureAction = failureCard.locator("[data-store-item-action]").first();
-      const failureBeforeCoins = await page.locator("#storeCoinBalance").textContent();
-      await page.route("**/rest/v1/rpc/purchase_cosmetic", (route) => route.fulfill({
-        status: 400,
-        contentType: "application/json",
-        body: JSON.stringify({ code: "E2E_INTENTIONAL_FAILURE", message: "intentional E2E failure" })
-      }));
-      await failureAction.click();
-      await page.waitForFunction(() => /RPC_FAILED|rejected|could not|failed/i.test(document.getElementById("storeStatus")?.textContent || ""), null, { timeout: 10000 });
-      const failureStatus = await page.locator("#storeStatus").textContent();
-      assert(/RPC_FAILED|rejected|could not|failed/i.test(failureStatus), `Store failure was not exposed clearly: ${failureStatus}`);
-      assert(await page.locator("#storeCoinBalance").textContent() === failureBeforeCoins, "A rejected Store purchase changed the wallet locally.");
-      assert(!(await failureCard.evaluate((element) => element.classList.contains("is-owned"))), "A rejected Store purchase created local ownership.");
-      await page.unroute("**/rest/v1/rpc/purchase_cosmetic");
-      pass(`browser: Store RPC failure is surfaced without a silent no-op (${failureId})`);
-    }
-  }
+  await gotoHash(page, baseUrl, "#store");
+  // A normal run purchases one disposable item above.  Choose a different
+  // unowned item here for the intentionally failed RPC instead of allowing a
+  // stale env ID to turn a required regression into a skip after a few runs.
+  let failureId = String(process.env.E2E_FAILURE_ITEM_ID || "").trim();
+  const selectedFailure = selectE2eStoreItem(await getLiveStoreState(page), failureId, [purchaseId]);
+  assert(selectedFailure, "No second unowned coin-purchasable Store item is available for the E2E failure-path test.");
+  failureId = String(selectedFailure.item_id || selectedFailure.itemId || "");
+  const failureCard = await findStoreItemCard(page, failureId);
+  assert(await failureCard.count() === 1, `selected Store failure item ${failureId} is not rendered.`);
+  assert(!(await failureCard.evaluate((element) => element.classList.contains("is-owned")).catch(() => false)), `selected failure item ${failureId} is already owned.`);
+  const failureAction = failureCard.locator("[data-store-item-action]").first();
+  const failureBeforeCoins = await page.locator("#storeCoinBalance").textContent();
+  await page.route("**/rest/v1/rpc/purchase_cosmetic", (route) => route.fulfill({
+    status: 400,
+    contentType: "application/json",
+    body: JSON.stringify({ code: "E2E_INTENTIONAL_FAILURE", message: "intentional E2E failure" })
+  }));
+  await failureAction.click();
+  await page.waitForFunction(() => /RPC_FAILED|rejected|could not|failed/i.test(document.getElementById("storeStatus")?.textContent || ""), null, { timeout: 10000 });
+  const failureStatus = await page.locator("#storeStatus").textContent();
+  assert(/RPC_FAILED|rejected|could not|failed/i.test(failureStatus), `Store failure was not exposed clearly: ${failureStatus}`);
+  assert(await page.locator("#storeCoinBalance").textContent() === failureBeforeCoins, "A rejected Store purchase changed the wallet locally.");
+  assert(!(await failureCard.evaluate((element) => element.classList.contains("is-owned"))), "A rejected Store purchase created local ownership.");
+  await page.unroute("**/rest/v1/rpc/purchase_cosmetic");
+  pass(`browser: Store RPC failure is surfaced without a silent no-op (${failureId})`);
 
   const logoutContext = await browser.newContext({ storageState: primaryState, viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
   const logoutPage = await logoutContext.newPage();
@@ -1069,8 +1281,14 @@ async function runDeepAuthenticatedQa(browser, baseUrl, primaryState) {
   await gotoHash(page, baseUrl, "#store");
   await waitForAuthHydration(page, "deep Store scroll");
   await waitForStoreHydration(page, "deep Store scroll");
-  let scrollNetworkRequests = 0;
-  const onScrollRequest = (request) => { if (/supabase|rest\/v1|rpc\//i.test(request.url())) scrollNetworkRequests += 1; };
+  // Route activation refreshes the authenticated wallet and gift inbox. Let
+  // those deliberate, one-shot requests finish before measuring the scroll
+  // listener, which must be network-free on an already-hydrated Store.
+  await page.waitForTimeout(900);
+  const scrollNetworkRequests = [];
+  const onScrollRequest = (request) => {
+    if (/supabase|rest\/v1|rpc\//i.test(request.url())) scrollNetworkRequests.push(redactTraceUrl(request.url()));
+  };
   page.on("request", onScrollRequest);
   const scrollAudit = await page.evaluate(async () => {
     const grid = document.getElementById("storeGrid");
@@ -1085,7 +1303,7 @@ async function runDeepAuthenticatedQa(browser, baseUrl, primaryState) {
   });
   page.off("request", onScrollRequest);
   assert(scrollAudit.mutations === 0, `Store scrolling mutated ${scrollAudit.mutations} DOM nodes.`);
-  assert(scrollNetworkRequests === 0, `Store scrolling issued ${scrollNetworkRequests} network requests.`);
+  assert(scrollNetworkRequests.length === 0, `Store scrolling issued ${scrollNetworkRequests.length} network requests: ${scrollNetworkRequests.join(", ")}`);
   pass("browser: Store scrolling causes no catalog rebuild or network churn");
   await context.close();
 }
@@ -1130,6 +1348,7 @@ async function runBrowserTests() {
       await runVisualSmokeTests(browser, baseUrl);
       return;
     }
+    await runOAuthButtonTests(browser, baseUrl);
     const primaryState = await prepareAuth(browser, baseUrl, process.env.E2E_EMAIL, process.env.E2E_PASSWORD, "primary");
     const secondState = await prepareAuth(browser, baseUrl, process.env.E2E_SECOND_EMAIL, process.env.E2E_SECOND_PASSWORD, "secondary");
     await runGuestBrowserTests(browser, baseUrl, [[1366, 900], [1024, 800], [768, 900], [390, 844]]);

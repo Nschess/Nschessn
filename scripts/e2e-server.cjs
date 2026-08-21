@@ -48,7 +48,11 @@ const server = http.createServer((request, response) => {
       });
       return;
     }
-    sendJson(response, 200, { url: config.url, anonKey: config.anonKey });
+    sendJson(response, 200, {
+      url: config.url,
+      anonKey: config.anonKey,
+      authRedirectOrigins: [`http://127.0.0.1:${port}`]
+    });
     return;
   }
   const filePath = safePath(request.url);
