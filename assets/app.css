@@ -35449,11 +35449,9 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-profile-fie
 }
 
 body:not(.name-effects-off) .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username:not(.name-style-classic),
-body.perf-lite .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username:not(.name-style-classic),
 body:not(.name-effects-off) .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username:not(.name-style-classic),
-body.perf-lite .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username:not(.name-style-classic),
 body:not(.name-effects-off) .site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username:not(.name-style-classic),
-body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username:not(.name-style-classic) {
+body:not(.name-effects-off) .site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username:not(.name-style-classic) {
   /* Use the same gradient and live text treatment as Player Pass/Profile.
      The compact variant only reduces the footprint; it does not flatten the
      equipped cosmetic into a solid fallback colour. */
@@ -35467,11 +35465,21 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
   -webkit-text-fill-color: var(--name-color, transparent) !important;
   font-weight: var(--name-font-weight, 1000) !important;
   letter-spacing: var(--name-letter-spacing, 0) !important;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--name-glow) 54%, transparent)) !important;
+  filter: var(--name-filter, none) !important;
   text-shadow: var(--name-shadow, none) !important;
-  /* Compact identities use the same static text treatment as the shared
-     renderer.  Do not introduce a navbar-only animation that makes the same
-     equipped style diverge from Profile/Player Pass. */
+  /* Compact identities use the same resolved text treatment as the shared
+     renderer.  Only the footprint is smaller; the equipped style's own
+     animation/filter tokens remain authoritative. */
+  animation: var(--name-animation, none) !important;
+}
+
+/* Performance-lite keeps the equipped silhouette and gradient, but removes
+   the animated/filter work.  Reduced motion follows the shared static path
+   below rather than inventing a separate navbar skin. */
+body.perf-lite .site-header .nav-utilities .player-flex-name.player-identity-line[data-identity-variant="compact"] > .styled-username:not(.name-style-classic),
+body.perf-lite .site-header .nav-utilities .player-flex-name > [data-profile-field="name"].styled-username:not(.name-style-classic),
+body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-identity-name].styled-username:not(.name-style-classic) {
+  filter: none !important;
   animation: none !important;
 }
 
@@ -38082,7 +38090,7 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
   text-overflow: ellipsis;
   white-space: nowrap;
   text-shadow: var(--name-shadow, none) !important;
-  animation: nameGradientFlow 4.6s linear infinite !important;
+  animation: var(--name-animation, none) !important;
 }
 
 .player-identity-line .styled-username:not(.name-style-classic),
@@ -38095,7 +38103,7 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
   -webkit-background-clip: text !important;
   color: var(--name-color, transparent) !important;
   -webkit-text-fill-color: var(--name-color, transparent) !important;
-  filter: none !important;
+  filter: var(--name-filter, none) !important;
 }
 
 .player-identity-line .styled-username.name-style-classic,
@@ -38120,5 +38128,24 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
 body:is(.reduced-motion, .low-performance, .perf-lite, .name-effects-off) .player-identity-line .styled-username,
 body:is(.reduced-motion, .low-performance, .perf-lite, .name-effects-off) .player-identity-line.styled-username,
 body:is(.reduced-motion, .low-performance, .perf-lite, .name-effects-off) .site-header .nav-utilities .player-flex-name.player-identity-line .styled-username {
+  animation: none !important;
+}
+
+body:is(.low-performance, .perf-lite, .name-effects-off) .player-identity-line .styled-username,
+body:is(.low-performance, .perf-lite, .name-effects-off) .player-identity-line.styled-username,
+body:is(.low-performance, .perf-lite, .name-effects-off) .site-header .nav-utilities .player-flex-name.player-identity-line .styled-username {
+  filter: none !important;
+}
+
+body.name-effects-off .player-identity-line .styled-username:not(.name-style-classic),
+body.name-effects-off .player-identity-line.styled-username:not(.name-style-classic),
+body.name-effects-off .site-header .nav-utilities .player-flex-name.player-identity-line .styled-username:not(.name-style-classic) {
+  background-image: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+  color: var(--text) !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+  filter: none !important;
   animation: none !important;
 }
