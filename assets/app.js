@@ -26806,6 +26806,12 @@
       let supabaseLibraryPromise = null;
       let socialPresenceOwnChannel = null;
       let socialPresenceSubscriptions = new Map();
+      // Auth callbacks can outlive the sign-out request that superseded them
+      // (notably INITIAL_SESSION/profile hydration).  Every auth transition
+      // gets a generation so stale account resolution can never re-authenticate
+      // the UI after a successful logout.
+      let authGeneration = 0;
+      let signOutInFlight = null;
 
       const authDebug = (message, detail = {}) => {
         try {
@@ -26963,6 +26969,7 @@
       };
 
       const clearSession = () => {
+        authGeneration += 1;
         cachedAccount = null;
         stopSessionRefresh();
         clearSupabaseBrowserAuthStorage();
@@ -27016,10 +27023,11 @@
         headers: { Authorization: `Bearer ${accessToken}` }
       });
 
-      const accountFromSession = async (session) => {
+      const accountFromSession = async (session, generation = authGeneration) => {
         const accessToken = session?.access_token || session?.accessToken || "";
         const user = session?.user || await fetchUser(accessToken);
         const account = await getProfile(user, accessToken);
+        if (generation !== authGeneration) return null;
         cachedAccount = account;
         return account;
       };
@@ -27465,21 +27473,24 @@
         emailExists: async () => false,
         register: async ({ username, email, password }) => {
           const supabase = await getSupabaseClient();
+          const generation = ++authGeneration;
           startSessionRefresh(supabase);
           const { data: payload, error } = await supabase.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: await getAuthRedirectUrl() } });
           if (error) throw emailError(error);
           const user = payload?.user || null;
           if (!user || (Array.isArray(user.identities) && user.identities.length === 0)) throw new Error("That email already has a Player Pass.");
           const account = await getProfile(user);
-          if (payload.session) await accountFromSession(payload.session);
+          if (generation !== authGeneration) return null;
+          if (payload.session) await accountFromSession(payload.session, generation);
           return { ...account, requiresEmailConfirmation: !payload.session };
         },
         login: async ({ email, password }) => {
           const supabase = await getSupabaseClient();
+          const generation = ++authGeneration;
           startSessionRefresh(supabase);
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
-          return accountFromSession(data.session);
+          return accountFromSession(data.session, generation);
         },
         resetPassword: async (email) => {
           const supabase = await getSupabaseClient();
@@ -27492,27 +27503,42 @@
           if (error) throw emailError(error);
         },
         logout: async () => {
-          const supabase = await getSupabaseClient();
-          const { error } = await supabase.auth.signOut({ scope: "local" });
-          if (error) throw error;
-          stopSessionRefresh();
-          clearSession();
-          authDebug("Local logout completed");
+          if (signOutInFlight) return signOutInFlight;
+          signOutInFlight = (async () => {
+            const supabase = await getSupabaseClient();
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            // Invalidate every account hydration that was already in flight
+            // before clearing the Supabase session and browser auth storage.
+            clearSession();
+            authDebug("Local logout completed");
+          })();
+          try {
+            await signOutInFlight;
+          } finally {
+            signOutInFlight = null;
+          }
         },
         logoutAllDevices: async () => {
-          const supabase = await getSupabaseClient();
-          authDebug("Global logout requested");
-          const { error } = await supabase.auth.signOut({ scope: "global" });
-          if (error) {
-            authDebug("Global logout failed; securing this browser", { message: error.message || "unknown" });
-            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-            stopSessionRefresh();
+          if (signOutInFlight) return signOutInFlight;
+          signOutInFlight = (async () => {
+            const supabase = await getSupabaseClient();
+            authDebug("Global logout requested");
+            const { error } = await supabase.auth.signOut({ scope: "global" });
+            if (error) {
+              authDebug("Global logout failed; securing this browser", { message: error.message || "unknown" });
+              await supabase.auth.signOut().catch(() => {});
+              clearSession();
+              throw new Error("This browser was signed out, but other devices could not be revoked. Please try Logout All Devices again.");
+            }
             clearSession();
-            throw new Error("This browser was signed out, but other devices could not be revoked. Please try Logout All Devices again.");
+            authDebug("Global logout completed");
+          })();
+          try {
+            await signOutInFlight;
+          } finally {
+            signOutInFlight = null;
           }
-          stopSessionRefresh();
-          clearSession();
-          authDebug("Global logout completed");
         },
         deleteAccount: async () => {
           const supabase = await getSupabaseClient();
@@ -27563,16 +27589,19 @@
         },
         getSession: async () => {
           const supabase = await getSupabaseClient();
+          const generation = authGeneration;
           authDebug("getSession requested");
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
           authDebug("getSession resolved", { hasSession: Boolean(data.session), hasUser: Boolean(data.session?.user) });
-          return data.session ? accountFromSession(data.session) : null;
+          return data.session ? accountFromSession(data.session, generation) : null;
         },
         onAuthStateChange: async (callback) => {
           const supabase = await getSupabaseClient();
           const { data } = supabase.auth.onAuthStateChange((event, session) => {
+            const generation = authGeneration;
             window.setTimeout(async () => {
+              if (generation !== authGeneration) return;
               authDebug("Auth state changed", { event, hasSession: Boolean(session) });
               if (!session) {
                 clearSession();
@@ -27580,7 +27609,8 @@
                 return;
               }
               try {
-                const account = await accountFromSession(session);
+                const account = await accountFromSession(session, generation);
+                if (!account || generation !== authGeneration) return;
                 authDebug("Auth state account resolved", { hasUsername: Boolean(account?.username), hasEmail: Boolean(account?.email) });
                 callback(account, { status: "authenticated" });
               } catch (error) {
@@ -27886,12 +27916,16 @@
         const nextStatus = ["unknown", "error", "signed_out"].includes(status) ? status : "error";
         setStoreAuthState(nextStatus);
         cloudProfileReady = false;
+        window.clearTimeout(cloudProfileSyncTimer);
+        cloudProfileSyncTimer = 0;
+        cloudProfileSignature = "";
         serverPrivacyHydratedFor = "";
         serverBlockedUserIds = new Set();
         stopSocialNotificationRealtime();
         stopSocialActivityRealtime();
         stopMessagingRealtime();
         clearServerStoreState();
+        stopRealtimeMatchLifecycle();
         stopFriendPresence();
         stopFriendNetworkSync();
         stopTournamentNetworkSync();
@@ -28055,25 +28089,40 @@
         updateAuthEmailRetryUi("verify");
       };
 
-      const finishLocalLogout = async () => {
-        const provider = getAuthProvider();
-        if (!provider?.logout) throw new Error("Online account logout is unavailable.");
-        await provider.logout();
-        registerForm.reset();
-        loginForm.reset();
-        applyAuthenticatedAccount(null);
+      let logoutInFlight = null;
+      const setLogoutPending = (pending) => {
+        [panelLogoutButton, panelLogoutAllButton].forEach((button) => {
+          if (!button) return;
+          button.disabled = Boolean(pending);
+          button.setAttribute("aria-busy", String(Boolean(pending)));
+        });
+      };
+      const runLogout = (scope = "local") => {
+        if (logoutInFlight) return logoutInFlight;
+        logoutInFlight = (async () => {
+          const provider = getAuthProvider();
+          const method = scope === "global" ? provider?.logoutAllDevices : provider?.logout;
+          if (!method) throw new Error("Online account logout is unavailable.");
+          setLogoutPending(true);
+          try {
+            await method();
+            registerForm.reset();
+            loginForm.reset();
+            applyAuthenticatedAccount(null);
+            if (scope === "global") {
+              location.hash = "#login";
+              window.requestAnimationFrame(() => document.getElementById("login")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            }
+          } finally {
+            setLogoutPending(false);
+          }
+        })();
+        logoutInFlight.finally(() => { logoutInFlight = null; }).catch(() => {});
+        return logoutInFlight;
       };
 
-      const finishGlobalLogout = async () => {
-        const provider = getAuthProvider();
-        if (!provider?.logoutAllDevices) throw new Error("Online account logout is unavailable.");
-        await provider.logoutAllDevices();
-        registerForm.reset();
-        loginForm.reset();
-        applyAuthenticatedAccount(null);
-        location.hash = "#login";
-        window.requestAnimationFrame(() => document.getElementById("login")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-      };
+      const finishLocalLogout = () => runLogout("local");
+      const finishGlobalLogout = () => runLogout("global");
 
       const authPrefs = readJsonStorage(authPreferencesStorageKey, { rememberEmail: "" });
       if (authPrefs.rememberEmail && loginEmail) {
@@ -28129,6 +28178,10 @@
               password: result.password,
               progress: getAuthProgressSnapshot(accountDates)
             });
+            if (!onlineAccount) {
+              setAuthMessage("Account creation was interrupted. Please try again.", "error");
+              return;
+            }
             if (onlineAccount.requiresEmailConfirmation) {
               writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), rememberEmail: result.email });
               registerForm.reset();
@@ -28429,8 +28482,13 @@
     }
 
     function activateSupabaseProfile(account) {
-      applySupabaseProfileData(account);
+      const appliedRemoteProfile = applySupabaseProfileData(account);
       cloudProfileReady = true;
+      // Hydrating an unchanged server profile should not immediately enqueue
+      // a redundant PATCH.  Apart from wasted traffic, that late write could
+      // race a freshly mounted route.  Local-newer data still keeps the empty
+      // signature and is persisted by the normal autosave path.
+      if (appliedRemoteProfile) cloudProfileSignature = JSON.stringify(getCloudProfilePayload());
       queueSupabaseProfileSync();
     }
 
@@ -28442,7 +28500,11 @@
       if (serverProfileRefreshPromise) return serverProfileRefreshPromise;
       serverProfileRefreshPromise = Promise.resolve(provider.getSession())
         .then((account) => {
-          if (!account) return null;
+          // A session can resolve just before sign-out.  Do not let that
+          // already-started refresh re-apply profile data after the auth
+          // provider has cleared its cached account.
+          const currentAccount = provider.getCachedAccount?.() || null;
+          if (!account || !currentAccount || String(currentAccount.authUserId || currentAccount.publicId || "") !== String(account.authUserId || account.publicId || "")) return null;
           applySupabaseProfileData(account, { preferRemote: true });
           cloudProfileSignature = "";
           renderLearnerProfile();

@@ -8,7 +8,7 @@
 - [ ] Run `node scripts/check-deploy-assets.js dist`.
 - [ ] Run `node scripts/multiplayer-regression.js`.
 - [ ] Run `git diff --check`.
-- [ ] Confirm `review-v174-shared-name-style` is present in `index.html`, `assets/app.js`, and `service-worker.js`.
+- [ ] Confirm `review-v175-social-oauth` is present in `index.html`, `assets/app.js`, and `service-worker.js`.
 - [ ] Publish `dist/` (or the repository root for GitHub Pages) with `offline.html`, `site.webmanifest`, icons, piece assets, and `data/puzzles.json`.
 
 ## Supabase migrations

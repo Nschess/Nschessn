@@ -2,8 +2,8 @@
 
 ## Build
 
-- Asset version: `review-v174-shared-name-style`
-- Service-worker cache: `nschess-shell-v174-shared-name-style`
+- Asset version: `review-v175-social-oauth`
+- Service-worker cache: `nschess-shell-v175-social-oauth`
 
 ## Board interaction polish
 
@@ -17,7 +17,6 @@
 - Correct Puzzle moves no longer animate a destination overlay or disabled
   board surface; the shared arrow layer remains solution-independent and
   solution-revealing recommendation arrows are never generated.
-  is generated.
 - Premove is opt-in and applies only while waiting for a turn in an active
   live-human Quick Match or Friend Challenge; AI fallback never exposes it.
 - Queued premoves now have distinct violet FROM/TO board markers and a
