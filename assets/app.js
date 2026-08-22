@@ -3945,6 +3945,11 @@
     let streak = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.streak) || 0) : 0;
     let puzzleXp = Math.max(0, Number(savedPuzzleState.xp) || 0);
     let puzzleCoins = Math.max(0, Number(savedPuzzleState.coins) || 0);
+    // One application-level auth state drives every identity surface.  The
+    // Supabase provider owns the session, but renderers must never infer
+    // identity from stale profile/local-store data after sign-out.
+    let applicationAuthState = "loading";
+    let applicationAuthAccount = null;
     const localCoinGrantKey = "checkmateQuest.localCoinGrant.50000.v1";
     const storeDevelopmentMode = (() => {
       try {
@@ -7351,6 +7356,10 @@
     // contract.  A surface may scale the result, but it must not invent a
     // second navbar/profile cosmetic implementation.
     function getEquippedNameStyle() {
+      // A persisted cosmetic is not proof that a user is still signed in.
+      // During loading and after logout, use the neutral default until the
+      // single application auth state has resolved an authenticated account.
+      if (applicationAuthState !== "authenticated" || !applicationAuthAccount) return "classic";
       const prefs = readLearnerPrefs();
       return nameStyleThemes[prefs.nameStyle] ? prefs.nameStyle : "classic";
     }
@@ -10874,21 +10883,35 @@
     }
 
     function getDragonProfileSnapshot() {
-      const profile = readDragonProfile();
-      const prefs = readLearnerPrefs();
-      const learnerName = getPreferredPlayerName(profile);
-      const profileXp = Math.max(0, Number(profile.xp) || 0);
-      const xp = Math.max(profileXp, puzzleXp);
-      const tokens = Math.max(0, Number(puzzleCoins) || 0);
-      const profileStreak = Math.max(0, Number(profile.streak) || 0);
-      const dayStreak = Math.max(profileStreak, dailyHabit.streak);
+      const authenticated = applicationAuthState === "authenticated" && Boolean(applicationAuthAccount);
+      const profile = authenticated ? readDragonProfile() : {
+        name: "Guest Explorer",
+        level: "Level 1 Explorer",
+        rank: "Explorer",
+        streak: 0,
+        xp: 0,
+        tokens: 0,
+        missions: { puzzles: false, win: false, forks: false }
+      };
+      const savedPrefs = readLearnerPrefs();
+      const prefs = authenticated
+        ? savedPrefs
+        : { ...savedPrefs, avatar: "auto", avatarFrame: "", avatarEffect: "none", title: "" };
+      const learnerName = authenticated ? getPreferredPlayerName(profile) : "Guest Explorer";
+      const profileXp = authenticated ? Math.max(0, Number(profile.xp) || 0) : 0;
+      const xp = authenticated ? Math.max(profileXp, puzzleXp) : 0;
+      const tokens = authenticated ? Math.max(0, Number(puzzleCoins) || 0) : 0;
+      const profileStreak = authenticated ? Math.max(0, Number(profile.streak) || 0) : 0;
+      const dayStreak = authenticated ? Math.max(profileStreak, dailyHabit.streak) : 0;
       const levelState = getLearnerLevel(xp);
       const currentXp = levelState.current[1];
       const nextXpTarget = levelState.next?.[1] || Math.max(xp, currentXp + 1);
       const progressFill = levelState.next ? ((xp - currentXp) / (nextXpTarget - currentXp)) * 100 : 100;
-      const level = levelState.current[0];
+      const level = authenticated ? levelState.current[0] : "Level 1 Explorer";
       const avatar = getSelectedProfileAvatar(prefs, xp);
-      const rank = prefs.title || (xp >= 700 || gameStats.wins > 0 ? "Castle Defender" : solvedPuzzles.size >= 5 ? "Puzzle Defender" : "Explorer");
+      const rank = authenticated
+        ? (prefs.title || (xp >= 700 || gameStats.wins > 0 ? "Castle Defender" : solvedPuzzles.size >= 5 ? "Puzzle Defender" : "Explorer"))
+        : "Explorer";
       const progress = Math.round(Math.min(100, Math.max(0, progressFill)));
       const nextLevelXp = levelState.next ? Math.max(0, levelState.next[1] - xp) : 0;
       const missionState = {
@@ -12255,8 +12278,9 @@
       const shortLessonsDone = readShortLessonState().completed.length;
       const lessonCount = completedPathLessons.size + shortLessonsDone;
       const achievements = profile.achievements.filter((item) => item.unlocked).map((item) => item.label);
+      const authenticated = applicationAuthState === "authenticated" && Boolean(applicationAuthAccount);
       return {
-        username: learner.name || profile.name,
+        username: authenticated ? (learner.name || profile.name) : "Guest Explorer",
         avatar: { icon: profile.avatar, label: profile.avatarLabel },
         xp: profile.xp,
         level: profile.level,
@@ -26562,7 +26586,11 @@
     function renderLearnerProfile() {
       const profile = readLearnerProfile();
       const adventureProfile = renderPlayerProfile();
-      const name = String(profile.name || "").trim();
+      const authenticated = applicationAuthState === "authenticated" && Boolean(applicationAuthAccount);
+      // The local Player Pass cache may still contain the last online name;
+      // it is not an authority after logout.  Render the anonymous copy until
+      // the shared application auth state resolves a live account again.
+      const name = authenticated ? String(profile.name || "").trim() : "";
       const avatar = document.getElementById("loginAvatar");
       const displayName = document.getElementById("loginDisplayName");
       const displayMeta = document.getElementById("loginDisplayMeta");
@@ -27889,12 +27917,21 @@
       const accountPanel = document.getElementById("authAccountPanel");
       if (loadingPanel) loadingPanel.hidden = !loading;
       if (accountPanel) accountPanel.hidden = loading || !authenticated;
-      if (!authenticated) return;
-      const profile = account.profileData || {};
       const avatar = document.getElementById("authAccountAvatar");
       const name = document.getElementById("authAccountName");
       const title = document.getElementById("authAccountTitle");
       const email = document.getElementById("authAccountEmail");
+      if (!authenticated) {
+        if (avatar) avatar.textContent = String.fromCodePoint(0x2726);
+        if (name) {
+          name.textContent = "Guest Explorer";
+          applyNameStyleToTextElement(name, "classic", "Guest Explorer");
+        }
+        if (title) title.textContent = "Sign in to save progress";
+        if (email) email.textContent = "";
+        return;
+      }
+      const profile = account.profileData || {};
       const accountIdentity = getPlayerIdentityModel({ ...profile, name: account.username || "Chess Player", isPlayer: true }, { profile: getDragonProfileSnapshot(), isPlayer: true, variant: "compact" });
       if (avatar) applySharedAvatarElement(avatar, accountIdentity, { variant: "compact" });
       if (name) name.textContent = account.username || "Chess Player";
@@ -27914,6 +27951,8 @@
     function applyAuthenticatedAccount(account, { status = "signed_out" } = {}) {
       if (!account?.username) {
         const nextStatus = ["unknown", "error", "signed_out"].includes(status) ? status : "error";
+        applicationAuthState = nextStatus === "error" ? "error" : "guest";
+        applicationAuthAccount = null;
         setStoreAuthState(nextStatus);
         cloudProfileReady = false;
         window.clearTimeout(cloudProfileSyncTimer);
@@ -27929,10 +27968,19 @@
         stopFriendPresence();
         stopFriendNetworkSync();
         stopTournamentNetworkSync();
+        // The navbar and board/player cards are rendered outside the login
+        // panel.  Re-render them from the same anonymous state immediately;
+        // otherwise the panel can be logged out while the old chip remains.
+        renderLearnerProfile();
+        renderHomeDashboard();
+        renderInGamePlayerCard();
+        updateAiPlayerHeader();
         renderAuthUi(null, false);
         renderStore();
         return;
       }
+      applicationAuthState = "authenticated";
+      applicationAuthAccount = account;
       setStoreAuthState("authenticated", account.authUserId || account.publicId || "");
       activateSupabaseProfile(account);
       void refreshServerStoreState().catch(() => {});
@@ -27976,6 +28024,8 @@
       setStoreAuthState(provider?.getStoreState ? "unknown" : "signed_out");
       renderAuthUi(null, true);
       if (!provider?.getSession) {
+        applicationAuthState = "guest";
+        applicationAuthAccount = null;
         setStoreAuthState("signed_out");
         renderAuthUi(null, false);
         return;
@@ -27989,6 +28039,8 @@
         // guest/local Store wallet.
         applyAuthenticatedAccount(await provider.getSession(), { status: "signed_out" });
       } catch (error) {
+        applicationAuthState = "error";
+        applicationAuthAccount = null;
         setStoreAuthState("error");
         console.error("[Nschess Auth] Session initialization failed.", error);
         renderAuthUi(null, false);
