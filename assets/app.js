@@ -3950,6 +3950,9 @@
     // identity from stale profile/local-store data after sign-out.
     let applicationAuthState = "loading";
     let applicationAuthAccount = null;
+    function isApplicationAuthenticated() {
+      return applicationAuthState === "authenticated" && Boolean(applicationAuthAccount);
+    }
     const localCoinGrantKey = "checkmateQuest.localCoinGrant.50000.v1";
     const storeDevelopmentMode = (() => {
       try {
@@ -5764,11 +5767,13 @@
     }
 
     function getPuzzleAccuracy(fallback = 100) {
+      if (!isApplicationAuthenticated()) return 0;
       const misses = Math.max(puzzleFailed, puzzleAttempts);
       return puzzleCorrect + misses ? Math.round((puzzleCorrect / (puzzleCorrect + misses)) * 100) : fallback;
     }
 
     function getAdaptivePuzzleLevel() {
+      if (!isApplicationAuthenticated()) return "Beginner";
       const accuracy = getPuzzleAccuracy(0);
       if (accuracy >= 90 && streak >= 4 && solvedPuzzles.size >= 10) return "Advanced";
       if (accuracy >= 70 && streak >= 2 && solvedPuzzles.size >= 4) return "Intermediate";
@@ -5776,6 +5781,7 @@
     }
 
     function getAdaptiveNudge() {
+      if (!isApplicationAuthenticated()) return "Sign in to save puzzle progress and coaching insights.";
       const accuracy = getPuzzleAccuracy(100);
       if (puzzleMistakeCount >= 2 || (puzzleAttempts >= 3 && accuracy < 55)) {
         return "No pressure: use hints, slower replay, and Adaptive will pick easier puzzles.";
@@ -6317,24 +6323,29 @@
     }
 
     function updatePuzzleStats() {
+      const authenticated = isApplicationAuthenticated();
       const indexes = getActivePuzzleIndexes();
-      const solvedInPlan = indexes.filter((index) => solvedPuzzles.has(index)).length;
+      const solvedInPlan = authenticated ? indexes.filter((index) => solvedPuzzles.has(index)).length : 0;
       const total = indexes.length || puzzles.length;
       const currentPosition = Math.max(0, indexes.indexOf(currentPuzzle));
+      const visibleSolved = authenticated ? (activePuzzlePlan === "all" ? solvedPuzzles.size : solvedInPlan) : 0;
+      const visibleStreak = authenticated ? streak : 0;
+      const visibleFailed = authenticated ? puzzleFailed : 0;
+      const visibleBestStreak = authenticated ? bestPuzzleStreak : 0;
+      const visibleAverageTime = authenticated && puzzleSolveTimes.length ? puzzleSolveTimes.reduce((sum, value) => sum + value, 0) / puzzleSolveTimes.length : 0;
 
       document.getElementById("puzzleCounter").textContent = `${currentPosition + 1} / ${total}`;
-      document.getElementById("puzzleSolved").textContent = activePuzzlePlan === "all" ? solvedPuzzles.size : solvedInPlan;
-      document.getElementById("puzzleStreak").textContent = streak;
-      document.getElementById("puzzleFailed").textContent = puzzleFailed;
+      document.getElementById("puzzleSolved").textContent = visibleSolved;
+      document.getElementById("puzzleStreak").textContent = visibleStreak;
+      document.getElementById("puzzleFailed").textContent = visibleFailed;
       document.getElementById("puzzleAccuracyStat").textContent = `${getPuzzleAccuracy(0)}%`;
-      document.getElementById("puzzleBestStreak").textContent = bestPuzzleStreak;
-      const averageTime = puzzleSolveTimes.length ? puzzleSolveTimes.reduce((sum, value) => sum + value, 0) / puzzleSolveTimes.length : 0;
-      document.getElementById("puzzleAvgTime").textContent = formatPuzzleTime(averageTime);
-      document.getElementById("puzzleProgress").style.width = `${((activePuzzlePlan === "all" ? solvedPuzzles.size : solvedInPlan) / total) * 100}%`;
+      document.getElementById("puzzleBestStreak").textContent = visibleBestStreak;
+      document.getElementById("puzzleAvgTime").textContent = formatPuzzleTime(visibleAverageTime);
+      document.getElementById("puzzleProgress").style.width = `${(visibleSolved / total) * 100}%`;
       renderPuzzlePlanButtons();
       renderBeginnerProgress();
       renderHomeDashboard();
-      savePuzzleState();
+      if (authenticated) savePuzzleState();
     }
 
     function readPuzzleState() {
@@ -6391,7 +6402,7 @@
       }
     }
 
-    function savePuzzleState() {
+    function savePuzzleState({ skipCloudSync = false } = {}) {
       writeJsonStorage(puzzleStorageKey, {
         bankVersion: puzzleBankVersion,
         activePlan: activePuzzlePlan,
@@ -6427,7 +6438,7 @@
         bossBattles: bossBattleState,
         loginReward: savedPuzzleState.loginReward || { lastClaimDate: "", streak: 0, bestStreak: 0, lastReward: 0 }
       });
-      saveProgressSnapshot("puzzle progress");
+      saveProgressSnapshot("puzzle progress", { skipCloudSync });
       renderLeaderboards();
     }
 
@@ -6469,6 +6480,7 @@
     }
 
     function getCompletedGamesWithReviews() {
+      if (!isApplicationAuthenticated()) return [];
       const reviewedGames = matchReviews.map((review) => {
         const summary = review?.summary || {};
         const text = String(summary.result || "").toLowerCase();
@@ -6499,6 +6511,7 @@
     }
 
     function getMostReviewedOpening() {
+      if (!isApplicationAuthenticated()) return null;
       const counts = new Map();
       matchReviews.forEach((review) => {
         const opening = String(review?.summary?.opening || "").trim();
@@ -7146,7 +7159,9 @@
         // hydration so navbar/home surfaces cannot remain on a stale Classic
         // style when their local preference was already current.
         renderPlayerIdentityExtras(getDragonProfileSnapshot());
-        savePuzzleState();
+        // Store hydration mirrors authoritative inventory locally; it is not a
+        // player edit and must not enqueue a delayed profile PATCH.
+        savePuzzleState({ skipCloudSync: true });
         renderStoreSyncFeedback();
         if (rerender) {
           renderStore();
@@ -7364,6 +7379,40 @@
       return nameStyleThemes[prefs.nameStyle] ? prefs.nameStyle : "classic";
     }
 
+    // Name effects are resolved once here and consumed by every identity
+    // surface.  Compact surfaces may remove decorative pseudo-layers, but
+    // they must retain the same style-specific text motion and lift as the
+    // full Player Pass renderer.
+    function getNameStyleAnimation(styleValue = "classic") {
+      const animations = {
+        lime: "nameSoftGlow 3.8s ease-in-out infinite",
+        sky: "nameSoftGlow 3.8s ease-in-out infinite",
+        ruby: "nameSoftGlow 3.8s ease-in-out infinite",
+        royal: "nameTextRoyalGold 3.4s linear infinite",
+        gold: "nameTextRoyalGold 3.4s linear infinite",
+        violet: "nameSoftGlow 3.8s ease-in-out infinite",
+        fire: "nameTextFire 2.5s linear infinite",
+        ice: "nameTextIce 4s ease-in-out infinite",
+        lightning: "nameTextLightning 1.8s steps(3, end) infinite",
+        emerald: "nameTextEmerald 3.5s ease-in-out infinite",
+        sapphire: "nameTextSapphire 3s ease-in-out infinite",
+        neon: "nameTextSapphire 3s ease-in-out infinite",
+        galaxy: "nameTextGalaxy 5.2s linear infinite",
+        cosmic: "nameTextGalaxy 5.2s linear infinite",
+        celestial: "nameTextGalaxy 5.2s linear infinite",
+        crystal: "nameTextCrystal 3.2s ease-in-out infinite",
+        shadow: "nameTextShadow 4.8s ease-in-out infinite",
+        voidPulse: "nameTextShadow 4.8s ease-in-out infinite",
+        phoenix: "nameTextPhoenix 2.9s linear infinite",
+        holo: "nameTextAurora 4.4s ease-in-out infinite",
+        aurora: "nameTextAurora 4.4s ease-in-out infinite",
+        divine: "nameTextDivine 3.1s ease-in-out infinite",
+        solarDivine: "nameTextDivine 3.1s ease-in-out infinite",
+        rubyNova: "nameTextRuby 3.1s ease-in-out infinite"
+      };
+      return animations[styleValue] || "none";
+    }
+
     function resolveNameStyle(styleValue = getEquippedNameStyle()) {
       const value = nameStyleThemes[styleValue] ? styleValue : "classic";
       const theme = getNameStyleTheme(value);
@@ -7376,6 +7425,8 @@
         gradient: "var(--name-gradient)",
         color: premium ? "transparent" : "var(--text)",
         shadow: premium ? `0 0 2px rgba(255, 255, 255, 0.38), 0 0 9px ${glow}, 0 0 18px color-mix(in srgb, ${glow} 58%, transparent)` : "none",
+        filter: premium ? `drop-shadow(0 0 4px color-mix(in srgb, ${glow} 54%, transparent))` : "none",
+        animation: getNameStyleAnimation(value),
         fontWeight: premium ? "1000" : "800",
         letterSpacing: "0"
       };
@@ -7457,6 +7508,8 @@
       element.style.setProperty("--name-aura", resolved.glow);
       element.style.setProperty("--name-color", resolved.color);
       element.style.setProperty("--name-shadow", resolved.shadow);
+      element.style.setProperty("--name-filter", resolved.filter);
+      element.style.setProperty("--name-animation", resolved.animation);
       element.style.setProperty("--name-font-weight", resolved.fontWeight);
       element.style.setProperty("--name-letter-spacing", resolved.letterSpacing);
       Object.keys(nameStyleThemes).forEach((key) => element.classList.remove(`name-style-${key}`));
@@ -10810,6 +10863,7 @@
     }
 
     function getAchievementRoadmap() {
+      if (!isApplicationAuthenticated()) return [];
       const makeProgress = (current, target, label) => ({ current: Math.max(0, Math.min(target, Number(current) || 0)), target, label });
       const stages = [
         { tier: "Beginner", label: "Beginner", short: "B", badge: "♙", note: "Start your first tiny win", condition: "Open your chess journey", reward: "+25 XP", progress: () => makeProgress(1, 1, "Journey started") },
@@ -10842,6 +10896,7 @@
     }
 
     function getNextAchievementMilestone() {
+      if (!isApplicationAuthenticated()) return { label: "Start your journey", detail: "Sign in to track achievements and rewards.", href: "#login", action: "", plan: "" };
       const next = getAchievementRoadmap().find((stage) => !stage.unlocked);
       if (!next) return { label: "Champion", detail: "All current milestones unlocked. Build your next weekly streak.", href: "#puzzles", action: "puzzle-plan", plan: "adaptive" };
       if (next.label === "Explorer" || next.label === "Puzzle Scout") {
@@ -10883,7 +10938,7 @@
     }
 
     function getDragonProfileSnapshot() {
-      const authenticated = applicationAuthState === "authenticated" && Boolean(applicationAuthAccount);
+      const authenticated = isApplicationAuthenticated();
       const profile = authenticated ? readDragonProfile() : {
         name: "Guest Explorer",
         level: "Level 1 Explorer",
@@ -10914,17 +10969,17 @@
         : "Explorer";
       const progress = Math.round(Math.min(100, Math.max(0, progressFill)));
       const nextLevelXp = levelState.next ? Math.max(0, levelState.next[1] - xp) : 0;
-      const missionState = {
+      const missionState = authenticated ? {
         puzzles: Boolean(profile.missions.puzzles) || solvedPuzzles.size >= 5,
         win: Boolean(profile.missions.win) || gameStats.wins >= 1,
         forks: Boolean(profile.missions.forks) || getSolvedPuzzleCountByPattern("Forks") > 0
-      };
+      } : { puzzles: false, win: false, forks: false };
       const missions = [
-        ["puzzles", "Solve 5 puzzles", missionState.puzzles, missionState.puzzles ? "Done" : `${Math.min(5, solvedPuzzles.size)}/5`],
-        ["win", "Win 1 game", missionState.win, missionState.win ? "Done" : `${Math.min(1, gameStats.wins)}/1`],
+        ["puzzles", "Solve 5 puzzles", missionState.puzzles, missionState.puzzles ? "Done" : `${Math.min(5, authenticated ? solvedPuzzles.size : 0)}/5`],
+        ["win", "Win 1 game", missionState.win, missionState.win ? "Done" : `${Math.min(1, authenticated ? gameStats.wins : 0)}/1`],
         ["forks", "Learn Forks", missionState.forks, missionState.forks ? "Done" : "Ready"]
       ].map(([id, label, done, meta]) => ({ id, label, done, meta }));
-      const achievements = getAchievementRoadmap().map((stage) => ({
+      const achievements = authenticated ? getAchievementRoadmap().map((stage) => ({
         icon: stage.badge || stage.short,
         label: stage.label,
         tier: stage.tier,
@@ -10934,7 +10989,7 @@
         progress: stage.progress,
         unlocked: stage.unlocked,
         secret: Boolean(stage.secret)
-      }));
+      })) : [];
 
       return {
         name: learnerName,
@@ -11009,6 +11064,7 @@
     }
 
     function getEarnedPlayerIcons(profile = getDragonProfileSnapshot()) {
+      if (!isApplicationAuthenticated()) return [];
       const earned = (profile.achievements || []).filter((item) => item.unlocked).map((item) => ({
         icon: item.icon,
         label: item.label
@@ -11524,6 +11580,7 @@
     }
 
     function syncCurrentPlayerStatsToRegistry() {
+      if (!isApplicationAuthenticated()) return;
       const profile = readLearnerProfile();
       const name = normalizeAuthUsername(profile.name);
       if (!name) return;
@@ -11707,10 +11764,11 @@
     }
 
     function buildLeaderboardEntries(type = "puzzles") {
-      const currentName = normalizeAuthUsername(readLearnerProfile().name).toLowerCase();
+      const authenticated = isApplicationAuthenticated();
+      const currentName = authenticated ? normalizeAuthUsername(readLearnerProfile().name).toLowerCase() : "";
       const seen = new Set();
       const useSharedAccounts = leaderboardRuntime.status !== "local" && Array.isArray(leaderboardRuntime.accounts);
-      const sourceAccounts = useSharedAccounts ? leaderboardRuntime.accounts : readAuthRegistry().accounts;
+      const sourceAccounts = useSharedAccounts ? leaderboardRuntime.accounts : authenticated ? readAuthRegistry().accounts : [];
       const accounts = filterLeaderboardAccounts(sourceAccounts);
       return accounts
         .map((account) => {
@@ -11925,7 +11983,7 @@
     }
 
     function renderPlayerIdentityExtras(profile = getDragonProfileSnapshot()) {
-      const countryCode = normalizeCountryFlagValue(readLearnerProfile().countryFlag);
+      const countryCode = isApplicationAuthenticated() ? normalizeCountryFlagValue(readLearnerProfile().countryFlag) : "";
       const icons = getEarnedPlayerIcons(profile);
       const identity = getPlayerIdentityModel({ ...profile, countryCode, icons, isPlayer: true }, { profile, isPlayer: true });
       document.querySelectorAll(".player-flex-chip .player-profile-avatar, .login-pass .player-profile-avatar").forEach((avatar) => {
@@ -11996,12 +12054,13 @@
       setProfileText('[data-profile-field="tokens"]', formatProfileNumber(profile.tokens));
       setProfileText('[data-profile-field="rank"]', `Rank: ${profile.rank}`);
       setProfileText('[data-profile-field="title"]', profile.rank || "Chess player");
-      const gameRating = getLearnerGameRating();
-      const puzzleRating = getLearnerPuzzleRating();
-      const gamesPlayed = Math.max(0, Number(gameStats.played) || 0);
-      const wins = Math.max(0, Number(gameStats.wins) || 0);
+      const authenticated = isApplicationAuthenticated();
+      const gameRating = authenticated ? getLearnerGameRating() : 450;
+      const puzzleRating = authenticated ? getLearnerPuzzleRating() : 400;
+      const gamesPlayed = authenticated ? Math.max(0, Number(gameStats.played) || 0) : 0;
+      const wins = authenticated ? Math.max(0, Number(gameStats.wins) || 0) : 0;
       const winRate = gamesPlayed ? Math.round((wins / gamesPlayed) * 100) : 0;
-      const puzzleAttemptsTotal = puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts);
+      const puzzleAttemptsTotal = authenticated ? puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts) : 0;
       const unlockedAchievements = profile.achievements.filter((achievement) => achievement.unlocked).length;
       setProfileText('[data-profile-field="gameRating"]', `${formatProfileNumber(gameRating)} Elo`);
       setProfileText('[data-profile-field="puzzleRating"]', formatProfileNumber(puzzleRating));
@@ -12070,8 +12129,9 @@
     }
 
     function renderProfileRatingHistory() {
-      const currentRating = getLearnerPuzzleRating();
-      const recorded = Array.isArray(puzzleRatingHistory)
+      const authenticated = isApplicationAuthenticated();
+      const currentRating = authenticated ? getLearnerPuzzleRating() : 400;
+      const recorded = authenticated && Array.isArray(puzzleRatingHistory)
         ? puzzleRatingHistory
           .map((entry) => ({ rating: Number(entry?.rating), at: entry?.at || "" }))
           .filter((entry) => Number.isFinite(entry.rating) && entry.rating > 0)
@@ -12147,15 +12207,16 @@
     }
 
     function renderProfileShowcase(profile = getDragonProfileSnapshot()) {
-      const records = getCompletedGamesWithReviews();
+      const authenticated = isApplicationAuthenticated();
+      const records = authenticated ? getCompletedGamesWithReviews() : [];
       const recordedWins = records.filter((game) => game.result === "win").length;
       const recordedDraws = records.filter((game) => game.result === "draw").length;
       const recordedLosses = records.filter((game) => game.result === "loss").length;
-      const played = Math.max(0, Number(gameStats.played) || 0, recordedWins + recordedDraws + recordedLosses);
-      const wins = Math.min(played, Math.max(0, Number(gameStats.wins) || 0, recordedWins));
-      const draws = Math.min(Math.max(0, played - wins), Math.max(0, Number(gameStats.draws) || 0, recordedDraws));
-      const losses = Math.max(0, played - wins - draws, recordedLosses);
-      const puzzleAttemptsTotal = puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts);
+      const played = authenticated ? Math.max(0, Number(gameStats.played) || 0, recordedWins + recordedDraws + recordedLosses) : 0;
+      const wins = authenticated ? Math.min(played, Math.max(0, Number(gameStats.wins) || 0, recordedWins)) : 0;
+      const draws = authenticated ? Math.min(Math.max(0, played - wins), Math.max(0, Number(gameStats.draws) || 0, recordedDraws)) : 0;
+      const losses = authenticated ? Math.max(0, played - wins - draws, recordedLosses) : 0;
+      const puzzleAttemptsTotal = authenticated ? puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts) : 0;
       const puzzleAccuracy = puzzleAttemptsTotal ? getPuzzleAccuracy(0) : 0;
       const setContent = (selector, nodes) => document.querySelectorAll(selector).forEach((target) => target.replaceChildren(...nodes));
       const metric = (value, label, tone = "") => {
@@ -12165,11 +12226,11 @@
       };
 
       setContent("[data-profile-record]", [metric(wins, "Wins", "positive"), metric(losses, "Losses", "negative"), metric(draws, "Draws")]);
-      setContent("[data-profile-puzzle-stats]", [metric(solvedPuzzles.size, "Solved", "positive"), metric(puzzleAccuracy, "Accuracy"), metric(bestPuzzleStreak, "Best streak")]);
+      setContent("[data-profile-puzzle-stats]", [metric(authenticated ? solvedPuzzles.size : 0, "Solved", "positive"), metric(puzzleAccuracy, "Accuracy"), metric(authenticated ? bestPuzzleStreak : 0, "Best streak")]);
 
       const openingCounts = new Map();
-      if (favoriteOpening) openingCounts.set(favoriteOpening, 1);
-      matchReviews.forEach((review) => {
+      if (authenticated && favoriteOpening) openingCounts.set(favoriteOpening, 1);
+      if (authenticated) matchReviews.forEach((review) => {
         const opening = String(review?.summary?.opening || "").trim();
         if (opening) openingCounts.set(opening, (openingCounts.get(opening) || 0) + 1);
       });
@@ -12182,7 +12243,7 @@
         })
         : [createBookText("p", "profile-empty-note", "Play or review a game to reveal your openings.")]);
 
-      const prefs = readLearnerPrefs();
+      const prefs = authenticated ? readLearnerPrefs() : { board: "wood", pieceSkin: "chessnut", backgroundTheme: "classic" };
       const cosmetics = [
         ["Board", getBoardTheme(prefs.board).label],
         ["Pieces", getPieceSetTheme(prefs.pieceSkin).label],
@@ -12208,9 +12269,9 @@
         return card;
       }));
 
-      const collections = typeof storeCollectionDefinitions !== "undefined" ? storeCollectionDefinitions : [];
+      const collections = authenticated && typeof storeCollectionDefinitions !== "undefined" ? storeCollectionDefinitions : [];
       setContent("[data-profile-collections]", collections.map((collection) => {
-        const progress = getStoreCollectionProgress(collection, prefs, new Set(storeState.owned));
+        const progress = getStoreCollectionProgress(collection, prefs, authenticated ? new Set(storeState.owned) : new Set());
         const card = createBookText("article", "profile-collection-card", "");
         const head = createBookText("div", "profile-collection-head", "");
         head.append(createBookText("strong", "", collection.name), createBookText("span", "", `${progress.owned}/${progress.total}`));
@@ -12256,10 +12317,12 @@
     }
 
     function getLearnerPuzzleRating() {
+      if (!isApplicationAuthenticated()) return 400;
       return 400 + (solvedPuzzles.size * 12) + (bestPuzzleStreak * 8) + Math.floor(puzzleXp / 10);
     }
 
     function getLearnerGameRating() {
+      if (!isApplicationAuthenticated()) return 450;
       const wins = Math.max(0, Number(gameStats.wins) || 0);
       const played = Math.max(0, Number(gameStats.played) || 0);
       const losses = Math.max(0, played - wins);
@@ -12278,7 +12341,22 @@
       const shortLessonsDone = readShortLessonState().completed.length;
       const lessonCount = completedPathLessons.size + shortLessonsDone;
       const achievements = profile.achievements.filter((item) => item.unlocked).map((item) => item.label);
-      const authenticated = applicationAuthState === "authenticated" && Boolean(applicationAuthAccount);
+      const authenticated = isApplicationAuthenticated();
+      const safePrefs = authenticated
+        ? prefs
+        : {
+          theme: "dark",
+          board: "wood",
+          backgroundTheme: "classic",
+          pieceSkin: "chessnut",
+          nameStyle: "classic",
+          nameFx: "off",
+          lastMoveColor: "classic",
+          title: "",
+          avatar: "auto",
+          avatarFrame: "",
+          avatarEffect: "none"
+        };
       return {
         username: authenticated ? (learner.name || profile.name) : "Guest Explorer",
         avatar: { icon: profile.avatar, label: profile.avatarLabel },
@@ -12288,37 +12366,37 @@
         puzzleRating: getLearnerPuzzleRating(),
         gameRating: getLearnerGameRating(),
         currentStreak: profile.streak,
-        achievements,
-        flexBadges: badgeModel,
-        equippedBadge: getFlexBadgeTheme(badgeModel.equippedBadge).label,
-        nameStyle: getNameStyleTheme(prefs.nameStyle).label,
-        lastMoveHighlight: getLastMoveHighlightTheme(prefs.lastMoveColor).label,
-        storyProgress: { completed: storyState?.completed?.length || 0, total: storyChapters.length },
-        settings: prefs,
+        achievements: authenticated ? achievements : [],
+        flexBadges: authenticated ? badgeModel : { owned: [], equippedBadge: "" },
+        equippedBadge: authenticated ? getFlexBadgeTheme(badgeModel.equippedBadge).label : "None",
+        nameStyle: authenticated ? getNameStyleTheme(prefs.nameStyle).label : "Classic Precision",
+        lastMoveHighlight: authenticated ? getLastMoveHighlightTheme(prefs.lastMoveColor).label : "Classic",
+        storyProgress: { completed: authenticated ? (storyState?.completed?.length || 0) : 0, total: authenticated ? storyChapters.length : 0 },
+        settings: safePrefs,
         statistics: {
-          gamesPlayed: gameStats.played,
-          wins: gameStats.wins,
-          draws: gameStats.draws,
-          losses: Math.max(0, gameStats.played - gameStats.wins - gameStats.draws),
-          winRate: gameStats.played ? Math.round((gameStats.wins / gameStats.played) * 100) : 0,
-          puzzlesSolved: solvedPuzzles.size,
-          puzzleAccuracy: getPuzzleAccuracy(0),
-          lessonsCompleted: lessonCount,
-          timeSpentMinutes: getLearningMinutes(lessonCount)
+          gamesPlayed: authenticated ? gameStats.played : 0,
+          wins: authenticated ? gameStats.wins : 0,
+          draws: authenticated ? gameStats.draws : 0,
+          losses: authenticated ? Math.max(0, gameStats.played - gameStats.wins - gameStats.draws) : 0,
+          winRate: authenticated && gameStats.played ? Math.round((gameStats.wins / gameStats.played) * 100) : 0,
+          puzzlesSolved: authenticated ? solvedPuzzles.size : 0,
+          puzzleAccuracy: authenticated ? getPuzzleAccuracy(0) : 0,
+          lessonsCompleted: authenticated ? lessonCount : 0,
+          timeSpentMinutes: authenticated ? getLearningMinutes(lessonCount) : 0
         },
         favorites: {
-          opening: favoriteOpening,
-          board: getBoardTheme(prefs.board).label,
-          pieces: getPieceSetTheme(prefs.pieceSkin).label,
-          background: getBackgroundTheme(prefs.backgroundTheme).label
+          opening: authenticated ? favoriteOpening : "None",
+          board: authenticated ? getBoardTheme(prefs.board).label : "Wood",
+          pieces: authenticated ? getPieceSetTheme(prefs.pieceSkin).label : "Classic",
+          background: authenticated ? getBackgroundTheme(prefs.backgroundTheme).label : "Night"
         },
-        joinDate: learner.joinDate || "",
-        lastLogin: learner.lastLogin || ""
+        joinDate: authenticated ? (learner.joinDate || "") : "",
+        lastLogin: authenticated ? (learner.lastLogin || "") : ""
       };
     }
 
     let progressSnapshotTimer = 0;
-    function writeProgressSnapshot(reason = "auto") {
+    function writeProgressSnapshot(reason = "auto", { skipCloudSync = false } = {}) {
       try {
         const account = getUserProfileSnapshot();
         const dailyTraining = readDailyTrainingState();
@@ -12363,20 +12441,20 @@
           aiCoachRecommendation: coachFocus
         });
         createProgressBackup(reason);
-        queueSupabaseProfileSync();
+        if (!skipCloudSync) queueSupabaseProfileSync();
       } catch {
         // Autosave should never interrupt play.
       }
     }
 
-    function saveProgressSnapshot(reason = "auto") {
+    function saveProgressSnapshot(reason = "auto", options = {}) {
       const urgent = /leaving|reset|admin|profile|settings|page load/i.test(reason);
       window.clearTimeout(progressSnapshotTimer);
       if (urgent) {
-        writeProgressSnapshot(reason);
+        writeProgressSnapshot(reason, options);
         return;
       }
-      progressSnapshotTimer = window.setTimeout(() => writeProgressSnapshot(reason), 450);
+      progressSnapshotTimer = window.setTimeout(() => writeProgressSnapshot(reason, options), 450);
     }
 
     function renderAccountVault(profile) {
@@ -12415,18 +12493,22 @@
     }
 
     function getSolvedPuzzleCountByPattern(pattern) {
+      if (!isApplicationAuthenticated()) return 0;
       return [...solvedPuzzles].filter((index) => getPuzzlePattern(puzzles[index]) === pattern).length;
     }
 
     function getMoveQualityScore() {
+      if (!isApplicationAuthenticated()) return 100;
       return gameStats.moveQualityMoves ? Math.round(gameStats.moveQualityTotal / gameStats.moveQualityMoves) : 100;
     }
 
     function getHangingPerGame() {
+      if (!isApplicationAuthenticated()) return 0;
       return gameStats.played ? gameStats.hanging / gameStats.played : 0;
     }
 
     function getWeeklySkillScores() {
+      if (!isApplicationAuthenticated()) return [["Tactics", 0, "tactics"], ["Opening principles", 0, "openings"], ["Endgames", 0, "endgame"], ["Board vision", 0, "review"], ["Calculation", 0, "calculation"]];
       return [
         ["Tactics", getPuzzleAccuracy(0), "tactics"],
         ["Opening principles", gameStats.principleGames ? 82 : 45, "openings"],
@@ -12441,6 +12523,7 @@
     }
 
     function getGameUnlocks() {
+      if (!isApplicationAuthenticated()) return ["Sign in to unlock learner rewards."];
       const level = getLearnerLevel(puzzleXp).current[0];
       const prefs = readLearnerPrefs();
       return [
@@ -12455,6 +12538,7 @@
     }
 
     function getSolvedThemeCounts() {
+      if (!isApplicationAuthenticated()) return {};
       return [...solvedPuzzles].reduce((counts, index) => {
         const theme = getPuzzlePattern(puzzles[index]);
         counts[theme] = (counts[theme] || 0) + 1;
@@ -12463,6 +12547,7 @@
     }
 
     function getMasteredTacticalThemes() {
+      if (!isApplicationAuthenticated()) return [];
       return Object.entries(getSolvedThemeCounts())
         .filter(([, count]) => count >= 2)
         .sort((a, b) => b[1] - a[1])
@@ -12470,6 +12555,7 @@
     }
 
     function getLearningMinutes(lessonCount) {
+      if (!isApplicationAuthenticated()) return 0;
       return Math.round((solvedPuzzles.size * 2.5) + (lessonCount * 3) + (gameStats.played * 8) + (puzzleAttempts * 0.75));
     }
 
@@ -12481,6 +12567,7 @@
     }
 
     function getUnlockedLearningSkills() {
+      if (!isApplicationAuthenticated()) return [];
       const counts = getSolvedThemeCounts();
       return [
         ["Board scanner", solvedPuzzles.size >= 1],
@@ -12591,7 +12678,7 @@
       link.setAttribute("aria-label", "Next unlock: " + milestone.label + ". " + milestone.detail);
     }
     function renderPremiumHomeExperience({ focus, focusPuzzlePlan, nextStep, latestReadyReview }) {
-      const profile = readLearnerProfile();
+      const profile = isApplicationAuthenticated() ? readLearnerProfile() : {};
       const minutes = [5, 10, 15].includes(Number(profile.sessionMinutes)) ? Number(profile.sessionMinutes) : 10;
       const sessionStep = latestReadyReview
         ? ["Turn your latest game into one useful pattern.", "#play", "Review one moment", "continue-review", ""]
@@ -12790,21 +12877,23 @@
     }
 
     function getAcademySnapshot() {
-      const tutorialDone = new Set(beginnerTutorialState.completed || []).size;
-      const lessonDone = tutorialDone + completedPathLessons.size + readShortLessonState().completed.length;
+      const authenticated = isApplicationAuthenticated();
+      const tutorialDone = authenticated ? new Set(beginnerTutorialState.completed || []).size : 0;
+      const lessonDone = authenticated ? tutorialDone + completedPathLessons.size + readShortLessonState().completed.length : 0;
       const focus = getSingleCoachFocus();
       const accuracy = getPuzzleAccuracy(0);
       const progress = Math.min(100, Math.round(
         Math.min(tutorialDone, 5) * 9 +
-        Math.min(solvedPuzzles.size, 8) * 5 +
-        Math.min(gameStats.played, 3) * 7 +
-        Math.min(dailyHabit.streak, 5) * 4 +
+        Math.min(authenticated ? solvedPuzzles.size : 0, 8) * 5 +
+        Math.min(authenticated ? gameStats.played : 0, 3) * 7 +
+        Math.min(authenticated ? dailyHabit.streak : 0, 5) * 4 +
         Math.min(lessonDone, 8) * 3
       ));
       return { tutorialDone, lessonDone, focus, accuracy, progress };
     }
 
     function getAcademyCertificateProgress() {
+      if (!isApplicationAuthenticated()) return [];
       const tiers = [
         ["beginner", "Beginner", "Board Foundations", "+50 XP +10 coins"],
         ["intermediate", "Intermediate", "Tactical Builder", "+75 XP +15 coins"],
@@ -12894,12 +12983,13 @@
       const quizBox = document.getElementById("academyQuiz");
       if (!section || !track || !quizBox) return;
 
+      const authenticated = isApplicationAuthenticated();
       const state = readAcademyState();
       const snapshot = getAcademySnapshot();
       const today = getTodayKey();
       const quiz = academyQuizBank[Math.abs(Math.floor(new Date(`${today}T00:00:00`) / 86400000)) % academyQuizBank.length];
-      const rewardClaimed = state.quizDate === today;
-      const level = getLearnerLevel(puzzleXp).current[0];
+      const rewardClaimed = authenticated && state.quizDate === today;
+      const level = getLearnerLevel(authenticated ? puzzleXp : 0).current[0];
 
       const setText = (id, value) => {
         const node = document.getElementById(id);
@@ -12909,9 +12999,9 @@
       setText("academyDaily", rewardClaimed ? "Today's Academy quiz is complete." : `${getDailyChallengeName()} + one quick quiz`);
       setText("academyFocus", `Coach focus: ${snapshot.focus.skill}. Next practice: ${snapshot.focus.practice}.`);
       setText("academyProgressText", `${snapshot.progress}%`);
-      setText("academyStreak", dailyHabit.streak);
-      setText("academyXp", formatProfileNumber(puzzleXp));
-      setText("academyCoins", formatProfileNumber(puzzleCoins));
+      setText("academyStreak", authenticated ? dailyHabit.streak : 0);
+      setText("academyXp", formatProfileNumber(authenticated ? puzzleXp : 0));
+      setText("academyCoins", formatProfileNumber(authenticated ? puzzleCoins : 0));
       setText("academyAccuracy", `${snapshot.accuracy}%`);
       setText("academyReward", rewardClaimed ? "Reward claimed. Come back tomorrow for a fresh Academy boost." : "Daily quiz reward: +12 XP and +6 coins.");
       const fill = document.getElementById("academyProgressFill");
@@ -12929,10 +13019,10 @@
 
       const badges = [
         ["Guided Starter", snapshot.tutorialDone > 0],
-        ["Puzzle Spark", solvedPuzzles.size > 0],
-        ["Coach Player", gameStats.played > 0],
-        ["Streak Builder", dailyHabit.streak >= 3],
-        [level, puzzleXp > 0]
+        ["Puzzle Spark", authenticated && solvedPuzzles.size > 0],
+        ["Coach Player", authenticated && gameStats.played > 0],
+        ["Streak Builder", authenticated && dailyHabit.streak >= 3],
+        [level, authenticated && puzzleXp > 0]
       ];
       const achievementRow = document.getElementById("academyAchievements");
       if (achievementRow) {
@@ -13075,6 +13165,19 @@
     }
 
     function getDailyGoalsProgress() {
+      if (!isApplicationAuthenticated()) {
+        const goals = [
+          { key: "puzzles", label: "Solve 3 puzzles", href: "#puzzles", done: false, value: 0, target: 3, progress: "0/3" },
+          { key: "game", label: "Play 1 game", href: "#play", done: false, value: 0, target: 1, progress: "0/1" },
+          { key: "review", label: "Review 1 game", href: "#play", done: false, value: 0, target: 1, progress: "0/1" }
+        ];
+        const weekly = [
+          { key: "weekly-puzzles", label: "Solve 12 puzzles", href: "#puzzles", done: false, value: 0, target: 12, progress: "0/12" },
+          { key: "weekly-games", label: "Play 3 games", href: "#play", done: false, value: 0, target: 3, progress: "0/3" },
+          { key: "weekly-reviews", label: "Review 2 games", href: "#play", done: false, value: 0, target: 2, progress: "0/2" }
+        ];
+        return { goals, weekly, doneCount: 0, weeklyDoneCount: 0, complete: false, weeklyComplete: false, claimed: false, weekClaimed: false, streak: 0 };
+      }
       dailyGoals = normalizeDailyGoalsState(dailyGoals);
       const puzzleDone = Math.max(0, solvedPuzzles.size - dailyGoals.startSolved);
       const gameDone = Math.max(0, gameStats.played - dailyGoals.startGames, completedGameHistory.length - dailyGoals.startCompletedGames);
@@ -13336,6 +13439,7 @@
       });
     }
     function getWeeklyHomeRecap() {
+      if (!isApplicationAuthenticated()) return { xp: 0, games: 0, wins: 0, focus: "Forks", hasActivity: false };
       const days = [...Array(7)].map((_, offset) => {
         const date = new Date();
         date.setHours(0, 0, 0, 0);
@@ -13360,21 +13464,24 @@
       const heroContinue = document.getElementById("heroContinueLearning");
       if (!welcome) return;
 
-      const shortLessonsDone = readShortLessonState().completed.length;
-      const lessonCount = completedPathLessons.size + shortLessonsDone;
+      const authenticated = isApplicationAuthenticated();
+      const safeGameStats = authenticated ? gameStats : { played: 0, wins: 0, draws: 0 };
+      const safePuzzleXp = authenticated ? puzzleXp : 0;
+      const shortLessonsDone = authenticated ? readShortLessonState().completed.length : 0;
+      const lessonCount = authenticated ? completedPathLessons.size + shortLessonsDone : 0;
       const profileSnapshot = renderPlayerProfile();
-      const needsTactics = puzzleAttempts > puzzleCorrect;
-      const completedToday = dailyHabit.rewardDate === getTodayKey();
+      const needsTactics = authenticated && puzzleAttempts > puzzleCorrect;
+      const completedToday = authenticated && dailyHabit.rewardDate === getTodayKey();
       const nextLesson = Math.max(1, lessonCount + 1);
       const focus = getSingleCoachFocus();
-      const profileName = String(profileSnapshot?.name || readLearnerProfile().name || "").trim();
+      const profileName = authenticated ? String(profileSnapshot?.name || readLearnerProfile().name || "").trim() : "";
       const currentStreak = profileSnapshot?.streak ?? dailyHabit.streak;
       const masteredThemes = getMasteredTacticalThemes();
       const unlockedSkills = getUnlockedLearningSkills();
       const learningMinutes = getLearningMinutes(lessonCount);
-      const welcomeDelta = getWelcomeBackDelta(lessonCount);
+      const welcomeDelta = authenticated ? getWelcomeBackDelta(lessonCount) : { text: "Your next move is ready.", changed: false };
       const weeklyRecap = getWeeklyHomeRecap();
-      const weeklySummaryEnabled = readLearnerProfile().weeklySummary !== "off";
+      const weeklySummaryEnabled = authenticated && readLearnerProfile().weeklySummary !== "off";
       const weeklyGoal = document.getElementById("homeWeeklyGoal");
       const weeklyGoalTarget = 120;
       if (weeklyGoal) {
@@ -13411,7 +13518,7 @@
         : completedToday
           ? [`Open Lesson ${nextLesson} and learn one tiny rule.`, "#paths", "Continue learning", "", ""]
           : ["Solve today's puzzle for XP, coins, and a calmer board scan.", "#puzzles", "Start daily puzzle", "daily-puzzle", ""];
-      const onboardingPlan = !gameStats.played && !lessonCount ? getOnboardingPlan(readLearnerProfile()) : null;
+      const onboardingPlan = authenticated && !safeGameStats.played && !lessonCount ? getOnboardingPlan(readLearnerProfile()) : null;
       const nextStep = onboardingPlan || defaultNextStep;
       const recommendations = [
         { label: `Continue Lesson ${nextLesson}`, href: "#paths" },
@@ -13420,7 +13527,7 @@
         { label: "Practice Mistakes", href: "#play" }
       ];
 
-      welcome.textContent = profileName ? `Welcome back, ${profileName}!` : lessonCount || puzzleXp ? "Welcome back!" : "Welcome! Start with one tiny win.";
+      welcome.textContent = profileName ? `Welcome back, ${profileName}!` : lessonCount || safePuzzleXp ? "Welcome back!" : "Welcome! Start with one tiny win.";
       if (delta) {
         const weeklyLine = weeklyRecap.hasActivity
           ? `This week: ${weeklyRecap.xp} XP, ${weeklyRecap.games} ${weeklyRecap.games === 1 ? "game" : "games"}${weeklyRecap.wins ? `, ${weeklyRecap.wins} win${weeklyRecap.wins === 1 ? "" : "s"}` : ""}. Next focus: ${weeklyRecap.focus}.`
@@ -13428,17 +13535,17 @@
         delta.textContent = weeklySummaryEnabled && weeklyLine ? weeklyLine : welcomeDelta.text;
         delta.classList.toggle("is-new", weeklySummaryEnabled && weeklyRecap.hasActivity ? true : welcomeDelta.changed);
       }
-      setHomeStat("homeGamesPlayed", formatProfileNumber(gameStats.played), gameStats.played ? `${gameStats.wins || 0} wins recorded` : "Play one friendly AI game to start this stat.");
+      setHomeStat("homeGamesPlayed", formatProfileNumber(safeGameStats.played), safeGameStats.played ? `${safeGameStats.wins || 0} wins recorded` : "Play one friendly AI game to start this stat.");
       setHomeStat("homeThemesMastered", formatProfileNumber(masteredThemes.length), masteredThemes.length ? masteredThemes.join(", ") : "Solve two puzzles from one theme to master it.");
       setHomeStat("homeStreak", `${formatProfileNumber(currentStreak)} days`, currentStreak ? "Keep the tiny daily habit alive." : "Finish one daily puzzle to start a streak.");
       setHomeStat("homeLearningTime", formatLearningTime(learningMinutes), "Estimated from completed lessons, puzzles, attempts, and games.");
       setHomeStat("homeSkillsUnlocked", formatProfileNumber(unlockedSkills.length), unlockedSkills.length ? unlockedSkills.join(", ") : "First unlock: solve one puzzle.");
-      setHomeStat("homeXp", `${formatProfileNumber(profileSnapshot?.xp ?? puzzleXp)} XP`, `${lessonCount} lessons done`);
+      setHomeStat("homeXp", `${formatProfileNumber(profileSnapshot?.xp ?? safePuzzleXp)} XP`, `${lessonCount} lessons done`);
       const mainRating = document.getElementById("homeMainRating");
       const mainRatingMeta = document.getElementById("homeMainRatingMeta");
       if (mainRating) mainRating.textContent = String(getLearnerGameRating());
-      if (mainRatingMeta) mainRatingMeta.textContent = gameStats.played
-        ? `${gameStats.wins || 0} wins from ${gameStats.played} game${gameStats.played === 1 ? "" : "s"}.`
+      if (mainRatingMeta) mainRatingMeta.textContent = safeGameStats.played
+        ? `${safeGameStats.wins || 0} wins from ${safeGameStats.played} game${safeGameStats.played === 1 ? "" : "s"}.`
         : "Play a game to establish your rating.";
       renderHomeRecentGames();
       renderHomeFriendStatus();
@@ -13472,7 +13579,7 @@
       const continueAction = document.getElementById("homeContinueAction");
       const continueTitle = document.getElementById("homeContinueTitle");
       const continueNote = document.getElementById("homeContinueNote");
-      const latestReadyReview = matchReviews.find((review) => review?.moves?.length && review?.summary);
+      const latestReadyReview = authenticated ? matchReviews.find((review) => review?.moves?.length && review?.summary) : null;
       if (continueAction && continueTitle && continueNote) {
         if (latestReadyReview) {
           continueAction.href = "#play";
@@ -13538,6 +13645,38 @@
       const xpGoal = document.getElementById("learnerXpGoal");
       const rpgPath = document.getElementById("rpgLevelPath");
       if (!xpPill || !levelPill || !gamesPill || !winRatePill || !solvedPill || !bestPill || !dailyPill || !dailyStreakPill || !lessonPill || !openingPill || !accuracyPill || !dailyReward || !coach || !badges || !chart) return;
+
+      if (!isApplicationAuthenticated()) {
+        xpPill.textContent = "0 XP";
+        if (coinPill) coinPill.textContent = "0 coins";
+        if (starPill) starPill.textContent = "0 stars";
+        if (keyPill) keyPill.textContent = "0 keys";
+        if (chestPill) chestPill.textContent = "0 chests";
+        levelPill.textContent = "Level 1 Explorer";
+        levelPill.title = "Sign in to track your learner level";
+        if (xpFill) xpFill.style.width = "0%";
+        if (xpGoal) xpGoal.textContent = "Sign in to track XP";
+        if (rpgPath) rpgPath.replaceChildren();
+        gamesPill.textContent = "Games played 0";
+        winRatePill.textContent = "Win rate 0%";
+        solvedPill.textContent = "Puzzles solved 0";
+        bestPill.textContent = "Best streak 0";
+        dailyPill.textContent = "Daily challenge";
+        dailyStreakPill.textContent = "Current streak 0";
+        lessonPill.textContent = "Missions completed 0";
+        openingPill.textContent = "Favorite opening: None";
+        openingPill.title = "Sign in to track opening progress.";
+        accuracyPill.textContent = "Puzzle confidence 0%";
+        if (hangingPill) hangingPill.textContent = "Hanging pieces/game 0";
+        if (moveQualityPill) moveQualityPill.textContent = "Move quality 0%";
+        if (puzzleRatingPill) puzzleRatingPill.textContent = "Puzzle rating 400";
+        if (timePill) timePill.textContent = "Time: ready";
+        dailyReward.textContent = "Sign in to track daily progress.";
+        coach.textContent = "Sign in to save your coach plan and puzzle progress.";
+        badges.replaceChildren();
+        chart.replaceChildren();
+        return;
+      }
 
       const completedToday = dailyHabit.rewardDate === getTodayKey();
       const shortLessonsDone = readShortLessonState().completed.length;
@@ -15269,8 +15408,8 @@
     }
 
     function getAiHeaderProfile(level = coachDifficulty) {
-      const friendOpponent = getFriendMatchProfiles().opponent;
-      if (friendChallengeState?.active) {
+      const friendOpponent = isApplicationAuthenticated() ? getFriendMatchProfiles().opponent : null;
+      if (isApplicationAuthenticated() && friendChallengeState?.active) {
         const opponent = friendOpponent || normalizeFriendMatchProfile(null, { name: friendChallengeState.targetName || "Opponent" });
         return {
           name: opponent.displayName,
@@ -15900,9 +16039,10 @@
     function renderInGamePlayerCard() {
       const card = document.getElementById("matchPlayerCard");
       if (!card) return;
+      const authenticated = isApplicationAuthenticated();
       const profile = getDragonProfileSnapshot();
-      const friendSelf = friendChallengeState?.active ? getFriendMatchProfiles().self : null;
-      const prefs = readLearnerPrefs();
+      const friendSelf = authenticated && friendChallengeState?.active ? getFriendMatchProfiles().self : null;
+      const prefs = authenticated ? readLearnerPrefs() : { ...readLearnerPrefs(), nameStyle: "classic", nameFx: "off", title: "", avatar: "auto", avatarFrame: "", avatarEffect: "none" };
       const rating = document.querySelector("[data-match-rating]");
       const coins = card.querySelector("[data-match-coins]");
       const premium = document.querySelector("[data-match-premium]");
@@ -15926,9 +16066,9 @@
       const playerRating = Math.max(400, Number(friendSelf?.rating) || getLearnerGameRating());
       if (rating) rating.textContent = `${playerRating} Elo`;
       if (coins) coins.textContent = `◆ ${formatProfileNumber(profile.tokens)}`;
-      const gamesPlayed = Math.max(0, Number(gameStats.played) || 0);
-      const wins = Math.min(gamesPlayed, Math.max(0, Number(gameStats.wins) || 0));
-      const draws = Math.min(Math.max(0, gamesPlayed - wins), Math.max(0, Number(gameStats.draws) || 0));
+      const gamesPlayed = authenticated ? Math.max(0, Number(gameStats.played) || 0) : 0;
+      const wins = authenticated ? Math.min(gamesPlayed, Math.max(0, Number(gameStats.wins) || 0)) : 0;
+      const draws = authenticated ? Math.min(Math.max(0, gamesPlayed - wins), Math.max(0, Number(gameStats.draws) || 0)) : 0;
       const losses = Math.max(0, gamesPlayed - wins - draws);
       const frameStats = {
         rating: playerRating,
@@ -15937,7 +16077,7 @@
         losses,
         draws,
         "win-rate": `${gamesPlayed ? Math.round((wins / gamesPlayed) * 100) : 0}%`,
-        "best-rating": Math.max(playerRating, Number(gameStats.bestRating) || 0)
+        "best-rating": authenticated ? Math.max(playerRating, Number(gameStats.bestRating) || 0) : playerRating
       };
       Object.entries(frameStats).forEach(([key, value]) => {
         const field = card.querySelector(`[data-match-frame-stat="${key}"]`);
@@ -21776,6 +21916,7 @@
     }
 
     function getSocialFriends() {
+      if (!isApplicationAuthenticated()) return [];
       const remote = Array.isArray(friendNetworkState?.directory) ? friendNetworkState.directory : [];
       const local = readFriendDirectoryState().friends.map(normalizeFriendRecord);
       const source = remote.length ? remote : local;
@@ -27968,6 +28109,13 @@
         stopFriendPresence();
         stopFriendNetworkSync();
         stopTournamentNetworkSync();
+        // Do not let a signed-out browser render the previous account's
+        // wallet, inventory, or equipped cosmetics from the local snapshot.
+        // Authenticated sessions hydrate these values again from the server
+        // after the next login; the anonymous state remains deterministic.
+        puzzleCoins = 0;
+        storeState = { ...normalizeStoreState({}), equipped: {} };
+        writeJsonStorage(puzzleStorageKey, { ...readPuzzleState(), coins: 0, store: storeState });
         // The navbar and board/player cards are rendered outside the login
         // panel.  Re-render them from the same anonymous state immediately;
         // otherwise the panel can be logged out while the old chip remains.

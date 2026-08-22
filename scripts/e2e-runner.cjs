@@ -358,6 +358,46 @@ async function auditIdentity(page, label, expectedStyle = "") {
   return audit;
 }
 
+async function auditCurrentIdentityParity(page, label, expectedStyle = "") {
+  const parity = await page.evaluate(() => {
+    const read = (selector) => {
+      const name = document.querySelector(selector);
+      if (!name) return null;
+      const style = getComputedStyle(name);
+      const vars = ["--name-gradient", "--name-glow", "--name-color", "--name-shadow", "--name-filter", "--name-animation", "--name-font-weight", "--name-letter-spacing"];
+      return {
+        selector,
+        text: String(name.textContent || "").trim(),
+        style: name.dataset.nameStyle || "",
+        rarity: name.dataset.rarity || "",
+        className: String(name.className || ""),
+        backgroundImage: style.backgroundImage,
+        backgroundClip: style.backgroundClip || style.webkitBackgroundClip,
+        color: style.color,
+        textFill: style.webkitTextFillColor,
+        textShadow: style.textShadow,
+        filter: style.filter,
+        fontWeight: style.fontWeight,
+        letterSpacing: style.letterSpacing,
+        animationName: style.animationName,
+        animationDuration: style.animationDuration,
+        vars: Object.fromEntries(vars.map((key) => [key, style.getPropertyValue(key).trim()]))
+      };
+    };
+    return {
+      navbar: read('.site-header .nav-utilities .player-flex-name [data-profile-field="name"]'),
+      playerPass: read('#loginDisplayName')
+    };
+  });
+  assert(parity.navbar && parity.playerPass, `${label}: navbar or Player Pass identity was not mounted: ${JSON.stringify(parity)}`);
+  assert(parity.navbar.text && parity.playerPass.text, `${label}: navbar or Player Pass username is empty: ${JSON.stringify(parity)}`);
+  const identityKeys = ["style", "rarity", "backgroundImage", "backgroundClip", "color", "textFill", "textShadow", "filter", "fontWeight", "letterSpacing", "animationName", "animationDuration"];
+  identityKeys.forEach((key) => assert(parity.navbar[key] === parity.playerPass[key], `${label}: navbar and Player Pass ${key} differ (navbar=${JSON.stringify(parity.navbar[key])}, playerPass=${JSON.stringify(parity.playerPass[key])}).`));
+  Object.keys(parity.navbar.vars).forEach((key) => assert(parity.navbar.vars[key] === parity.playerPass.vars[key], `${label}: navbar and Player Pass ${key} token differs (navbar=${JSON.stringify(parity.navbar.vars[key])}, playerPass=${JSON.stringify(parity.playerPass.vars[key])}).`));
+  if (expectedStyle) assert(parity.navbar.style === expectedStyle && parity.playerPass.style === expectedStyle, `${label}: expected ${expectedStyle}, found navbar=${parity.navbar.style}, playerPass=${parity.playerPass.style}.`);
+  return parity;
+}
+
 async function readIdentityVisualState(page) {
   return page.evaluate(() => {
     const visible = (element) => {
@@ -985,6 +1025,9 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
   pass("browser: authenticated Supabase session and account identity (not Guest Explorer)");
 
   const expectedStyle = String(process.env.E2E_EXPECTED_NAME_STYLE || "").trim();
+  await auditIdentity(page, "authenticated#login", expectedStyle);
+  await auditCurrentIdentityParity(page, "authenticated navbar ↔ Player Pass", expectedStyle);
+  pass("browser: navbar and Player Pass share computed equipped cosmetic tokens");
   const modes = ["#play", "#bots", "#puzzles", "#openings", "#gameReview", "#leaderboards", "#friends", "#store"];
   for (const hash of modes) {
     await gotoHash(page, baseUrl, hash);
@@ -1173,6 +1216,7 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
       const chipVisible = Boolean(chip && !chip.hidden && getComputedStyle(chip).display !== "none" && getComputedStyle(chip).visibility !== "hidden");
       const chipText = chipVisible ? String(chip.innerText || "") : "";
       const visibleText = String(document.body?.innerText || "");
+      const textFor = (selector) => document.querySelector(selector)?.textContent?.trim() || "";
       const priorValues = [previousIdentity.name, previousIdentity.rank, previousIdentity.rating, previousIdentity.avatar]
         .map((value) => String(value || "").trim())
         .filter((value) => value && value !== "Guest Explorer" && value !== "Rank: Explorer" && value !== "450 Elo" && /[A-Za-z0-9]/.test(value));
@@ -1198,6 +1242,19 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         userPresent: Boolean(userResult?.data?.user?.id),
         userError: userResult?.error?.message || "",
         authStorageKeys: storageKeys.filter((key) => /^sb-.*auth-token/i.test(key) || /supabase.*auth|auth.*supabase/i.test(key)),
+        guestMetrics: {
+          name: textFor('[data-profile-field="name"]'),
+          rank: textFor('[data-profile-field="rank"]'),
+          gameRating: textFor('[data-profile-field="gameRating"]'),
+          puzzleRating: textFor('[data-profile-field="puzzleRating"]'),
+          gamesPlayed: textFor('[data-profile-field="gamesPlayed"]'),
+          winRate: textFor('[data-profile-field="winRate"]'),
+          streak: textFor('[data-profile-field="streak"]'),
+          xp: textFor('[data-profile-field="xp"]'),
+          tokens: textFor('[data-profile-field="tokens"]'),
+          achievements: textFor('[data-profile-achievement-summary]'),
+          storeCoins: textFor('#storeCoinBalance')
+        },
         chipVisible,
         chipText,
         visibleText,
@@ -1210,6 +1267,12 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
       `${label} did not clear the Supabase session and browser auth state: ${JSON.stringify(state)}`);
     assert(!state.staleIdentityInNavbar && !state.staleIdentityVisible,
       `${label} left the previous authenticated identity visible after logout: ${JSON.stringify({ previousIdentity, chipText: state.chipText, staleIdentityInNavbar: state.staleIdentityInNavbar, staleIdentityVisible: state.staleIdentityVisible, staleElements: state.staleElements })}`);
+    const metrics = state.guestMetrics;
+    assert(metrics.name === "Guest Explorer" && /Explorer/i.test(metrics.rank) && /450\s*Elo/i.test(metrics.gameRating)
+      && metrics.puzzleRating === "400" && /(?:No games yet|0\s+games)/i.test(metrics.gamesPlayed) && /0/.test(metrics.streak)
+      && metrics.xp === "0" && metrics.tokens === "0" && metrics.achievements === "0/0 unlocked"
+      && (!metrics.storeCoins || metrics.storeCoins === "0"),
+      `${label} retained authenticated profile metrics after logout: ${JSON.stringify(metrics)}`);
     pass(`browser: ${label}`);
   };
 
