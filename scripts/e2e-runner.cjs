@@ -236,8 +236,9 @@ function changedFiles() {
 function runStaticChecks(full) {
   const checks = [
     ["JavaScript syntax", () => runNode("--check", ["assets/app.js"])],
-    ["E2E harness syntax", () => ["scripts/e2e-config.cjs", "scripts/e2e-runner.cjs", "scripts/e2e-server.cjs", "scripts/store-preflight.cjs", "scripts/oauth-auth-regression.js"].forEach((file) => runNode("--check", [file]))],
+    ["E2E harness syntax", () => ["scripts/e2e-config.cjs", "scripts/e2e-runner.cjs", "scripts/e2e-server.cjs", "scripts/store-preflight.cjs", "scripts/oauth-auth-regression.js", "scripts/auth-logout-regression.js"].forEach((file) => runNode("--check", [file]))],
     ["OAuth redirect policy", () => runNode("scripts/oauth-auth-regression.js")],
+    ["auth logout regression", () => runNode("scripts/auth-logout-regression.js")],
     ["board interaction regression", () => runNode("scripts/board-interaction-regression.js")],
     ["site structure", () => runNode("scripts/verify-site.js")]
   ];
@@ -615,7 +616,11 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
   }
   const statePath = path.join(root, ".playwright", "auth", `${label}.json`);
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
-  if (fs.existsSync(statePath)) {
+  // A failed-signout fixture is created immediately after a real logout. The
+  // preceding sign-out may revoke the cached refresh token, so an apparently
+  // authenticated snapshot is not safe to reuse for this specific case.
+  const forceFreshState = label === "failed-logout";
+  if (!forceFreshState && fs.existsSync(statePath)) {
     const cachedContext = await browser.newContext({ storageState: statePath });
     const cachedPage = await cachedContext.newPage();
     await gotoHash(cachedPage, baseUrl, "#login");
@@ -1139,13 +1144,81 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
   await page.unroute("**/rest/v1/rpc/purchase_cosmetic");
   pass(`browser: Store RPC failure is surfaced without a silent no-op (${failureId})`);
 
+  const assertLoggedOut = async (target, label) => {
+    await target.waitForFunction(() => document.documentElement.dataset.authState === "guest"
+      && document.getElementById("authAccountPanel")?.hidden === true, null, { timeout: 10000 });
+    const state = await target.evaluate(async () => {
+      const client = window.CheckmateQuestSupabaseClient?.client;
+      const sessionResult = await client?.auth?.getSession?.();
+      const userResult = await client?.auth?.getUser?.();
+      const storageKeys = [...Object.keys(localStorage), ...Object.keys(sessionStorage)];
+      return {
+        authState: document.documentElement.dataset.authState || "",
+        accountHidden: Boolean(document.getElementById("authAccountPanel")?.hidden),
+        accountName: document.getElementById("authAccountName")?.textContent || "",
+        sessionPresent: Boolean(sessionResult?.data?.session?.user?.id),
+        sessionError: sessionResult?.error?.message || "",
+        userPresent: Boolean(userResult?.data?.user?.id),
+        userError: userResult?.error?.message || "",
+        authStorageKeys: storageKeys.filter((key) => /^sb-.*auth-token/i.test(key) || /supabase.*auth|auth.*supabase/i.test(key))
+      };
+    });
+    assert(state.authState === "guest" && state.accountHidden && !state.sessionPresent && !state.userPresent && !state.authStorageKeys.length,
+      `${label} did not clear the Supabase session and browser auth state: ${JSON.stringify(state)}`);
+    pass(`browser: ${label}`);
+  };
+
   const logoutContext = await browser.newContext({ storageState: primaryState, viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
   const logoutPage = await logoutContext.newPage();
   await gotoHash(logoutPage, baseUrl, "#login");
-  await logoutPage.locator("#authPanelLogout").click();
-  await logoutPage.waitForFunction(() => document.documentElement.dataset.authState !== "authenticated", null, { timeout: 10000 });
-  pass("browser: logout clears the authenticated session");
+  await waitForAuthenticatedHydration(logoutPage, "logout regression");
+  await logoutPage.evaluate(() => {
+    const auth = window.CheckmateQuestSupabaseClient?.client?.auth;
+    if (!auth?.signOut) throw new Error("Supabase signOut is unavailable to the logout regression.");
+    const original = auth.signOut.bind(auth);
+    window.__nschessLogoutCalls = 0;
+    auth.signOut = async (...args) => {
+      window.__nschessLogoutCalls += 1;
+      return original(...args);
+    };
+  });
+  await logoutPage.locator("#authPanelLogout").click({ noWaitAfter: true });
+  // A DOM-dispatched second activation bypasses native disabled behavior and
+  // verifies the shared logout promise prevents duplicate sign-out requests.
+  await logoutPage.evaluate(() => document.getElementById("authPanelLogout")?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
+  await assertLoggedOut(logoutPage, "email/password session logout clears Supabase session");
+  assert(await logoutPage.evaluate(() => window.__nschessLogoutCalls) === 1, "Repeated logout clicks issued more than one Supabase signOut call.");
+  await logoutPage.reload({ waitUntil: "domcontentloaded" });
+  await gotoHash(logoutPage, baseUrl, "#login");
+  await waitForAuthHydration(logoutPage, "logout reload");
+  await assertLoggedOut(logoutPage, "logout remains signed out after reload");
+  const newTab = await logoutContext.newPage();
+  await gotoHash(newTab, baseUrl, "#login");
+  await waitForAuthHydration(newTab, "logout new tab");
+  await assertLoggedOut(newTab, "logout remains signed out in a new tab");
+  await newTab.close();
   await logoutContext.close();
+
+  // The preceding logout regression intentionally invalidates the disposable
+  // session.  Obtain a fresh authenticated state before testing a failed
+  // sign-out so that this case exercises the error path rather than a stale
+  // storage snapshot.
+  const failedLogoutState = await prepareAuth(browser, baseUrl, process.env.E2E_EMAIL, process.env.E2E_PASSWORD, "failed-logout");
+  const failedLogoutContext = await browser.newContext({ storageState: failedLogoutState, viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
+  const failedLogoutPage = await failedLogoutContext.newPage();
+  await gotoHash(failedLogoutPage, baseUrl, "#login");
+  await waitForAuthenticatedHydration(failedLogoutPage, "failed logout regression");
+  await failedLogoutPage.evaluate(() => {
+    const auth = window.CheckmateQuestSupabaseClient?.client?.auth;
+    auth.signOut = async () => ({ data: null, error: { code: "E2E_SIGNOUT_FAILURE", message: "intentional sign-out failure" } });
+  });
+  await failedLogoutPage.locator("#authPanelLogout").click({ noWaitAfter: true });
+  await failedLogoutPage.waitForFunction(() => document.getElementById("authStatus")?.classList.contains("is-error"), null, { timeout: 5000 });
+  const failedState = await readAuthRuntimeSnapshot(failedLogoutPage);
+  assert(failedState.authState === "authenticated" && failedState.session.present && !failedState.accountHidden && !/logged out/i.test(failedState.authStatus),
+    `Failed sign-out falsely rendered a logged-out state: ${JSON.stringify(failedState)}`);
+  pass("browser: failed sign-out preserves authenticated UI and reports an error");
+  await failedLogoutContext.close();
   await context.close();
 }
 
