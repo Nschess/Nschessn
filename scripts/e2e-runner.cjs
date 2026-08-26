@@ -574,15 +574,29 @@ async function drawAndToggleManualArrow(page, boardSelector, label) {
   await page.mouse.move(end.x, end.y, { steps: 4 });
   await page.mouse.up({ button: "right" });
   await page.waitForTimeout(60);
-  const countAfterDraw = await board.locator('[data-analysis-layer="arrows"] [data-arrow-id], .review-arrow-group').count();
+  const readArrowState = () => board.evaluate((node, points) => ({
+    route: location.hash,
+    groups: [...node.querySelectorAll('[data-analysis-layer="arrows"] [data-arrow-id], .review-arrow-group')].map((group) => ({
+      id: group.getAttribute("data-arrow-id") || "",
+      kind: group.getAttribute("data-arrow-kind") || "",
+      priority: group.getAttribute("data-arrow-priority") || "",
+      lane: group.getAttribute("data-arrow-lane") || ""
+    })),
+    layers: node.querySelectorAll(":scope > .review-arrow-layer").length,
+    squareAtStart: document.elementFromPoint(points.start.x, points.start.y)?.closest?.("[data-square]")?.dataset?.square || "",
+    squareAtEnd: document.elementFromPoint(points.end.x, points.end.y)?.closest?.("[data-square]")?.dataset?.square || ""
+  }), { start, end });
+  const arrowStateAfterDraw = await readArrowState();
+  const countAfterDraw = arrowStateAfterDraw.groups.length;
   assert(countAfterDraw >= 1, `${label}: right-click drag did not create a manual arrow.`);
   await page.mouse.move(start.x, start.y);
   await page.mouse.down({ button: "right" });
   await page.mouse.move(end.x, end.y, { steps: 4 });
   await page.mouse.up({ button: "right" });
   await page.waitForTimeout(60);
-  const countAfterToggle = await board.locator('[data-analysis-layer="arrows"] [data-arrow-id], .review-arrow-group').count();
-  assert(countAfterToggle === 0, `${label}: drawing the same route did not toggle the arrow off.`);
+  const arrowStateAfterToggle = await readArrowState();
+  const countAfterToggle = arrowStateAfterToggle.groups.length;
+  assert(countAfterToggle === 0, `${label}: drawing the same route did not toggle the arrow off: ${JSON.stringify({ arrowStateAfterDraw, arrowStateAfterToggle })}`);
 }
 
 async function readAuthRuntimeSnapshot(page) {
@@ -638,8 +652,9 @@ async function waitForAuthenticatedHydration(page, label) {
       return state === "authenticated" && !document.getElementById("authAccountPanel")?.hidden;
     }, null, { timeout: 15000 });
   } catch (error) {
-    const snapshot = await readAuthRuntimeSnapshot(page);
-    throw new Error(`${label} authenticated state did not settle: ${JSON.stringify({ timeout: error.message, snapshot })}`);
+      const snapshot = await readAuthRuntimeSnapshot(page);
+    const authDebug = await page.evaluate(() => Array.isArray(window.__nschessAuthDebugLog) ? window.__nschessAuthDebugLog.slice(-30) : []).catch(() => []);
+    throw new Error(`${label} authenticated state did not settle: ${JSON.stringify({ timeout: error.message, snapshot, authDebug })}`);
   }
   const snapshot = await readAuthRuntimeSnapshot(page);
   assert(snapshot.session?.present && snapshot.supabaseClientReady && snapshot.accountName.trim() && snapshot.accountName.trim() !== "Guest Explorer", `${label} resolved without a live authenticated Supabase session: ${JSON.stringify(snapshot)}`);
@@ -657,6 +672,168 @@ async function waitForStoreHydration(page, label) {
     const snapshot = await readAuthRuntimeSnapshot(page);
     throw new Error(`${label} Store state did not settle: ${JSON.stringify({ timeout: error.message, snapshot, storeSyncStatus: await page.evaluate(() => document.documentElement.dataset.storeSyncStatus || "") })}`);
   }
+}
+
+function expectedNameStyleForE2eAccount(label) {
+  const variable = label === "secondary" ? "E2E_SECOND_EXPECTED_NAME_STYLE" : "E2E_EXPECTED_NAME_STYLE";
+  return String(process.env[variable] || "").trim();
+}
+
+async function ensureExpectedE2eNameStyle(page, label, expectedStyle) {
+  const style = String(expectedStyle || "").trim();
+  if (!style) return { ok: true, changed: false };
+  const itemId = `name-${style}`;
+  const result = await page.evaluate(async (expectedItemId) => {
+    const client = window.CheckmateQuestSupabaseClient?.client;
+    if (!client?.auth?.getUser || !client?.rpc) return { ok: false, reason: "supabase-client-unavailable" };
+    const { data: userData, error: userError } = await client.auth.getUser();
+    if (userError) return { ok: false, reason: "auth-user-error", message: userError.message || "unknown" };
+    if (!userData?.user?.id) return { ok: false, reason: "no-authenticated-user" };
+    const { data: store, error: storeError } = await client.rpc("get_store_state");
+    if (storeError) return { ok: false, reason: "store-state-error", message: storeError.message || "unknown" };
+    const inventory = Array.isArray(store?.inventory) ? store.inventory : [];
+    const item = inventory.find((entry) => String(entry?.item_id || entry?.itemId || "") === expectedItemId);
+    if (!item) return { ok: false, reason: "expected-style-not-owned", itemId: expectedItemId };
+    if (item.equipped) return { ok: true, changed: false, itemId: expectedItemId };
+    const { error: equipError } = await client.rpc("equip_cosmetic", { p_item_id: expectedItemId });
+    if (equipError) return { ok: false, reason: "equip-request-failed", itemId: expectedItemId, message: equipError.message || "unknown" };
+    return { ok: true, changed: true, itemId: expectedItemId };
+  }, itemId);
+  if (!result?.ok) {
+    throw new Error(`${label} E2E Name Style fixture is not authoritative and repairable: ${JSON.stringify(result)}`);
+  }
+  if (result.changed) {
+    // Rehydrate from the Store RPC after the fixture repair. This keeps the
+    // assertion below tied to the same authoritative path used by the app,
+    // rather than accepting a locally patched preference.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForAuthenticatedHydration(page, `${label} Name Style fixture rehydration`);
+    await waitForStoreHydration(page, `${label} Name Style fixture Store rehydration`);
+  }
+  return result;
+}
+
+async function activateLoginForm(page, label) {
+  const loginTab = page.locator('[data-auth-tab="login"]');
+  await loginTab.click({ noWaitAfter: true, timeout: 10000 });
+  try {
+    await page.waitForFunction(() => {
+      const form = document.getElementById("authLoginForm");
+      return Boolean(form && !form.hidden && getComputedStyle(form).display !== "none");
+    }, null, { timeout: 10000 });
+  } catch (error) {
+    const snapshot = await readAuthRuntimeSnapshot(page);
+    throw new Error(`${label} did not expose the Login form after an anonymous transition: ${JSON.stringify({ timeout: error.message, snapshot })}`);
+  }
+}
+
+async function submitE2ePasswordLogin(page, { email, password, label }) {
+  await activateLoginForm(page, label);
+  const trace = { consoleErrors: [], requestFailures: [], authResponses: [] };
+  const onConsole = (message) => {
+    if (message.type() === "error") trace.consoleErrors.push(redactDiagnosticText(message.text()));
+  };
+  const onRequestFailed = (request) => {
+    if (/auth-config|supabase|auth\/v1|rest\/v1/i.test(request.url())) {
+      trace.requestFailures.push({ url: redactTraceUrl(request.url()), failure: request.failure()?.errorText || "unknown" });
+    }
+  };
+  const onResponse = (response) => {
+    if (/auth-config|supabase|auth\/v1|rest\/v1/i.test(response.url())) {
+      trace.authResponses.push({ url: redactTraceUrl(response.url()), status: response.status() });
+    }
+  };
+  page.on("console", onConsole);
+  page.on("requestfailed", onRequestFailed);
+  page.on("response", onResponse);
+  try {
+    await page.locator("#authLoginEmail").fill(email);
+    await page.locator("#authLoginPassword").fill(password);
+    await page.locator("#authLoginForm button[type='submit']").click();
+    try {
+      await page.waitForFunction(async () => {
+        const status = document.getElementById("authStatus");
+        const client = window.CheckmateQuestSupabaseClient?.client;
+        const sessionResult = await client?.auth?.getSession?.().catch(() => null);
+        const liveSession = Boolean(sessionResult?.data?.session?.user?.id);
+        return (document.documentElement.dataset.authState === "authenticated"
+          && !document.getElementById("authAccountPanel")?.hidden
+          && liveSession)
+          || status?.classList.contains("is-error");
+      }, null, { timeout: 15000 });
+    } catch (error) {
+      const snapshot = await readAuthRuntimeSnapshot(page);
+      const ui = await page.evaluate(() => ({
+        status: document.getElementById("authStatus")?.textContent?.trim() || "",
+        statusError: document.getElementById("authStatus")?.classList.contains("is-error") || false,
+        formHidden: Boolean(document.getElementById("authLoginForm")?.hidden),
+        submitDisabled: Boolean(document.querySelector("#authLoginForm button[type='submit']")?.disabled),
+        fieldErrors: [...document.querySelectorAll("[data-auth-error].is-error")].map((node) => node.textContent?.trim() || ""),
+        authDebug: Array.isArray(window.__nschessAuthDebugLog) ? window.__nschessAuthDebugLog.slice(-20) : []
+      }));
+      throw new Error(`${label} password login did not reach either an authenticated state or a visible error: ${JSON.stringify({ timeout: error.message, snapshot, ui, trace })}`);
+    }
+    const ui = await page.evaluate(() => ({
+      status: document.getElementById("authStatus")?.textContent?.trim() || "",
+      statusError: document.getElementById("authStatus")?.classList.contains("is-error") || false,
+      fieldErrors: [...document.querySelectorAll("[data-auth-error].is-error")].map((node) => node.textContent?.trim() || "")
+    }));
+    if (ui.statusError) {
+      const snapshot = await readAuthRuntimeSnapshot(page);
+      throw new Error(`${label} password login was rejected by the application: ${JSON.stringify({ snapshot, ui, trace })}`);
+    }
+  } finally {
+    page.off("console", onConsole);
+    page.off("requestfailed", onRequestFailed);
+    page.off("response", onResponse);
+  }
+}
+
+async function assertIsolationGuestState(page, label, priorIdentity = {}) {
+  const state = await page.evaluate(async (identity) => {
+    const client = window.CheckmateQuestSupabaseClient?.client;
+    const session = await client?.auth?.getSession?.();
+    const keys = [
+      "checkmateQuest.shortLessons.v1", "checkmateQuest.puzzles.v1", "checkmateQuest.realPuzzleCollection.v4",
+      "checkmateQuest.progressBackup.v1", "checkmateQuest.realPuzzles.v1", "checkmateQuest.progressAutosave.v1",
+      "checkmateQuest.visitSnapshot.v1", "checkmateQuest.sound.v1", "checkmateQuest.beginnerTutorial.v1",
+      "checkmateQuest.academy.v1", "checkmateQuestBeginnerBots", "checkmateQuest.bookReader.v1",
+      "checkmateQuest.localBooks.v1", "checkmateQuest.dailyTraining.v1", "checkmateQuest.gentleStart.v1",
+      "checkmateQuest.firstTimeTour.v1", "checkmateQuest.firstVisitSetup.v1", "checkmateQuest.story.v1",
+      "checkmateQuest.preferences.v1", "checkmateQuest.profile.v1", "checkmateQuest.authPreferences.v1",
+      "checkmateQuest.dragonProfile.v1", "checkmateQuest.friendChallenge.v1", "checkmateQuest.friends.v1",
+      "checkmateQuest.friendHub.v1", "checkmateQuest.friendRecent.v1", "checkmateQuest.tournaments.v1",
+      "checkmateQuest.reviewAnalysis.v1", "nschessRecentAiBots", "nschess.quickMatchSettings.v1"
+    ];
+    const priorValues = [identity.name, identity.flag, identity.title, identity.rank, identity.rating, identity.avatar]
+      .map((value) => String(value || "").trim())
+      // Values shared by the neutral Guest presentation cannot demonstrate a
+      // cross-account leak. Account ownership, workspace emptiness, session,
+      // and every account-distinct identity value are asserted separately.
+      .filter((value) => value && !/^Guest Explorer$|^(?:Rank:\s*)?Explorer$|^450 Elo$|^🌐$|^[✦♟]$/i.test(value));
+    const identityText = [...document.querySelectorAll(
+      ".player-flex-chip, .login-pass, .login-player-profile, #authAccountPanel, .hero-player-card--you, .match-player-card, .review-player-chip:not(.review-player-chip--opponent), .player-profile-card"
+    )].map((element) => String(element.innerText || element.textContent || "")).join("\n");
+    const identityAvatars = [...document.querySelectorAll(
+      '[data-identity-owner="player"] .player-identity-avatar, .player-flex-chip .player-profile-avatar, .login-pass .player-profile-avatar, #authAccountAvatar, #loginAvatar, .hero-player-card--you .player-identity-avatar, .match-player-card .player-identity-avatar, .review-player-chip:not(.review-player-chip--opponent) .player-identity-avatar'
+    )].map((element) => String(element.textContent || "").trim());
+    return {
+      authState: document.documentElement.dataset.authState || "",
+      sessionPresent: Boolean(session?.data?.session?.user?.id),
+      accountHidden: Boolean(document.getElementById("authAccountPanel")?.hidden),
+      accountName: document.getElementById("authAccountName")?.textContent?.trim() || "",
+      accountAvatar: document.getElementById("authAccountAvatar")?.textContent?.trim() || "",
+      owner: localStorage.getItem("checkmateQuest.accountWorkspaceOwner.v1") || "",
+      activeWorkspaceKeys: keys.filter((key) => localStorage.getItem(key) !== null),
+      staleValues: priorValues.filter((value) => value === String(identity.avatar || "").trim()
+        ? identityAvatars.includes(value)
+        : identityText.includes(value))
+    };
+  }, priorIdentity);
+  assert(state.authState === "guest" && !state.sessionPresent && state.accountHidden
+    && state.accountName === "Guest Explorer" && state.accountAvatar === "✦" && state.owner === "guest" && state.activeWorkspaceKeys.length === 0
+    && state.staleValues.length === 0,
+  `${label} did not reach a clean anonymous account boundary: ${JSON.stringify(state)}`);
 }
 
 async function prepareAuth(browser, baseUrl, email, password, label) {
@@ -682,6 +859,28 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
     // deep authenticated audit.
     await waitForAuthHydration(cachedPage, `${label} cached auth`).catch(() => {});
     const cachedAuth = await readAuthRuntimeSnapshot(cachedPage);
+    let cachedStoreReady = false;
+    let cachedExpectedStyleReady = !expectedNameStyleForE2eAccount(label);
+    if (cachedAuth.authState === "authenticated" && cachedAuth.session?.present && cachedAuth.supabaseClientReady) {
+      // A valid auth token can still carry a pre-hydration Classic preference.
+      // Reuse cached state only after the authoritative Store state has been
+      // applied to the shared identity renderer.
+      await gotoHash(cachedPage, baseUrl, "#top");
+      await waitForAuthenticatedHydration(cachedPage, `${label} cached identity`).catch(() => {});
+      await waitForStoreHydration(cachedPage, `${label} cached Store`).catch(() => {});
+      cachedStoreReady = await cachedPage.evaluate(() => document.documentElement.dataset.storeSyncStatus === "ready");
+      const expectedStyle = expectedNameStyleForE2eAccount(label);
+      if (expectedStyle) {
+        cachedExpectedStyleReady = await cachedPage.evaluate((style) => {
+          const domReady = [...document.querySelectorAll('.player-identity-line[data-identity-owner="player"]')]
+            .some((line) => line.dataset.identityNameStyle === style);
+          let stored = "";
+          try { stored = JSON.parse(localStorage.getItem("checkmateQuest.preferences.v1") || "{}").nameStyle || ""; } catch {}
+          return domReady && stored === style;
+        }, expectedStyle).catch(() => false);
+      }
+    }
+    if (cachedStoreReady && cachedExpectedStyleReady) await cachedContext.storageState({ path: statePath });
     await cachedContext.close();
     if (cachedAuth.authState === "authenticated"
       && cachedAuth.session?.present
@@ -689,7 +888,9 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
       && cachedAuth.accountHidden === false
       && cachedAuth.accountEmail.trim().toLowerCase() === String(email).trim().toLowerCase()
       && cachedAuth.accountName.trim()
-      && cachedAuth.accountName.trim() !== "Guest Explorer") return statePath;
+      && cachedAuth.accountName.trim() !== "Guest Explorer"
+      && cachedStoreReady
+      && cachedExpectedStyleReady) return statePath;
   }
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -717,7 +918,7 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
     // this click can hang when Supabase is still hydrating.  Trigger the
     // semantic click without Playwright's navigation wait, then continue to
     // the form readiness check below.
-    await loginTab.click({ noWaitAfter: true, timeout: 10000 });
+    await activateLoginForm(page, `${label} initial login`);
     await page.locator("#authLoginEmail").fill(email);
     await page.locator("#authLoginPassword").fill(password);
     await page.locator("#authLoginForm button[type=submit]").click();
@@ -744,6 +945,25 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
       throw new Error(`E2E login returned without an authenticated account. ${JSON.stringify({ snapshot: finalSnapshot, trace })}`);
     }
   }
+  await waitForStoreHydration(page, `${label} Store hydration`);
+  await gotoHash(page, baseUrl, "#top");
+  await waitForAuthenticatedHydration(page, `${label} identity hydration`);
+  await waitForStoreHydration(page, `${label} identity Store hydration`);
+  const expectedStyle = expectedNameStyleForE2eAccount(label);
+  if (expectedStyle) {
+    await ensureExpectedE2eNameStyle(page, label, expectedStyle);
+    try {
+      await page.waitForFunction((style) => [...document.querySelectorAll('.player-identity-line[data-identity-owner="player"]')]
+        .some((line) => line.dataset.identityNameStyle === style), expectedStyle, { timeout: 10000 });
+      const storedStyle = await page.evaluate(() => {
+        try { return JSON.parse(localStorage.getItem("checkmateQuest.preferences.v1") || "{}").nameStyle || ""; } catch { return ""; }
+      });
+      if (storedStyle !== expectedStyle) throw new Error(`local preference is ${storedStyle || "empty"}`);
+    } catch (error) {
+      const snapshot = await readAuthRuntimeSnapshot(page);
+      throw new Error(`E2E ${label} Store hydration did not apply expected Name Style ${expectedStyle}. ${JSON.stringify({ timeout: error.message, snapshot })}`);
+    }
+  }
   await context.storageState({ path: statePath });
   await context.close();
   return statePath;
@@ -752,13 +972,43 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
 async function runOAuthButtonTests(browser, baseUrl) {
   const context = await browser.newContext({ viewport: { width: 1024, height: 800 }, serviceWorkers: "block" });
   const page = await context.newPage();
+  const trace = { consoleErrors: [], pageErrors: [], requestFailures: [], authResponses: [] };
+  page.on("console", (message) => {
+    if (message.type() === "error") trace.consoleErrors.push(redactDiagnosticText(message.text()));
+  });
+  page.on("pageerror", (error) => trace.pageErrors.push(redactDiagnosticText(error.message || error)));
+  page.on("requestfailed", (request) => {
+    if (/auth-config|supabase|auth\/v1|rest\/v1|jsdelivr/i.test(request.url())) {
+      trace.requestFailures.push({ url: redactTraceUrl(request.url()), failure: request.failure()?.errorText || "unknown" });
+    }
+  });
+  page.on("response", (response) => {
+    if (/auth-config|supabase|auth\/v1|rest\/v1|jsdelivr/i.test(response.url())) {
+      trace.authResponses.push({ url: redactTraceUrl(response.url()), status: response.status() });
+    }
+  });
   const waitForOauthUi = async () => {
     await gotoHash(page, baseUrl, "#login");
-    await page.waitForFunction(() => Boolean(
-      window.CheckmateQuestAuthProvider?.startOAuthLogin
-      && window.CheckmateQuestSupabaseClient?.client?.auth?.signInWithOAuth
-      && document.getElementById("authGoogleLogin")
-    ), null, { timeout: 15000 });
+    try {
+      await page.waitForFunction(() => Boolean(
+        window.CheckmateQuestAuthProvider?.startOAuthLogin
+        && window.CheckmateQuestSupabaseClient?.client?.auth?.signInWithOAuth
+        && document.getElementById("authGoogleLogin")
+      ), null, { timeout: 15000 });
+    } catch (error) {
+      const snapshot = await page.evaluate(() => ({
+        url: location.href,
+        hash: location.hash,
+        authState: document.documentElement.dataset.authState || "",
+        providerReady: Boolean(window.CheckmateQuestAuthProvider?.startOAuthLogin),
+        clientReady: Boolean(window.CheckmateQuestSupabaseClient?.client),
+        oauthMethodReady: Boolean(window.CheckmateQuestSupabaseClient?.client?.auth?.signInWithOAuth),
+        googleButtonPresent: Boolean(document.getElementById("authGoogleLogin")),
+        googleButtonVisible: Boolean(document.getElementById("authGoogleLogin") && !document.getElementById("authGoogleLogin")?.hidden),
+        authStatus: document.getElementById("authStatus")?.textContent || ""
+      }));
+      throw new Error(`OAuth UI prerequisites did not settle: ${JSON.stringify({ timeout: error.message, snapshot, trace })}`);
+    }
   };
   const intercept = async (result) => page.evaluate((nextResult) => {
     const client = window.CheckmateQuestSupabaseClient.client;
@@ -1048,7 +1298,201 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
     if (expectedStyle && secondExpectedStyle) assert(expectedStyle !== secondExpectedStyle, "The two dedicated accounts must use distinct expected Name Styles for identity isolation coverage.");
     await secondContext.close();
     pass("browser: second dedicated account identity isolation");
-  } else pass("browser: second-account identity isolation not configured (optional dedicated account)");
+
+    const secondEmail = String(process.env.E2E_SECOND_EMAIL || "").trim();
+    const secondPassword = String(process.env.E2E_SECOND_PASSWORD || "");
+    if (secondEmail && secondPassword) {
+      const isolationContext = await browser.newContext({ storageState: primaryState, viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
+      const isolationPage = await isolationContext.newPage();
+      await gotoHash(isolationPage, baseUrl, "#login");
+      await isolationPage.evaluate(() => localStorage.setItem("checkmateQuest.authDebug", "1"));
+      const accountASnapshot = await waitForAuthenticatedHydration(isolationPage, "account A isolation");
+      const readIsolationIdentity = (targetPage = isolationPage) => targetPage.evaluate(() => {
+        const chip = document.querySelector(".player-flex-chip");
+        const line = document.querySelector('.player-identity-line[data-identity-owner="player"]');
+        const textFor = (selector) => document.querySelector(selector)?.textContent?.trim() || "";
+        return {
+          name: textFor('.player-flex-chip [data-profile-field="name"]') || textFor('[data-profile-field="name"]'),
+          flag: textFor('[data-profile-field="countryFlag"]'),
+          title: textFor('[data-profile-field="title"]'),
+          rank: textFor('[data-profile-field="rank"]'),
+          rating: textFor('[data-profile-field="gameRating"]'),
+          avatar: textFor('.player-flex-chip .player-profile-avatar'),
+          nameStyle: line?.dataset.identityNameStyle || "",
+          chipText: chip && !chip.hidden ? String(chip.innerText || "") : ""
+        };
+      });
+      const readIsolationAccountState = (targetPage = isolationPage) => targetPage.evaluate(async () => {
+        const client = window.CheckmateQuestSupabaseClient?.client;
+        const { data: userData, error: userError } = await client?.auth?.getUser?.() || {};
+        const userId = String(userData?.user?.id || "");
+        let profile = null;
+        let profileError = "";
+        if (userId && client?.from) {
+          const result = await client.from("profiles")
+            .select("id,username,avatar,country_flag,rating,coins,xp,wins,losses,draws,title")
+            .eq("id", userId)
+            .maybeSingle();
+          profile = result?.data || null;
+          profileError = result?.error?.message || "";
+        }
+        return {
+          userPresent: Boolean(userId),
+          userError: userError?.message || "",
+          profile: profile ? {
+            username: profile.username || "",
+            avatar: profile.avatar || "",
+            country: profile.country_flag || "",
+            rating: Number(profile.rating) || 0,
+            coins: Number(profile.coins) || 0,
+            xp: Number(profile.xp) || 0,
+            title: profile.title || ""
+          } : null,
+          profileError,
+          header: {
+            name: document.getElementById("authAccountName")?.textContent?.trim() || "",
+            title: document.getElementById("authAccountTitle")?.textContent?.trim() || "",
+            avatar: document.getElementById("authAccountAvatar")?.textContent?.trim() || ""
+          },
+          // Non-secret, account-owned state recorded solely to diagnose an
+          // identity hydration mismatch. This is intentionally limited to
+          // cosmetic/profile values; it never records session tokens.
+          activePreferences: (() => {
+            try {
+              const stored = JSON.parse(localStorage.getItem("checkmateQuest.preferences.v1") || "{}");
+              return {
+                avatar: String(stored?.avatar || ""),
+                title: String(stored?.title || ""),
+                nameStyle: String(stored?.nameStyle || ""),
+                avatarFrame: String(stored?.avatarFrame || ""),
+                avatarEffect: String(stored?.avatarEffect || "")
+              };
+            } catch {
+              return {};
+            }
+          })(),
+          authDebug: Array.isArray(window.__nschessAuthDebugLog) ? window.__nschessAuthDebugLog.slice(-30) : []
+        };
+      });
+      const accountAIdentity = await readIsolationIdentity();
+      const accountAName = accountASnapshot.accountName.trim() || accountAIdentity.name;
+      await isolationPage.locator("#authPanelLogout").click({ noWaitAfter: true });
+      await isolationPage.waitForFunction(() => document.documentElement.dataset.authState === "guest" && document.getElementById("authAccountPanel")?.hidden === true, null, { timeout: 10000 });
+      await assertIsolationGuestState(isolationPage, "Account A logout before Account B login", accountAIdentity);
+      await submitE2ePasswordLogin(isolationPage, { email: secondEmail, password: secondPassword, label: "Account B login" });
+      const accountBSnapshot = await waitForAuthenticatedHydration(isolationPage, "account B isolation");
+      await waitForStoreHydration(isolationPage, "account B Store isolation");
+      assert(accountASnapshot.session.userId && accountBSnapshot.session.userId && accountASnapshot.session.userId !== accountBSnapshot.session.userId,
+        `Account A and B unexpectedly resolved to the same Supabase user: ${JSON.stringify({ accountA: accountASnapshot.session.userId, accountB: accountBSnapshot.session.userId })}`);
+      const accountBIdentity = await readIsolationIdentity();
+      const accountBAccountState = await readIsolationAccountState();
+      assert(accountBSnapshot.accountName.trim() && accountBSnapshot.accountName.trim() !== accountAName,
+        `Account B inherited Account A's visible identity: ${JSON.stringify({ accountAName, accountBName: accountBSnapshot.accountName })}`);
+      if (secondExpectedStyle) assert(accountBIdentity.nameStyle === secondExpectedStyle,
+        `Account B did not restore its expected Name Style: ${JSON.stringify({ expected: secondExpectedStyle, actual: accountBIdentity.nameStyle })}`);
+      assert(accountBAccountState.userPresent && !accountBAccountState.userError && accountBAccountState.profile,
+        `Account B did not expose an authenticated authoritative profile: ${JSON.stringify(accountBAccountState)}`);
+      assert(accountBAccountState.profile.username === accountBSnapshot.accountName.trim()
+        && accountBAccountState.profile.title === "E2E B Marshal"
+        && accountBAccountState.profile.country === "JP"
+        && accountBAccountState.profile.avatar === "♞"
+        && accountBAccountState.profile.rating === 1520
+        && accountBAccountState.profile.xp === 840
+        && accountBAccountState.profile.coins === 1000000000,
+      `Account B authoritative distinctive profile did not restore: ${JSON.stringify(accountBAccountState)}`);
+      assert(accountBAccountState.header.name === accountBAccountState.profile.username
+        && accountBAccountState.header.title === accountBAccountState.profile.title
+        && accountBIdentity.rating !== accountAIdentity.rating
+        && accountBIdentity.chipText.includes("🇯🇵")
+        && accountBIdentity.chipText.toLocaleLowerCase().includes(String(accountBAccountState.profile.title || "").toLocaleLowerCase()),
+      `Account B visible identity did not reflect its own profile: ${JSON.stringify({ accountAIdentity, accountBIdentity, accountBAccountState })}`);
+      assert(accountBAccountState.activePreferences.avatar === accountBAccountState.profile.avatar
+        && accountBAccountState.activePreferences.title === accountBAccountState.profile.title
+        && accountBAccountState.activePreferences.nameStyle === secondExpectedStyle,
+      `Account B saved cosmetic preferences did not hydrate from its authoritative profile/inventory: ${JSON.stringify(accountBAccountState)}`);
+      const getDistinctPriorIdentityLeaks = (pageHandle, priorIdentity, currentIdentity) => pageHandle.evaluate(({ prior, current }) => {
+        const sharedCurrentValues = new Set([current.name, current.flag, current.title, current.rank, current.rating, current.avatar]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean));
+        const neutralValues = /^(?:Guest Explorer|(?:Rank:\s*)?Explorer|450 Elo|🌐|[✦♟])$/i;
+        // Rank labels and generic titles are not account identifiers: two
+        // accounts can legitimately share the same tier. Their isolation is
+        // asserted separately against each account's authoritative profile
+        // and header. Only compare account-distinct values here, and only
+        // against mounted identity elements rather than the whole page where
+        // Store catalog labels can produce false positives.
+        const identityText = [...document.querySelectorAll(
+          '.player-identity-line[data-identity-owner="player"], .player-flex-chip, #authAccountPanel, .login-pass, .player-profile-title'
+        )].map((element) => String(element.innerText || element.textContent || "")).join("\n");
+        const values = [prior.name, prior.flag, prior.rating, prior.avatar, prior.nameStyle]
+          .map((value) => String(value || "").trim())
+          // A value that deliberately represents both accounts (for example
+          // the free Explorer rank) cannot prove leakage. Account IDs,
+          // account-distinct fields, equipped style, wallet, inventory, and
+          // workspace ownership remain independently asserted.
+          .filter((value) => value && !neutralValues.test(value) && !sharedCurrentValues.has(value));
+        return values.filter((value) => identityText.includes(value));
+      }, { prior: priorIdentity, current: currentIdentity });
+      const leakedAccountA = await getDistinctPriorIdentityLeaks(isolationPage, accountAIdentity, accountBIdentity);
+      assert(!leakedAccountA.length, `Account A identity remained visible after Account B login: ${JSON.stringify({ accountAIdentity, accountBIdentity, accountBAccountState, leaked: leakedAccountA })}`);
+      await isolationPage.reload({ waitUntil: "domcontentloaded" });
+      const accountBReloaded = await waitForAuthenticatedHydration(isolationPage, "Account B reload isolation");
+      await waitForStoreHydration(isolationPage, "Account B reload Store isolation");
+      assert(accountBReloaded.session.userId === accountBSnapshot.session.userId,
+        `Account B did not persist through reload: ${JSON.stringify({ before: accountBSnapshot.session.userId, after: accountBReloaded.session.userId })}`);
+      await auditIdentity(isolationPage, "Account B reload identity", secondExpectedStyle);
+      const bNewTab = await isolationContext.newPage();
+      await gotoHash(bNewTab, baseUrl, "#login");
+      const accountBNewTab = await waitForAuthenticatedHydration(bNewTab, "Account B new-tab isolation");
+      await waitForStoreHydration(bNewTab, "Account B new-tab Store isolation");
+      assert(accountBNewTab.session.userId === accountBSnapshot.session.userId,
+        `Account B did not persist into a new tab: ${JSON.stringify({ expected: accountBSnapshot.session.userId, actual: accountBNewTab.session.userId })}`);
+      await auditIdentity(bNewTab, "Account B new-tab identity", secondExpectedStyle);
+      const accountBNewTabIdentity = await readIsolationIdentity(bNewTab);
+      const accountBNewTabState = await readIsolationAccountState(bNewTab);
+      assert(accountBNewTabState.userPresent && !accountBNewTabState.userError && accountBNewTabState.profile
+        && accountBNewTabState.profile.username === accountBNewTabState.header.name
+        && accountBNewTabState.profile.title === accountBNewTabState.header.title
+        && accountBNewTabState.profile.avatar === accountBNewTabState.header.avatar
+        && accountBNewTabState.profile.country === "JP"
+        && accountBNewTabState.profile.coins === 1000000000,
+      `Account B new-tab identity did not resolve from its own authoritative profile: ${JSON.stringify(accountBNewTabState)}`);
+      const newTabLeak = await getDistinctPriorIdentityLeaks(bNewTab, accountAIdentity, accountBNewTabIdentity);
+      assert(!newTabLeak.length, `Account A identity appeared in Account B's new tab: ${JSON.stringify({ accountAIdentity, leaked: newTabLeak })}`);
+      await bNewTab.close();
+      await isolationPage.locator("#authPanelLogout").click({ noWaitAfter: true });
+      await isolationPage.waitForFunction(() => document.documentElement.dataset.authState === "guest"
+        && document.getElementById("authAccountPanel")?.hidden === true, null, { timeout: 10000 });
+      await assertIsolationGuestState(isolationPage, "Account B logout before Account A restore", accountBIdentity);
+      await submitE2ePasswordLogin(isolationPage, {
+        email: String(process.env.E2E_EMAIL || ""),
+        password: String(process.env.E2E_PASSWORD || ""),
+        label: "Account A restore login"
+      });
+      const accountARestored = await waitForAuthenticatedHydration(isolationPage, "account A restore after B");
+      await waitForStoreHydration(isolationPage, "account A Store restore after B");
+      assert(accountARestored.session.userId === accountASnapshot.session.userId,
+        `Account A did not restore after Account B logout: ${JSON.stringify({ before: accountASnapshot.session.userId, after: accountARestored.session.userId })}`);
+      await auditIdentity(isolationPage, "account A restored after B", expectedStyle);
+      await isolationContext.close();
+      pass("browser: Account A → logout → Account B → logout → Account A isolation and restoration");
+    }
+  } else fail("browser: Account A → Account B identity isolation", new Error("No confirmed disposable E2E Account B is configured. Set E2E_SECOND_EMAIL/E2E_SECOND_PASSWORD to a dedicated confirmed test account; the cross-account browser proof is required and was not skipped."));
+
+  // The isolation flow intentionally signs out and back in inside a separate
+  // browser context. Revalidate the primary purchase page after that boundary
+  // instead of assuming its original refresh token is still usable.
+  await gotoHash(page, baseUrl, "#login");
+  const primaryAfterIsolation = await readAuthRuntimeSnapshot(page);
+  if (primaryAfterIsolation.authState !== "authenticated" || !primaryAfterIsolation.session.present) {
+    await submitE2ePasswordLogin(page, {
+      email: String(process.env.E2E_EMAIL || ""),
+      password: String(process.env.E2E_PASSWORD || ""),
+      label: "primary purchase re-authentication"
+    });
+  }
+  await waitForAuthenticatedHydration(page, "primary purchase after isolation");
+  await waitForStoreHydration(page, "primary purchase Store after isolation");
 
   let purchaseId = String(process.env.E2E_PURCHASE_ITEM_ID || "").trim();
   let purchasePrice = Number(process.env.E2E_PURCHASE_ITEM_PRICE || 0);
@@ -1217,9 +1661,24 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
       const chipText = chipVisible ? String(chip.innerText || "") : "";
       const visibleText = String(document.body?.innerText || "");
       const textFor = (selector) => document.querySelector(selector)?.textContent?.trim() || "";
-      const priorValues = [previousIdentity.name, previousIdentity.rank, previousIdentity.rating, previousIdentity.avatar]
+      const priorValues = [previousIdentity.name, previousIdentity.rank, previousIdentity.rating, previousIdentity.avatar, previousIdentity.flag, previousIdentity.title]
         .map((value) => String(value || "").trim())
         .filter((value) => value && value !== "Guest Explorer" && value !== "Rank: Explorer" && value !== "450 Elo" && /[A-Za-z0-9]/.test(value));
+      const accountWorkspaceKeys = [
+        "checkmateQuest.shortLessons.v1", "checkmateQuest.puzzles.v1", "checkmateQuest.realPuzzleCollection.v4",
+        "checkmateQuest.progressBackup.v1", "checkmateQuest.realPuzzles.v1", "checkmateQuest.progressAutosave.v1",
+        "checkmateQuest.visitSnapshot.v1", "checkmateQuest.sound.v1", "checkmateQuest.beginnerTutorial.v1",
+        "checkmateQuest.academy.v1", "checkmateQuestBeginnerBots", "checkmateQuest.bookReader.v1",
+        "checkmateQuest.localBooks.v1", "checkmateQuest.dailyTraining.v1", "checkmateQuest.gentleStart.v1",
+        "checkmateQuest.firstTimeTour.v1", "checkmateQuest.firstVisitSetup.v1", "checkmateQuest.authPreferences.v1",
+        "checkmateQuest.story.v1", "checkmateQuest.preferences.v1", "checkmateQuest.profile.v1",
+        "checkmateQuest.dragonProfile.v1", "checkmateQuest.friendChallenge.v1", "checkmateQuest.friends.v1",
+        "checkmateQuest.friendHub.v1", "checkmateQuest.friendRecent.v1", "checkmateQuest.tournaments.v1",
+        "checkmateQuest.reviewAnalysis.v1", "nschessRecentAiBots",
+        "nschess.quickMatchSettings.v1"
+      ];
+      const activeWorkspaceKeys = accountWorkspaceKeys.filter((key) => localStorage.getItem(key) !== null);
+      const workspaceOwner = localStorage.getItem("checkmateQuest.accountWorkspaceOwner.v1") || "";
       const staleElements = priorValues.length
         ? [...document.querySelectorAll("body *")].filter((element) => {
           const style = getComputedStyle(element);
@@ -1242,6 +1701,8 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         userPresent: Boolean(userResult?.data?.user?.id),
         userError: userResult?.error?.message || "",
         authStorageKeys: storageKeys.filter((key) => /^sb-.*auth-token/i.test(key) || /supabase.*auth|auth.*supabase/i.test(key)),
+        workspaceOwner,
+        activeWorkspaceKeys,
         guestMetrics: {
           name: textFor('[data-profile-field="name"]'),
           rank: textFor('[data-profile-field="rank"]'),
@@ -1263,7 +1724,8 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         staleIdentityVisible: priorValues.some((value) => visibleText.includes(value))
       };
     }, previousIdentity);
-    assert(state.authState === "guest" && state.accountHidden && !state.sessionPresent && !state.userPresent && !state.authStorageKeys.length,
+    assert(state.authState === "guest" && state.accountHidden && !state.sessionPresent && !state.userPresent && !state.authStorageKeys.length
+      && state.workspaceOwner === "guest" && state.activeWorkspaceKeys.length === 0,
       `${label} did not clear the Supabase session and browser auth state: ${JSON.stringify(state)}`);
     assert(!state.staleIdentityInNavbar && !state.staleIdentityVisible,
       `${label} left the previous authenticated identity visible after logout: ${JSON.stringify({ previousIdentity, chipText: state.chipText, staleIdentityInNavbar: state.staleIdentityInNavbar, staleIdentityVisible: state.staleIdentityVisible, staleElements: state.staleElements })}`);
@@ -1279,18 +1741,63 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
   const logoutContext = await browser.newContext({ storageState: primaryState, viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
   const logoutPage = await logoutContext.newPage();
   await gotoHash(logoutPage, baseUrl, "#login");
-  await waitForAuthenticatedHydration(logoutPage, "logout regression");
+  const logoutInitial = await readAuthRuntimeSnapshot(logoutPage);
+  if (logoutInitial.authState !== "authenticated" || !logoutInitial.session.present) {
+    await submitE2ePasswordLogin(logoutPage, {
+      email: String(process.env.E2E_EMAIL || ""),
+      password: String(process.env.E2E_PASSWORD || ""),
+      label: "logout regression re-authentication"
+    });
+  }
+  try {
+    await waitForAuthenticatedHydration(logoutPage, "logout regression");
+  } catch (error) {
+    // A cached Playwright storage state can be revoked by the preceding
+    // isolation flow. If the page has concretely settled as guest, perform a
+    // real password login and retry; do not mask any other auth failure.
+    const settled = await readAuthRuntimeSnapshot(logoutPage);
+    if (settled.authState !== "guest" || settled.session.present) throw error;
+    await submitE2ePasswordLogin(logoutPage, {
+      email: String(process.env.E2E_EMAIL || ""),
+      password: String(process.env.E2E_PASSWORD || ""),
+      label: "logout regression recovery login"
+    });
+    await waitForAuthenticatedHydration(logoutPage, "logout regression after recovery login");
+  }
   const previousIdentity = await logoutPage.evaluate(() => {
     const chip = document.querySelector(".player-flex-chip");
+    const identityLine = document.querySelector('.player-identity-line[data-identity-owner="player"]');
     return {
       name: chip?.querySelector('[data-profile-field="name"]')?.textContent || "",
       rank: chip?.querySelector('[data-profile-field="rank"]')?.textContent || "",
       rating: chip?.querySelector('[data-profile-field="gameRating"]')?.textContent || "",
-      avatar: chip?.querySelector(".player-profile-avatar")?.textContent || ""
+      avatar: chip?.querySelector(".player-profile-avatar")?.textContent || "",
+      flag: chip?.querySelector('[data-profile-field="countryFlag"]')?.textContent || "",
+      title: chip?.querySelector('[data-profile-field="title"]')?.textContent || "",
+      nameStyle: identityLine?.dataset.identityNameStyle || ""
     };
   });
   assert(previousIdentity.name.trim() && previousIdentity.name.trim() !== "Guest Explorer",
     `logout regression did not start from an authenticated navbar identity: ${JSON.stringify(previousIdentity)}`);
+  const waitForVisibleLogoutControl = async (label) => {
+    const isVisible = async () => logoutPage.waitForFunction(() => {
+      const button = document.getElementById("authPanelLogout");
+      if (!button || button.hidden || getComputedStyle(button).display === "none" || getComputedStyle(button).visibility === "hidden") return false;
+      const rect = button.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }, null, { timeout: 5000 }).then(() => true).catch(() => false);
+    if (await isVisible()) return;
+    // Auth hydration can finish while the requested hash panel is still
+    // transitioning from the previous route. Re-activate the login panel and
+    // require the authenticated UI/control to be mounted before clicking.
+    await gotoHash(logoutPage, baseUrl, "#login");
+    await waitForAuthenticatedHydration(logoutPage, `${label} route reactivation`);
+    if (!(await isVisible())) {
+      const snapshot = await readAuthRuntimeSnapshot(logoutPage);
+      throw new Error(`${label} logout control never became visibly mounted: ${JSON.stringify(snapshot)}`);
+    }
+  };
+  await waitForVisibleLogoutControl("email/password logout regression");
   await logoutPage.evaluate(() => {
     const auth = window.CheckmateQuestSupabaseClient?.client?.auth;
     if (!auth?.signOut) throw new Error("Supabase signOut is unavailable to the logout regression.");
@@ -1461,13 +1968,18 @@ async function runDeepAuthenticatedQa(browser, baseUrl, primaryState) {
   await gotoHash(page, baseUrl, "#store");
   await waitForAuthHydration(page, "deep Store scroll");
   await waitForStoreHydration(page, "deep Store scroll");
-  // Route activation refreshes the authenticated wallet and gift inbox. Let
-  // those deliberate, one-shot requests finish before measuring the scroll
-  // listener, which must be network-free on an already-hydrated Store.
-  await page.waitForTimeout(900);
+  // Route activation can enqueue a one-shot profile persistence pass.  Wait
+  // for that explicit lifecycle to finish before measuring the scroll
+  // listener itself; the scroll interval remains strictly network-free.
+  await page.waitForFunction(() => {
+    const status = document.documentElement.dataset.profileSyncStatus || "idle";
+    return status === "idle";
+  }, null, { timeout: 15000 });
   const scrollNetworkRequests = [];
   const onScrollRequest = (request) => {
-    if (/supabase|rest\/v1|rpc\//i.test(request.url())) scrollNetworkRequests.push(redactTraceUrl(request.url()));
+    if (/supabase|rest\/v1|rpc\//i.test(request.url())) {
+      scrollNetworkRequests.push({ url: redactTraceUrl(request.url()), method: request.method() });
+    }
   };
   page.on("request", onScrollRequest);
   const scrollAudit = await page.evaluate(async () => {
@@ -1483,7 +1995,7 @@ async function runDeepAuthenticatedQa(browser, baseUrl, primaryState) {
   });
   page.off("request", onScrollRequest);
   assert(scrollAudit.mutations === 0, `Store scrolling mutated ${scrollAudit.mutations} DOM nodes.`);
-  assert(scrollNetworkRequests.length === 0, `Store scrolling issued ${scrollNetworkRequests.length} network requests: ${scrollNetworkRequests.join(", ")}`);
+  assert(scrollNetworkRequests.length === 0, `Store scrolling issued ${scrollNetworkRequests.length} network requests: ${JSON.stringify(scrollNetworkRequests)}`);
   pass("browser: Store scrolling causes no catalog rebuild or network churn");
   await context.close();
 }

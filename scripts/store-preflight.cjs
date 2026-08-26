@@ -1,11 +1,14 @@
-/* Read-only E2E Store budget check.
+/* E2E Store budget check.
  *
  * This script authenticates only the disposable E2E account with the public
- * Supabase anon key, reads its own public.profiles.coins row, and never buys,
- * equips, resets, or mutates Store state.
+ * Supabase anon key and reads its own public.profiles.coins row. If the
+ * authoritative balance is below the catalog budget, it may invoke the
+ * server-key-only wallet reset for the two strictly validated generated E2E
+ * accounts; it never buys or equips Store items and never falls back locally.
  */
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const { discoverSupabaseConfig } = require("./e2e-config.cjs");
 
 const root = path.resolve(__dirname, "..");
@@ -59,6 +62,24 @@ function safeSupabaseConfigReport(config = discoverSupabaseConfig()) {
     supabaseUrlSource: config.urlSource,
     supabaseAnonKeySource: config.keySource
   };
+}
+
+function resetDedicatedE2eWallets() {
+  if (process.env.E2E_WALLET_RESET_ATTEMPTED === "1") {
+    throw new Error("E2E wallet reset completed but the authoritative balance is still below the catalog budget.");
+  }
+  const adminKey = String(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  if (!adminKey || process.env.E2E_AUTO_RESET_WALLET === "0") return false;
+  console.error("E2E wallet is below budget; resetting only the generated primary and secondary E2E accounts through the Auth Admin setup script.");
+  process.env.E2E_WALLET_RESET_ATTEMPTED = "1";
+  const result = spawnSync(process.execPath, [path.join(root, "scripts", "provision-e2e-account.cjs"), "--wallet-only"], {
+    cwd: root,
+    env: process.env,
+    stdio: "inherit"
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`Dedicated E2E wallet reset failed with exit code ${result.status}.`);
+  return true;
 }
 
 async function jsonRequest(url, options = {}) {
@@ -141,7 +162,8 @@ async function main() {
     console.log(JSON.stringify(report, null, 2));
     if (!report.profileMatchesAuthUser) throw new Error("The authenticated user ID does not match public.profiles.id.");
     if (!report.enoughToBuyEveryEligibleItem) {
-      console.error("E2E account is underfunded for a full catalog purchase. No purchase was attempted; provision only the disposable E2E account or reset its isolated test state.");
+      if (resetDedicatedE2eWallets()) return main();
+      console.error("E2E account is underfunded for a full catalog purchase. No purchase was attempted; provide the server-only key for the isolated E2E wallet reset or run the setup script first.");
       process.exitCode = 2;
     }
   } catch (error) {

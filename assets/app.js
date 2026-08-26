@@ -1,3 +1,157 @@
+    /*
+     * Account workspace persistence
+     * -----------------------------
+     * The original client stored progress, preferences, profile data, Store
+     * state, and social caches under one global set of localStorage keys.  A
+     * logout could therefore leave Account A's values available to Account B
+     * before the next server hydration completed.  Keep the existing storage
+     * contracts for the rest of the app, but snapshot the account-owned keys
+     * behind the authenticated Supabase user id and clear the active workspace
+     * whenever the account changes.
+     */
+    const accountWorkspaceStorageKey = "checkmateQuest.accountWorkspaces.v1";
+    const accountWorkspaceOwnerKey = "checkmateQuest.accountWorkspaceOwner.v1";
+    const accountWorkspaceKeys = Object.freeze([
+      "checkmateQuest.shortLessons.v1",
+      "checkmateQuest.puzzles.v1",
+      "checkmateQuest.realPuzzleCollection.v4",
+      "checkmateQuest.progressBackup.v1",
+      "checkmateQuest.realPuzzles.v1",
+      "checkmateQuest.progressAutosave.v1",
+      "checkmateQuest.visitSnapshot.v1",
+      "checkmateQuest.sound.v1",
+      "checkmateQuest.beginnerTutorial.v1",
+      "checkmateQuest.academy.v1",
+      "checkmateQuestBeginnerBots",
+      "checkmateQuest.bookReader.v1",
+      "checkmateQuest.localBooks.v1",
+      "checkmateQuest.dailyTraining.v1",
+      "checkmateQuest.gentleStart.v1",
+      "checkmateQuest.firstTimeTour.v1",
+      "checkmateQuest.firstVisitSetup.v1",
+      "checkmateQuest.story.v1",
+      "checkmateQuest.preferences.v1",
+      "checkmateQuest.profile.v1",
+      "checkmateQuest.authPreferences.v1",
+      "checkmateQuest.dragonProfile.v1",
+      "checkmateQuest.friendChallenge.v1",
+      "checkmateQuest.friends.v1",
+      "checkmateQuest.friendHub.v1",
+      "checkmateQuest.friendRecent.v1",
+      "checkmateQuest.tournaments.v1",
+      "checkmateQuest.reviewAnalysis.v1",
+      "nschessRecentAiBots",
+      "nschess.quickMatchSettings.v1"
+    ]);
+    const accountSessionWorkspaceKeys = Object.freeze([
+      "checkmateQuest.friendChallenge.v1",
+      "checkmateQuest.tournaments.v1"
+    ]);
+    let activeAccountWorkspaceId = "";
+
+    function normalizeAccountWorkspaceId(value) {
+      return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 96);
+    }
+
+    function readRawJsonStorage(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function writeRawJsonStorage(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+    }
+
+    function readRawStorageValue(key, fallback = "") {
+      try {
+        const value = localStorage.getItem(key);
+        return value === null ? fallback : value;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function readAccountWorkspaceStore() {
+      const saved = readRawJsonStorage(accountWorkspaceStorageKey, {});
+      return saved && typeof saved === "object" && saved.accounts && typeof saved.accounts === "object"
+        ? saved
+        : { version: 1, accounts: {} };
+    }
+
+    function persistAccountWorkspace(accountId) {
+      const id = normalizeAccountWorkspaceId(accountId);
+      if (!id) return;
+      const store = readAccountWorkspaceStore();
+      const snapshot = {};
+      accountWorkspaceKeys.forEach((key) => {
+        try {
+          const value = localStorage.getItem(key);
+          if (value !== null) snapshot[key] = value;
+        } catch {}
+      });
+      store.accounts[id] = { updatedAt: new Date().toISOString(), values: snapshot };
+      // Keep storage bounded if a browser has accumulated abandoned accounts.
+      const ids = Object.keys(store.accounts).sort((a, b) => String(store.accounts[b]?.updatedAt || "").localeCompare(String(store.accounts[a]?.updatedAt || "")));
+      ids.slice(24).forEach((staleId) => { delete store.accounts[staleId]; });
+      writeRawJsonStorage(accountWorkspaceStorageKey, store);
+    }
+
+    function clearActiveAccountWorkspaceStorage() {
+      accountWorkspaceKeys.forEach((key) => {
+        try { localStorage.removeItem(key); } catch {}
+      });
+      accountSessionWorkspaceKeys.forEach((key) => {
+        try { sessionStorage.removeItem(key); } catch {}
+      });
+    }
+
+    function restoreAccountWorkspace(accountId) {
+      const id = normalizeAccountWorkspaceId(accountId);
+      clearActiveAccountWorkspaceStorage();
+      if (!id) return;
+      const store = readAccountWorkspaceStore();
+      const values = store.accounts?.[id]?.values;
+      if (!values || typeof values !== "object") return;
+      Object.entries(values).forEach(([key, value]) => {
+        if (!accountWorkspaceKeys.includes(key) || typeof value !== "string") return;
+        try { localStorage.setItem(key, value); } catch {}
+      });
+    }
+
+    function switchAccountWorkspace(account = {}) {
+      const targetId = normalizeAccountWorkspaceId(account.authUserId || account.publicId);
+      if (!targetId) return false;
+      const owner = normalizeAccountWorkspaceId(readRawStorageValue(accountWorkspaceOwnerKey));
+      const changed = owner !== targetId || activeAccountWorkspaceId !== targetId;
+      if (activeAccountWorkspaceId && activeAccountWorkspaceId !== targetId) persistAccountWorkspace(activeAccountWorkspaceId);
+      if (owner !== targetId || activeAccountWorkspaceId !== targetId) restoreAccountWorkspace(targetId);
+      activeAccountWorkspaceId = targetId;
+      try { localStorage.setItem(accountWorkspaceOwnerKey, targetId); } catch {}
+      return changed;
+    }
+
+    function clearAccountWorkspaceAfterLogout(accountId = "") {
+      const id = normalizeAccountWorkspaceId(accountId || activeAccountWorkspaceId);
+      if (id) persistAccountWorkspace(id);
+      clearActiveAccountWorkspaceStorage();
+      activeAccountWorkspaceId = "";
+      try { localStorage.setItem(accountWorkspaceOwnerKey, "guest"); } catch {}
+    }
+
+    // Never paint a previous account's local workspace while Supabase is
+    // still resolving the current session. Snapshot the last known owner,
+    // clear the active keys, then restore only after its verified user id is
+    // available in switchAccountWorkspace().
+    (() => {
+      const previousOwner = normalizeAccountWorkspaceId(readRawStorageValue(accountWorkspaceOwnerKey));
+      if (previousOwner && previousOwner !== "guest") persistAccountWorkspace(previousOwner);
+      clearActiveAccountWorkspaceStorage();
+      activeAccountWorkspaceId = "";
+    })();
 
     function reportDeployAssetError(asset, detail = "") {
       const message = `[Nschess] Asset failed to load: ${asset}${detail ? ` (${detail})` : ""}`;
@@ -3822,8 +3976,8 @@
       bot.movetime = Math.max(45, Math.min(3000, 45 + Math.round((bot.elo - 200) * 1.1)));
       bot.blunder = Math.max(.015, .42 - (bot.elo - 200) * .00016);
     });
-    const savedPuzzleState = readPuzzleState();
-    const puzzleStateMatchesBank = savedPuzzleState.bankVersion === puzzleBankVersion;
+    let savedPuzzleState = readPuzzleState();
+    let puzzleStateMatchesBank = savedPuzzleState.bankVersion === puzzleBankVersion;
     let storeState = normalizeStoreState(savedPuzzleState.store);
     if (JSON.stringify(savedPuzzleState.store?.equipped || {}) !== JSON.stringify(storeState.equipped)) {
       // Drop retired/unknown equipped Store IDs immediately. This includes
@@ -3834,6 +3988,7 @@
     let serverStoreCatalog = new Map();
     let serverStoreReady = false;
     let serverStoreRefreshPromise = null;
+    let serverStoreRefreshAccountId = "";
     let serverStoreSyncStatus = "idle";
     let serverStoreSyncError = null;
     let serverStoreMissingIds = [];
@@ -3875,7 +4030,7 @@
     let puzzleStarted = false;
     let puzzleAnalyzeMode = false;
     let puzzleFlipped = false;
-    const savedPuzzleSoundPrefs = readJsonStorage(soundPrefsStorageKey, {});
+    let savedPuzzleSoundPrefs = readJsonStorage(soundPrefsStorageKey, {});
     let puzzleSoundOn = savedPuzzleSoundPrefs.premium ? savedPuzzleSoundPrefs.puzzle !== false : true;
     let puzzleMistakeCount = 0;
     let puzzleLineStep = 0;
@@ -3883,7 +4038,7 @@
     let puzzleTimerId = 0;
     let puzzleAutoNextTimer = 0;
     let puzzleHintDestination = "";
-    const savedRealPuzzleState = readRealPuzzleState();
+    let savedRealPuzzleState = readRealPuzzleState();
     let realPuzzleMode = realPuzzleModes.includes(savedRealPuzzleState.mode) ? savedRealPuzzleState.mode : "Trainer";
     let realPuzzleDifficulty = realPuzzleDifficultyLevels.includes(savedRealPuzzleState.difficulty) ? savedRealPuzzleState.difficulty : "All";
     let realPuzzleIndex = Math.max(0, Math.min(realPuzzleBank.length - 1, Number(savedRealPuzzleState.index) || 0));
@@ -4107,6 +4262,139 @@
     };
     let activeAdventureWorld = adventureWorldProgression.some((world) => world.id === bossBattleState.world) ? bossBattleState.world : "village";
     let activeAdventureBoss = adventureBosses.some((boss) => boss.id === bossBattleState.active) ? bossBattleState.active : "";
+
+    function hydrateAccountWorkspaceRuntimeState() {
+      // All account-owned in-memory state is re-read only after the workspace
+      // has been switched to the verified Supabase user id. This prevents a
+      // prior account's globals from surviving an A → logout → B transition.
+      savedPuzzleState = readPuzzleState();
+      puzzleStateMatchesBank = savedPuzzleState.bankVersion === puzzleBankVersion;
+      storeState = normalizeStoreState(savedPuzzleState.store);
+      currentPuzzle = puzzleStateMatchesBank ? Math.max(0, Math.min(puzzles.length - 1, Number(savedPuzzleState.currentPuzzle) || 0)) : 0;
+      activePuzzlePlan = puzzleStateMatchesBank && puzzlePlanOptions.includes(savedPuzzleState.activePlan) ? savedPuzzleState.activePlan : "main";
+      if (activePuzzlePlan === "all") activePuzzlePlan = "main";
+      streak = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.streak) || 0) : 0;
+      puzzleXp = Math.max(0, Number(savedPuzzleState.xp) || 0);
+      puzzleCoins = Math.max(0, Number(savedPuzzleState.coins) || 0);
+      videoRewardState = {
+        shorts: Array.isArray(savedPuzzleState.videoRewards?.shorts) ? savedPuzzleState.videoRewards.shorts : [],
+        videos: Array.isArray(savedPuzzleState.videoRewards?.videos) ? savedPuzzleState.videoRewards.videos : []
+      };
+      puzzleStars = Math.max(0, Number(savedPuzzleState.stars) || 0);
+      puzzleKeys = Math.max(0, Number(savedPuzzleState.keys) || 0);
+      puzzleChests = Math.max(0, Number(savedPuzzleState.chests) || 0);
+      bestPuzzleStreak = puzzleStateMatchesBank ? Math.max(streak, Number(savedPuzzleState.bestStreak) || 0) : 0;
+      puzzleAttempts = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.attempts) || 0) : 0;
+      puzzleCorrect = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.correct) || 0) : 0;
+      puzzleFailed = puzzleStateMatchesBank ? Math.max(0, Number(savedPuzzleState.failed) || 0) : 0;
+      puzzleSolveTimes = puzzleStateMatchesBank && Array.isArray(savedPuzzleState.solveTimes) ? savedPuzzleState.solveTimes.map(Number).filter(Boolean).slice(-200) : [];
+      puzzleRatingHistory = puzzleStateMatchesBank && Array.isArray(savedPuzzleState.ratingHistory) ? savedPuzzleState.ratingHistory.slice(-200) : [];
+      randomPuzzleSeen = puzzleStateMatchesBank && savedPuzzleState.randomSeen && typeof savedPuzzleState.randomSeen === "object" ? savedPuzzleState.randomSeen : {};
+      spacedReview = puzzleStateMatchesBank && savedPuzzleState.spacedReview && typeof savedPuzzleState.spacedReview === "object" ? savedPuzzleState.spacedReview : null;
+      puzzleWeaknesses = puzzleStateMatchesBank && savedPuzzleState.weaknesses && typeof savedPuzzleState.weaknesses === "object" ? savedPuzzleState.weaknesses : {};
+      weeklyPuzzleXp = savedPuzzleState.weekly && typeof savedPuzzleState.weekly === "object" ? savedPuzzleState.weekly : {};
+      favoriteOpening = String(savedPuzzleState.favoriteOpening || "Italian Game");
+      favoriteOpenings = Array.isArray(savedPuzzleState.favoriteOpenings)
+        ? [...new Set(savedPuzzleState.favoriteOpenings.map((opening) => String(opening || "").trim()).filter(Boolean))].slice(0, 8)
+        : [];
+      if (!favoriteOpenings.length && favoriteOpening) favoriteOpenings = [favoriteOpening];
+      if (!favoriteOpenings.length) favoriteOpenings = ["Italian Game"];
+      favoriteOpening = favoriteOpenings[0] || "Italian Game";
+      savedPuzzleSoundPrefs = readJsonStorage(soundPrefsStorageKey, {});
+      puzzleSoundOn = savedPuzzleSoundPrefs.premium ? savedPuzzleSoundPrefs.puzzle !== false : true;
+      savedRealPuzzleState = readRealPuzzleState();
+      realPuzzleMode = realPuzzleModes.includes(savedRealPuzzleState.mode) ? savedRealPuzzleState.mode : "Trainer";
+      realPuzzleDifficulty = realPuzzleDifficultyLevels.includes(savedRealPuzzleState.difficulty) ? savedRealPuzzleState.difficulty : "All";
+      realPuzzleIndex = Math.max(0, Math.min(realPuzzleBank.length - 1, Number(savedRealPuzzleState.index) || 0));
+      realPuzzleSolved = new Set(Array.isArray(savedRealPuzzleState.solved) ? savedRealPuzzleState.solved : []);
+      realPuzzleAchievementsUnlocked = new Set(Array.isArray(savedRealPuzzleState.achievements) ? savedRealPuzzleState.achievements : []);
+      realPuzzleBestSeconds = Math.max(0, Number(savedRealPuzzleState.bestSeconds) || 0);
+      realPuzzleCoinsEarned = Math.max(0, Number(savedRealPuzzleState.coinsEarned) || 0);
+      realPuzzleAttempts = Math.max(0, Number(savedRealPuzzleState.attempts) || 0);
+      realPuzzleCorrect = Math.max(0, Number(savedRealPuzzleState.correct) || 0);
+      realPuzzleFailed = Math.max(0, Number(savedRealPuzzleState.failed) || 0);
+      realPuzzleStreak = Math.max(0, Number(savedRealPuzzleState.streak) || 0);
+      realPuzzleBestStreak = Math.max(realPuzzleStreak, Number(savedRealPuzzleState.bestStreak) || 0);
+      realPuzzleRating = Math.max(600, Number(savedRealPuzzleState.rating) || 600);
+      realPuzzleRatingHistory = Array.isArray(savedRealPuzzleState.ratingHistory) ? savedRealPuzzleState.ratingHistory.slice(-100) : [];
+      realPuzzleRecentlyPlayed = Array.isArray(savedRealPuzzleState.recentlyPlayed) ? savedRealPuzzleState.recentlyPlayed.slice(-200) : [];
+      realPuzzleSeenByDifficulty = savedRealPuzzleState.seenByDifficulty && typeof savedRealPuzzleState.seenByDifficulty === "object" ? savedRealPuzzleState.seenByDifficulty : {};
+      gameStats = savedPuzzleState.gameStats && typeof savedPuzzleState.gameStats === "object" ? savedPuzzleState.gameStats : {};
+      gameStats = {
+        played: Math.max(0, Number(gameStats.played) || 0),
+        wins: Math.max(0, Number(gameStats.wins) || 0),
+        draws: Math.max(0, Number(gameStats.draws) || 0),
+        hanging: Math.max(0, Number(gameStats.hanging) || 0),
+        moveQualityTotal: Math.max(0, Number(gameStats.moveQualityTotal) || 0),
+        moveQualityMoves: Math.max(0, Number(gameStats.moveQualityMoves) || 0),
+        cleanGames: Math.max(0, Number(gameStats.cleanGames) || 0),
+        principleGames: Math.max(0, Number(gameStats.principleGames) || 0),
+        endgameWins: Math.max(0, Number(gameStats.endgameWins) || 0)
+      };
+      matchReviews = Array.isArray(savedPuzzleState.matchReviews) ? savedPuzzleState.matchReviews.slice(-12) : [];
+      completedGameHistory = Array.isArray(savedPuzzleState.completedGames)
+        ? savedPuzzleState.completedGames.map((game) => normalizeCompletedGameRecord(game)).filter(Boolean).slice(0, 12)
+        : [];
+      completedPathLessons.clear();
+      (Array.isArray(savedPuzzleState.completedPathLessons) ? savedPuzzleState.completedPathLessons : []).forEach((lesson) => completedPathLessons.add(lesson));
+      dailyHabit = savedPuzzleState.habit && typeof savedPuzzleState.habit === "object" ? savedPuzzleState.habit : {};
+      dailyHabit = { streak: Math.max(0, Number(dailyHabit.streak) || 0), lastDate: dailyHabit.lastDate || "", rewardDate: dailyHabit.rewardDate || "" };
+      solvedPuzzles.clear();
+      if (puzzleStateMatchesBank) (Array.isArray(savedPuzzleState.solved) ? savedPuzzleState.solved : []).map(Number).filter((index) => index >= 0 && index < puzzles.length).forEach((index) => solvedPuzzles.add(index));
+      dailyGoals = normalizeDailyGoalsState(savedPuzzleState.dailyGoals);
+      storyState = readJsonStorage(storyStorageKey, { completed: [], stars: 0 });
+      beginnerTutorialState = readBeginnerTutorialState();
+      currentTutorialLesson = Math.max(0, Math.min(beginnerTutorialLessons.length - 1, Number(beginnerTutorialState.current) || 0));
+      tutorialVoiceOn = Boolean(beginnerTutorialState.voice);
+      tutorialCoordinatesOn = beginnerTutorialState.coords !== false;
+      tutorialFlipped = Boolean(beginnerTutorialState.flipped);
+      beginnerBotState = readBeginnerBotState();
+      bossBattleState = {
+        active: typeof savedPuzzleState.bossBattles?.active === "string" ? savedPuzzleState.bossBattles.active : "",
+        cleared: Array.isArray(savedPuzzleState.bossBattles?.cleared) ? savedPuzzleState.bossBattles.cleared : [],
+        world: typeof savedPuzzleState.bossBattles?.world === "string" ? savedPuzzleState.bossBattles.world : "village"
+      };
+      activeAdventureWorld = adventureWorldProgression.some((world) => world.id === bossBattleState.world) ? bossBattleState.world : "village";
+      activeAdventureBoss = adventureBosses.some((boss) => boss.id === bossBattleState.active) ? bossBattleState.active : "";
+      flexBadgeState = normalizeFlexBadgeState(savedPuzzleState.flexBadges, savedPuzzleState.store, readJsonStorage(learnerPrefsStorageKey, {}));
+
+      // Non-rendered account services also keep in-memory state.  Reset them
+      // at the same workspace boundary as the profile/progress globals so a
+      // delayed A response cannot repopulate B's friends, messages, review,
+      // or tournament surfaces.  The stop* helpers cancel subscriptions and
+      // timers; these assignments clear the remaining snapshots/caches.
+      friendChallengeState = null;
+      friendNetworkState = { directory: [], search: [], challenges: [] };
+      friendHubState = { view: "online", selectedId: "", search: "", minRating: "", maxRating: "" };
+      friendHubReady = false;
+      friendHubRenderSignature = "";
+      friendRealtimeReady = false;
+      friendProfileCache.clear();
+      publicProfileFallbacks.clear();
+      friendProfileRequest += 1;
+      publicProfileRequest += 1;
+      friendNetworkRequest += 1;
+      friendChallengeSyncEpoch += 1;
+      friendChallengeSyncQueue = Promise.resolve();
+      friendChallengeLastPositionSignature = "";
+      friendChallengePendingMove = null;
+      friendChallengeRefreshPromise = null;
+      friendIncomingNoticeCode = "";
+      socialNotificationState = [];
+      socialActivityState = [];
+      serverBlockedUserIds = new Set();
+      reviewAnalysisCacheMemory = null;
+      window.clearTimeout(reviewAnalysisCacheWriteTimer);
+      reviewAnalysisCacheWriteTimer = 0;
+      tournamentRuntime.events = [];
+      tournamentRuntime.currentCode = "";
+      tournamentRuntime.refreshPromise = null;
+      tournamentRuntime.lastRefresh = 0;
+      tournamentRuntime.inviteResults = [];
+      tournamentRuntime.renderSignature = "";
+      tournamentRuntime.launchingPairingId = "";
+      tournamentRuntime.nextLaunchAt = 0;
+    }
     let adventureBossMessage = "";
     const bookLevels = ["Beginner", "Intermediate", "Advanced"];
     const bookLevelNotes = {
@@ -7079,14 +7367,22 @@
       const current = readLearnerPrefs();
       const next = { ...current, audio: { ...(current.audio || {}) } };
       let changed = false;
+      // A profile avatar is server-owned even when the Store inventory has no
+      // separately equipped avatar item. Do not let a stale account-workspace
+      // preference survive an Account A -> Account B boundary. An explicitly
+      // equipped Store avatar still wins in the inventory loop below.
+      const hasServerAvatar = Object.prototype.hasOwnProperty.call(equipped || {}, "avatar")
+        && Boolean(equipped.avatar);
+      const profileAvatar = String(applicationAuthAccount?.profileData?.avatar || "").trim();
+      const set = (field, value) => {
+        if (value === undefined || value === null || next[field] === value) return;
+        next[field] = value;
+        changed = true;
+      };
+      if (!hasServerAvatar && profileAvatar && profileAvatar !== "auto") set("avatar", profileAvatar);
       Object.entries(equipped || {}).forEach(([type, itemId]) => {
         const item = getStoreItem(itemId);
         if (!item) return;
-        const set = (field, value) => {
-          if (value === undefined || value === null || next[field] === value) return;
-          next[field] = value;
-          changed = true;
-        };
         if (type === "board") set("board", item.value);
         else if (type === "skin") set("pieceSkin", item.value);
         else if (type === "pieceFinish") set("pieceFinish", item.value);
@@ -7122,12 +7418,16 @@
       if (!provider?.getStoreState) return null;
       const user = await getAuthoritativeStoreUser();
       if (!user) return null;
-      if (serverStoreRefreshPromise) return serverStoreRefreshPromise;
+      const expectedAccountId = normalizeAccountWorkspaceId(user.id || applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId);
+      if (serverStoreRefreshPromise && serverStoreRefreshAccountId === expectedAccountId) return serverStoreRefreshPromise;
       serverStoreSyncStatus = "syncing";
       serverStoreSyncError = null;
       serverStoreMissingIds = [];
       renderStoreSyncFeedback();
-      serverStoreRefreshPromise = Promise.resolve().then(() => provider.getStoreState()).then((state) => {
+      serverStoreRefreshAccountId = expectedAccountId;
+      const refreshPromise = Promise.resolve().then(() => provider.getStoreState()).then((state) => {
+        const currentAccountId = normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId);
+        if (!isApplicationAuthenticated() || currentAccountId !== expectedAccountId) return null;
         const source = state && typeof state === "object" ? state : {};
         const catalog = Array.isArray(source.catalog) ? source.catalog : [];
         const nextCatalog = new Map(catalog.map((item) => [String(item.item_id || item.itemId || ""), item]).filter(([id]) => id));
@@ -7154,11 +7454,31 @@
         serverStoreSyncError = null;
         puzzleCoins = serverStoreState.coins;
         storeState = { ...storeState, owned, equipped };
+        // Flex badges have their own in-memory model because they predate the
+        // Store inventory. Rebuild it from the authoritative inventory before
+        // any purchase/equip flow checks ownership; otherwise a successful
+        // server purchase can remain visually locked until a later reload.
+        const serverFlexBadges = inventory
+          .map((entry) => getStoreItem(String(entry.item_id || entry.itemId || "")))
+          .filter((item) => item?.type === "flexBadge")
+          .map((item) => item.value);
+        const equippedFlexBadgeId = equipped.flexBadge || "";
+        const equippedFlexBadgeItem = getStoreItem(equippedFlexBadgeId);
+        flexBadgeState = normalizeFlexBadgeState({
+          badges: serverFlexBadges,
+          equippedBadge: equippedFlexBadgeItem?.type === "flexBadge" ? equippedFlexBadgeItem.value : "rookie"
+        });
+        renderFlexBadgeTargets();
         syncServerEquippedPreferences(equipped);
         // Re-apply the shared identity pipeline after authoritative Store
         // hydration so navbar/home surfaces cannot remain on a stale Classic
         // style when their local preference was already current.
         renderPlayerIdentityExtras(getDragonProfileSnapshot());
+        // The compact account chip is mounted outside the generic identity
+        // lines. Re-render it from the same active account after Store/profile
+        // hydration so a server-owned avatar (or title/name style) cannot leave
+        // the navbar showing the previous workspace's cosmetic.
+        renderAuthUi(applicationAuthAccount, false);
         // Store hydration mirrors authoritative inventory locally; it is not a
         // player edit and must not enqueue a delayed profile PATCH.
         savePuzzleState({ skipCloudSync: true });
@@ -7170,6 +7490,7 @@
         }
         return serverStoreState;
       }).catch((error) => {
+        if (!isApplicationAuthenticated() || normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId) !== expectedAccountId) return null;
         serverStoreReady = false;
         serverStoreState = null;
         serverStoreSyncStatus = "error";
@@ -7185,8 +7506,14 @@
         renderStoreSyncFeedback();
         if (rerender) renderStore();
         throw error;
-      }).finally(() => { serverStoreRefreshPromise = null; });
-      return serverStoreRefreshPromise;
+      }).finally(() => {
+        if (serverStoreRefreshAccountId === expectedAccountId) {
+          serverStoreRefreshPromise = null;
+          serverStoreRefreshAccountId = "";
+        }
+      });
+      serverStoreRefreshPromise = refreshPromise;
+      return refreshPromise;
     }
 
     async function ensureServerStoreReady() {
@@ -7223,6 +7550,7 @@
       serverStoreCatalog = new Map();
       serverStoreReady = false;
       serverStoreRefreshPromise = null;
+      serverStoreRefreshAccountId = "";
       serverStoreSyncStatus = "idle";
       serverStoreSyncError = null;
       serverStoreMissingIds = [];
@@ -7278,15 +7606,18 @@
 
     async function refreshStoreGiftInbox() {
       const provider = getAuthProvider();
-      if (!provider?.listGiftInbox || !getFriendCurrentUserId?.()) {
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
+      if (!provider?.listGiftInbox || !expectedUserId) {
         giftInboxState = [];
         renderStoreGiftInbox();
         return [];
       }
       try {
         const rows = await provider.listGiftInbox(40);
+        if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
         giftInboxState = Array.isArray(rows) ? rows : [];
       } catch {
+        if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
         giftInboxState = [];
       }
       renderStoreGiftInbox();
@@ -7557,8 +7888,20 @@
       });
     }
 
-    function refreshMountedPlayerIdentities(profile = getDragonProfileSnapshot()) {
-      const identity = getPlayerIdentityModel({ ...profile, isPlayer: true }, { profile, isPlayer: true });
+    function refreshMountedPlayerIdentities(profile = getDragonProfileSnapshot(), prefsOverride = null) {
+      const prefs = prefsOverride && typeof prefsOverride === "object" ? prefsOverride : readLearnerPrefs();
+      const identity = getPlayerIdentityModel({
+        ...profile,
+        ...(prefs.avatar && prefs.avatar !== "auto" ? { avatar: prefs.avatar } : {}),
+        isPlayer: true
+      }, { profile, prefs, isPlayer: true });
+      // Re-apply the same resolved avatar to every already-mounted current
+      // player surface. Name-only refreshes left the navbar chip visually
+      // stale after Store/profile hydration even though its preference had
+      // changed correctly.
+      document.querySelectorAll('[data-identity-owner="player"].player-identity-avatar, [data-identity-owner="player"] .player-identity-avatar, [data-identity-owner="player"] .player-profile-avatar, [data-identity-owner="player"] .match-player-avatar, .player-flex-chip .player-profile-avatar, .login-pass .player-profile-avatar').forEach((avatar) => {
+        applySharedAvatarElement(avatar, identity, { variant: avatar.dataset.identityVariant || "compact" });
+      });
       document.querySelectorAll('.player-identity-line[data-identity-owner="player"]').forEach((line) => {
         const name = line.matches?.('[data-player-identity-name], [data-match-name], [data-profile-field="name"], #loginDisplayName')
           ? line
@@ -7927,7 +8270,7 @@
       renderPlayerProfile();
       renderFlexBadgeTargets(prefs);
       renderStyledUsernames();
-      refreshMountedPlayerIdentities(getDragonProfileSnapshot());
+      refreshMountedPlayerIdentities(getDragonProfileSnapshot(), prefs);
       renderInGamePlayerCard();
     }
 
@@ -10738,7 +11081,25 @@
       const levelChoice = profileAvatars.find((avatar) => avatar.icon === prefs.avatar && xp >= avatar.xp);
       if (levelChoice) return levelChoice;
       const storeChoice = storeItems.find((item) => item.type === "avatar" && (item.value === prefs.avatar || item.id === prefs.avatar) && storeState.owned.includes(item.id));
-      return storeChoice ? { icon: storeChoice.value, label: storeChoice.name, rarity: storeChoice.rarity || "", petAvatar: Boolean(storeChoice.petAvatar), petId: storeChoice.id } : levelAvatar;
+      if (storeChoice) return { icon: storeChoice.value, label: storeChoice.name, rarity: storeChoice.rarity || "", petAvatar: Boolean(storeChoice.petAvatar), petId: storeChoice.id };
+      // Authenticated profiles may carry a server-provisioned/custom avatar
+      // that is not represented by the local level list or Store catalog.
+      // Render that authoritative value instead of silently falling back to a
+      // stale workspace avatar/level icon. Guest and local-only profiles keep
+      // the existing level-avatar fallback.
+      const authenticatedIdentity = isApplicationAuthenticated()
+        || document.documentElement?.dataset.authState === "authenticated";
+      if (authenticatedIdentity) {
+        const activeAvatar = String(prefs.avatar || "").trim();
+        // Once the authenticated profile/store boundary has hydrated, the
+        // active preference is the shared avatar value for every identity
+        // surface. This also supports server-provisioned/custom glyphs that
+        // are not part of the local level or Store catalog.
+        if (activeAvatar && activeAvatar !== "auto") {
+          return { icon: activeAvatar, label: "Profile avatar", rarity: "", petAvatar: false, petId: "" };
+        }
+      }
+      return levelAvatar;
     }
 
     function getProfileAvatarChoices(xp) {
@@ -10844,7 +11205,10 @@
     }
 
     function saveDragonProfileSnapshot(snapshot) {
-      if (!snapshot) return;
+      // Guest rendering is intentionally ephemeral. Persisting the derived
+      // profile while signed out would recreate an account-owned workspace
+      // immediately after logout and could leak it into the next session.
+      if (!snapshot || !isApplicationAuthenticated()) return;
       writeJsonStorage(dragonProfileStorageKey, {
         name: snapshot.name,
         level: snapshot.level,
@@ -11116,7 +11480,31 @@
       const nameStyle = isPlayer
         ? getEquippedNameStyle()
         : (nameStyleThemes[requestedNameStyle] ? requestedNameStyle : "classic");
-      const avatar = String(source.avatar || options.avatar || (isPlayer ? profile.avatar : "?")).trim() || "?";
+      // Current-player surfaces must resolve the avatar from the active
+      // account workspace, not from a stale profile-shaped source object that
+      // a caller may have captured before server/store hydration. Remote
+      // identities continue to use their supplied public avatar.
+      const authenticatedIdentity = isApplicationAuthenticated()
+        || document.documentElement?.dataset.authState === "authenticated";
+      const activePreferenceAvatar = String(prefs.avatar || "").trim();
+      // The verified Supabase profile is the account-bound source of truth
+      // while Store/workspace preferences are still hydrating. A stale
+      // workspace can briefly contain the previous account's avatar; using it
+      // here allowed the navbar to remain on that glyph even after the server
+      // profile and active preference storage had been updated.
+      const accountProfileAvatar = authenticatedIdentity && isPlayer
+        ? String(applicationAuthAccount?.profileData?.avatar || "").trim()
+        : "";
+      const resolvedPlayerAvatar = isPlayer
+        ? (authenticatedIdentity && accountProfileAvatar && accountProfileAvatar !== "auto"
+          ? accountProfileAvatar
+          : authenticatedIdentity && activePreferenceAvatar && activePreferenceAvatar !== "auto"
+            ? activePreferenceAvatar
+            : getSelectedProfileAvatar(prefs, Math.max(0, Number(profile.xp) || Number(puzzleXp) || 0))?.icon)
+        : "";
+      const avatar = String(isPlayer
+        ? (resolvedPlayerAvatar || options.avatar || source.avatar || profile.avatar)
+        : (source.avatar || options.avatar || "?")).trim() || "?";
       const level = String(source.level || options.level || (isPlayer ? profile.level : "")).trim();
       const title = String(source.title ?? options.title ?? (isPlayer ? (prefs.title || profile.rank) : "")).trim();
       const avatarProfile = isPlayer
@@ -11983,9 +12371,17 @@
     }
 
     function renderPlayerIdentityExtras(profile = getDragonProfileSnapshot()) {
-      const countryCode = isApplicationAuthenticated() ? normalizeCountryFlagValue(readLearnerProfile().countryFlag) : "";
+      const authenticated = isApplicationAuthenticated() || document.documentElement?.dataset.authState === "authenticated";
+      const countryCode = authenticated ? normalizeCountryFlagValue(readLearnerProfile().countryFlag) : "";
       const icons = getEarnedPlayerIcons(profile);
-      const identity = getPlayerIdentityModel({ ...profile, countryCode, icons, isPlayer: true }, { profile, isPlayer: true });
+      const prefs = readLearnerPrefs();
+      const identity = getPlayerIdentityModel({
+        ...profile,
+        ...(authenticated && prefs.avatar && prefs.avatar !== "auto" ? { avatar: prefs.avatar } : {}),
+        countryCode,
+        icons,
+        isPlayer: true
+      }, { profile, prefs, isPlayer: true });
       document.querySelectorAll(".player-flex-chip .player-profile-avatar, .login-pass .player-profile-avatar").forEach((avatar) => {
         applySharedAvatarElement(avatar, identity, { variant: "compact" });
       });
@@ -12323,6 +12719,8 @@
 
     function getLearnerGameRating() {
       if (!isApplicationAuthenticated()) return 450;
+      const authoritativeRating = Number(applicationAuthAccount?.profileData?.rating);
+      if (Number.isFinite(authoritativeRating) && authoritativeRating > 0) return Math.max(400, Math.round(authoritativeRating));
       const wins = Math.max(0, Number(gameStats.wins) || 0);
       const played = Math.max(0, Number(gameStats.played) || 0);
       const losses = Math.max(0, played - wins);
@@ -12397,6 +12795,7 @@
 
     let progressSnapshotTimer = 0;
     function writeProgressSnapshot(reason = "auto", { skipCloudSync = false } = {}) {
+      if (!isApplicationAuthenticated()) return;
       try {
         const account = getUserProfileSnapshot();
         const dailyTraining = readDailyTrainingState();
@@ -23391,23 +23790,35 @@
     async function refreshTournamentNetwork(force = false) {
       const provider = getTournamentProvider();
       if (!provider || tournamentRuntime.refreshPromise || (!force && Date.now() - tournamentRuntime.lastRefresh < 2200)) return;
+      const expectedAccountId = normalizeAccountWorkspaceId(getFriendCurrentUserId());
+      const expectedGeneration = tournamentRuntime.subscriptionGeneration;
       ensureTournamentRealtime(provider);
       tournamentRuntime.refreshPromise = provider.listTournaments()
         .then(async (rows) => {
+          if (!isApplicationAuthenticated()
+            || normalizeAccountWorkspaceId(getFriendCurrentUserId()) !== expectedAccountId
+            || tournamentRuntime.subscriptionGeneration !== expectedGeneration) return;
           tournamentRuntime.events = (Array.isArray(rows) ? rows : []).map(normalizeTournament).filter(Boolean);
           tournamentRuntime.lastRefresh = Date.now();
           const requested = new URLSearchParams(location.hash.split("?")[1] || "").get("tournament");
           const code = String(requested || tournamentRuntime.currentCode || readTournamentState().currentCode || "").toUpperCase();
           if (code && !tournamentRuntime.events.some((event) => event.code === code)) {
-            try { setSelectedTournament(await provider.getTournament(code)); } catch { tournamentRuntime.currentCode = ""; }
+            try {
+              const selected = await provider.getTournament(code);
+              if (isApplicationAuthenticated()
+                && normalizeAccountWorkspaceId(getFriendCurrentUserId()) === expectedAccountId
+                && tournamentRuntime.subscriptionGeneration === expectedGeneration) setSelectedTournament(selected);
+            } catch { if (tournamentRuntime.subscriptionGeneration === expectedGeneration) tournamentRuntime.currentCode = ""; }
           } else if (code) tournamentRuntime.currentCode = code;
           void syncTournamentLobbyPresence();
           renderTournamentLobby();
         })
         .catch(() => { renderTournamentLobby(); })
         .finally(() => {
-          tournamentRuntime.refreshPromise = null;
-          renderHomeTournaments();
+          if (tournamentRuntime.subscriptionGeneration === expectedGeneration) {
+            tournamentRuntime.refreshPromise = null;
+            renderHomeTournaments();
+          }
         });
       renderHomeTournaments();
       return tournamentRuntime.refreshPromise;
@@ -26872,6 +27283,7 @@
       if (!provider?.getUserPrivacySettings || !userId || serverPrivacyHydratedFor === userId) return;
       serverPrivacyHydratedFor = userId;
       void provider.getUserPrivacySettings().then((settings) => {
+        if (!isApplicationAuthenticated() || String(getFriendCurrentUserId() || "") !== String(userId)) return;
         if (!settings || typeof settings !== "object") return;
         const current = readLearnerProfile();
         writeJsonStorage(learnerProfileStorageKey, {
@@ -26892,8 +27304,10 @@
     function syncServerBlockedUsers({ allowUnblock = false } = {}) {
       const provider = getFriendProvider();
       if (!provider?.listUserBlocks) return;
+      const userId = String(getFriendCurrentUserId() || "");
       const local = getBlockedUserKeys();
       void provider.listUserBlocks().then((rows) => {
+        if (!isApplicationAuthenticated() || String(getFriendCurrentUserId() || "") !== userId) return;
         const server = new Map((Array.isArray(rows) ? rows : []).map((row) => [normalizeBlockedUserKey(row?.blocked_id || row?.blockedId), row]));
         if (!allowUnblock && server.size) {
           const merged = new Set(local);
@@ -26981,11 +27395,17 @@
       // the UI after a successful logout.
       let authGeneration = 0;
       let signOutInFlight = null;
+      let authTransition = "";
 
       const authDebug = (message, detail = {}) => {
         try {
           const enabled = localStorage.getItem("checkmateQuest.authDebug") === "1" || new URLSearchParams(location.search).get("authDebug") === "1";
-          if (enabled) console.debug("[Nschess Auth]", message, detail);
+          if (enabled) {
+            console.debug("[Nschess Auth]", message, detail);
+            const entries = Array.isArray(window.__nschessAuthDebugLog) ? window.__nschessAuthDebugLog : [];
+            entries.push({ at: Date.now(), message: String(message || ""), detail: detail && typeof detail === "object" ? detail : {} });
+            window.__nschessAuthDebugLog = entries.slice(-80);
+          }
         } catch {}
       };
 
@@ -27601,11 +28021,13 @@
         },
         saveProfile: async (profileData = {}) => {
           const supabase = await getSupabaseClient();
+          const generation = authGeneration;
           const { data, error } = await supabase.auth.getSession();
           if (error) throw error;
           const accessToken = data.session?.access_token;
-          const account = cachedAccount || (data.session ? await accountFromSession(data.session) : null);
+          const account = cachedAccount || (data.session ? await accountFromSession(data.session, generation) : null);
           if (!accessToken || !account?.publicId) return null;
+          if (generation !== authGeneration) return null;
           const row = {
             avatar: String(profileData.avatar || "auto").slice(0, 64),
             country_flag: normalizeCountryFlagValue(profileData.countryFlag || ""),
@@ -27625,6 +28047,7 @@
             rows = await request("rest/v1", legacyProfilePath, { ...requestOptions, body: JSON.stringify(legacyRow) });
           }
           const saved = Array.isArray(rows) ? rows[0] : null;
+          if (generation !== authGeneration) return null;
           cachedAccount = {
             ...account,
             profileData: normalizeSupabaseProfileData(saved ? { ...row, ...saved } : row)
@@ -27656,10 +28079,18 @@
         login: async ({ email, password }) => {
           const supabase = await getSupabaseClient();
           const generation = ++authGeneration;
+          // A delayed SIGNED_OUT event from the account we just left can race
+          // the new password session while Supabase persists it. Do not let
+          // that event clear the new session before profile hydration settles.
+          authTransition = "signing_in";
           startSessionRefresh(supabase);
-          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-          if (error) throw error;
-          return accountFromSession(data.session, generation);
+          try {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            return await accountFromSession(data.session, generation);
+          } finally {
+            if (generation === authGeneration) authTransition = "";
+          }
         },
         resetPassword: async (email) => {
           const supabase = await getSupabaseClient();
@@ -27773,6 +28204,32 @@
               if (generation !== authGeneration) return;
               authDebug("Auth state changed", { event, hasSession: Boolean(session) });
               if (!session) {
+                if (authTransition === "signing_in") {
+                  authDebug("Ignored delayed signed-out event during sign-in transition");
+                  return;
+                }
+                // Supabase can dispatch a delayed SIGNED_OUT notification
+                // after another account has already completed a password or
+                // OAuth sign-in in this same tab.  The event payload belongs
+                // to the old session, so never clear browser auth storage
+                // solely from it.  Re-read the client's current session: a
+                // live, newer session wins; only a confirmed null session may
+                // transition the shared application state to Guest.
+                const current = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+                if (generation !== authGeneration) return;
+                const currentSession = current?.data?.session || null;
+                if (currentSession?.user) {
+                  try {
+                    const account = await accountFromSession(currentSession, generation);
+                    if (!account || generation !== authGeneration) return;
+                    authDebug("Ignored stale signed-out event; current session restored", { hasUsername: Boolean(account?.username) });
+                    callback(account, { status: "authenticated", event: "session-revalidated" });
+                  } catch (error) {
+                    authDebug("Current session revalidation failed", { message: error?.message || "unknown" });
+                    callback(null, { status: "error", error });
+                  }
+                  return;
+                }
                 clearSession();
                 callback(null, { status: "signed_out" });
                 return;
@@ -28089,44 +28546,67 @@
       }
     }
 
+    function resetApplicationAccountState(previousAccountId = "", { status = "signed_out", render = true } = {}) {
+      applicationAuthAccount = null;
+      applicationAuthState = status === "error" ? "error" : status === "loading" ? "loading" : "guest";
+      setStoreAuthState(status === "loading" ? "unknown" : status);
+      cloudProfileReady = false;
+      window.clearTimeout(cloudProfileSyncTimer);
+      cloudProfileSyncTimer = 0;
+      setCloudProfileSyncStatus("idle");
+      window.clearTimeout(progressSnapshotTimer);
+      progressSnapshotTimer = 0;
+      cloudProfileSignature = "";
+      serverPrivacyHydratedFor = "";
+      serverBlockedUserIds = new Set();
+      stopSocialNotificationRealtime();
+      stopSocialActivityRealtime();
+      stopMessagingRealtime();
+      clearServerStoreState();
+      stopRealtimeMatchLifecycle();
+      stopFriendPresence();
+      stopFriendNetworkSync();
+      stopTournamentNetworkSync();
+      clearAccountWorkspaceAfterLogout(previousAccountId);
+      hydrateAccountWorkspaceRuntimeState();
+      if (!render) return;
+      // Identity-bearing surfaces render from the same anonymous state. This
+      // is also used during A -> B transitions so A cannot remain visible
+      // while B's verified profile is hydrating.
+      renderLearnerProfile();
+      renderHomeDashboard();
+      renderInGamePlayerCard();
+      updateAiPlayerHeader();
+      renderAuthUi(null, status === "loading");
+      renderStore();
+    }
+
     function applyAuthenticatedAccount(account, { status = "signed_out" } = {}) {
       if (!account?.username) {
+        // A profile/network error is not a logout. Preserve the live account
+        // and its cosmetics until Supabase can resolve the request again.
+        if (status === "error" && applicationAuthAccount) {
+          applicationAuthState = "authenticated";
+          setStoreAuthState("error", applicationAuthAccount.authUserId || applicationAuthAccount.publicId || "");
+          return;
+        }
+        const previousAccountId = applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId || activeAccountWorkspaceId;
         const nextStatus = ["unknown", "error", "signed_out"].includes(status) ? status : "error";
-        applicationAuthState = nextStatus === "error" ? "error" : "guest";
-        applicationAuthAccount = null;
-        setStoreAuthState(nextStatus);
-        cloudProfileReady = false;
-        window.clearTimeout(cloudProfileSyncTimer);
-        cloudProfileSyncTimer = 0;
-        cloudProfileSignature = "";
-        serverPrivacyHydratedFor = "";
-        serverBlockedUserIds = new Set();
-        stopSocialNotificationRealtime();
-        stopSocialActivityRealtime();
-        stopMessagingRealtime();
-        clearServerStoreState();
-        stopRealtimeMatchLifecycle();
-        stopFriendPresence();
-        stopFriendNetworkSync();
-        stopTournamentNetworkSync();
-        // Do not let a signed-out browser render the previous account's
-        // wallet, inventory, or equipped cosmetics from the local snapshot.
-        // Authenticated sessions hydrate these values again from the server
-        // after the next login; the anonymous state remains deterministic.
-        puzzleCoins = 0;
-        storeState = { ...normalizeStoreState({}), equipped: {} };
-        writeJsonStorage(puzzleStorageKey, { ...readPuzzleState(), coins: 0, store: storeState });
-        // The navbar and board/player cards are rendered outside the login
-        // panel.  Re-render them from the same anonymous state immediately;
-        // otherwise the panel can be logged out while the old chip remains.
-        renderLearnerProfile();
-        renderHomeDashboard();
-        renderInGamePlayerCard();
-        updateAiPlayerHeader();
-        renderAuthUi(null, false);
-        renderStore();
+        // Preserve the previous account in an id-scoped workspace, but make
+        // the active browser workspace truly anonymous before any route can
+        // paint another identity.
+        resetApplicationAccountState(previousAccountId, { status: nextStatus, render: true });
         return;
       }
+      const previousAccountId = applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId || "";
+      const nextAccountId = account.authUserId || account.publicId || "";
+      if (previousAccountId && nextAccountId && normalizeAccountWorkspaceId(previousAccountId) !== normalizeAccountWorkspaceId(nextAccountId)) {
+        // Account B must never render against Account A's mounted workspace
+        // while B's profile and inventory are being hydrated.
+        resetApplicationAccountState(previousAccountId, { status: "loading", render: true });
+      }
+      const workspaceChanged = switchAccountWorkspace(account);
+      if (workspaceChanged) hydrateAccountWorkspaceRuntimeState();
       applicationAuthState = "authenticated";
       applicationAuthAccount = account;
       setStoreAuthState("authenticated", account.authUserId || account.publicId || "");
@@ -28653,15 +29133,11 @@
     function applySupabaseProfileData(account, { preferRemote = false } = {}) {
       if (!account?.profileData) return false;
       const remote = normalizeSupabaseProfileData(account.profileData);
-      const remoteScore = (Number(remote.xp) || 0) + (Number(remote.coins) || 0) + (Number(remote.wins) || 0) + (Number(remote.losses) || 0) + (Number(remote.draws) || 0) + remote.friends.friends.length;
-      const localFriends = readFriendDirectoryState().friends;
-      const localFriendCount = Array.isArray(localFriends) ? localFriends.length : 0;
-      const localScore = puzzleXp + puzzleCoins + (Number(gameStats.wins) || 0) + Math.max(0, Number(gameStats.played) || 0) + localFriendCount;
-      const localSavedAt = Date.parse(readJsonStorage(progressAutosaveStorageKey, {})?.savedAt || "") || 0;
-      const remoteSavedAt = Date.parse(remote.updatedAt || "") || 0;
-      if (!remoteScore && localScore) return false;
-      if (!preferRemote && localScore && localSavedAt > remoteSavedAt) return false;
-
+      // The authenticated profile is authoritative at an account boundary.
+      // A previous local-workspace timestamp must not win over the verified
+      // account's avatar, ratings, wallet, or progress during A -> B login.
+      // Account-scoped local state remains useful for fields not represented
+      // by the server profile, but server-owned fields hydrate first.
       puzzleXp = Math.max(0, Number(remote.xp) || 0);
       puzzleCoins = Math.max(0, Number(remote.coins) || 0);
       const wins = Math.max(0, Number(remote.wins) || 0);
@@ -28693,6 +29169,9 @@
     }
 
     let serverProfileRefreshPromise = null;
+    function setCloudProfileSyncStatus(status = "idle") {
+      if (document.documentElement) document.documentElement.dataset.profileSyncStatus = String(status || "idle");
+    }
 
     async function refreshServerAuthoritativeProfile() {
       const provider = getAuthProvider();
@@ -28711,6 +29190,12 @@
           renderHomeDashboard();
           renderInGamePlayerCard();
           updateAiPlayerHeader();
+          // Profile refresh can arrive after the initial auth render. Repaint
+          // every shared identity surface so server-owned avatar/title/flag
+          // changes cannot remain trapped in storage while the navbar keeps
+          // the pre-hydration glyph.
+          renderPlayerIdentityExtras(getDragonProfileSnapshot());
+          renderAuthUi(account, false);
           return account;
         })
         .catch(() => null)
@@ -28720,17 +29205,34 @@
 
     function queueSupabaseProfileSync() {
       const provider = getAuthProvider();
-      if (!cloudProfileReady || !provider?.saveProfile || !provider.getCachedAccount?.()?.publicId || friendChallengeState?.remote) return;
+      if (!cloudProfileReady || !provider?.saveProfile || !provider.getCachedAccount?.()?.publicId || friendChallengeState?.remote) {
+        setCloudProfileSyncStatus("idle");
+        return;
+      }
       window.clearTimeout(cloudProfileSyncTimer);
+      setCloudProfileSyncStatus("scheduled");
       cloudProfileSyncTimer = window.setTimeout(async () => {
-        if (friendChallengeState?.remote) return;
+        cloudProfileSyncTimer = 0;
+        if (friendChallengeState?.remote) {
+          setCloudProfileSyncStatus("idle");
+          return;
+        }
+        setCloudProfileSyncStatus("syncing");
         const payload = getCloudProfilePayload();
         const signature = JSON.stringify(payload);
-        if (signature === cloudProfileSignature) return;
+        if (signature === cloudProfileSignature) {
+          setCloudProfileSyncStatus("idle");
+          return;
+        }
         try {
           await provider.saveProfile(payload);
           cloudProfileSignature = signature;
-        } catch {}
+        } catch {
+          // Autosave remains best-effort.  The status is still finalized so
+          // the next intentional save may be scheduled normally.
+        } finally {
+          setCloudProfileSyncStatus("idle");
+        }
       }, 700);
     }
 
@@ -32555,8 +33057,10 @@
       const provider = getFriendProvider();
       if (!provider?.getSocialActivityFeed) return [];
       if (socialActivityRefreshPromise) return socialActivityRefreshPromise;
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
       socialActivityRefreshPromise = provider.getSocialActivityFeed(40)
         .then((rows) => {
+          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialActivityState;
           socialActivityState = (Array.isArray(rows) ? rows : []).map(normalizeSocialActivity).filter((row) => row.id && row.type);
           if (rerender) window.refreshSiteNotifications?.({ skipServer: true });
           if (friendHubState.view !== "messages") renderFriendsHub();
@@ -32592,8 +33096,10 @@
       const provider = getFriendProvider();
       if (!provider?.getSocialNotifications) return [];
       if (socialNotificationRefreshPromise) return socialNotificationRefreshPromise;
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
       socialNotificationRefreshPromise = provider.getSocialNotifications(40)
         .then((rows) => {
+          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialNotificationState;
           socialNotificationState = (Array.isArray(rows) ? rows : []).map((row) => ({
             id: String(row?.id || ""),
             type: String(row?.type || ""),

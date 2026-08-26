@@ -9,6 +9,8 @@
     "test:e2e": "node scripts/e2e-runner.cjs e2e",
     "test:visual": "node scripts/e2e-runner.cjs visual",
     "test:store-preflight": "node scripts/store-preflight.cjs",
+    "provision:e2e-b": "node scripts/provision-e2e-account.cjs",
+    "test:e2e-wallet": "node scripts/provision-e2e-account.cjs --wallet-only",
     "build": "node scripts/build-pages.js"
   },
   "devDependencies": {
