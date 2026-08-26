@@ -37809,6 +37809,285 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
 .login-player-profile .profile-season-row strong { color: var(--cq-text-primary); font-size: .7rem; }
 .login-player-profile .profile-season-card p { margin: 0; color: var(--cq-text-subtle); font-size: .61rem; line-height: 1.4; }
 
+/* Phase 1: premium layout polish.  These end-of-file rules intentionally
+   refine hierarchy only; controls, IDs, and application behaviour stay put. */
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck {
+  padding: 24px 0 20px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-inner,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-secondary .home-command-secondary-grid {
+  width: min(100% - 40px, 1280px);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-layout {
+  grid-template-columns: minmax(0, 1.12fr) minmax(340px, .88fr);
+  gap: 14px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-copy,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-stage,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-dashboard {
+  border-radius: 18px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-copy {
+  padding: 18px 20px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-copy h1 {
+  font-size: clamp(1.8rem, 2.5vw, 2.7rem);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-stage {
+  min-height: clamp(320px, 29vw, 420px);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 16px 18px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .home-session-ritual,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .home-mission-dock,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .home-session-reward,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session > details:not(.home-mission-dock) {
+  grid-column: 1 / -1;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .button.secondary {
+  color: var(--cq-text-primary, #edf3ff);
+  border-color: rgba(130, 163, 216, .36);
+  background: rgba(9, 22, 39, .72);
+  box-shadow: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck details.home-mission-dock {
+  display: block;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(122, 157, 207, .22);
+  border-radius: 12px;
+  background: rgba(4, 14, 27, .34);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  color: var(--cq-text-secondary, #d9e5f7);
+  font-size: .7rem;
+  font-weight: 850;
+  cursor: pointer;
+  list-style: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-summary::-webkit-details-marker { display: none; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-summary strong { color: #9fe6ff; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-summary::after { content: "+"; color: #9fe6ff; font-size: 1rem; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck details.home-mission-dock[open] .home-mission-summary { border-bottom: 1px solid rgba(122, 157, 207, .16); }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck details.home-mission-dock[open] .home-mission-summary::after { content: "−"; }
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-dock-content {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-dashboard {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-quick-card {
+  min-height: 74px;
+  padding: 11px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-quick-card--play {
+  border-color: rgba(131, 159, 203, .25);
+  background: rgba(8, 20, 36, .7);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-progress-card {
+  padding: 10px 11px;
+}
+
+/* The hero button remains Home's single primary action. */
+:is(body:not(.theme-light), body.theme-light) #top > :is(.home-command-secondary, .home-main-section) .button:not(.secondary) {
+  color: var(--cq-text-primary, #edf3ff);
+  border-color: rgba(130, 163, 216, .36);
+  background: rgba(9, 22, 39, .72);
+  box-shadow: none;
+}
+
+/* Store: the featured inspector owns the purchase emphasis; catalog actions stay quiet. */
+:is(body:not(.theme-light), body.theme-light) #store .wrap { width: min(100% - 40px, 1280px); }
+:is(body:not(.theme-light), body.theme-light) #store .store-shell { gap: 14px; }
+:is(body:not(.theme-light), body.theme-light) #store .store-featured-stage { grid-template-rows: auto minmax(190px, 1fr) auto; }
+:is(body:not(.theme-light), body.theme-light) #store .store-featured-preview { min-height: 190px; }
+:is(body:not(.theme-light), body.theme-light) #store .store-grid .store-card .button:not(.secondary),
+:is(body:not(.theme-light), body.theme-light) #store :is(.piece-designer, .board-theme-designer, .name-style-designer, .highlight-designer) .button:not(.secondary) {
+  color: var(--cq-text-primary, #edf3ff);
+  border-color: rgba(130, 163, 216, .34);
+  background: rgba(11, 24, 43, .78);
+  box-shadow: none;
+}
+:is(body:not(.theme-light), body.theme-light) #store .store-featured-inspector .store-primary-action:not(.secondary) {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #5579ef, #8a5cf0);
+  box-shadow: 0 10px 20px rgba(75, 67, 190, .22);
+}
+
+/* Profile is an overview first; deep statistics remain one intentional reveal away. */
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > .profile-overview,
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > .profile-enhancements {
+  grid-column: 1 / -1;
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > :is(.profile-stat-section, .profile-performance, .profile-progress-section, .profile-collection, .profile-activity, .profile-achievement-section) {
+  min-width: 0;
+  margin: 0;
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--cq-border);
+  border-radius: var(--cq-radius-card);
+  background: var(--cq-surface-elevated);
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  color: var(--cq-text-secondary);
+  font-size: .72rem;
+  font-weight: 850;
+  cursor: pointer;
+  list-style: none;
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements > summary::-webkit-details-marker { display: none; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements > summary::after { content: "+"; color: var(--cq-accent-secondary); font-size: 1rem; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements[open] > summary { border-bottom: 1px solid var(--cq-border); }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements[open] > summary::after { content: "−"; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements[open] > :not(summary) { margin: 10px; }
+
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--cq-border);
+  border-radius: var(--cq-radius-card);
+  background: var(--cq-surface-elevated);
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section > .profile-detail-summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--cq-text-secondary);
+  font-size: .68rem;
+  font-weight: 850;
+  cursor: pointer;
+  list-style: none;
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section > .profile-detail-summary::-webkit-details-marker { display: none; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section > .profile-detail-summary > span:last-child { color: var(--cq-text-subtle); font-size: .6rem; font-weight: 750; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section > .profile-detail-summary::after { content: "+"; color: var(--cq-accent-secondary); font-size: .95rem; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section[open] > .profile-detail-summary { border-bottom: 1px solid var(--cq-border); }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section[open] > .profile-detail-summary::after { content: "−"; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section[open] > .profile-detail-body { padding: 10px; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section .profile-detail-body > .profile-section-heading { display: none; }
+
+/* Play keeps the board as the dominant object, with mode descriptions removed
+   from the active workspace rather than from the underlying navigation. */
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-app-rail { display: none !important; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+  grid-template-areas: "left center right";
+  grid-template-columns: minmax(190px, 220px) minmax(420px, 760px) minmax(220px, 280px) !important;
+  max-width: 1280px;
+  gap: 14px;
+}
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-head small,
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card small { display: none; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card { min-height: 48px; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card strong { font-size: .76rem; }
+
+@media (max-width: 1180px) {
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-layout {
+    grid-template-areas:
+      "status status"
+      "feature today"
+      "session session";
+    grid-template-columns: minmax(0, 1fr) minmax(320px, .9fr);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas:
+      "center center"
+      "left right";
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 860px) {
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-inner,
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-secondary .home-command-secondary-grid,
+  :is(body:not(.theme-light), body.theme-light) #store .wrap { width: min(100% - 24px, 680px); }
+
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-layout {
+    grid-template-areas: "status" "feature" "session" "today";
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-stage { min-height: min(78vw, 460px); }
+  :is(body:not(.theme-light), body.theme-light) #login .login-player-profile { grid-template-columns: minmax(0, 1fr); }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "right" "left";
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck { padding: 12px 0 16px; }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session { grid-template-columns: minmax(0, 1fr); }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .button.secondary { width: 100%; }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-dashboard { grid-template-columns: minmax(0, 1fr); }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-quick-card { min-height: 64px; }
+}
+
+/* The Player Pass has a deliberately narrow column inside the account view.
+   Keep its overview linear there; the two-column treatment belongs to wider
+   profile surfaces and otherwise leaves false empty space between sections. */
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
 @media (max-width: 430px) {
   .login-player-profile .profile-command-grid,
   .login-player-profile .profile-favorites-grid,
@@ -38148,4 +38427,143 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   text-shadow: none !important;
   filter: none !important;
   animation: none !important;
+}
+
+/* Phase 1 final authority: scoped hierarchy refinements after legacy layers. */
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck {
+  padding: 24px 0 20px;
+}
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-inner,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-secondary .home-command-secondary-grid,
+:is(body:not(.theme-light), body.theme-light) #store .wrap { width: min(100% - 40px, 1280px); }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-layout {
+  grid-template-columns: minmax(0, 1.12fr) minmax(340px, .88fr);
+  gap: 14px;
+}
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-stage { min-height: clamp(320px, 29vw, 420px); }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 16px 18px;
+}
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .home-session-ritual,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .home-mission-dock,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .home-session-reward,
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session > details:not(.home-mission-dock) { grid-column: 1 / -1; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .button.secondary,
+:is(body:not(.theme-light), body.theme-light) #top > :is(.home-command-secondary, .home-main-section) .button:not(.secondary) {
+  color: var(--cq-text-primary, #edf3ff);
+  border-color: rgba(130, 163, 216, .36);
+  background: rgba(9, 22, 39, .72);
+  box-shadow: none;
+}
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck details.home-mission-dock {
+  display: block;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(122, 157, 207, .22);
+  border-radius: 12px;
+  background: rgba(4, 14, 27, .34);
+}
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  color: var(--cq-text-secondary, #d9e5f7);
+  font-size: .7rem;
+  font-weight: 850;
+  cursor: pointer;
+  list-style: none;
+}
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-summary::-webkit-details-marker { display: none; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-summary strong { color: #9fe6ff; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-summary::after { content: "+"; color: #9fe6ff; font-size: 1rem; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck details.home-mission-dock[open] .home-mission-summary { border-bottom: 1px solid rgba(122, 157, 207, .16); }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck details.home-mission-dock[open] .home-mission-summary::after { content: "−"; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-mission-dock-content { display: grid; gap: 10px; padding: 12px; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-quick-card { min-height: 74px; padding: 11px; }
+:is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-quick-card--play { border-color: rgba(131, 159, 203, .25); background: rgba(8, 20, 36, .7); }
+
+:is(body:not(.theme-light), body.theme-light) #store .store-shell { gap: 14px; }
+:is(body:not(.theme-light), body.theme-light) #store .store-featured-stage { grid-template-rows: auto minmax(190px, 1fr) auto; }
+:is(body:not(.theme-light), body.theme-light) #store .store-featured-preview { min-height: 190px; }
+:is(body:not(.theme-light), body.theme-light) #store .store-grid .store-card .button:not(.secondary),
+:is(body:not(.theme-light), body.theme-light) #store :is(.piece-designer, .board-theme-designer, .name-style-designer, .highlight-designer) .button:not(.secondary) {
+  color: var(--cq-text-primary, #edf3ff);
+  border-color: rgba(130, 163, 216, .34);
+  background: rgba(11, 24, 43, .78);
+  box-shadow: none;
+}
+:is(body:not(.theme-light), body.theme-light) #store .store-featured-inspector .store-primary-action:not(.secondary) {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #5579ef, #8a5cf0);
+  box-shadow: 0 10px 20px rgba(75, 67, 190, .22);
+}
+
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > .profile-overview,
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > .profile-enhancements { grid-column: 1 / -1; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--cq-border);
+  border-radius: var(--cq-radius-card);
+  background: var(--cq-surface-elevated);
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  color: var(--cq-text-secondary);
+  font-size: .72rem;
+  font-weight: 850;
+  cursor: pointer;
+  list-style: none;
+}
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements > summary::-webkit-details-marker { display: none; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements > summary::after { content: "+"; color: var(--cq-accent-secondary); font-size: 1rem; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements[open] > summary { border-bottom: 1px solid var(--cq-border); }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements[open] > summary::after { content: "−"; }
+:is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements[open] > :not(summary) { margin: 10px; }
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-app-rail { display: none !important; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+  grid-template-areas: "left center right";
+  grid-template-columns: minmax(190px, 220px) minmax(420px, 760px) minmax(220px, 280px) !important;
+  max-width: 1280px;
+  gap: 14px;
+}
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-head small,
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card small { display: none; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card { min-height: 48px; }
+
+@media (max-width: 1180px) {
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-layout { grid-template-areas: "status status" "feature today" "session session"; grid-template-columns: minmax(0, 1fr) minmax(320px, .9fr); }
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell { grid-template-areas: "center center" "left right"; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 860px) {
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-inner,
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-secondary .home-command-secondary-grid,
+  :is(body:not(.theme-light), body.theme-light) #store .wrap { width: min(100% - 24px, 680px); }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-layout { grid-template-areas: "status" "feature" "session" "today"; grid-template-columns: minmax(0, 1fr); }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-stage { min-height: min(78vw, 460px); }
+  :is(body:not(.theme-light), body.theme-light) #login .login-player-profile { grid-template-columns: minmax(0, 1fr); }
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell { grid-template-areas: "center" "right" "left"; grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 480px) {
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck { padding: 12px 0 16px; }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session { grid-template-columns: minmax(0, 1fr); }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .button.secondary { width: 100%; }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-dashboard { grid-template-columns: minmax(0, 1fr); }
+  :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-quick-card { min-height: 64px; }
 }

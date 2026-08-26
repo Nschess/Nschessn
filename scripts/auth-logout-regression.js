@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const app = fs.readFileSync("assets/app.js", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
 
-if (!/auth\.signOut\(\)/.test(app)) throw new Error("Supabase local logout must call auth.signOut() without a UI-only shortcut.");
+if (!/auth\.signOut\(\{\s*scope:\s*["']local["']\s*\}\)/.test(app)) throw new Error("Supabase local logout must explicitly use the local scope.");
 if (!/let authGeneration = 0/.test(app) || !/generation !== authGeneration/.test(app)) throw new Error("Auth hydration needs generation guards against stale post-logout callbacks.");
 if (!/const current = await supabase\.auth\.getSession\(\)\.catch\(/.test(app)
   || !/Ignored stale signed-out event; current session restored/.test(app)) {

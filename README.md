@@ -126,6 +126,12 @@ credentials or service-role keys in `.env.e2e`. A valid saved browser state is
 reused on later runs and is refreshed through the login form only when it has
 expired.
 
+The checked-in navbar baselines include the composited 86px translucent header.
+The Phase 1 Home surface changed the content sampled through its backdrop blur,
+so the responsive navbar captures were regenerated after visual review. This
+records the intended compositing change; it does not weaken the pixel assertion
+or change navbar behavior.
+
 For a local E2E URL, the harness first reuses a public Supabase URL/key from
 the process environment, local project env files, or the linked
 `supabase/.temp/project-ref`. Set only the missing public value in `.env.e2e`;

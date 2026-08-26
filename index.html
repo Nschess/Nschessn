@@ -135,10 +135,10 @@
       <div class="hero-inner">
         <div class="hero-layout">
           <div class="hero-copy hero-copy--welcome">
-            <p class="hero-welcome-badge"><span class="hero-welcome-dot"></span><span id="homeWelcome">Welcome back!</span></p>
-            <p class="hero-welcome-note" id="homeWelcomeDelta">Your next move is ready.</p>
+            <p class="hero-welcome-badge"><span class="hero-welcome-dot"></span><span id="homeWelcome">Welcome back.</span></p>
+            <p class="hero-welcome-note" id="homeWelcomeDelta">Your move is ready.</p>
             <h1 id="hero-title">Ready to <span>play?</span></h1>
-            <p class="hero-description">One focused game, puzzle, or lesson?your choice.</p>
+            <p class="hero-description">Choose your next move.</p>
             <div class="hero-actions">
               <a class="button" href="#play" id="heroContinueLearning" data-site-tab="play" data-site-panel="play">Play Now</a>
               <a class="button secondary" href="#puzzles" id="newToChessButton" data-site-tab="puzzles" data-site-panel="puzzles">Daily Puzzle</a>
@@ -168,15 +168,18 @@
           </div>
 
           <section class="home-session-card home-command-session" id="homeSessionCard" aria-live="polite">
-            <div class="home-session-copy"><span class="home-session-kicker">Your daily session</span><strong id="homeSessionTitle">One calm move forward</strong><p id="homeSessionCopy">Your personal next step will appear here.</p><span class="home-session-meta" id="homeSessionMeta">Private plan · stored on this device</span></div>
-            <a class="button" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Continue Daily Session</a>
+            <div class="home-session-copy"><span class="home-session-kicker">Daily session</span><strong id="homeSessionTitle">One calm move</strong><p id="homeSessionCopy">Your next step appears here.</p><span class="home-session-meta" id="homeSessionMeta">On this device</span></div>
+            <a class="button secondary" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Continue</a>
             <div class="home-session-ritual" id="homeSessionRitual" aria-label="Today's three-step ritual"></div>
-            <section class="home-mission-dock" id="homeDailyGoals" aria-label="Daily and weekly missions">
-              <div class="home-mission-dock-head"><div><span class="home-mission-kicker">Daily missions</span><strong id="dailyMissionStreak">0 day streak</strong></div><strong id="dailyGoalsProgress">0/3</strong></div>
+            <details class="home-mission-dock" id="homeDailyGoals" aria-label="Daily and weekly missions">
+              <summary class="home-mission-summary"><span>Daily missions</span><strong id="dailyGoalsProgress">0/3</strong></summary>
+              <div class="home-mission-dock-content">
+              <div class="home-mission-dock-head"><div><span class="home-mission-kicker">Today</span><strong id="dailyMissionStreak">0 day streak</strong></div></div>
               <ul class="daily-goals-list" id="dailyGoalsList"></ul>
               <div class="home-mission-weekly"><div class="home-mission-dock-head"><div><span class="home-mission-kicker">Weekly challenges</span><strong>Build your rhythm</strong></div><strong id="weeklyGoalsProgress">0/3</strong></div><ul class="daily-goals-list" id="weeklyGoalsList"></ul></div>
               <div class="home-mission-rewards"><span id="dailyGoalsReward">Daily reward: +50 XP · +50 coins</span><span id="weeklyGoalsReward">Weekly reward: +180 XP · +180 coins</span><small class="home-mission-reset">Resets daily · weekly resets Monday · cosmetic rewards only</small><button class="button" type="button" id="claimWeeklyGoals" disabled>Claim weekly</button></div>
-            </section>
+              </div>
+            </details>
             <div class="home-session-reward" id="homeSessionReward" hidden>
               <div><span class="home-session-reward-kicker">Daily ritual complete</span><strong id="homeSessionRewardText">Your 50 coin reward is ready.</strong></div>
               <button class="button" type="button" id="homeSessionClaim" data-home-action="claim-daily-ritual">Claim +50</button>
@@ -185,20 +188,20 @@
           </section>
 
           <aside class="home-dashboard hero-dashboard" aria-label="Quick chess actions">
-            <div class="home-today-heading"><span>Today</span><h2>Choose your next move</h2><p>Three clear ways to keep momentum.</p></div>
+            <div class="home-today-heading"><span>Today</span><h2>Choose your next move</h2><p>Pick one thing.</p></div>
             <a class="hero-quick-card hero-quick-card--play" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick">
               <span class="hero-quick-icon">Play</span>
-              <span><strong>Quick Play</strong><small>Start a focused game</small></span>
+              <span><strong>Quick Play</strong><small>Start a game</small></span>
               <b aria-hidden="true">&gt;</b>
             </a>
             <a class="hero-quick-card" href="#puzzles" data-home-action="daily-puzzle">
               <span class="hero-quick-icon">Daily</span>
-              <span><strong>Daily Puzzle</strong><small>One tactic, one reward</small></span>
+              <span><strong>Daily Puzzle</strong><small>One tactic</small></span>
               <b aria-hidden="true">&gt;</b>
             </a>
             <a class="hero-quick-card hero-quick-card--learn" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">
               <span class="hero-quick-icon">Learn</span>
-              <span><strong>Learn</strong><small>Build one reliable skill</small></span>
+              <span><strong>Learn</strong><small>Build a skill</small></span>
               <b aria-hidden="true">&gt;</b>
             </a>
             <section class="hero-progress-card" aria-label="Progress">
@@ -211,7 +214,7 @@
             </section>
             <a class="hero-quick-card" id="homeContinueAction" href="#bots" data-site-tab="bots" data-site-panel="bots">
               <span class="hero-quick-icon">Next</span>
-              <span><strong id="homeContinueTitle">Choose an AI bot</strong><small id="homeContinueNote">Start a focused game</small></span>
+              <span><strong id="homeContinueTitle">Choose an AI bot</strong><small id="homeContinueNote">Start a game</small></span>
               <b aria-hidden="true">&gt;</b>
             </a>
             <div class="hero-logic-cache" aria-hidden="true">
@@ -261,7 +264,7 @@
         <article class="home-board-panel">
           <div class="home-board-heading">
             <h2 id="home-board-title">Your board</h2>
-            <p>Tap the board to begin a focused game.</p>
+            <p>Start from your board.</p>
           </div>
           <a class="home-main-board-link" href="#play" data-site-tab="play" data-site-panel="play" aria-label="Open the interactive chessboard">
             <div class="home-main-board" id="homeMainBoard" aria-hidden="true"></div>
@@ -271,8 +274,8 @@
         <aside class="home-quick-column" aria-label="Quick chess actions">
           <article class="home-quick-card is-featured">
             <div class="home-quick-card-head"><h3>Quick Play</h3><span class="badge">Ready</span></div>
-            <p>Start a calm game against the coach whenever you have a few minutes.</p>
-            <a class="button" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick">Play Now</a>
+            <p>Start a game against the coach.</p>
+            <a class="button secondary" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick">Play Now</a>
           </article>
           <article class="home-quick-card">
             <div class="home-quick-card-head"><h3>Player Rating</h3></div>
@@ -281,7 +284,7 @@
           </article>
           <article class="home-quick-card">
             <div class="home-quick-card-head"><h3>Daily Puzzle</h3></div>
-            <p>One focused tactic, a helpful hint, and a small reward.</p>
+            <p>One tactic and a hint.</p>
             <a class="button secondary" href="#puzzles" data-home-action="daily-puzzle">Solve Puzzle</a>
           </article>
           <article class="home-quick-card">
@@ -295,12 +298,12 @@
     </section>
     <section class="home-command-secondary" aria-label="Recent progress and recommended next step">
       <div class="wrap home-command-secondary-grid"><article class="home-dna-card">
-        <div class="home-dna-heading"><span>Your Chess DNA</span><h2 id="homeDnaTitle">A clearer picture of your game</h2><p id="homeDnaSummary">Your daily focus will appear here.</p></div>
+        <div class="home-dna-heading"><span>Your Chess DNA</span><h2 id="homeDnaTitle">Your game, in focus</h2><p id="homeDnaSummary">Your focus appears here.</p></div>
         <div class="home-dna-skills" id="homeDnaSkills" aria-live="polite"></div>
-        <a class="button" id="homeDnaAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Build my focus</a>
+        <a class="button secondary" id="homeDnaAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Build my focus</a>
       </article>
       <article class="home-momentum-card" aria-labelledby="homeMomentumTitle">
-        <div class="home-momentum-copy"><span>Weekly momentum</span><h2 id="homeMomentumTitle">A week that adds up</h2><p id="homeMomentumCopy">Your next focused session is the first mark on this week's runway.</p></div>
+        <div class="home-momentum-copy"><span>Weekly momentum</span><h2 id="homeMomentumTitle">A week that adds up</h2><p id="homeMomentumCopy">One session starts your week.</p></div>
         <div class="home-momentum-progress">
           <div class="home-momentum-progress-head"><strong id="homeMomentumProgress">0 / 120 XP</strong><span id="homeMomentumStatus">One small session starts your rhythm.</span></div>
           <div class="home-momentum-meter" id="homeMomentumMeter" role="progressbar" aria-label="Weekly XP progress" aria-valuemin="0" aria-valuemax="120" aria-valuenow="0"><span id="homeMomentumMeterFill"></span></div>
@@ -309,7 +312,7 @@
             <span>Next unlock</span><span class="home-momentum-milestone-copy"><strong id="homeMomentumMilestoneTitle">Explorer</strong><small id="homeMomentumMilestoneCopy">Solve 3 puzzles</small></span><b aria-hidden="true">&gt;</b>
           </a>
         </div>
-        <a class="button" id="homeMomentumAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Build momentum</a>
+        <a class="button secondary" id="homeMomentumAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Build momentum</a>
       </article></div>
     </section>
     <section class="home-lower-dashboard" aria-label="Chess activity overview">
@@ -498,7 +501,7 @@
                 <div class="player-profile-row">
                   <div class="player-profile-avatar" aria-hidden="true">&#10022;</div>
                   <div class="player-profile-title">
-                    <span class="player-profile-kicker">Pawn Rookie Avatar</span>
+                    <span class="player-profile-kicker">Rookie avatar</span>
                     <strong class="player-profile-name" data-profile-field="name">Guest Explorer</strong>
                     <span class="player-profile-level" data-profile-field="level">Level 1 Explorer</span>
                   </div>
@@ -516,7 +519,9 @@
                 </div>
               </header>
 
-              <section class="profile-collection" aria-labelledby="profileCollectionTitle">
+              <details class="profile-collection profile-detail-section">
+                <summary class="profile-detail-summary"><span>Appearance</span><span>Avatar collection</span></summary>
+                <div class="profile-detail-body">
                 <div class="profile-section-heading">
                   <div>
                     <span class="profile-section-kicker">Appearance</span>
@@ -525,13 +530,16 @@
                   <p>Choose an unlocked look.</p>
                 </div>
                 <div class="player-avatar-strip" data-avatar-strip aria-label="Choose profile avatar"></div>
-              </section>
+                </div>
+              </details>
 
-              <section class="profile-performance" aria-labelledby="profilePerformanceTitle">
+              <details class="profile-performance profile-detail-section">
+                <summary class="profile-detail-summary"><span>Ratings</span><span data-profile-achievement-summary>0/18 unlocked</span></summary>
+                <div class="profile-detail-body">
                 <div class="profile-section-heading">
                   <div>
                     <span class="profile-section-kicker">Performance</span>
-                    <h4 id="profilePerformanceTitle">Ratings and activity</h4>
+                    <h4 id="profilePerformanceTitle">Ratings</h4>
                   </div>
                   <span class="profile-section-status" data-profile-achievement-summary>0/18 unlocked</span>
                 </div>
@@ -559,12 +567,13 @@
                     </div>
                   </div>
                 </details>
-              </section>
+                </div>
+              </details>
 
               <section class="profile-stat-section" aria-label="Profile stats">
                 <div class="profile-stat-heading">
                   <span>Player stats</span>
-                  <small>At a glance</small>
+                  <small>Overview</small>
                 </div>
                 <div class="player-profile-stats">
                   <div class="player-profile-stat">
@@ -599,17 +608,22 @@
                 </div>
               </section>
 
-              <section class="profile-activity" aria-labelledby="profileActivityTitle">
+              <details class="profile-activity profile-detail-section">
+                <summary class="profile-detail-summary"><span>Today</span><span>Focus queue</span></summary>
+                <div class="profile-detail-body">
                 <div class="profile-section-heading">
                   <div>
                     <span class="profile-section-kicker">Today</span>
-                    <h4 id="profileActivityTitle">Focus queue</h4>
+                    <h4 id="profileActivityTitle">Today</h4>
                   </div>
                 </div>
                 <div class="player-profile-missions" data-profile-missions aria-label="Today's missions"></div>
-              </section>
+                </div>
+              </details>
 
-              <section class="profile-achievement-section" aria-labelledby="profileAchievementsTitle">
+              <details class="profile-achievement-section profile-detail-section">
+                <summary class="profile-detail-summary"><span>Achievements</span><span data-profile-achievement-summary>0/18 unlocked</span></summary>
+                <div class="profile-detail-body">
                 <div class="profile-section-heading">
                   <div>
                     <span class="profile-section-kicker">Milestones</span>
@@ -618,16 +632,18 @@
                   <span class="profile-section-status" data-profile-achievement-summary>0/18 unlocked</span>
                 </div>
                 <div class="player-profile-achievements" data-profile-achievements aria-label="Achievements"></div>
-              </section>
+                </div>
+              </details>
 
-              <div class="profile-enhancements" aria-label="Player profile highlights">
+              <details class="profile-enhancements" aria-label="Player profile highlights">
+              <summary>More profile detail</summary>
               <div class="profile-command-section" aria-labelledby="profileCommandTitle">
                 <div class="profile-section-heading">
                   <div>
                     <span class="profile-section-kicker">Player card</span>
-                    <h4 id="profileCommandTitle">Your numbers</h4>
+                    <h4 id="profileCommandTitle">Stats</h4>
                   </div>
-                  <span class="profile-section-status">Live from your games</span>
+                  <span class="profile-section-status">Live</span>
                 </div>
                 <div class="profile-command-grid">
                   <article class="profile-command-card">
@@ -644,7 +660,7 @@
               <div class="profile-favorites-section" aria-labelledby="profileFavoritesTitle">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Signature style</span>
+                    <span class="profile-section-kicker">Style</span>
                     <h4 id="profileFavoritesTitle">Favorites</h4>
                   </div>
                 </div>
@@ -664,7 +680,7 @@
                 <div class="profile-section-heading">
                   <div>
                     <span class="profile-section-kicker">Showcase</span>
-                    <h4 id="profileShowcaseTitle">Achievements & collections</h4>
+                    <h4 id="profileShowcaseTitle">Highlights</h4>
                   </div>
                 </div>
                 <div class="profile-achievement-showcase" data-profile-achievement-showcase aria-label="Achievement showcase"></div>
@@ -685,8 +701,8 @@
               <div class="profile-season-section" aria-labelledby="profileSeasonTitle">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Season journey</span>
-                    <h4 id="profileSeasonTitle">Seasonal progress</h4>
+                    <span class="profile-section-kicker">Season</span>
+                    <h4 id="profileSeasonTitle">Progress</h4>
                   </div>
                   <span class="profile-section-status" data-profile-season-label>Current season</span>
                 </div>
@@ -699,7 +715,7 @@
                   <p data-profile-season-note>Keep playing, solving, and learning to advance your season track.</p>
                 </div>
               </div>
-              </div>
+              </details>
             </aside>
             <details class="account-vault" aria-labelledby="accountVaultTitle">
               <summary id="accountVaultTitle">Account details <span>View</span></summary>
@@ -1149,18 +1165,18 @@
       <div class="wrap">
         <div class="section-head">
           <div>
-            <p class="section-kicker">Premium reward store</p>
-            <h2 id="store-title">Build your chess identity</h2>
+            <p class="section-kicker">Store</p>
+            <h2 id="store-title">Make it yours</h2>
           </div>
-          <p class="section-intro">Unlock boards, pieces, backgrounds, avatars, pets, frames, and name styles. Everything is cosmetic, readable, and built for fast play.</p>
+          <p class="section-intro">Boards, pieces, and player style—cosmetic and clear at speed.</p>
         </div>
         <div class="store-shell store-premium-shell">
           <div class="store-wallet" aria-live="polite">
             <div class="store-wallet-copy">
-              <p class="store-wallet-kicker">Your currency</p>
-              <h3>Adventure wallet</h3>
-              <p>Earn coins by solving puzzles, watching Shorts, finishing videos, reviewing mistakes, and completing daily challenges.</p>
-              <p class="store-status" id="storeStatus">Pick a reward to unlock or equip.</p>
+              <p class="store-wallet-kicker">Currency</p>
+              <h3>Coins</h3>
+              <p>Earn coins in play. Unlock your look.</p>
+              <p class="store-status" id="storeStatus">Choose a reward.</p>
               <div class="store-wallet-actions">
                 <button class="button secondary store-sync-retry" type="button" id="storeSyncRetry" hidden>Retry Store sync</button>
                 <button class="button secondary store-inventory-open" type="button" id="storeInventoryOpen">Open inventory</button>
@@ -1179,7 +1195,7 @@
           <div class="game-reward-row" id="storeInventory" aria-label="Equipped rewards"></div>
           <section class="store-inventory-page" id="storeInventoryPage" role="dialog" aria-modal="true" aria-labelledby="storeInventoryTitle" tabindex="-1" hidden>
             <header class="store-inventory-head">
-              <div><p class="section-kicker">Your collection</p><h3 id="storeInventoryTitle">Inventory</h3><p>Everything you own, equipped, favorited, and recently unlocked in one place.</p></div>
+              <div><p class="section-kicker">Collection</p><h3 id="storeInventoryTitle">Inventory</h3><p>Owned, equipped, and saved.</p></div>
               <button class="button secondary" type="button" id="storeInventoryClose">Back to Store</button>
             </header>
             <div class="store-inventory-tools" id="storeInventoryTools" aria-label="Inventory filters"></div>
@@ -1198,10 +1214,10 @@
             <div class="store-featured-stage">
               <div class="store-featured-stage-head">
                 <div>
-                  <p class="section-kicker">Featured vault</p>
-                  <h3 id="storeFeaturedTitle">Make your next move iconic</h3>
+                  <p class="section-kicker">Featured</p>
+                  <h3 id="storeFeaturedTitle">Your next move, styled</h3>
                 </div>
-                <span class="store-featured-live">Live preview</span>
+                <span class="store-featured-live">Preview</span>
               </div>
               <div class="store-featured-preview" id="storeFeaturedPreview" aria-label="Featured cosmetic preview"></div>
               <div class="store-showcase" id="storeShowcase" aria-label="Featured store collections"></div>
@@ -1250,7 +1266,7 @@
             <div class="piece-designer-copy">
               <p class="section-kicker">Piece designer</p>
               <h3>Design your army</h3>
-              <p id="pieceDesignerSummary">Preview realistic chess piece styles, favorite the ones you like, then buy or equip with coins.</p>
+              <p id="pieceDesignerSummary">Preview, save, buy, or equip a piece set.</p>
               <div class="piece-designer-controls">
                 <label>Style
                   <select id="pieceDesignerSelect" aria-label="Choose chess piece style"></select>
@@ -1361,7 +1377,7 @@
             <article class="store-skeleton-card" aria-hidden="true"><span></span><i></i><i></i><b></b></article>
             <article class="store-skeleton-card" aria-hidden="true"><span></span><i></i><i></i><b></b></article>
           </div>
-          <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Earn more coins</a>
+          <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Earn coins</a>
         </div>
       </div>
     </section>
@@ -2954,10 +2970,10 @@
       <div class="wrap">
         <div class="section-head cq-section-header">
           <div>
-            <p class="section-kicker">Beginner game</p>
+            <p class="section-kicker">Play</p>
             <h2 id="play-title">Play the coach</h2>
           </div>
-          <p class="section-intro">Practice one friendly game at a time. Legal moves, checks, checkmate, castling, en passant, promotion, and draws are handled by chess.js.</p>
+          <p class="section-intro">Start a friendly game. Full chess rules are built in.</p>
         </div>
 
         <div class="friend-lobby" id="friendChallenge" aria-labelledby="friendChallengeTitle">
@@ -2965,7 +2981,7 @@
             <div>
               <p class="section-kicker">Friend challenge</p>
               <h3 id="friendChallengeTitle">Play a friend</h3>
-              <p>Create a polished private invite, or join a game you already received.</p>
+              <p>Create or join a private game.</p>
             </div>
             <div class="friend-code-card">
               <small>Invite code</small>
@@ -3015,7 +3031,7 @@
             </div>
 
             <div class="friend-search-panel" aria-label="Find and challenge friends">
-              <div><strong>Challenge someone directly</strong><span>Search a username, add them, then send a challenge in one tap.</span></div>
+              <div><strong>Challenge someone</strong><span>Find a player and send an invite.</span></div>
               <div class="friend-search-row">
                 <input id="friendSearchInput" type="search" autocomplete="off" placeholder="Search player name..." aria-label="Search players to add as friends" />
                 <button class="button secondary" type="button" id="friendSearchButton">Find players</button>
@@ -3025,7 +3041,7 @@
             </div>
 
             <div class="friend-share-card" aria-label="Create and share a private invite">
-              <div class="friend-share-card-copy"><strong>Private invite</strong><span>Create the invite first. Its link and code will be ready to share instantly.</span></div>
+              <div class="friend-share-card-copy"><strong>Private invite</strong><span>Create an invite to get a link and code.</span></div>
               <div class="friend-share-row">
                 <input id="friendInviteLink" readonly aria-label="Friend challenge invite link" placeholder="Create an invite to get a share link" />
                 <button class="button secondary" type="button" id="friendCopyLink" disabled>Copy link</button>

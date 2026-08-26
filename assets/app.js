@@ -7701,12 +7701,12 @@
     // All identity surfaces resolve the equipped style through this small
     // contract.  A surface may scale the result, but it must not invent a
     // second navbar/profile cosmetic implementation.
-    function getEquippedNameStyle() {
+    function getEquippedNameStyle(prefsOverride = null) {
       // A persisted cosmetic is not proof that a user is still signed in.
       // During loading and after logout, use the neutral default until the
       // single application auth state has resolved an authenticated account.
       if (applicationAuthState !== "authenticated" || !applicationAuthAccount) return "classic";
-      const prefs = readLearnerPrefs();
+      const prefs = prefsOverride && typeof prefsOverride === "object" ? prefsOverride : readLearnerPrefs();
       return nameStyleThemes[prefs.nameStyle] ? prefs.nameStyle : "classic";
     }
 
@@ -7860,8 +7860,8 @@
       }
     }
 
-    function renderStyledUsernames(name = "") {
-      const equippedStyle = getEquippedNameStyle();
+    function renderStyledUsernames(name = "", prefsOverride = null) {
+      const equippedStyle = getEquippedNameStyle(prefsOverride);
       const profile = getDragonProfileSnapshot();
       const text = name || profile.name || "Guest Explorer";
       // This is intentionally a compatibility pass for static, signed-in
@@ -8269,7 +8269,7 @@
       } else refreshBoardSurfaces();
       renderPlayerProfile();
       renderFlexBadgeTargets(prefs);
-      renderStyledUsernames();
+      renderStyledUsernames("", prefs);
       refreshMountedPlayerIdentities(getDragonProfileSnapshot(), prefs);
       renderInGamePlayerCard();
     }
@@ -8350,7 +8350,7 @@
       recordStoreHistory("equipped", item);
       // Keep every mounted identity in sync even when the Store inventory's
       // quick-equip action bypasses the larger purchase flow.
-      renderPlayerIdentityExtras(getDragonProfileSnapshot());
+      renderPlayerIdentityExtras(getDragonProfileSnapshot(), nextPrefs);
       return true;
     }
 
@@ -11478,7 +11478,7 @@
       // identity must resolve through getEquippedNameStyle().
       const requestedNameStyle = sourceNameStyle || optionNameStyle || "classic";
       const nameStyle = isPlayer
-        ? getEquippedNameStyle()
+        ? (prefs && typeof prefs === "object" ? getEquippedNameStyle(prefs) : getEquippedNameStyle())
         : (nameStyleThemes[requestedNameStyle] ? requestedNameStyle : "classic");
       // Current-player surfaces must resolve the avatar from the active
       // account workspace, not from a stale profile-shaped source object that
@@ -12370,11 +12370,11 @@
       }));
     }
 
-    function renderPlayerIdentityExtras(profile = getDragonProfileSnapshot()) {
+    function renderPlayerIdentityExtras(profile = getDragonProfileSnapshot(), prefsOverride = null) {
       const authenticated = isApplicationAuthenticated() || document.documentElement?.dataset.authState === "authenticated";
       const countryCode = authenticated ? normalizeCountryFlagValue(readLearnerProfile().countryFlag) : "";
       const icons = getEarnedPlayerIcons(profile);
-      const prefs = readLearnerPrefs();
+      const prefs = prefsOverride && typeof prefsOverride === "object" ? prefsOverride : readLearnerPrefs();
       const identity = getPlayerIdentityModel({
         ...profile,
         ...(authenticated && prefs.avatar && prefs.avatar !== "auto" ? { avatar: prefs.avatar } : {}),
@@ -12416,8 +12416,8 @@
         if (!isOpponent) applyPlayerIdentity(chip, profile, { line: chip, nameSelector, avatarSelector: "#reviewPlayerAvatar", variant: "compact" });
       });
       updateMatchQuickStats(profile);
-      renderStyledUsernames(profile.name);
-      refreshMountedPlayerIdentities(profile);
+      renderStyledUsernames(profile.name, prefs);
+      refreshMountedPlayerIdentities(profile, prefs);
       applyAvatarRankBadges(profile);
     }
 
@@ -13015,24 +13015,24 @@
       if (tone === "quiet") {
         return {
           tone,
-          session: sessionStep[2] + ". " + minutes + " minutes. One clear task.",
-          why: "Focus: " + focus.practice + ". One deliberate rep is enough.",
-          dna: "Focus: " + focus.skill + ". Repeat one useful habit."
+          session: sessionStep[2] + ". " + minutes + " minutes.",
+          why: "Focus: " + focus.practice + ".",
+          dna: "Focus: " + focus.skill + "."
         };
       }
       if (tone === "hype") {
         return {
           tone,
-          session: sessionStep[0] + " You have a clean " + minutes + "-minute win in front of you.",
-          why: "Your " + focus.skill + " is growing. One deliberate rep today builds the next win.",
-          dna: "Your edge is " + focus.skill + ". Keep stacking small wins."
+          session: sessionStep[0] + " " + minutes + " minutes.",
+          why: focus.skill + " is growing.",
+          dna: "Your edge: " + focus.skill + "."
         };
       }
       return {
         tone,
         session: sessionStep[0],
-        why: "Coach focus: " + focus.practice + ". You only need one deliberate rep today.",
-        dna: "Today's edge: " + focus.skill + ". Build it with one small, repeatable habit."
+        why: "Focus: " + focus.practice + ".",
+        dna: "Today's edge: " + focus.skill + "."
       };
     }
     function getPremiumMomentumCopy(tone, earned, target, remaining, minutes, focus) {
@@ -13045,16 +13045,16 @@
       }
       if (tone === "hype") {
         return earned >= target
-          ? "Weekly goal complete. Every extra focused rep is a bonus win."
+          ? "Weekly goal complete."
           : earned
-            ? "Just " + remaining + " XP to go. Stack a " + minutes + "-minute " + focus.skill + " rep."
-            : "Make your first mark this week with a " + minutes + "-minute " + focus.skill + " session.";
+            ? remaining + " XP left. " + focus.skill + " is next."
+            : "Start with " + minutes + " minutes of " + focus.skill + ".";
       }
       return earned >= target
-        ? "Weekly goal reached. Every extra focused rep now makes next week easier."
+        ? "Weekly goal reached."
         : earned
-          ? "Only " + remaining + " XP left. A " + minutes + "-minute " + focus.skill + " session keeps the line moving."
-          : "Your next " + minutes + "-minute " + focus.skill + " session is the first mark on this week's runway.";
+          ? remaining + " XP left. " + focus.skill + " is next."
+          : "Start with " + minutes + " minutes of " + focus.skill + ".";
     }
     function setPremiumHomeAction(link, step) {
       if (!link || !step) return;
@@ -13089,7 +13089,7 @@
       const sessionWhy = document.getElementById("homeSessionWhy");
       if (sessionTitle) sessionTitle.textContent = `${minutes}-minute focus: ${focus.skill}`;
       if (sessionCopy) sessionCopy.textContent = coachVoice.session;
-      if (sessionMeta) sessionMeta.textContent = `Private plan · about ${minutes} minutes · this device only`;
+      if (sessionMeta) sessionMeta.textContent = `${minutes} minutes · this device`;
       if (sessionWhy) sessionWhy.textContent = coachVoice.why;
       setPremiumHomeAction(document.getElementById("homeSessionAction"), sessionStep);
       const daily = getDailyGoalsProgress();
@@ -13514,7 +13514,7 @@
       const previous = readJsonStorage(visitSnapshotStorageKey, null);
       const current = getCurrentVisitSnapshot(lessonCount);
       if (!previous || typeof previous !== "object") {
-        return { changed: true, text: `${getDailyMotivation()} Start with one tiny win.` };
+        return { changed: true, text: `${getDailyMotivation()} Start small.` };
       }
       const changes = [
         current.xp > previous.xp ? `+${current.xp - previous.xp} XP` : "",
@@ -13523,8 +13523,8 @@
         current.lessons > previous.lessons ? `+${current.lessons - previous.lessons} lesson${current.lessons - previous.lessons === 1 ? "" : "s"}` : "",
         current.best > previous.best ? `best streak ${current.best}` : ""
       ].filter(Boolean);
-      if (changes.length) return { changed: true, text: `Since last visit: ${changes.slice(0, 3).join(", ")}. Nice steady progress.` };
-      if (previous.date !== current.date) return { changed: false, text: `New day, fresh board. ${getDailyMotivation()}` };
+      if (changes.length) return { changed: true, text: `Since last visit: ${changes.slice(0, 3).join(", ")}.` };
+      if (previous.date !== current.date) return { changed: false, text: `New day. ${getDailyMotivation()}` };
       return { changed: false, text: getDailyMotivation() };
     }
 
@@ -13878,7 +13878,7 @@
       const masteredThemes = getMasteredTacticalThemes();
       const unlockedSkills = getUnlockedLearningSkills();
       const learningMinutes = getLearningMinutes(lessonCount);
-      const welcomeDelta = authenticated ? getWelcomeBackDelta(lessonCount) : { text: "Your next move is ready.", changed: false };
+      const welcomeDelta = authenticated ? getWelcomeBackDelta(lessonCount) : { text: "Your move is ready.", changed: false };
       const weeklyRecap = getWeeklyHomeRecap();
       const weeklySummaryEnabled = authenticated && readLearnerProfile().weeklySummary !== "off";
       const weeklyGoal = document.getElementById("homeWeeklyGoal");
@@ -13916,7 +13916,7 @@
         ? ["Practice one tactic pattern before playing. This stops free-piece losses fast.", "#puzzles", "Train tactics", "puzzle-plan", "Tactics"]
         : completedToday
           ? [`Open Lesson ${nextLesson} and learn one tiny rule.`, "#paths", "Continue learning", "", ""]
-          : ["Solve today's puzzle for XP, coins, and a calmer board scan.", "#puzzles", "Start daily puzzle", "daily-puzzle", ""];
+          : ["Solve today's puzzle for XP and coins.", "#puzzles", "Start daily puzzle", "daily-puzzle", ""];
       const onboardingPlan = authenticated && !safeGameStats.played && !lessonCount ? getOnboardingPlan(readLearnerProfile()) : null;
       const nextStep = onboardingPlan || defaultNextStep;
       const recommendations = [
@@ -13926,7 +13926,7 @@
         { label: "Practice Mistakes", href: "#play" }
       ];
 
-      welcome.textContent = profileName ? `Welcome back, ${profileName}!` : lessonCount || safePuzzleXp ? "Welcome back!" : "Welcome! Start with one tiny win.";
+      welcome.textContent = profileName ? `Welcome back, ${profileName}.` : lessonCount || safePuzzleXp ? "Welcome back." : "Welcome. Start small.";
       if (delta) {
         const weeklyLine = weeklyRecap.hasActivity
           ? `This week: ${weeklyRecap.xp} XP, ${weeklyRecap.games} ${weeklyRecap.games === 1 ? "game" : "games"}${weeklyRecap.wins ? `, ${weeklyRecap.wins} win${weeklyRecap.wins === 1 ? "" : "s"}` : ""}. Next focus: ${weeklyRecap.focus}.`
@@ -25450,6 +25450,10 @@
       squares.forEach((square) => {
         square.replaceChildren();
         delete square.dataset.pieceKey;
+        // Clearing the DOM invalidates both layers of the shared piece
+        // renderer cache. Leaving pieceRenderKey behind makes the renderer
+        // treat an empty square as already painted on the next puzzle load.
+        delete square.dataset.pieceRenderKey;
       });
     }
 
@@ -27396,6 +27400,20 @@
       let authGeneration = 0;
       let signOutInFlight = null;
       let authTransition = "";
+      let authEventQueue = Promise.resolve();
+      let authEventRevision = 0;
+      const waitForAuthEventsToSettle = async () => {
+        let revision;
+        do {
+          revision = authEventRevision;
+          await authEventQueue.catch(() => {});
+        } while (revision !== authEventRevision);
+      };
+      // Keep the last session returned by Supabase in memory so a delayed
+      // SIGNED_OUT broadcast from the account we just left cannot strand a
+      // newly accepted session between storage writes. Explicit logout clears
+      // this recovery source before the transition is exposed as Guest.
+      let activeSession = null;
 
       const authDebug = (message, detail = {}) => {
         try {
@@ -27557,11 +27575,13 @@
         return supabaseClientPromise;
       };
 
-      const clearSession = () => {
+      const clearSession = ({ clearAuthStorage = true, preserveActiveSession = false } = {}) => {
+        const previousSession = activeSession;
         authGeneration += 1;
         cachedAccount = null;
+        activeSession = preserveActiveSession ? previousSession : null;
         stopSessionRefresh();
-        clearSupabaseBrowserAuthStorage();
+        if (clearAuthStorage) clearSupabaseBrowserAuthStorage();
         writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), currentEmail: "", rememberEmail: "" });
       };
 
@@ -27617,6 +27637,9 @@
         const user = session?.user || await fetchUser(accessToken);
         const account = await getProfile(user, accessToken);
         if (generation !== authGeneration) return null;
+        if (session?.refresh_token || session?.access_token) {
+          activeSession = session;
+        }
         cachedAccount = account;
         return account;
       };
@@ -28087,7 +28110,30 @@
           try {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
-            return await accountFromSession(data.session, generation);
+            // Drain auth notifications emitted by the previous logout before
+            // publishing this login. The transition stays open while any
+            // queued SIGNED_OUT broadcast is revalidated/recovered.
+            await waitForAuthEventsToSettle();
+            const account = await accountFromSession(data.session, generation);
+            if (!account || generation !== authGeneration) return account;
+            // A concurrent sign-out in another tab can finish its storage
+            // removal after signInWithPassword has returned its new session.
+            // Reconcile against Supabase's current session before exposing the
+            // account; if the session is missing or belongs to another user,
+            // persist the authoritative login response once and verify it.
+            const live = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+            const expectedUserId = String(data.session?.user?.id || "");
+            const liveUserId = String(live?.data?.session?.user?.id || "");
+            if (expectedUserId && liveUserId !== expectedUserId) {
+              const restored = await supabase.auth.setSession(data.session).catch((restoreError) => ({ data: { session: null }, error: restoreError }));
+              const restoredUserId = String(restored?.data?.session?.user?.id || "");
+              if (restored?.error || restoredUserId !== expectedUserId) {
+                throw restored?.error || new Error("The new account session could not be confirmed. Please try signing in again.");
+              }
+              activeSession = restored.data.session;
+            }
+            await waitForAuthEventsToSettle();
+            return account;
           } finally {
             if (generation === authGeneration) authTransition = "";
           }
@@ -28106,12 +28152,27 @@
           if (signOutInFlight) return signOutInFlight;
           signOutInFlight = (async () => {
             const supabase = await getSupabaseClient();
-            const { error } = await supabase.auth.signOut();
-            if (error) throw error;
-            // Invalidate every account hydration that was already in flight
-            // before clearing the Supabase session and browser auth storage.
-            clearSession();
-            authDebug("Local logout completed");
+            authTransition = "signing_out";
+            try {
+              // Ordinary logout ends only this browser session. A global
+              // revoke belongs exclusively to the explicit "Logout All
+              // Devices" action below; using Supabase's default global scope
+              // here invalidates another open context for the same account.
+              const { error } = await supabase.auth.signOut({ scope: "local" });
+              if (error) throw error;
+              // Supabase may invoke the listener synchronously but schedule
+              // our guarded work behind the signOut promise. Finish that
+              // work while signing_out is still active, before clearing the
+              // accepted session and ending the transition.
+              await waitForAuthEventsToSettle();
+              // Invalidate every account hydration that was already in flight
+              // before clearing the Supabase session and browser auth storage.
+              activeSession = null;
+              clearSession();
+              authDebug("Local logout completed");
+            } finally {
+              if (authTransition === "signing_out") authTransition = "";
+            }
           })();
           try {
             await signOutInFlight;
@@ -28123,16 +28184,23 @@
           if (signOutInFlight) return signOutInFlight;
           signOutInFlight = (async () => {
             const supabase = await getSupabaseClient();
-            authDebug("Global logout requested");
-            const { error } = await supabase.auth.signOut({ scope: "global" });
-            if (error) {
-              authDebug("Global logout failed; securing this browser", { message: error.message || "unknown" });
-              await supabase.auth.signOut().catch(() => {});
+            authTransition = "signing_out";
+            try {
+              authDebug("Global logout requested");
+              const { error } = await supabase.auth.signOut({ scope: "global" });
+              if (error) {
+                authDebug("Global logout failed; securing this browser", { message: error.message || "unknown" });
+                await supabase.auth.signOut().catch(() => {});
+                activeSession = null;
+                clearSession();
+                throw new Error("This browser was signed out, but other devices could not be revoked. Please try Logout All Devices again.");
+              }
+              activeSession = null;
               clearSession();
-              throw new Error("This browser was signed out, but other devices could not be revoked. Please try Logout All Devices again.");
+              authDebug("Global logout completed");
+            } finally {
+              if (authTransition === "signing_out") authTransition = "";
             }
-            clearSession();
-            authDebug("Global logout completed");
           })();
           try {
             await signOutInFlight;
@@ -28199,54 +28267,178 @@
         onAuthStateChange: async (callback) => {
           const supabase = await getSupabaseClient();
           const { data } = supabase.auth.onAuthStateChange((event, session) => {
-            const generation = authGeneration;
-            window.setTimeout(async () => {
-              if (generation !== authGeneration) return;
-              authDebug("Auth state changed", { event, hasSession: Boolean(session) });
-              if (!session) {
-                if (authTransition === "signing_in") {
-                  authDebug("Ignored delayed signed-out event during sign-in transition");
-                  return;
-                }
-                // Supabase can dispatch a delayed SIGNED_OUT notification
-                // after another account has already completed a password or
-                // OAuth sign-in in this same tab.  The event payload belongs
-                // to the old session, so never clear browser auth storage
-                // solely from it.  Re-read the client's current session: a
-                // live, newer session wins; only a confirmed null session may
-                // transition the shared application state to Guest.
-                const current = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
-                if (generation !== authGeneration) return;
-                const currentSession = current?.data?.session || null;
-                if (currentSession?.user) {
+            const eventGeneration = authGeneration;
+            const processEvent = () => {
+            // Supabase awaits auth subscribers, but the old handler returned
+            // immediately and deferred its work. That let logout resolve while
+            // a SIGNED_OUT callback was still queued; a fast next login could
+            // then be cleared by that old callback. Keep the deferral that
+            // avoids initialization re-entrancy, but return a promise so the
+            // auth operation cannot cross an unfinished transition boundary.
+            return new Promise((resolve) => {
+              window.setTimeout(async () => {
+                try {
+                  const generation = eventGeneration;
+                  if (generation !== authGeneration) {
+                    // Supabase still removes this context's persisted session
+                    // when it delivers a delayed SIGNED_OUT broadcast, even
+                    // when this handler correctly recognizes the event as
+                    // stale. If a newer login has already been accepted,
+                    // restore that authoritative session before returning;
+                    // otherwise the UI can show Account B while getSession()
+                    // is empty. Explicit logout clears activeSession first,
+                    // so it never gets resurrected here.
+                    const recoverableSession = activeSession;
+                    if (!session && authTransition !== "signing_out"
+                      && recoverableSession?.refresh_token && recoverableSession?.user?.id) {
+                      const recovered = await supabase.auth.setSession(recoverableSession).catch(() => ({ data: { session: null } }));
+                      const recoveredSession = recovered?.data?.session || null;
+                      const currentGeneration = authGeneration;
+                      if (recoveredSession?.user && currentGeneration === authGeneration) {
+                        try {
+                          const account = await accountFromSession(recoveredSession, currentGeneration);
+                          if (account && currentGeneration === authGeneration) {
+                            callback(account, { status: "authenticated", event: "stale-session-recovered" });
+                          }
+                        } catch (error) {
+                          authDebug("Stale session recovery failed", { message: error?.message || "unknown" });
+                        }
+                      }
+                    }
+                    return;
+                  }
+                  authDebug("Auth state changed", { event, hasSession: Boolean(session) });
+                  if (!session) {
+                    if (authTransition === "signing_out") {
+                      authDebug("Ignored delayed signed-out event during auth transition", { transition: authTransition });
+                      return;
+                    }
+                    if (authTransition === "signing_in") {
+                      // A sign-out broadcast queued by the account we just
+                      // left can arrive after the new login has already
+                      // written its session. Re-submit the accepted session
+                      // while the login transition is still open so the stale
+                      // event cannot leave Supabase storage empty.
+                      const recoverableSession = activeSession;
+                      if (recoverableSession?.refresh_token && recoverableSession?.user?.id) {
+                        const recovered = await supabase.auth.setSession(recoverableSession).catch(() => ({ data: { session: null } }));
+                        if (generation !== authGeneration) return;
+                        const recoveredSession = recovered?.data?.session || null;
+                        if (recoveredSession?.user) {
+                          try {
+                            const account = await accountFromSession(recoveredSession, generation);
+                            if (!account || generation !== authGeneration) return;
+                            callback(account, { status: "authenticated", event: "session-recovered" });
+                          } catch (error) {
+                            authDebug("Active session recovery failed", { message: error?.message || "unknown" });
+                          }
+                        }
+                      }
+                      return;
+                    }
+                    // Supabase can dispatch a delayed SIGNED_OUT notification
+                    // after another account has already completed a password or
+                    // OAuth sign-in in this same tab. The event payload belongs
+                    // to the old session, so never clear browser auth storage
+                    // solely from it. Re-read the client's current session: a
+                    // live, newer session wins; only a confirmed null session may
+                    // transition the shared application state to Guest.
+                    const current = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+                    if (generation !== authGeneration) return;
+                    const currentSession = current?.data?.session || null;
+                    if (currentSession?.user) {
+                      try {
+                        const account = await accountFromSession(currentSession, generation);
+                        if (!account || generation !== authGeneration) return;
+                        authDebug("Ignored stale signed-out event; current session restored", { hasUsername: Boolean(account?.username) });
+                        callback(account, { status: "authenticated", event: "session-revalidated" });
+                      } catch (error) {
+                        authDebug("Current session revalidation failed", { message: error?.message || "unknown" });
+                        callback(null, { status: "error", error });
+                      }
+                      return;
+                    }
+                    // A local sign-out broadcasts SIGNED_OUT after its
+                    // storage removal. If that broadcast reaches this tab
+                    // after a newer password login, getSession() can briefly
+                    // observe the empty storage window even though the newer
+                    // session is still authoritative in memory. Re-submit
+                    // that session through Supabase; revoked/expired sessions
+                    // fail here and correctly fall through to Guest.
+                    const recoverableSession = activeSession;
+                    if (recoverableSession?.refresh_token && recoverableSession?.user?.id) {
+                      const recovered = await supabase.auth.setSession(recoverableSession).catch(() => ({ data: { session: null } }));
+                      if (generation !== authGeneration) return;
+                      const recoveredSession = recovered?.data?.session || null;
+                      if (recoveredSession?.user) {
+                        try {
+                          const account = await accountFromSession(recoveredSession, generation);
+                          if (!account || generation !== authGeneration) return;
+                          authDebug("Recovered active session after delayed signed-out event", { hasUsername: Boolean(account?.username) });
+                          callback(account, { status: "authenticated", event: "session-recovered" });
+                          return;
+                        } catch (error) {
+                          authDebug("Active session recovery failed", { message: error?.message || "unknown" });
+                        }
+                      }
+                    }
+                    clearSession({
+                      clearAuthStorage: false,
+                      // Keep a page's last accepted session available for
+                      // recovery when a broadcast from another Playwright
+                      // context/tab clears only that context's Supabase
+                      // storage. Explicit local logout clears it above.
+                      preserveActiveSession: Boolean(activeSession?.user?.id && applicationAuthAccount)
+                    });
+                    callback(null, { status: "signed_out" });
+                    return;
+                  }
                   try {
-                    const account = await accountFromSession(currentSession, generation);
+                    // Auth events can arrive with a valid session payload
+                    // while another tab is finishing an older sign-out
+                    // storage update. Confirm that this context still owns
+                    // the event's session before publishing the account. A
+                    // context with no matching local session must remain
+                    // Guest; it must not adopt another tab's login through a
+                    // broadcast payload.
+                    let effectiveSession = session;
+                    const expectedUserId = String(session?.user?.id || "");
+                    if (expectedUserId) {
+                      const live = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+                      const liveUserId = String(live?.data?.session?.user?.id || "");
+                      if (liveUserId !== expectedUserId) return;
+                      effectiveSession = live?.data?.session || session;
+                    }
+                    if (!effectiveSession?.user) return;
+                    const account = await accountFromSession(effectiveSession, generation);
                     if (!account || generation !== authGeneration) return;
-                    authDebug("Ignored stale signed-out event; current session restored", { hasUsername: Boolean(account?.username) });
-                    callback(account, { status: "authenticated", event: "session-revalidated" });
+                    authDebug("Auth state account resolved", { hasUsername: Boolean(account?.username), hasEmail: Boolean(account?.email) });
+                    callback(account, { status: "authenticated" });
                   } catch (error) {
-                    authDebug("Current session revalidation failed", { message: error?.message || "unknown" });
+                    authDebug("Auth state account resolution failed", { message: error?.message || "unknown" });
+                    // A profile/network failure is not proof that the session
+                    // signed out. Keep Store authority unresolved so it cannot
+                    // fall back to local coins while the session is retried.
                     callback(null, { status: "error", error });
                   }
-                  return;
+                } finally {
+                  resolve();
                 }
-                clearSession();
-                callback(null, { status: "signed_out" });
-                return;
-              }
-              try {
-                const account = await accountFromSession(session, generation);
-                if (!account || generation !== authGeneration) return;
-                authDebug("Auth state account resolved", { hasUsername: Boolean(account?.username), hasEmail: Boolean(account?.email) });
-                callback(account, { status: "authenticated" });
-              } catch (error) {
-                authDebug("Auth state account resolution failed", { message: error?.message || "unknown" });
-                // A profile/network failure is not proof that the session
-                // signed out. Keep Store authority unresolved so it cannot
-                // fall back to local coins while the session is retried.
-                callback(null, { status: "error", error });
-              }
-            }, 0);
+              }, 0);
+            });
+            };
+            // Auth events can be emitted concurrently by multiple Supabase
+            // clients/tabs during logout and the next login. Process them in
+            // arrival order so an older SIGNED_OUT callback cannot race a
+            // newer SIGNED_IN callback or strand the UI half-authenticated.
+            authEventRevision += 1;
+            const queuedEvent = authEventQueue.then(processEvent, processEvent);
+            authEventQueue = queuedEvent.catch(() => {});
+            // Do not return this promise to Supabase. Its auth callback runs
+            // under the client's exclusive lock, and our queued revalidation
+            // deliberately calls getSession/setSession after that callback
+            // has returned. Returning it here would deadlock those calls.
+            void queuedEvent;
           });
           authDebug("Auth listener subscribed", { active: Boolean(data.subscription) });
           return () => data.subscription?.unsubscribe();
@@ -28475,6 +28667,7 @@
     }
 
     let authStateUnsubscribe = null;
+    let authUiSetupPromise = null;
 
     function syncAuthProfileHeader(account = null) {
       const panel = document.querySelector(".login-player-profile");
@@ -28647,7 +28840,16 @@
       }
     }
 
-    async function setupSupabaseAuthUi() {
+    function setupSupabaseAuthUi() {
+      // Startup and the deferred Login route can request auth hydration at
+      // the same time. Share one in-flight setup so the Supabase client gets
+      // exactly one listener; duplicate listeners amplify cross-tab auth
+      // broadcasts and can race a subsequent account login.
+      if (!authUiSetupPromise) authUiSetupPromise = setupSupabaseAuthUiImpl();
+      return authUiSetupPromise;
+    }
+
+    async function setupSupabaseAuthUiImpl() {
       const provider = getAuthProvider();
       setStoreAuthState(provider?.getStoreState ? "unknown" : "signed_out");
       renderAuthUi(null, true);
