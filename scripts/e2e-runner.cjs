@@ -16,6 +16,13 @@ const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
 const artifactDir = path.join(root, "e2e-artifacts");
 const snapshotDir = path.join(root, "tests", "e2e", "snapshots");
+// Playwright storage-state files are consumed by several contexts throughout
+// a run. Keep each invocation's snapshots in a private directory so a second
+// runner cannot overwrite/rename a file while the first runner is still using
+// it. The legacy fixed-name files remain read-only cache inputs below.
+const sharedAuthDir = path.join(root, ".playwright", "auth");
+fs.mkdirSync(sharedAuthDir, { recursive: true });
+const runAuthDir = fs.mkdtempSync(path.join(sharedAuthDir, "run-"));
 const mode = process.argv[2] || "affected";
 const visualOnly = mode === "visual";
 
@@ -386,15 +393,22 @@ async function auditCurrentIdentityParity(page, label, expectedStyle = "") {
     };
     return {
       navbar: read('.site-header .nav-utilities .player-flex-name [data-profile-field="name"]'),
-      playerPass: read('#loginDisplayName')
+      playerPass: read('#loginDisplayName'),
+      playCard: read('#matchPlayerCard [data-match-name]')
     };
   });
-  assert(parity.navbar && parity.playerPass, `${label}: navbar or Player Pass identity was not mounted: ${JSON.stringify(parity)}`);
-  assert(parity.navbar.text && parity.playerPass.text, `${label}: navbar or Player Pass username is empty: ${JSON.stringify(parity)}`);
+  assert(parity.navbar && parity.playerPass && parity.playCard, `${label}: navbar, Player Pass, or Play identity was not mounted: ${JSON.stringify(parity)}`);
+  assert(parity.navbar.text && parity.playerPass.text && parity.playCard.text, `${label}: a current-player username is empty: ${JSON.stringify(parity)}`);
+  [parity.playerPass, parity.playCard].forEach((surface) => {
+    assert(surface.text === parity.navbar.text, `${label}: current-player username differs across surfaces (navbar=${JSON.stringify(parity.navbar.text)}, surface=${JSON.stringify(surface.text)}).`);
+  });
   const identityKeys = ["style", "rarity", "backgroundImage", "backgroundClip", "color", "textFill", "textShadow", "filter", "fontWeight", "letterSpacing", "animationName", "animationDuration"];
-  identityKeys.forEach((key) => assert(parity.navbar[key] === parity.playerPass[key], `${label}: navbar and Player Pass ${key} differ (navbar=${JSON.stringify(parity.navbar[key])}, playerPass=${JSON.stringify(parity.playerPass[key])}).`));
+  [parity.playerPass, parity.playCard].forEach((surface) => {
+    identityKeys.forEach((key) => assert(parity.navbar[key] === surface[key], `${label}: current-player ${key} differs across surfaces (navbar=${JSON.stringify(parity.navbar[key])}, surface=${JSON.stringify(surface[key])}).`));
+  });
   Object.keys(parity.navbar.vars).forEach((key) => assert(parity.navbar.vars[key] === parity.playerPass.vars[key], `${label}: navbar and Player Pass ${key} token differs (navbar=${JSON.stringify(parity.navbar.vars[key])}, playerPass=${JSON.stringify(parity.playerPass.vars[key])}).`));
-  if (expectedStyle) assert(parity.navbar.style === expectedStyle && parity.playerPass.style === expectedStyle, `${label}: expected ${expectedStyle}, found navbar=${parity.navbar.style}, playerPass=${parity.playerPass.style}.`);
+  Object.keys(parity.navbar.vars).forEach((key) => assert(parity.navbar.vars[key] === parity.playCard.vars[key], `${label}: navbar and Play ${key} token differs (navbar=${JSON.stringify(parity.navbar.vars[key])}, play=${JSON.stringify(parity.playCard.vars[key])}).`));
+  if (expectedStyle) assert(parity.navbar.style === expectedStyle && parity.playerPass.style === expectedStyle && parity.playCard.style === expectedStyle, `${label}: expected ${expectedStyle}, found navbar=${parity.navbar.style}, playerPass=${parity.playerPass.style}, play=${parity.playCard.style}.`);
   return parity;
 }
 
@@ -843,14 +857,33 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
   if (envSummary.emailLooksPlaceholder || envSummary.passwordLooksPlaceholder) {
     throw new Error(`Dedicated E2E credentials are still placeholders in ${envFile}. Replace E2E_EMAIL/E2E_PASSWORD with a real disposable test account; no password was printed.`);
   }
-  const statePath = path.join(root, ".playwright", "auth", `${label}.json`);
-  fs.mkdirSync(path.dirname(statePath), { recursive: true });
+  const statePath = path.join(runAuthDir, `${label}.json`);
+  const legacyStatePath = path.join(sharedAuthDir, `${label}.json`);
+  // Seed this run's immutable snapshot from the old shared cache when it is
+  // available. Never refresh or write the shared file: another runner may be
+  // rotating it, and a transient ENOENT simply means we perform a fresh login.
+  if (!fs.existsSync(statePath) && fs.existsSync(legacyStatePath)) {
+    try {
+      fs.copyFileSync(legacyStatePath, statePath);
+    } catch {
+      try { fs.unlinkSync(statePath); } catch {}
+    }
+  }
   // A failed-signout fixture is created immediately after a real logout. The
   // preceding sign-out may revoke the cached refresh token, so an apparently
   // authenticated snapshot is not safe to reuse for this specific case.
   const forceFreshState = label === "failed-logout";
   if (!forceFreshState && fs.existsSync(statePath)) {
-    const cachedContext = await browser.newContext({ storageState: statePath });
+    let cachedContext;
+    try {
+      cachedContext = await browser.newContext({ storageState: statePath });
+    } catch {
+      // A concurrently rotated/corrupt legacy cache is not an auth failure;
+      // discard only this run's copy and establish a fresh session.
+      try { fs.unlinkSync(statePath); } catch {}
+      cachedContext = null;
+    }
+    if (cachedContext) {
     const cachedPage = await cachedContext.newPage();
     await gotoHash(cachedPage, baseUrl, "#login");
     // A stored refresh token can look authenticated for one microtask before
@@ -891,6 +924,7 @@ async function prepareAuth(browser, baseUrl, email, password, label) {
       && cachedAuth.accountName.trim() !== "Guest Explorer"
       && cachedStoreReady
       && cachedExpectedStyleReady) return statePath;
+    }
   }
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -1103,6 +1137,35 @@ async function runGuestBrowserTests(browser, baseUrl, viewports) {
           throw new Error(`${name}@${width}: board did not reach 64 squares before audit: ${JSON.stringify({ readiness, timeout: error.message, consoleErrors })}`);
         }
       }
+      if (name === "play") {
+        const playSetup = await page.evaluate(() => {
+          const board = document.querySelector("#coachBoard");
+          const rect = board?.getBoundingClientRect();
+          return {
+            opponent: document.querySelector("#aiPlayerName")?.textContent.trim() || "",
+            selected: [...document.querySelectorAll("[data-beginner-bot], [data-game-difficulty]")]
+              .filter((button) => button.getAttribute("aria-pressed") === "true")
+              .map((button) => button.dataset.beginnerBot || button.dataset.gameDifficulty),
+            playerClock: document.querySelector("[data-match-timer]")?.textContent.trim() || "",
+            opponentClock: document.querySelector("#aiPlayerTimer")?.textContent.trim() || "",
+            status: document.querySelector("#gameStatusBadge")?.textContent.trim() || "",
+            turn: document.querySelector("#gameTurnBadge")?.textContent.trim() || "",
+            startDisabled: Boolean(document.querySelector("#restartGame")?.disabled),
+            draggable: [...(board?.querySelectorAll("[data-square]") || [])].some((square) => square.draggable),
+            boardWidth: rect?.width || 0,
+            boardHeight: rect?.height || 0,
+            horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
+          };
+        });
+        assert(!/Nova Rookie|Club Tutor/i.test(playSetup.opponent), `${name}@${width}: Play mounted a default bot: ${JSON.stringify(playSetup)}`);
+        assert(playSetup.selected.length === 0, `${name}@${width}: Play marked a bot or difficulty selected before user action: ${JSON.stringify(playSetup)}`);
+        assert(playSetup.playerClock === "--:--" && playSetup.opponentClock === "--:--", `${name}@${width}: Play clock started before setup: ${JSON.stringify(playSetup)}`);
+        assert(/Choose a bot|Waiting/i.test(playSetup.status) && /Waiting|start/i.test(playSetup.turn), `${name}@${width}: Play did not expose its idle setup state: ${JSON.stringify(playSetup)}`);
+        assert(playSetup.startDisabled && !playSetup.draggable, `${name}@${width}: Play exposed active game controls before bot selection: ${JSON.stringify(playSetup)}`);
+        assert(Math.abs(playSetup.boardWidth - playSetup.boardHeight) < 1 && playSetup.boardWidth > 0, `${name}@${width}: Play board geometry is invalid: ${JSON.stringify(playSetup)}`);
+        assert(!playSetup.horizontalOverflow, `${name}@${width}: Play introduced horizontal overflow: ${JSON.stringify(playSetup)}`);
+        if (width >= 1181) assert(playSetup.boardWidth >= 720, `${name}@${width}: desktop Play board was silently reduced: ${JSON.stringify(playSetup)}`);
+      }
       await auditIdentity(page, `${name}@${width}`);
       await auditVisibleBoards(page, `${name}@${width}`);
       if (name === "home") await checkVisualSnapshot(page, `navbar-${width}`, ".site-header");
@@ -1199,15 +1262,20 @@ async function readStorePurchaseSettlementDiagnostics(page, itemId, runtimeTrace
 }
 
 async function waitForStorePurchaseSettlement(page, itemId, runtimeTrace) {
-  // A successfully purchased item is equipped immediately.  Its final action
-  // must therefore be deliberately disabled as "Equipped", not re-enabled.
-  // This proves the transaction lock cleared without mistaking the correct
-  // post-equip disabled button for a stuck pending request.
+  // A successfully purchased item is equipped immediately.  Regular items
+  // expose a disabled "Equipped" action; Name Styles intentionally expose an
+  // enabled "Unequip" action so the user can switch styles.  Accept both
+  // authoritative settled states while still requiring the transaction lock
+  // and pending markers to be cleared.
   try {
     await page.waitForFunction((id) => {
       const card = [...document.querySelectorAll("[data-store-item-id]")].find((element) => element.dataset.storeItemId === id);
       const action = card?.querySelector("[data-store-item-action]");
       const status = document.getElementById("storeStatus");
+      const regularEquippedAction = action?.disabled && /equipped/i.test(action.textContent || "");
+      const nameStyleUnequipAction = card?.classList.contains("is-name-style")
+        && !action?.disabled
+        && /^unequip$/i.test(String(action.textContent || "").trim());
       return Boolean(
         card
         && card.classList.contains("is-owned")
@@ -1215,10 +1283,9 @@ async function waitForStorePurchaseSettlement(page, itemId, runtimeTrace) {
         && !card.classList.contains("is-pending")
         && card.getAttribute("aria-busy") !== "true"
         && action
-        && action.disabled
         && !action.classList.contains("is-pending")
         && action.getAttribute("aria-busy") !== "true"
-        && /equipped/i.test(action.textContent || "")
+        && (regularEquippedAction || nameStyleUnequipAction)
         && status?.dataset.storePendingItem !== id
         && status?.getAttribute("aria-busy") !== "true"
       );
@@ -1738,7 +1805,12 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
     pass(`browser: ${label}`);
   };
 
-  const logoutContext = await browser.newContext({ storageState: primaryState, viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
+  // The isolation flow intentionally signs Account A out before restoring it.
+  // That can revoke the refresh token contained in primaryState, so starting
+  // this independent logout regression from that snapshot creates a stale
+  // authenticated UI with no live Supabase session. Use an anonymous context
+  // and perform an explicit password login instead.
+  const logoutContext = await browser.newContext({ viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
   const logoutPage = await logoutContext.newPage();
   await gotoHash(logoutPage, baseUrl, "#login");
   const logoutInitial = await readAuthRuntimeSnapshot(logoutPage);

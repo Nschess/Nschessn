@@ -3246,16 +3246,16 @@
               </div>
               <span class="play-setup-chip">Casual</span>
               <span class="play-setup-chip">Stockfish WASM</span>
-              <span class="badge" id="gameDifficultyBadge">Easy coach</span>
-              <span class="play-setup-chip" id="gameEloBadge">1050 Elo</span>
+              <span class="badge" id="gameDifficultyBadge">No bot selected</span>
+              <span class="play-setup-chip" id="gameEloBadge">— Elo</span>
               <span class="badge status-skeleton" id="gameStatusBadge" role="status" aria-live="polite" aria-atomic="true"><span class="sr-only">Loading chess rules.</span></span>
-              <span class="badge" id="gameTurnBadge">White to move</span>
+              <span class="badge" id="gameTurnBadge">Waiting to start</span>
               <span class="badge" id="gameBossBadge" hidden>Boss battle</span>
               <details class="coach-difficulty-menu">
                 <summary>Difficulty</summary>
                 <div class="mission-selector puzzle-plan-selector coach-levels" role="group" aria-label="AI difficulty">
                   <button class="mission-button" type="button" data-game-difficulty="beginner" aria-pressed="false">Beginner</button>
-                  <button class="mission-button" type="button" data-game-difficulty="easy" aria-pressed="true">Easy</button>
+                  <button class="mission-button" type="button" data-game-difficulty="easy" aria-pressed="false">Easy</button>
                   <button class="mission-button" type="button" data-game-difficulty="medium" aria-pressed="false">Medium</button>
                   <button class="mission-button" type="button" data-game-difficulty="hard" aria-pressed="false">Hard</button>
                   <button class="mission-button" type="button" data-game-difficulty="expert" aria-pressed="false">Expert</button>
@@ -3268,14 +3268,14 @@
             <aside class="ai-player-card player-frame player-frame--opponent cq-player-card" id="aiPlayerCard" data-ai-rarity="Common" aria-label="Opponent player frame">
               <div class="player-frame-topline">
                 <span class="player-frame-kicker">Opponent</span>
-                <span class="ai-player-status" id="aiPlayerStatus">Online</span>
+                <span class="ai-player-status" id="aiPlayerStatus">Waiting</span>
               </div>
               <span class="ai-player-avatar" id="aiPlayerAvatar" aria-hidden="true">♟</span>
               <span class="ai-player-main">
-                <strong><span id="aiPlayerFlag" class="player-country-flag" data-country-code="GB">🇬🇧</span><span id="aiPlayerName">Club Tutor</span></strong>
-                <small><span id="aiPlayerTitle">Novice Student</span> • <span id="aiPlayerRating">1050 Elo</span></small>
+                <strong><span id="aiPlayerFlag" class="player-country-flag" data-country-code=""></span><span id="aiPlayerName">Choose a bot</span></strong>
+                <small><span id="aiPlayerTitle">Select an AI opponent to begin</span> • <span id="aiPlayerRating">—</span></small>
               </span>
-              <span class="ai-player-timer" id="aiPlayerTimer" aria-label="Opponent game clock">00:00</span>
+              <span class="ai-player-timer" id="aiPlayerTimer" aria-label="Opponent game clock">--:--</span>
               <details class="player-frame-details">
                 <summary>Opponent details</summary>
                 <dl class="player-frame-stats player-frame-stats--opponent" aria-label="Opponent details">
@@ -3289,7 +3289,7 @@
                 <p class="player-frame-description" data-ai-description>A calm opponent that develops safely and looks for practical tactics.</p>
               </details>
               <div class="player-frame-footer">
-                <span class="ai-player-move" id="aiMoveIndicator">Black</span>
+                <span class="ai-player-move" id="aiMoveIndicator">—</span>
                 <span class="ai-player-last" id="aiLastMove">Last: --</span>
                 <span class="player-frame-record" data-ai-games>0 games</span>
                 <span class="player-frame-record" data-ai-win-rate>-- win rate</span>
@@ -3305,7 +3305,7 @@
                 <strong class="match-player-name-line"><span data-match-name>Player</span></strong>
                 <span class="match-player-subline"><small data-match-level>Level 1 Explorer</small><span class="match-flex-badge" data-flex-badge data-match-flex data-rarity="Common">Rookie Spark</span></span>
               </span>
-              <span class="match-player-timer" data-match-timer>00:00</span>
+              <span class="match-player-timer" data-match-timer>--:--</span>
               <span class="match-player-meta" aria-label="Player match details">
                 <span class="match-player-pill" data-match-side>White</span>
                 <span class="match-player-pill" data-match-rating>450 Elo</span>
@@ -3365,7 +3365,7 @@
                 <button class="premove-status-cancel" type="button" id="cancelPremove" aria-label="Cancel queued premove" hidden>×</button>
               </div>
               <div class="puzzle-actions play-actions play-primary-actions">
-                <button class="button play-start-button" type="button" id="restartGame"><span aria-hidden="true">&#9654;</span> Start Game</button>
+                <button class="button play-start-button" type="button" id="restartGame" disabled><span aria-hidden="true">&#9654;</span> Start Game</button>
                 <button class="button secondary play-draw-action" type="button" id="offerDraw">Agree Draw</button>
                 <button class="button secondary danger play-resign-action" type="button" id="resignGame">Resign</button>
                 <details class="play-extra-actions">

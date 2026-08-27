@@ -7892,6 +7892,7 @@
       const prefs = prefsOverride && typeof prefsOverride === "object" ? prefsOverride : readLearnerPrefs();
       const identity = getPlayerIdentityModel({
         ...profile,
+        name: getPreferredPlayerName(profile),
         ...(prefs.avatar && prefs.avatar !== "auto" ? { avatar: prefs.avatar } : {}),
         isPlayer: true
       }, { profile, prefs, isPlayer: true });
@@ -7907,7 +7908,10 @@
           ? line
           : line.querySelector('[data-player-identity-name], [data-match-name], [data-profile-field="name"], #loginDisplayName');
         if (!name) return;
-        applyNameStyleToTextElement(name, identity.nameStyle, name.dataset.nameText || name.textContent || identity.name);
+        // Current-player lines are projections of the shared identity model,
+        // so never preserve a cached DOM name from a previous account or
+        // profile snapshot while refreshing its equipped cosmetic.
+        applyNameStyleToTextElement(name, identity.nameStyle, identity.name);
         line.dataset.identityNameStyle = identity.nameStyle;
         line.dataset.identityNameRarity = identity.nameStyleTheme.rarity || "Common";
         const shell = line.closest(".player-identity-shell") || line;
@@ -11197,6 +11201,10 @@
     }
 
     function getPreferredPlayerName(profile = readDragonProfile()) {
+      const accountName = isApplicationAuthenticated()
+        ? String(applicationAuthAccount?.username || "").trim()
+        : "";
+      if (accountName) return accountName;
       const localName = String(readLearnerProfile().name || "").trim();
       const profileName = String(profile?.name || "").trim();
       if (localName) return localName;
@@ -11469,7 +11477,14 @@
       const isPlayer = options.isPlayer !== undefined
         ? Boolean(options.isPlayer)
         : source.isPlayer !== undefined ? Boolean(source.isPlayer) : true;
-      const name = String(source.name || source.displayName || source.username || options.name || (isPlayer ? profile.name : "Player")).trim() || (isPlayer ? "Guest Explorer" : "Player");
+      const authenticatedIdentity = isApplicationAuthenticated()
+        || document.documentElement?.dataset.authState === "authenticated";
+      const accountName = authenticatedIdentity && isPlayer
+        ? String(applicationAuthAccount?.username || "").trim()
+        : "";
+      const name = accountName
+        || String(source.name || source.displayName || source.username || options.name || (isPlayer ? profile.name : "Player")).trim()
+        || (isPlayer ? "Guest Explorer" : "Player");
       // The signed-in player has exactly one equipped cosmetic source.  Auth
       // profile payloads and cached surface models can contain an older
       // name_style value; allowing that value to win made the navbar/profile
@@ -11484,8 +11499,6 @@
       // account workspace, not from a stale profile-shaped source object that
       // a caller may have captured before server/store hydration. Remote
       // identities continue to use their supplied public avatar.
-      const authenticatedIdentity = isApplicationAuthenticated()
-        || document.documentElement?.dataset.authState === "authenticated";
       const activePreferenceAvatar = String(prefs.avatar || "").trim();
       // The verified Supabase profile is the account-bound source of truth
       // while Store/workspace preferences are still hydrating. A stale
@@ -12377,6 +12390,7 @@
       const prefs = prefsOverride && typeof prefsOverride === "object" ? prefsOverride : readLearnerPrefs();
       const identity = getPlayerIdentityModel({
         ...profile,
+        name: getPreferredPlayerName(profile),
         ...(authenticated && prefs.avatar && prefs.avatar !== "auto" ? { avatar: prefs.avatar } : {}),
         countryCode,
         icons,
@@ -12415,8 +12429,8 @@
         const nameSelector = isOpponent ? "#reviewOpponentName" : "#reviewPlayerIdentity";
         if (!isOpponent) applyPlayerIdentity(chip, profile, { line: chip, nameSelector, avatarSelector: "#reviewPlayerAvatar", variant: "compact" });
       });
-      updateMatchQuickStats(profile);
-      renderStyledUsernames(profile.name, prefs);
+      updateMatchQuickStats({ ...profile, name: identity.name });
+      renderStyledUsernames(identity.name, prefs);
       refreshMountedPlayerIdentities(profile, prefs);
       applyAvatarRankBadges(profile);
     }
@@ -15275,7 +15289,10 @@
     let coachSelected = "";
     let coachLegalMoves = [];
     let coachLastMove = null;
-    let coachDifficulty = "easy";
+    // Play opens as a setup surface. A bot (or an explicit engine level)
+    // must be chosen before a local game can become active.
+    let coachDifficulty = "";
+    let coachSessionActive = false;
     let coachPlayerColor = "w";
     let coachFlipped = false;
     let coachThinking = false;
@@ -15451,6 +15468,7 @@
     }
 
     function isCoachGameOver() {
+      if (!coachSessionActive && !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState) return false;
       return Boolean(coachTerminalOutcome)
         || Boolean(matchClockExpiredColor)
         || coachDrawAgreed
@@ -15459,7 +15477,7 @@
     }
 
     function getCoachTerminalOutcome() {
-      if (!coachGame) return null;
+      if (!coachGame || (!coachSessionActive && !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState)) return null;
       const friendOutcome = friendChallengeState?.active ? getFriendGameOutcome(friendChallengeState) : null;
       if (friendOutcome) return friendOutcome;
       if (friendChallengeState?.status === "completed") return { result: "aborted", termination: "game complete" };
@@ -15661,7 +15679,7 @@
     }
 
     function setCoachDifficulty(level) {
-      coachDifficulty = stockfishLevels[level] || getBeginnerBot(level) ? level : "easy";
+      coachDifficulty = level && (stockfishLevels[level] || getBeginnerBot(level)) ? level : "";
       cancelStockfishSearch("Difficulty changed");
       if (coachThinking) {
         coachMoveToken += 1;
@@ -15675,9 +15693,9 @@
       });
       const labels = { beginner: "Beginner engine", easy: "Easy engine", medium: "Medium engine", hard: "Hard engine", expert: "Expert engine", master: "Master engine", strong: "2000 Elo bot" };
       const config = getCoachConfig();
-      document.getElementById("gameDifficultyBadge").textContent = labels[coachDifficulty] || config.label;
+      document.getElementById("gameDifficultyBadge").textContent = coachDifficulty ? (labels[coachDifficulty] || config.label) : "No bot selected";
       const gameEloBadge = document.getElementById("gameEloBadge");
-      if (gameEloBadge) gameEloBadge.textContent = `${config.elo} Elo`;
+      if (gameEloBadge) gameEloBadge.textContent = coachDifficulty ? `${config.elo} Elo` : "— Elo";
       stockfishInfo.depth = config.depth || stockfishInfo.depth;
       updateAiPlayerHeader();
       updateEnginePanel();
@@ -15759,6 +15777,16 @@
     }
 
     function startSoloCoachGame({ playerColor } = {}) {
+      if (!coachDifficulty) {
+        coachSessionActive = false;
+        matchClockState = null;
+        resetMatchPlayerTimer(getSoloMatchClockControl(), { running: false });
+        coachMessage = "Choose an AI bot, set your time control, then start the game.";
+        updateCoachPanel();
+        renderCoachBoard();
+        return false;
+      }
+      coachSessionActive = true;
       resetRealtimeContextForAi();
       if (playerColor === "w" || playerColor === "b") {
         coachPlayerColor = playerColor;
@@ -15773,6 +15801,7 @@
       setupCoachAvatarAssets();
       restartCoachGame();
       updateAiPlayerHeader();
+      updateCoachPanel();
       window.requestAnimationFrame(() => {
         if (document.getElementById("play")?.classList.contains("is-active-panel")) void initializeCoachEngine();
       });
@@ -15821,6 +15850,9 @@
           online: opponent.online,
           isFriend: true
         };
+      }
+      if (!level || (!stockfishLevels[level] && !getBeginnerBot(level))) {
+        return { name: "Choose a bot", title: "Select an AI opponent to begin", rarity: "Common", avatar: "?", flag: "", online: false, isPlaceholder: true };
       }
       const bot = getBeginnerBot(level);
       if (bot) return { name: bot.name, title: bot.personality, rarity: bot.elo >= 1000 ? "Rare" : "Common", avatar: bot.avatar, flag: "PH" };
@@ -16040,7 +16072,7 @@
       updateMatchSeatLayout();
       const config = getCoachConfig();
       const ai = getAiHeaderProfile();
-      const displayRating = Math.max(400, Number(ai.rating) || Number(config.elo) || 450);
+      const displayRating = ai.isPlaceholder ? 0 : Math.max(400, Number(ai.rating) || Number(config.elo) || 450);
       const isGameOver = coachGame && isCoachGameOver();
       const isMate = coachGame && callCoachRule(coachGame, "isCheckmate", "in_checkmate");
       const botColor = getCoachBotColor();
@@ -16061,7 +16093,7 @@
         renderSharedIdentityLine(aiLine, aiModel, { nameSelector: "#aiPlayerName", variant: "compact" });
       }
       document.getElementById("aiPlayerTitle").textContent = ai.title;
-      document.getElementById("aiPlayerRating").textContent = `${displayRating} Elo`;
+      document.getElementById("aiPlayerRating").textContent = ai.isPlaceholder ? "—" : `${displayRating} Elo`;
       const selectedBot = getBeginnerBot();
       const botGames = selectedBot
         ? Math.max(0, Number(beginnerBotState.wins[selectedBot.id]) || 0) + Math.max(0, Number(beginnerBotState.losses[selectedBot.id]) || 0)
@@ -16071,16 +16103,16 @@
         const field = card.querySelector(`[data-ai-stat="${key}"]`);
         if (field) field.textContent = value;
       };
-      setFrameStat("engine", ai.isFriend ? "Realtime match" : "Stockfish 16");
-      setFrameStat("difficulty", ai.isFriend ? (friendChallengeState?.gameType || "Casual") : config.label);
-      setFrameStat("rating", `${displayRating} Elo`);
-      setFrameStat("style", ai.isFriend ? "Live player" : selectedBot?.style || selectedBot?.opening || "Balanced engine");
-      setFrameStat("strength", ai.isFriend ? "Player" : `Skill ${config.skill}/20`);
-      setFrameStat("level", ai.title || "Opponent");
+      setFrameStat("engine", ai.isPlaceholder ? "—" : ai.isFriend ? "Realtime match" : "Stockfish 16");
+      setFrameStat("difficulty", ai.isPlaceholder ? "Choose a bot" : ai.isFriend ? (friendChallengeState?.gameType || "Casual") : config.label);
+      setFrameStat("rating", ai.isPlaceholder ? "—" : `${displayRating} Elo`);
+      setFrameStat("style", ai.isPlaceholder ? "Choose a bot" : ai.isFriend ? "Live player" : selectedBot?.style || selectedBot?.opening || "Balanced engine");
+      setFrameStat("strength", ai.isPlaceholder ? "—" : ai.isFriend ? "Player" : `Skill ${config.skill}/20`);
+      setFrameStat("level", ai.isPlaceholder ? "Setup" : ai.title || "Opponent");
       const description = card.querySelector("[data-ai-description]");
       if (description) description.textContent = ai.isFriend
         ? `${ai.name} is connected for a live game.`
-        : selectedBot?.bio || `${ai.name} uses ${config.label.toLowerCase()} calculation and practical tactics.`;
+        : ai.isPlaceholder ? "Choose an AI bot before starting a game." : selectedBot?.bio || `${ai.name} uses ${config.label.toLowerCase()} calculation and practical tactics.`;
       const games = card.querySelector("[data-ai-games]");
       if (games) games.textContent = `${botGames} game${botGames === 1 ? "" : "s"}`;
       const winRate = card.querySelector("[data-ai-win-rate]");
@@ -16091,14 +16123,15 @@
         flag.dataset.countryCode = ai.flag;
         flag.dataset.playerCountry = "";
       }
-      document.getElementById("aiMoveIndicator").textContent = getCoachColorName(botColor);
+      document.getElementById("aiMoveIndicator").textContent = ai.isPlaceholder ? "—" : getCoachColorName(botColor);
       document.getElementById("aiPlayerStatus").textContent = ai.isFriend
         ? (!navigator.onLine || !ai.online ? "Offline" : isGameOver ? "Review" : coachGame?.turn() === botColor ? "Their turn" : "Online")
-        : coachThinking ? "Thinking..." : isGameOver ? "Review" : "Online";
+        : ai.isPlaceholder ? "Waiting" : coachThinking ? "Thinking..." : isGameOver ? "Review" : "Online";
       document.getElementById("aiLastMove").textContent = `Last: ${coachLastMove?.san || "--"}`;
       card.title = ai.isFriend
         ? `${ai.name} - ${ai.title}. ${displayRating} Elo.`
-        : `${ai.name}: ${ai.title}. Plays ${config.label}, depth ${config.depth}. Favorite openings: Italian, Queen's Gambit, Sicilian setups.`;
+        : ai.isPlaceholder ? "Choose an AI bot to start a game."
+          : `${ai.name}: ${ai.title}. Plays ${config.label}, depth ${config.depth}. Favorite openings: Italian, Queen's Gambit, Sicilian setups.`;
     }
 
     function getCoachStrengthProfile() {
@@ -16406,7 +16439,9 @@
       }
       const isOnline = navigator.onLine !== false;
       const isGameOver = coachGame && isCoachGameOver();
-      const playerStatus = !isOnline ? "Offline"
+      const waitingForSetup = !coachSessionActive && !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState;
+      const playerStatus = waitingForSetup ? "Choose bot"
+        : !isOnline ? "Offline"
         : matchClockExpiredColor ? `${getCoachColorName(matchClockExpiredColor)} flagged`
           : isGameOver ? "Review"
             : coachGame?.turn() === coachPlayerColor && !coachThinking ? "Your move" : "Ready";
@@ -16448,19 +16483,19 @@
       const premiumLabel = getPremiumMatchBadge();
 
       const matchName = friendSelf?.displayName || getPreferredPlayerName(profile);
-      const identity = getPlayerIdentityModel(friendSelf ? { ...friendSelf, name: matchName, isPlayer: true } : { ...profile, name: matchName, isPlayer: true }, { profile, isPlayer: true, variant: "standard" });
+      const identity = getPlayerIdentityModel(friendSelf ? { ...friendSelf, name: matchName, isPlayer: true } : { ...profile, name: matchName, isPlayer: true }, { profile, prefs, isPlayer: true, variant: "standard" });
       const matchAvatar = card.querySelector("[data-match-avatar]");
       applySharedAvatarElement(matchAvatar, identity, { variant: "standard" });
-      card.querySelector("[data-match-name]").textContent = matchName;
+      card.querySelector("[data-match-name]").textContent = identity.name;
       card.querySelector("[data-match-level]").textContent = friendSelf?.title || profile.level || "Level 1 Explorer";
       applyAvatarRankBadges(profile);
-      renderStyledUsernames(matchName);
+      renderStyledUsernames(identity.name, prefs);
       if (friendSelf) {
         const line = card.querySelector(".match-player-name-line");
         renderSharedIdentityLine(line, identity, { nameSelector: "[data-match-name]", variant: "standard" });
-        updateMatchQuickStats({ ...profile, name: matchName });
+        updateMatchQuickStats({ ...profile, name: identity.name });
       } else {
-        renderPlayerIdentityExtras(profile);
+        renderPlayerIdentityExtras(profile, prefs);
       }
       const playerRating = Math.max(400, Number(friendSelf?.rating) || getLearnerGameRating());
       if (rating) rating.textContent = `${playerRating} Elo`;
@@ -16509,6 +16544,7 @@
       if (reviewRetryState) return piece.color === getReviewPlayerColor() && coachGame.turn() === getReviewPlayerColor();
       if (isFriendSpectatorMode()) return false;
       if (friendChallengeState?.active) return piece.color === coachPlayerColor && coachGame.turn() === coachPlayerColor;
+      if (!coachSessionActive) return false;
       return coachBotPaused ? piece.color === coachGame.turn() : piece.color === coachPlayerColor && coachGame.turn() === coachPlayerColor;
     }
 
@@ -20077,6 +20113,7 @@
       const friendOutcome = friendChallengeState?.remote ? getFriendGameOutcome(friendChallengeState) : null;
       const friendFinished = Boolean(friendOutcome) || friendChallengeState?.status === "completed";
       const gameFinished = Boolean(terminalOutcome);
+      const waitingForSetup = !coachSessionActive && !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState;
 
       statusBadge.classList.remove("status-skeleton");
       coach.classList.remove("coach-skeleton");
@@ -20088,8 +20125,13 @@
         bossBadge.hidden = !activeBoss;
         bossBadge.textContent = activeBoss ? `${getBossAvatar(activeBoss)} ${activeBoss.name}` : "Boss battle";
       }
-      turnBadge.textContent = coachThinking ? "Coach thinking" : `${turn} to move`;
-      if (friendFinished) {
+      turnBadge.textContent = waitingForSetup ? "Waiting to start" : coachThinking ? "Coach thinking" : `${turn} to move`;
+      if (waitingForSetup) {
+        statusBadge.textContent = coachDifficulty ? "Ready to start" : "Choose a bot";
+        coach.textContent = coachDifficulty
+          ? "Set your time control, then start the game when you are ready."
+          : "Choose an AI bot and time control before starting a game.";
+      } else if (friendFinished) {
         statusBadge.textContent = friendOutcome?.result === "draw" ? "Draw" : friendOutcome?.result === "aborted" ? "Aborted" : "Game complete";
         coach.textContent = formatFriendGameOutcome(friendOutcome);
       } else if (matchClockExpiredColor) {
@@ -20113,7 +20155,7 @@
       }
       coach.textContent = coachMemoryLine(coach.textContent);
       if (gameFinished) playCoachEndSound(isMate, Boolean(terminalOutcome?.result === "draw" || isDrawn));
-      setAudioScene(gameFinished ? "menu" : "game");
+      setAudioScene(gameFinished || waitingForSetup ? "menu" : "game");
 
       renderCoachCaptured();
       renderCoachHistory();
@@ -20135,9 +20177,14 @@
       const abortGame = document.getElementById("abortGame");
       const resignGame = document.getElementById("resignGame");
       const returnLobby = document.getElementById("returnLobby");
+      const startGame = document.getElementById("restartGame");
+      if (startGame) {
+        startGame.disabled = !coachDifficulty;
+        startGame.innerHTML = `<span aria-hidden="true">${coachSessionActive ? "↻" : "▶"}</span> ${coachSessionActive ? "Restart Game" : "Start Game"}`;
+      }
       if (offerDraw) {
         offerDraw.textContent = drawOutgoing ? "Draw Offered" : friendChallengeState?.active ? "Offer Draw" : "Agree Draw";
-        offerDraw.disabled = drawOutgoing || drawIncoming || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
+        offerDraw.disabled = (!coachSessionActive && !friendChallengeState?.active) || drawOutgoing || drawIncoming || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
       }
       if (acceptDraw) acceptDraw.hidden = !drawIncoming;
       if (declineDraw) declineDraw.hidden = !drawIncoming;
@@ -20147,7 +20194,7 @@
       }
       if (resignGame) {
         resignGame.hidden = false;
-        resignGame.disabled = coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
+        resignGame.disabled = (!coachSessionActive && !friendChallengeState?.active) || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
       }
       if (returnLobby) returnLobby.hidden = !friendChallengeState?.remote && !friendChallengeState?.active;
       updateEnginePanel();
@@ -21425,7 +21472,7 @@
     function makeCoachMove(from, to) {
       if (reviewSelfAnalysisState) return makeReviewSelfAnalysisMove(from, to);
       if (reviewRetryState) return makeReviewRetryMove(from, to);
-      if (!coachGame || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return false;
+      if (!coachGame || (!coachSessionActive && !friendChallengeState?.active) || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return false;
       const legalMoves = coachGame.moves({ square: from, verbose: true }).filter((move) => move.to === to);
       if (!legalMoves.length) {
         coachMessage = "Good idea to explore. The rules need one of the highlighted squares here.";
@@ -21510,6 +21557,11 @@
       if (reviewSelfAnalysisState) return handleReviewSelfAnalysisSquare(square);
       if (reviewRetryState) return handleReviewRetrySquare(square);
       if (!coachGame || coachThinking || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return;
+      if (!coachSessionActive && !friendChallengeState?.active) {
+        coachMessage = "Choose an AI bot, set your time control, then start the game.";
+        updateCoachPanel();
+        return;
+      }
       const piece = coachGame.get(square);
 
       if (isLivePremoveEnabled() && coachGame.turn() !== coachPlayerColor) {
@@ -21561,7 +21613,7 @@
 
     function queueCoachReply() {
       const botColor = getCoachBotColor();
-      if (coachBotPaused || isCoachGameOver() || coachGame.turn() !== botColor) return;
+      if (!coachSessionActive || coachBotPaused || isCoachGameOver() || coachGame.turn() !== botColor) return;
       const token = ++coachMoveToken;
       coachThinking = true;
       coachLearnerMoveScores = { fen: "", scored: [], pending: false };
@@ -21613,6 +21665,7 @@
 
     function restartCoachGame() {
       if (!CoachChess) return;
+      const gameShouldRun = coachSessionActive || Boolean(friendChallengeState?.active) || Boolean(reviewSelfAnalysisState) || Boolean(reviewRetryState);
       clearAnalysisArrows("game-restart", document.getElementById("coachBoard"));
       coachMoveToken += 1;
       window.clearInterval(reviewReplayTimer);
@@ -21652,19 +21705,21 @@
       coachReviewMoments = [];
       coachCurrentHanging = 0;
       coachFlipped = coachPlayerColor === "b";
-      coachMessage = coachPlayerColor === "b"
-        ? "Fresh game. You are Black. Coach starts as White."
-        : "Fresh game. You are White. Select a piece to see legal moves.";
+      coachMessage = gameShouldRun
+        ? coachPlayerColor === "b"
+          ? "Fresh game. You are Black. Coach starts as White."
+          : "Fresh game. You are White. Select a piece to see legal moves."
+        : "Choose an AI bot, set your time control, then start the game.";
       refreshRandomLastMoveHighlight();
-      resetMatchPlayerTimer();
+      resetMatchPlayerTimer(getSoloMatchClockControl(), gameShouldRun ? null : { running: false });
       document.getElementById("gamePgn").textContent = "PGN appears here after export.";
       renderGuidedGameReview(false);
-      playAudioCue("game-start");
+      if (gameShouldRun) playAudioCue("game-start");
       renderCoachSidePicker();
       renderCoachBoard();
       playMatchAvatarEntrance();
-      powerOnCoachBoard();
-      if (!coachBotPaused && coachGame.turn() === getCoachBotColor()) queueCoachReply();
+      if (gameShouldRun) powerOnCoachBoard();
+      if (gameShouldRun && !coachBotPaused && coachGame.turn() === getCoachBotColor()) queueCoachReply();
     }
 
     function createFriendChallengeCode() {
@@ -22892,6 +22947,7 @@
         return;
       }
       const color = state.color;
+      coachSessionActive = true;
       coachMoveToken += 1;
       coachGame = buildFriendChallengeGameFromMoves(state) || (state.fen ? new CoachChess(state.fen) : new CoachChess());
       coachPlayerColor = color;
@@ -25946,7 +26002,8 @@
         coachMistakeNote = "";
         coachReviewMoments = [];
         coachCurrentHanging = 0;
-        resetMatchPlayerTimer();
+        coachSessionActive = false;
+        resetMatchPlayerTimer(getSoloMatchClockControl(), { running: false });
       } catch {
         document.getElementById("gameStatusBadge").textContent = "Rules failed";
         document.getElementById("gameCoach").textContent = "Could not load chess.js. Check your connection, then refresh.";
@@ -25966,6 +26023,7 @@
             ? `${label} ready. No pressure: try to survive, ask Why, and learn one idea.`
             : `Difficulty set to ${label}. Keep it friendly and focus on one idea.`;
           renderCoachBoard();
+          updateCoachPanel();
         });
       });
       document.querySelectorAll("[data-coach-side]").forEach((button) => {
@@ -25974,8 +26032,11 @@
       ["playTimeControl", "playIncrement"].forEach((id) => {
         document.getElementById(id)?.addEventListener("change", () => {
           if (friendChallengeState?.active) return;
-          resetMatchPlayerTimer(getSoloMatchClockControl());
-          coachMessage = `Clock set to ${getSoloMatchClockControl().replace("+", " + ")}.`;
+          resetMatchPlayerTimer(getSoloMatchClockControl(), coachSessionActive ? null : { running: false });
+          coachMessage = coachSessionActive
+            ? `Clock set to ${getSoloMatchClockControl().replace("+", " + ")}.`
+            : `Clock ready: ${getSoloMatchClockControl().replace("+", " + ")}. Start the game when you are ready.`;
+          updateMatchPlayerTimer();
           updateCoachPanel();
         });
       });
@@ -26130,6 +26191,7 @@
       startMatchPlayerTimer();
       updateAiPlayerHeader();
       renderCoachBoard();
+      updateCoachPanel();
     }
 
     function buildCoachQuote(label, text) {

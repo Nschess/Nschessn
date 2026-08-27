@@ -38022,12 +38022,35 @@ body.perf-lite .site-header .nav-utilities .player-flex-name > [data-player-iden
 
 /* Play keeps the board as the dominant object, with mode descriptions removed
    from the active workspace rather than from the underlying navigation. */
-:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-app-rail { display: none !important; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-app-rail, .play-live-analysis) { display: none !important; }
 :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
-  grid-template-areas: "left center right";
-  grid-template-columns: minmax(190px, 220px) minmax(420px, 760px) minmax(220px, 280px) !important;
-  max-width: 1280px;
+  width: min(100% - 28px, 1460px);
+  max-width: 1460px;
+  grid-template-areas:
+    "left center right"
+    "social social social";
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr) minmax(220px, 280px) !important;
   gap: 14px;
+}
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-left-sidebar { grid-area: left; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column {
+  grid-area: center;
+  width: min(100%, 840px);
+  max-width: 840px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "opponent"
+    "board"
+    "player"
+    "actions"
+    "setup"
+    "options";
+}
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar { grid-area: right; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-social-bar { grid-area: social; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+  width: min(100%, 840px);
+  max-width: 840px;
 }
 :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-head small,
 :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-mode-card small { display: none; }
@@ -38549,7 +38572,10 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
 
 @media (max-width: 1180px) {
   :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-layout { grid-template-areas: "status status" "feature today" "session session"; grid-template-columns: minmax(0, 1fr) minmax(320px, .9fr); }
-  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell { grid-template-areas: "center center" "left right"; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center center" "left right" "social social";
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }
 @media (max-width: 860px) {
   :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-inner,
@@ -38558,7 +38584,10 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck .hero-layout { grid-template-areas: "status" "feature" "session" "today"; grid-template-columns: minmax(0, 1fr); }
   :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-stage { min-height: min(78vw, 460px); }
   :is(body:not(.theme-light), body.theme-light) #login .login-player-profile { grid-template-columns: minmax(0, 1fr); }
-  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell { grid-template-areas: "center" "right" "left"; grid-template-columns: minmax(0, 1fr) !important; }
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "right" "left" "social";
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
 }
 @media (max-width: 480px) {
   :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck.home-command-deck { padding: 12px 0 16px; }
@@ -38566,4 +38595,46 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .home-command-session .button.secondary { width: 100%; }
   :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-dashboard { grid-template-columns: minmax(0, 1fr); }
   :is(body:not(.theme-light), body.theme-light) #top > .home-command-deck .hero-quick-card { min-height: 64px; }
+}
+
+/* Final Play layout contract: keep every normal-mode grid item explicit so
+   hidden/secondary slots cannot create implicit tracks beside the board. */
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-app-rail, .play-live-analysis) { display: none !important; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+  width: min(100% - 28px, 1460px);
+  max-width: 1460px;
+  grid-template-areas:
+    "left center right"
+    "social social social";
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr) minmax(220px, 280px) !important;
+  gap: 14px;
+}
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-left-sidebar { grid-area: left; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column {
+  grid-area: center;
+  width: min(100%, 840px);
+  max-width: 840px;
+}
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar { grid-area: right; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-social-bar { grid-area: social; }
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+  width: min(100%, 840px);
+  max-width: 840px;
+}
+
+@media (max-width: 1180px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas:
+      "center center"
+      "left right"
+      "social social";
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 860px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "right" "left" "social";
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
 }
