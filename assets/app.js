@@ -11,6 +11,7 @@
      */
     const accountWorkspaceStorageKey = "checkmateQuest.accountWorkspaces.v1";
     const accountWorkspaceOwnerKey = "checkmateQuest.accountWorkspaceOwner.v1";
+    const playAiTimeControlStorageKey = "checkmateQuest.playAiTimeControl.v1";
     const accountWorkspaceKeys = Object.freeze([
       "checkmateQuest.shortLessons.v1",
       "checkmateQuest.puzzles.v1",
@@ -31,6 +32,8 @@
       "checkmateQuest.firstVisitSetup.v1",
       "checkmateQuest.story.v1",
       "checkmateQuest.preferences.v1",
+      "checkmateQuest.boardSizing.v1",
+      "checkmateQuest.playAiTimeControl.v1",
       "checkmateQuest.profile.v1",
       "checkmateQuest.authPreferences.v1",
       "checkmateQuest.dragonProfile.v1",
@@ -51,6 +54,10 @@
 
     function normalizeAccountWorkspaceId(value) {
       return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 96);
+    }
+
+    function getBoardSizingStorageOwner() {
+      return normalizeAccountWorkspaceId(activeAccountWorkspaceId || readRawStorageValue(accountWorkspaceOwnerKey)) || "guest";
     }
 
     function readRawJsonStorage(key, fallback) {
@@ -213,8 +220,8 @@
       bk: "bK.svg", bq: "bQ.svg", br: "bR.svg", bb: "bB.svg", bn: "bN.svg", bp: "bP.svg"
     });
     const requestedPieceSvgThemes = Object.freeze([
-      "cburnett", "chessnut", "alpha", "merida", "dubrovny", "fantasy", "fresca", "pixel", "pirouetti", "gioco",
-      "governor", "icpieces", "kiwen-suwi", "kosal", "leipzig", "letter", "maestro", "spatial", "staunty", "tatiana"
+      "cburnett", "chessnut", "merida", "fantasy", "pixel", "pirouetti",
+      "kiwen-suwi", "kosal", "letter", "spatial"
     ]);
     const licensedPieceAssetSets = Object.freeze(Object.fromEntries(requestedPieceSvgThemes.map((theme) => [
       theme,
@@ -801,6 +808,360 @@
         cancel(board, event = null) { registrations.get(board)?.cancel(event); },
         cancelAll(event = null) { activeRegistrations.forEach((registration) => registration.cancel(event)); },
         getState(board) { return registrations.get(board)?.state || null; }
+      });
+    })();
+
+    /*
+     * Shared interactive-board workspace
+     * ----------------------------------
+     * Board renderers own chess state and square painting. This controller
+     * owns only the common physical workspace around those renderers: the
+     * requested size, the clamped rendered size, direct controls, resize
+     * handle, and temporary native fullscreen geometry. Keeping this state
+     * here prevents Play, Puzzle, Tutorial, Adventures, Openings, and Review
+     * from growing separate sizing implementations.
+     */
+    const interactiveBoardSizeStorageKey = "checkmateQuest.boardSizing.v1";
+    const sharedInteractiveBoardWorkspace = (() => {
+      const defaultSize = 720;
+      const minSize = 280;
+      const maxSize = 1200;
+      const states = new WeakMap();
+      const stages = new Set();
+      let resizeFrame = 0;
+      let syncFrame = 0;
+
+      function readSavedSize() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(interactiveBoardSizeStorageKey) || "null");
+          const requested = Number(saved?.requested);
+          return {
+            requested: Number.isFinite(requested) ? Math.max(minSize, Math.min(maxSize, requested)) : defaultSize,
+            manual: Boolean(saved?.manual && Number.isFinite(requested))
+          };
+        } catch {
+          return { requested: defaultSize, manual: false };
+        }
+      }
+
+      function saveSize(requested) {
+        try {
+          localStorage.setItem(interactiveBoardSizeStorageKey, JSON.stringify({
+            version: 1,
+            requested: Math.round(requested),
+            manual: true,
+            updatedAt: new Date().toISOString()
+          }));
+        } catch {}
+      }
+
+      function clampRequested(value) {
+        return Math.max(minSize, Math.min(maxSize, Math.round(Number(value) || defaultSize)));
+      }
+
+      function boardForStage(stage) {
+        return stage?.querySelector("[data-interactive-board]") || null;
+      }
+
+      function availableSize(stage, board, fullscreen = false) {
+        const viewportWidth = Math.max(240, window.innerWidth || document.documentElement.clientWidth || 240);
+        const viewportHeight = Math.max(320, window.innerHeight || document.documentElement.clientHeight || 320);
+        if (fullscreen) {
+          return Math.max(minSize, Math.floor(Math.min(viewportWidth - 32, viewportHeight - 112)));
+        }
+        const parentRect = stage.parentElement?.getBoundingClientRect?.();
+        const stageRect = stage.getBoundingClientRect?.();
+        // A board surface can live in one track of a multi-column workspace.
+        // The stage itself may already be constrained by --interactive-board-size;
+        // using that self-constrained width here creates a feedback loop where a
+        // default 720px request can permanently collapse to the minimum size.
+        // Its immediate layout parent is the authoritative mounted track.
+        const parentWidth = Number(parentRect?.width) || 0;
+        const stageWidth = Number(stageRect?.width) || 0;
+        // Adventures and Openings place the shared stage inside a narrower
+        // board column within a wide two-column workspace. Their stage track,
+        // rather than the outer workspace, is the real safe width. Play,
+        // Puzzle, Tutorial, and Review continue to use their mounted parent
+        // track so the controller does not read its own size back as a
+        // circular constraint.
+        const surface = String(stage.dataset.boardSurface || "");
+        const constrainedTrack = surface === "adventure" || surface === "openings";
+        const width = Math.max(0, (constrainedTrack ? stageWidth : parentWidth) || stageWidth || viewportWidth - 24);
+        // The page can scroll below the board. Reserve the persistent site
+        // chrome and the compact player/setup rail, rather than using the
+        // board's current document offset (which would make a scrolled or
+        // tall workspace shrink unexpectedly).
+        const vertical = viewportHeight - 170;
+        const widthLimit = width - (stage.classList.contains("tutorial-board-wrap") ? 52 : 20);
+        return Math.max(minSize, Math.floor(Math.min(widthLimit, vertical > minSize ? vertical : widthLimit)));
+      }
+
+      function updateStage(stage, requestedOverride) {
+        const state = states.get(stage) || { requested: defaultSize, manual: false, fullscreen: false, beforeFullscreen: defaultSize };
+        const saved = readSavedSize();
+        if (!state.manual && saved.manual) {
+          state.requested = saved.requested;
+          state.manual = true;
+        }
+        if (!state.manual && Number.isFinite(Number(requestedOverride)) && Number(requestedOverride) > 0) {
+          state.requested = clampRequested(requestedOverride);
+        }
+        const board = boardForStage(stage);
+        if (!board) return;
+        const physical = Math.max(minSize, Math.min(state.requested, availableSize(stage, board, state.fullscreen)));
+        stage.dataset.boardRequestedSize = String(state.requested);
+        stage.dataset.boardRenderedSize = String(physical);
+        stage.dataset.boardManualSize = String(state.manual);
+        stage.style.setProperty("--interactive-board-requested-size", `${state.requested}px`);
+        stage.style.setProperty("--interactive-board-size", `${physical}px`);
+        board.dataset.boardRenderedSize = String(physical);
+        board.dataset.boardRequestedSize = String(state.requested);
+        const workspace = stage.parentElement;
+        if (workspace) {
+          workspace.dataset.interactiveBoardWorkspace = "true";
+          workspace.style.setProperty("--interactive-board-workspace-size", `${physical}px`);
+        }
+        states.set(stage, state);
+      }
+
+      function scheduleSync() {
+        if (syncFrame) return;
+        syncFrame = window.requestAnimationFrame(() => {
+          syncFrame = 0;
+          sync();
+        });
+      }
+
+      function scheduleResize(stage, requested) {
+        const state = states.get(stage);
+        if (!state) return;
+        state.pendingRequested = clampRequested(requested);
+        if (resizeFrame) return;
+        resizeFrame = window.requestAnimationFrame(() => {
+          resizeFrame = 0;
+          stages.forEach((item) => {
+            const itemState = states.get(item);
+            if (itemState?.pendingRequested) {
+              itemState.requested = itemState.pendingRequested;
+              itemState.manual = true;
+              delete itemState.pendingRequested;
+              updateStage(item);
+              syncControls(item);
+            }
+          });
+        });
+      }
+
+      function setOrientation(stage) {
+        const board = boardForStage(stage);
+        if (!board) return;
+        let flipped = false;
+        if (board.id === "coachBoard") {
+          coachFlipped = !coachFlipped;
+          flipped = coachFlipped;
+          renderCoachBoard();
+        } else if (board.id === "realPuzzleBoard") {
+          realPuzzleFlipped = !realPuzzleFlipped;
+          flipped = realPuzzleFlipped;
+          renderRealPuzzleBoard();
+        } else if (board.id === "puzzleBoard") {
+          puzzleFlipped = !puzzleFlipped;
+          flipped = puzzleFlipped;
+          renderPuzzleBoard();
+        } else if (board.id === "tutorialBoard") {
+          tutorialFlipped = !tutorialFlipped;
+          flipped = tutorialFlipped;
+          selectedTutorialSquare = "";
+          saveBeginnerTutorialState({ flipped: tutorialFlipped });
+          renderBeginnerTutorial(false);
+        }
+        board.dataset.boardOrientation = flipped ? "flipped" : "normal";
+        syncControls(stage);
+      }
+
+      function syncSelect(select, key, value) {
+        if (!select) return;
+        let options = [];
+        try { options = getSettingsOptions(key); } catch {}
+        if (!Array.isArray(options) || !options.length) {
+          const source = document.querySelector(`[data-pref-setting="${key}"]`);
+          options = source ? [...source.options].map((option) => ({ value: option.value, label: option.textContent })) : [];
+        }
+        if (options.length) setSelectOptions(select, options, value);
+        select.value = value || select.value;
+      }
+
+      function syncControls(stage) {
+        const board = boardForStage(stage);
+        const state = states.get(stage);
+        if (!board || !state) return;
+        const prefs = readLearnerPrefs();
+        const theme = stage.querySelector('[data-board-control="theme"]');
+        const pieces = stage.querySelector('[data-board-control="pieces"]');
+        syncSelect(theme, "board", prefs.board);
+        syncSelect(pieces, "pieceSkin", prefs.pieceSkin);
+        stage.querySelector('[data-board-action="flip"]')?.setAttribute("aria-pressed", String(board.dataset.boardOrientation === "flipped"));
+        const fullscreen = stage.querySelector('[data-board-action="fullscreen"]');
+        if (fullscreen) fullscreen.textContent = state.fullscreen ? "Exit Fullscreen" : "Fullscreen";
+        const handle = stage.querySelector("[data-board-resize-handle]");
+        if (handle) handle.setAttribute("aria-valuenow", String(state.requested));
+      }
+
+      function ensureControls(stage) {
+        if (stage.querySelector("[data-board-stage-tools]")) return;
+        const surface = String(stage.dataset.boardSurface || "board");
+        const tools = document.createElement("div");
+        tools.className = "interactive-board-stage-tools";
+        tools.dataset.boardStageTools = "true";
+        tools.setAttribute("aria-label", "Board controls");
+        const flip = document.createElement("button");
+        flip.type = "button";
+        flip.className = "button secondary";
+        flip.dataset.boardAction = "flip";
+        flip.textContent = "Flip Board";
+        const themeLabel = document.createElement("label");
+        themeLabel.className = "interactive-board-control-field";
+        themeLabel.append(document.createTextNode("Board Theme"));
+        const theme = document.createElement("select");
+        theme.dataset.boardControl = "theme";
+        theme.setAttribute("aria-label", "Board Theme");
+        themeLabel.append(theme);
+        const piecesLabel = document.createElement("label");
+        piecesLabel.className = "interactive-board-control-field";
+        piecesLabel.append(document.createTextNode("Piece Set"));
+        const pieces = document.createElement("select");
+        pieces.dataset.boardControl = "pieces";
+        pieces.setAttribute("aria-label", "Piece Set");
+        piecesLabel.append(pieces);
+        const fullscreen = document.createElement("button");
+        fullscreen.type = "button";
+        fullscreen.className = "button secondary interactive-board-fullscreen-button";
+        fullscreen.dataset.boardAction = "fullscreen";
+        fullscreen.textContent = "Fullscreen";
+        const handle = document.createElement("button");
+        handle.type = "button";
+        handle.className = "interactive-board-resize-handle";
+        handle.dataset.boardResizeHandle = surface === "coach" ? "play" : surface;
+        handle.setAttribute("aria-label", "Resize board");
+        handle.setAttribute("aria-valuemin", String(minSize));
+        handle.setAttribute("aria-valuemax", String(maxSize));
+        handle.setAttribute("aria-valuenow", String(defaultSize));
+        handle.setAttribute("aria-valuetext", "Board size");
+        tools.append(flip, themeLabel, piecesLabel, fullscreen);
+        const existingOpeningControls = stage.querySelector(".opening-explorer-controls");
+        if (existingOpeningControls) stage.insertBefore(tools, existingOpeningControls);
+        else stage.append(tools);
+        stage.append(handle);
+      }
+
+      function toggleFullscreen(stage) {
+        const state = states.get(stage);
+        if (!state) return;
+        if (document.fullscreenElement === stage) {
+          void document.exitFullscreen?.();
+          return;
+        }
+        state.beforeFullscreen = state.requested;
+        const request = stage.requestFullscreen?.({ navigationUI: "hide" });
+        if (request?.catch) request.catch(() => {});
+      }
+
+      function beginResize(stage, event) {
+        const state = states.get(stage);
+        if (!state || state.fullscreen) return;
+        event.preventDefault();
+        const pointerId = event.pointerId;
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const startSize = state.requested;
+        const move = (moveEvent) => {
+          if (moveEvent.pointerId !== pointerId) return;
+          const delta = Math.max(moveEvent.clientX - startX, moveEvent.clientY - startY);
+          scheduleResize(stage, startSize + delta);
+        };
+        const end = (endEvent) => {
+          if (endEvent.pointerId !== pointerId) return;
+          stage.removeEventListener("pointermove", move);
+          stage.removeEventListener("pointerup", end);
+          stage.removeEventListener("pointercancel", end);
+          const next = states.get(stage)?.pendingRequested || states.get(stage)?.requested || startSize;
+          saveSize(next);
+        };
+        stage.addEventListener("pointermove", move, { passive: false });
+        stage.addEventListener("pointerup", end, { once: true, passive: true });
+        stage.addEventListener("pointercancel", end, { once: true, passive: true });
+        try { event.currentTarget.setPointerCapture?.(pointerId); } catch {}
+      }
+
+      function bindStage(stage) {
+        if (stages.has(stage)) return;
+        stages.add(stage);
+        ensureControls(stage);
+        const saved = readSavedSize();
+        states.set(stage, { requested: saved.requested, manual: saved.manual, fullscreen: false, beforeFullscreen: saved.requested });
+        stage.querySelector('[data-board-action="flip"]')?.addEventListener("click", () => setOrientation(stage));
+        stage.querySelector('[data-board-action="fullscreen"]')?.addEventListener("click", () => toggleFullscreen(stage));
+        stage.querySelector('[data-board-resize-handle]')?.addEventListener("pointerdown", (event) => beginResize(stage, event), { passive: false });
+        stage.querySelector('[data-board-resize-handle]')?.addEventListener("keydown", (event) => {
+          const state = states.get(stage);
+          if (!state) return;
+          if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const amount = event.key === "Home" ? minSize : event.key === "End" ? maxSize : state.requested + (event.key === "ArrowUp" || event.key === "ArrowRight" ? 24 : -24);
+          state.requested = clampRequested(amount);
+          state.manual = true;
+          updateStage(stage);
+          saveSize(state.requested);
+        });
+        stage.querySelector('[data-board-control="theme"]')?.addEventListener("change", (event) => applySettingsPrefsPatch({ board: event.currentTarget.value }, "board theme"));
+        stage.querySelector('[data-board-control="pieces"]')?.addEventListener("change", (event) => applySettingsPrefsPatch({ pieceSkin: event.currentTarget.value }, "piece set"));
+        if (typeof ResizeObserver === "function" && stage.parentElement) {
+          const observer = new ResizeObserver(() => scheduleSync());
+          observer.observe(stage.parentElement);
+          stage._interactiveBoardResizeObserver = observer;
+        }
+        updateStage(stage);
+        syncControls(stage);
+      }
+
+      function sync() {
+        document.querySelectorAll("[data-interactive-board-stage]").forEach((stage) => {
+          const board = boardForStage(stage);
+          if (!board) return;
+          bindStage(stage);
+          updateStage(stage);
+          syncControls(stage);
+        });
+      }
+
+      document.addEventListener("fullscreenchange", () => {
+        let activeBoardStage = false;
+        stages.forEach((stage) => {
+          const state = states.get(stage);
+          if (!state) return;
+          const active = document.fullscreenElement === stage;
+          activeBoardStage = activeBoardStage || active;
+          state.fullscreen = active;
+          if (!active) state.requested = state.beforeFullscreen || state.requested;
+          updateStage(stage);
+          syncControls(stage);
+        });
+        document.body.classList.toggle("interactive-board-fullscreen-active", activeBoardStage);
+        scheduleSync();
+      });
+      window.addEventListener("resize", scheduleSync, { passive: true });
+      window.addEventListener("orientationchange", scheduleSync, { passive: true });
+
+      return Object.freeze({
+        sync,
+        scheduleSync,
+        getState(stage) { return states.get(stage) || null; },
+        applyPreferenceSize(value) {
+          stages.forEach((stage) => {
+            const state = states.get(stage);
+            if (!state?.manual) updateStage(stage, value);
+          });
+        }
       });
     })();
 
@@ -3342,7 +3703,7 @@
         name: "Royal Court Collection",
         rarity: "Legendary",
         discount: 0.20,
-        itemIds: ["board-royalCourt", "background-royal", "skin-maestro", "name-gold"],
+        itemIds: ["board-royalCourt", "background-royal", "name-gold"],
         description: "A warm royal identity for milestone games, polished profiles, and confident calculation."
       },
       {
@@ -3449,7 +3810,7 @@
     // Themed collections keep discovery intentional while remaining cosmetic-only.
     // IDs are resolved against the catalog so a missing optional item never breaks Store rendering.
     const storeCollectionDefinitions = Object.freeze([
-      { id: "royal-court", name: "Royal Court", description: "Warm royal finishes for milestone games.", itemIds: ["board-royalCourt", "background-royal", "skin-maestro", "name-gold", "avatar-royal-lion", "frame-crown"], reward: { type: "title", value: "Royal Collector", label: "Royal Collector title" } },
+      { id: "royal-court", name: "Royal Court", description: "Warm royal finishes for milestone games.", itemIds: ["board-royalCourt", "background-royal", "name-gold", "avatar-royal-lion", "frame-crown"], reward: { type: "title", value: "Royal Collector", label: "Royal Collector title" } },
       { id: "forest-defender", name: "Forest Defender", description: "Calm woodland color for patient, steady improvement.", itemIds: ["board-forest", "background-forest", "skin-fantasy", "lastmove-emerald", "avatar-bat"], reward: { type: "title", value: "Forest Guardian", label: "Forest Guardian title" } },
       { id: "samurai", name: "Samurai", description: "Disciplined red-gold accents for tactical battles.", itemIds: ["board-dragon", "background-volcano", "skin-samurai", "lastmove-fire", "avatar-samurai-mask", "frame-samurai"], reward: { type: "title", value: "Samurai Focus", label: "Samurai Focus title" } },
       { id: "space-explorer", name: "Space Explorer", description: "Deep-space contrast for long study sessions.", itemIds: ["board-space", "background-space", "skin-spatial", "lastmove-galaxy", "avatar-galaxy-star", "frame-galaxy"], reward: { type: "title", value: "Space Explorer", label: "Space Explorer title" } }
@@ -4379,6 +4740,13 @@
       friendChallengeLastPositionSignature = "";
       friendChallengePendingMove = null;
       friendChallengeRefreshPromise = null;
+      friendChallengeRefreshQueued = false;
+      friendChallengeRefreshQueuedCode = "";
+      friendChallengeRefreshQueuedRestoreBoard = false;
+      friendInviteHydrationPromise = null;
+      friendInviteHydrationCode = "";
+      friendInviteHydrationQueued = false;
+      friendInviteHydrationInFlight = false;
       friendIncomingNoticeCode = "";
       socialNotificationState = [];
       socialActivityState = [];
@@ -4757,6 +5125,7 @@
     function renderAdventureBoard() {
       const mission = adventureMissions[currentAdventure];
       const board = document.getElementById("adventureBoard");
+      sharedInteractiveBoardWorkspace.scheduleSync();
       board.innerHTML = "";
 
       adventureBoardState.forEach((piece, index) => {
@@ -5044,6 +5413,7 @@
       if (tutorialGame) syncTutorialTurn(lesson);
       const move = getActiveTutorialMove(lesson);
       if (!board) return;
+      sharedInteractiveBoardWorkspace.scheduleSync();
       const focusedSquareName = getFocusedBoardSquare(board);
       board.innerHTML = "";
       renderTutorialCoordinates();
@@ -5805,6 +6175,7 @@
     function renderOpeningExplorerBoard({ skipInteractionCancel = false } = {}) {
       const board = document.getElementById("openingExplorerBoard");
       if (!board) return;
+      sharedInteractiveBoardWorkspace.scheduleSync();
       const interactionState = boardInteractionEngine.getState(board);
       if (!skipInteractionCancel && interactionState && (interactionState.phase === boardInteractionPhases.DRAGGING || interactionState.ghost)) {
         boardInteractionEngine.cancel(board, { type: "opening-render" });
@@ -15224,7 +15595,10 @@
       });
     }
 
-    const chessJsUrl = "https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm";
+    // Chess rules are a required local runtime dependency. Keep the URL
+    // relative to this script so GitHub Pages subpaths and local previews
+    // resolve the tracked vendor module without a CDN request.
+    const chessJsUrl = "./vendor/chess.js-1.0.0.mjs";
     const stockfishSources = [
       {
         name: "Stockfish 16 Lite",
@@ -15322,6 +15696,7 @@
     let matchClockState = null;
     let matchClockExpiredColor = "";
     let friendChallengeState = null;
+    let stopQuickMatchSearch = null;
     let livePremovePreference = "off";
     let friendNetworkState = { directory: [], search: [], challenges: [] };
     let friendHubState = { view: "online", selectedId: "", search: "", minRating: "", maxRating: "" };
@@ -15339,6 +15714,7 @@
     let messagingLastTypingSentAt = 0;
     let messagingReconnectTimer = 0;
     let friendNetworkTimer = 0;
+    let friendChallengeSyncTimer = 0;
     let friendSearchTimer = 0;
     let friendSearchRequest = 0;
     let friendNetworkRequest = 0;
@@ -15380,10 +15756,22 @@
     let friendChallengeLastPositionSignature = "";
     let friendChallengePendingMove = null;
     let friendChallengeRefreshPromise = null;
+    let friendChallengeRefreshQueued = false;
+    let friendChallengeRefreshQueuedCode = "";
+    let friendChallengeRefreshQueuedRestoreBoard = false;
+    let friendInviteHydrationPromise = null;
+    let friendInviteHydrationCode = "";
+    let friendInviteHydrationQueued = false;
+    let friendInviteHydrationInFlight = false;
     let networkVisibilityHandler = null;
     let realtimeMatchHeartbeatTimer = 0;
     let realtimeMatchHeartbeatInFlight = false;
     let realtimeMatchVisibilityHandler = null;
+    let realtimeMatchWatchdogTimer = 0;
+    let realtimeMatchWatchdogInFlight = false;
+    let realtimeMatchWatchdogLastSignalAt = 0;
+    let realtimeMatchWatchdogObservedRevision = 0;
+    let realtimeMatchWatchdogDelay = 4500;
     let friendSpectatorRefreshTimer = 0;
     let friendIncomingNoticeCode = "";
     let friendUiAbortController = null;
@@ -15441,7 +15829,6 @@
 
     async function loadChessRules() {
       if (CoachChess) return CoachChess;
-      warmResourceOrigins("https://cdn.jsdelivr.net");
       if (!chessRulesPromise) {
         chessRulesPromise = import(chessJsUrl)
           .then((module) => module.Chess || module.default?.Chess || module.default)
@@ -15472,6 +15859,7 @@
       return Boolean(coachTerminalOutcome)
         || Boolean(matchClockExpiredColor)
         || coachDrawAgreed
+        || isFriendTerminalPending()
         || Boolean(friendChallengeState?.active && (friendChallengeState.status === "completed" || getFriendGameOutcome(friendChallengeState)))
         || callCoachRule(coachGame, "isGameOver", "game_over");
     }
@@ -15480,6 +15868,7 @@
       if (!coachGame || (!coachSessionActive && !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState)) return null;
       const friendOutcome = friendChallengeState?.active ? getFriendGameOutcome(friendChallengeState) : null;
       if (friendOutcome) return friendOutcome;
+      if (isFriendTerminalPending()) return null;
       if (friendChallengeState?.status === "completed") return { result: "aborted", termination: "game complete" };
       if (coachTerminalOutcome) return coachTerminalOutcome;
       if (matchClockExpiredColor) return {
@@ -15567,6 +15956,11 @@
 
     function completeCoachGame(outcome = getCoachTerminalOutcome()) {
       if (!coachGame || !outcome) return false;
+      // A live result is provisional until the server returns the completed
+      // challenge payload. Local chess.js state may detect a terminal
+      // position first, but only the locked RPC result may settle history,
+      // ratings, and the post-game flow.
+      if (friendChallengeState?.remote && friendChallengeState.active && friendChallengeState.status !== "completed") return false;
       clearAnalysisArrows("game-complete", document.getElementById("coachBoard"));
       const gameKey = coachGame.pgn() || `session-${coachGameSessionId}-${coachGame.history().length}`;
       const signature = `${gameKey}:${outcome.result}:${outcome.termination}`;
@@ -15588,7 +15982,7 @@
         recordCoachGameResult(outcome.result === playerResult);
       }
       configurePostGameDecisionActions(outcome);
-      ["postGameDecisionReview", "postGameDecisionRematch", "postGameDecisionNew", "postGameDecisionClose"].forEach((id) => {
+      ["postGameDecisionReview", "postGameDecisionRematch", "postGameDecisionNew", "postGameDecisionLobby", "postGameDecisionClose"].forEach((id) => {
         document.getElementById(id)?.removeAttribute("disabled");
       });
       showPostGameDecision();
@@ -15777,11 +16171,14 @@
     }
 
     function startSoloCoachGame({ playerColor } = {}) {
-      if (!coachDifficulty) {
+      const requiresPlayAiTimeControl = !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState;
+      if (!coachDifficulty || (requiresPlayAiTimeControl && !isPlayAiTimeControlValid())) {
         coachSessionActive = false;
         matchClockState = null;
         resetMatchPlayerTimer(getSoloMatchClockControl(), { running: false });
-        coachMessage = "Choose an AI bot, set your time control, then start the game.";
+        coachMessage = coachDifficulty
+          ? "Choose a valid time control before starting the game."
+          : "Choose a bot, set your time control, then start the game.";
         updateCoachPanel();
         renderCoachBoard();
         return false;
@@ -15856,7 +16253,7 @@
       }
       const bot = getBeginnerBot(level);
       if (bot) return { name: bot.name, title: bot.personality, rarity: bot.elo >= 1000 ? "Rare" : "Common", avatar: bot.avatar, flag: "PH" };
-      if (level === "strong") return { name: "KingNorbert", title: "Coach Bot", rarity: "Legendary", avatar: "KN", avatarImage: "assets/kingnorbert-coach.png", flag: "PH" };
+      if (level === "strong") return { name: "KingNorbert", title: "Coach Bot", rarity: "Legendary", avatar: "KN", flag: "PH" };
       const config = getCoachConfig(level);
       const elo = Number(config.elo) || 1000;
       if (elo >= 2500) return { name: "Astra Citadel", title: "Celestial Champion", rarity: "Divine", avatar: "♛", flag: "IS" };
@@ -15932,7 +16329,69 @@
     function getRecentAiBotIds() { const saved = readJsonStorage(recentAiBotStorageKey, []); return Array.isArray(saved) ? saved.filter((id) => beginnerBots.some((bot) => bot.id === id)).slice(0, 3) : []; }
     function rememberAiBot(botId) { writeJsonStorage(recentAiBotStorageKey, [botId, ...getRecentAiBotIds().filter((id) => id !== botId)].slice(0, 3)); }
     function chooseQuickMatchAiBot(targetRating = getLearnerGameRating()) { const rating = Math.max(200, Number(targetRating) || 450); const ranked = [...beginnerBots].sort((a, b) => Math.abs(a.elo - rating) - Math.abs(b.elo - rating)); const gap = Math.abs((ranked[0]?.elo || rating) - rating); const nearby = ranked.filter((bot) => Math.abs(bot.elo - rating) <= gap + 150); const recent = new Set(getRecentAiBotIds()); const fresh = nearby.filter((bot) => !recent.has(bot.id)); const alternate = ranked.filter((bot) => !recent.has(bot.id) && Math.abs(bot.elo - rating) <= gap + 420); const candidates = fresh.length ? fresh : alternate.length ? alternate : nearby.length ? nearby : ranked; return candidates[Math.floor(Math.random() * candidates.length)] || null; }
-    function selectAiBot(botId, options = {}) { const bot = getBeginnerBot(botId); if (!bot) return false; setCoachDifficulty(bot.id); rememberAiBot(bot.id); startSoloCoachGame(options); coachMessage = pickBotLine("pre", bot); renderCoachBoard(); return true; }
+    function selectAiBot(botId, options = {}) { const bot = getBeginnerBot(botId); if (!bot) return false; setCoachDifficulty(bot.id); rememberAiBot(bot.id); if (options.startImmediately) startSoloCoachGame(options); coachMessage = pickBotLine("pre", bot); renderCoachBoard(); updateCoachPanel(); return true; }
+    function openPlayBotDrawer({ focusFirstBot = false } = {}) {
+      const drawer = document.getElementById("playBotDrawer");
+      if (!(drawer instanceof HTMLDetailsElement)) return false;
+      drawer.open = true;
+      // Reveal the library without leaving a smooth scroll running after the
+      // user makes a selection. The selection handler will bring the primary
+      // setup action back into view when the library is below the board.
+      drawer.scrollIntoView({ block: "nearest", behavior: "auto" });
+      if (focusFirstBot) {
+        window.requestAnimationFrame(() => drawer.querySelector("[data-beginner-bot]:not(:disabled)")?.focus({ preventScroll: true }));
+      }
+      return true;
+    }
+
+    function collapsePlayLobbySetupDetails() {
+      const drawer = document.getElementById("playBotDrawer");
+      if (drawer instanceof HTMLDetailsElement) drawer.open = false;
+      const botInfo = document.getElementById("playLobbyBotInfo");
+      if (botInfo instanceof HTMLDetailsElement) botInfo.open = false;
+    }
+
+    function prepareAiLobby(botId, { trigger = null, preserveSetup = false } = {}) {
+      if (isRealtimeMatchActive()) {
+        coachMessage = "Finish or return to the live game before setting up an AI match.";
+        updateCoachPanel();
+        return false;
+      }
+      const bot = getBeginnerBot(botId);
+      if (!bot || !selectAiBot(bot.id)) return false;
+      const dialog = document.getElementById("aiGameReady");
+      if (!preserveSetup) {
+        const saved = getPersistedPlayAiTimeControl();
+        if (dialog) dialog.dataset.hasSavedPreferences = String(Boolean(saved));
+        setPlayAiTimeControl(saved || getDefaultPlayAiTimeControl(), { persist: false });
+        setCoachPlayerColor("w", false);
+      }
+      // Re-entering Game Ready always starts from a clean position, while the
+      // lobby-triggered path above preserves the user's current setup choices.
+      resetAiGameForSetup();
+      coachMessage = `${bot.name} is ready. Choose a pace, then start your game.`;
+      // Keep the lobby compact after the final opponent choice. The selected
+      // bot is already reflected in the opponent header and settings rail;
+      // expanding the secondary bot-info disclosure here pushes the board
+      // out of the reference composition and makes the selection feel like a
+      // new page. Users can still open the details explicitly when needed.
+      collapsePlayLobbySetupDetails();
+      updateCoachPanel();
+      renderCoachBoard();
+      window.requestAnimationFrame(() => {
+        renderPlayLobbyState();
+        const start = document.getElementById("playLobbyStart");
+        if (start) {
+          const rect = start.getBoundingClientRect();
+          const viewportHeight = window.visualViewport?.height || window.innerHeight;
+          if (rect.top < 76 || rect.bottom > viewportHeight - 16) {
+            start.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+          }
+          start.focus({ preventScroll: true });
+        }
+      });
+      return true;
+    }
     const aiBotAvatarImageCache = new Map();
     function getAiBotAvatarImage(bot, index) {
       const key = `${bot.id}:${index}`;
@@ -15960,9 +16419,9 @@
     function setupAiBotRoster() {
       const roster = document.getElementById("aiBotRoster"); const search = document.getElementById("aiBotSearch"); const filter = document.getElementById("aiBotFilter"); if (!roster || !search || !filter || roster.dataset.ready) return; roster.dataset.ready = "true"; const categories = ["Beginner", "Intermediate", "Advanced", "Master"];
       const render = () => { const query = search.value.trim().toLowerCase(); const matches = beginnerBots.filter((bot) => { const words = [bot.name, bot.elo, bot.personality, bot.opening, bot.bio, bot.style, bot.category].join(" ").toLowerCase(); return (filter.value === "All" || bot.category === filter.value) && (!query || words.includes(query)); }); if (!matches.length) { roster.replaceChildren(createBookText("p", "ai-bot-empty", "No bots match those filters.")); return; } const groups = categories.map((category) => { const bots = matches.filter((bot) => bot.category === category); if (!bots.length) return null; const section = document.createElement("section"); section.className = "ai-bot-category"; const head = document.createElement("div"); head.className = "ai-bot-category-head"; head.append(createBookText("h3", "", category), createBookText("span", "", String(bots.length) + " bots")); const grid = document.createElement("div"); grid.className = "ai-bot-grid"; bots.forEach((bot) => { const card = document.createElement("article"); card.className = "ai-bot-card"; const avatar = document.createElement("img"); avatar.className = "ai-bot-avatar"; avatar.src = getAiBotAvatarImage(bot, beginnerBots.indexOf(bot)); avatar.alt = ""; avatar.loading = "lazy"; avatar.decoding = "async"; avatar.style.setProperty("--ai-bot-hue", String((beginnerBots.indexOf(bot) * 47 + 194) % 360)); const copy = document.createElement("div"); copy.className = "ai-bot-card-copy"; const meta = document.createElement("div"); meta.className = "ai-bot-card-meta"; const elo = createBookText("span", "", String(bot.elo) + " Elo"); const difficulty = createBookText("span", "ai-bot-difficulty", bot.category); difficulty.dataset.difficulty = bot.category.toLowerCase(); const personality = createBookText("span", "", bot.personality); meta.append(elo, difficulty, personality); const nameLine = createBookText("span", "ai-bot-card-name-line", ""); const botName = createBookText("strong", "", bot.name); nameLine.append(botName); const botIdentity = getPlayerIdentityModel({ name: bot.name, title: bot.personality, avatar: bot.avatar, isPlayer: false }, { isPlayer: false, variant: "compact" }); renderSharedIdentityLine(nameLine, botIdentity, { nameSelector: "strong", variant: "compact" }); copy.append(nameLine, meta, createBookText("p", "", bot.bio), createBookText("span", "ai-bot-card-style", "Style: " + bot.style)); const play = createBookText("button", "button", "Play"); play.type = "button"; play.dataset.aiBotPlay = bot.id; play.setAttribute("aria-label", "Play " + bot.name + ", " + bot.elo + " Elo"); card.append(avatar, copy, play); grid.append(card); }); section.append(head, grid); return section; }).filter(Boolean); roster.replaceChildren(...groups); };
-      search.addEventListener("input", render); filter.addEventListener("change", render); roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => selectAiBot(button.dataset.aiBotPlay)); }); render();
+      search.addEventListener("input", render); filter.addEventListener("change", render); roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => openAiGameReady(button.dataset.aiBotPlay, { trigger: button })); }); render();
     }
-    function selectBeginnerBot(botId) { const bot = getBeginnerBot(botId); if (!bot || !isBeginnerBotUnlocked(bot.id)) return; selectAiBot(bot.id); }
+    function selectBeginnerBot(botId) { const bot = getBeginnerBot(botId); if (!bot || !isBeginnerBotUnlocked(bot.id)) return; prepareAiLobby(bot.id); }
     function chooseBeginnerBotMove(moves, bot = getBeginnerBot()) {
       if (!moves.length) return null;
       const config = getCoachConfig();
@@ -16162,6 +16621,414 @@
       return hasPremium ? "Premium" : "";
     }
 
+    const playAiTimeControlPresets = Object.freeze([
+      { control: "1+0", minutes: 1, seconds: 0, increment: 0, category: "Bullet" },
+      { control: "2+1", minutes: 2, seconds: 0, increment: 1, category: "Bullet" },
+      { control: "3+0", minutes: 3, seconds: 0, increment: 0, category: "Blitz" },
+      { control: "3+2", minutes: 3, seconds: 0, increment: 2, category: "Blitz" },
+      { control: "5+0", minutes: 5, seconds: 0, increment: 0, category: "Blitz" },
+      { control: "5+3", minutes: 5, seconds: 0, increment: 3, category: "Blitz" },
+      { control: "10+0", minutes: 10, seconds: 0, increment: 0, category: "Rapid" },
+      { control: "10+5", minutes: 10, seconds: 0, increment: 5, category: "Rapid" },
+      { control: "15+10", minutes: 15, seconds: 0, increment: 10, category: "Rapid" },
+      { control: "30+0", minutes: 30, seconds: 0, increment: 0, category: "Classical" }
+    ]);
+    const playAiNoClockTimeControl = Object.freeze({ mode: "none", control: "none", minutes: 0, seconds: 0, increment: 0, category: "No clock" });
+    const playAiDefaultTimeControl = Object.freeze({ mode: "preset", control: "10+0", minutes: 10, seconds: 0, increment: 0, category: "Rapid" });
+    let playAiTimeControlState = null;
+    let playAiTimeControlOwner = "";
+
+    function isNewExplorerProfile(profile = readLearnerProfile()) {
+      return String(profile?.level || "New Explorer").trim().toLowerCase() === "new explorer";
+    }
+
+    function getDefaultPlayAiTimeControl() {
+      return isNewExplorerProfile() ? { ...playAiNoClockTimeControl } : { ...playAiDefaultTimeControl };
+    }
+
+    function parsePlayAiTimeControlString(control) {
+      const match = String(control || "").trim().match(/^(\d{1,3})(?::(\d{1,2}))?\+(\d{1,3})$/);
+      if (!match) return null;
+      const minutes = Number(match[1]);
+      const seconds = match[2] == null ? 0 : Number(match[2]);
+      const increment = Number(match[3]);
+      if (!Number.isInteger(minutes) || minutes < 1 || minutes > 60) return null;
+      if (!Number.isInteger(seconds) || seconds < 0 || seconds > 59) return null;
+      if (!Number.isInteger(increment) || increment < 0 || increment > 120) return null;
+      return { minutes, seconds, increment };
+    }
+
+    function formatPlayAiTimeControl(minutes, seconds, increment) {
+      const base = seconds ? `${minutes}:${String(seconds).padStart(2, "0")}` : String(minutes);
+      return `${base}+${increment}`;
+    }
+
+    function getPlayAiTimeControlCategory(minutes, seconds) {
+      const totalSeconds = minutes * 60 + seconds;
+      if (totalSeconds <= 120) return "Bullet";
+      if (totalSeconds <= 600) return "Blitz";
+      if (totalSeconds <= 1800) return "Rapid";
+      return "Classical";
+    }
+
+    function normalizePlayAiTimeControl(value, fallback = playAiDefaultTimeControl) {
+      const safeFallback = fallback && typeof fallback === "object" && fallback.control
+        ? fallback
+        : playAiDefaultTimeControl;
+      const raw = value && typeof value === "object" ? value : { control: value };
+      if (String(raw.control || "").trim().toLowerCase() === "none") return { ...playAiNoClockTimeControl };
+      const parsed = parsePlayAiTimeControlString(raw.control)
+        || (raw.minutes != null
+          ? parsePlayAiTimeControlString(formatPlayAiTimeControl(raw.minutes, raw.seconds, raw.increment))
+          : null);
+      if (!parsed) return { ...safeFallback };
+      const preset = raw.mode !== "custom" ? playAiTimeControlPresets.find((item) => item.control === formatPlayAiTimeControl(parsed.minutes, parsed.seconds, parsed.increment)) : null;
+      const mode = preset ? "preset" : "custom";
+      return {
+        mode,
+        control: formatPlayAiTimeControl(parsed.minutes, parsed.seconds, parsed.increment),
+        minutes: parsed.minutes,
+        seconds: parsed.seconds,
+        increment: parsed.increment,
+        category: preset?.category || getPlayAiTimeControlCategory(parsed.minutes, parsed.seconds)
+      };
+    }
+
+    function isValidPersistedPlayAiTimeControl(value) {
+      const raw = value && typeof value === "object" ? value : { control: value };
+      if (String(raw.control || "").trim().toLowerCase() === "none") return true;
+      return Boolean(parsePlayAiTimeControlString(raw.control)
+        || (raw.minutes != null && parsePlayAiTimeControlString(formatPlayAiTimeControl(raw.minutes, raw.seconds, raw.increment))));
+    }
+
+    function getPersistedPlayAiTimeControl() {
+      const store = readRawJsonStorage(playAiTimeControlStorageKey, {});
+      const owner = getBoardSizingStorageOwner();
+      const saved = store && typeof store === "object" && store.values && typeof store.values === "object" ? store.values[owner] : null;
+      return isValidPersistedPlayAiTimeControl(saved) ? normalizePlayAiTimeControl(saved) : null;
+    }
+
+    function readPersistedPlayAiTimeControl() {
+      return getPersistedPlayAiTimeControl() || getDefaultPlayAiTimeControl();
+    }
+
+    function writePersistedPlayAiTimeControl(value) {
+      const store = readRawJsonStorage(playAiTimeControlStorageKey, {});
+      const values = store && typeof store === "object" && store.values && typeof store.values === "object" ? { ...store.values } : {};
+      values[getBoardSizingStorageOwner()] = normalizePlayAiTimeControl(value);
+      writeRawJsonStorage(playAiTimeControlStorageKey, { version: 1, values });
+    }
+
+    function ensurePlayAiTimeControlState() {
+      const owner = getBoardSizingStorageOwner();
+      if (!playAiTimeControlState || playAiTimeControlOwner !== owner) {
+        playAiTimeControlState = readPersistedPlayAiTimeControl();
+        playAiTimeControlOwner = owner;
+      }
+      return playAiTimeControlState;
+    }
+
+    function readPlayAiCustomDraft() {
+      const minutes = Number(document.getElementById("playCustomMinutes")?.value);
+      const seconds = Number(document.getElementById("playCustomSeconds")?.value);
+      const increment = Number(document.getElementById("playCustomIncrement")?.value);
+      const valid = [minutes, seconds, increment].every(Number.isInteger)
+        && minutes >= 1 && minutes <= 60
+        && seconds >= 0 && seconds <= 59
+        && increment >= 0 && increment <= 120;
+      return { valid, state: valid ? normalizePlayAiTimeControl({ mode: "custom", minutes, seconds, increment }) : null };
+    }
+
+    function getPlayAiTimeControlSelection() {
+      const state = ensurePlayAiTimeControlState();
+      if (state.mode === "custom") {
+        const draft = readPlayAiCustomDraft();
+        if (draft.valid && draft.state) return draft.state;
+      }
+      return state;
+    }
+
+    function syncPlayAiTimeControlFields(state = ensurePlayAiTimeControlState()) {
+      const minutesField = document.getElementById("playTimeControl");
+      const incrementField = document.getElementById("playIncrement");
+      if (minutesField) {
+        const value = String(state.minutes);
+        if (minutesField.tagName === "SELECT" && ![...minutesField.options].some((option) => option.value === value)) minutesField.add(new Option(`${value} minutes`, value));
+        minutesField.value = value;
+      }
+      if (incrementField) {
+        const value = String(state.increment);
+        if (incrementField.tagName === "SELECT" && ![...incrementField.options].some((option) => option.value === value)) incrementField.add(new Option(`${value} seconds`, value));
+        incrementField.value = value;
+      }
+      const secondsField = document.getElementById("playCustomSeconds");
+      if (secondsField && state.mode !== "none" && document.activeElement !== secondsField) secondsField.value = String(state.seconds);
+      const customMinutes = document.getElementById("playCustomMinutes");
+      if (customMinutes && state.mode !== "none" && document.activeElement !== customMinutes) customMinutes.value = String(state.minutes);
+      const customIncrement = document.getElementById("playCustomIncrement");
+      if (customIncrement && state.mode !== "none" && document.activeElement !== customIncrement) customIncrement.value = String(state.increment);
+    }
+
+    function renderPlayAiTimeControl() {
+      const state = ensurePlayAiTimeControlState();
+      syncPlayAiTimeControlFields(state);
+      const panel = document.getElementById("playAiTimeControlPanel");
+      if (!panel) return;
+      panel.dataset.selectedControl = state.control;
+      panel.querySelectorAll("[data-play-time-control]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.playTimeControl === (state.mode === "custom" ? "custom" : state.control)));
+        button.disabled = coachSessionActive;
+      });
+      const custom = document.getElementById("playCustomTime");
+      if (custom) {
+        custom.hidden = state.mode !== "custom";
+        custom.setAttribute("aria-hidden", String(state.mode !== "custom"));
+        custom.querySelectorAll("input").forEach((field) => { field.disabled = coachSessionActive; });
+      }
+      const draft = state.mode === "custom" ? readPlayAiCustomDraft() : { valid: true };
+      const error = document.getElementById("playCustomTimeError");
+      if (error) error.hidden = state.mode !== "custom" || draft.valid;
+      panel.classList.toggle("is-invalid", state.mode === "custom" && !draft.valid);
+      const summary = document.getElementById("playTimeControlSummary");
+      if (summary) {
+        if (state.mode === "none") summary.textContent = "No clock · Learn at your pace";
+        else {
+          const base = state.seconds ? `${state.minutes} minutes ${state.seconds} seconds` : `${state.minutes} minute${state.minutes === 1 ? "" : "s"}`;
+          summary.textContent = `${state.control.replace("+", " + ")} · ${base} · ${state.category}`;
+        }
+      }
+    }
+
+    function setPlayAiTimeControl(value, { persist = true } = {}) {
+      playAiTimeControlState = normalizePlayAiTimeControl(value);
+      playAiTimeControlOwner = getBoardSizingStorageOwner();
+      syncPlayAiTimeControlFields(playAiTimeControlState);
+      if (persist) writePersistedPlayAiTimeControl(playAiTimeControlState);
+      renderPlayAiTimeControl();
+      return playAiTimeControlState;
+    }
+
+    function isPlayAiTimeControlValid() {
+      const state = ensurePlayAiTimeControlState();
+      return state.mode !== "custom" || readPlayAiCustomDraft().valid;
+    }
+
+    let aiGameReadyReturnFocus = null;
+
+    function formatAiGameReadyTimeControl(state = getPlayAiTimeControlSelection()) {
+      if (state.mode === "none") return { label: "No clock", detail: "Learn at your pace" };
+      if (state.control === "10+0") return { label: "10 min", detail: "Relaxed · recommended" };
+      if (state.control === "5+0") return { label: "5 min", detail: "Quick" };
+      const labelBase = state.seconds ? `${state.minutes}:${String(state.seconds).padStart(2, "0")}` : `${state.minutes}`;
+      const detailBase = state.seconds
+        ? `${state.minutes} minutes ${state.seconds} seconds`
+        : `${state.minutes} minute${state.minutes === 1 ? "" : "s"}`;
+      const increment = state.increment ? `, plus ${state.increment} second${state.increment === 1 ? "" : "s"} after each move` : "";
+      return { label: `${labelBase}+${state.increment}`, detail: `${detailBase}${increment}` };
+    }
+
+    function getAiGameReadyCustomDraft() {
+      const minutes = Number(document.getElementById("aiGameReadyCustomMinutes")?.value);
+      const seconds = Number(document.getElementById("aiGameReadyCustomSeconds")?.value);
+      const increment = Number(document.getElementById("aiGameReadyCustomIncrement")?.value);
+      const valid = [minutes, seconds, increment].every(Number.isInteger)
+        && minutes >= 1 && minutes <= 60
+        && seconds >= 0 && seconds <= 59
+        && increment >= 0 && increment <= 120;
+      return { valid, state: valid ? normalizePlayAiTimeControl({ mode: "custom", minutes, seconds, increment }) : null };
+    }
+
+    function syncAiGameReadySelect(targetId, sourceId) {
+      const target = document.getElementById(targetId);
+      const source = document.getElementById(sourceId);
+      if (!(target instanceof HTMLSelectElement) || !(source instanceof HTMLSelectElement)) return;
+      if (target.options.length !== source.options.length || [...target.options].some((option, index) => option.value !== source.options[index]?.value || option.text !== source.options[index]?.text)) {
+        target.replaceChildren(...[...source.options].map((option) => new Option(option.text, option.value, option.defaultSelected, option.selected)));
+      }
+      target.value = source.value;
+    }
+
+    function renderAiGameReady() {
+      const dialog = document.getElementById("aiGameReady");
+      if (!dialog) return;
+      const bot = getBeginnerBot();
+      const state = getPlayAiTimeControlSelection();
+      const time = formatAiGameReadyTimeControl(state);
+      const isCustom = state.mode === "custom";
+      const customDraft = getAiGameReadyCustomDraft();
+      dialog.dataset.selectedControl = state.control;
+      const title = document.getElementById("aiGameReadyBotName");
+      const meta = document.getElementById("aiGameReadyBotMeta");
+      const avatar = document.getElementById("aiGameReadyAvatar");
+      const colorSummary = document.getElementById("aiGameReadyColorSummary");
+      const selection = document.getElementById("aiGameReadySelection");
+      const saved = document.getElementById("aiGameReadySaved");
+      if (title) title.textContent = bot?.name || "your bot";
+      if (meta) meta.textContent = bot ? `${bot.name} · ${bot.elo} Elo` : "Bot selected";
+      if (avatar) avatar.textContent = bot?.avatar || "♞";
+      if (colorSummary) colorSummary.textContent = `You play ${getCoachColorName(coachPlayerColor)}`;
+      if (selection) selection.textContent = `${time.label} · ${time.detail}`;
+      if (saved) saved.hidden = dialog.dataset.hasSavedPreferences !== "true";
+      dialog.querySelectorAll("[data-ai-game-ready-pace]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.aiGameReadyPace === state.control));
+      });
+      dialog.querySelectorAll("[data-ai-game-ready-control]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.aiGameReadyControl === (isCustom ? "custom" : state.control)));
+      });
+      dialog.querySelectorAll("[data-ai-game-ready-color]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.aiGameReadyColor === coachPlayerColor));
+      });
+      const custom = document.getElementById("aiGameReadyCustomTime");
+      if (custom) {
+        custom.hidden = !isCustom;
+        const fallback = state.mode === "none" ? playAiDefaultTimeControl : state;
+        [
+          ["aiGameReadyCustomMinutes", fallback.minutes],
+          ["aiGameReadyCustomSeconds", fallback.seconds],
+          ["aiGameReadyCustomIncrement", fallback.increment]
+        ].forEach(([id, value]) => {
+          const field = document.getElementById(id);
+          if (field && document.activeElement !== field) field.value = String(value);
+        });
+      }
+      const customError = document.getElementById("aiGameReadyCustomError");
+      if (customError) customError.hidden = !isCustom || customDraft.valid;
+      syncAiGameReadySelect("aiGameReadyMatchType", "playMatchType");
+      syncAiGameReadySelect("aiGameReadyEngine", "playEngine");
+      syncAiGameReadySelect("aiGameReadyBoardTheme", "prefBoard");
+      syncAiGameReadySelect("aiGameReadyPieceSet", "prefPieces");
+    }
+
+    function resetAiGameForSetup() {
+      coachSessionActive = false;
+      cancelStockfishSearch("Game Ready setup");
+      coachMoveToken += 1;
+      coachThinking = false;
+      coachPremove = null;
+      matchClockState = null;
+      matchClockExpiredColor = "";
+      if (CoachChess && coachGame) restartCoachGame();
+      else {
+        resetMatchPlayerTimer(getSoloMatchClockControl(), { running: false });
+        renderCoachBoard();
+      }
+    }
+
+    function closeAiGameReady({ restoreFocus = true } = {}) {
+      const dialog = document.getElementById("aiGameReady");
+      if (!dialog || dialog.hidden) return;
+      dialog.hidden = true;
+      document.getElementById("aiGameReadyMoreSettings")?.removeAttribute("open");
+      if (restoreFocus) aiGameReadyReturnFocus?.focus?.({ preventScroll: true });
+      aiGameReadyReturnFocus = null;
+    }
+
+    function openAiGameReady(botId, { trigger = null, preserveSetup = false } = {}) {
+      const prepared = prepareAiLobby(botId, { trigger, preserveSetup });
+      if (!prepared) return false;
+      const dialog = document.getElementById("aiGameReady");
+      if (dialog) {
+        aiGameReadyReturnFocus = trigger || document.activeElement;
+        dialog.hidden = false;
+        renderAiGameReady();
+        window.requestAnimationFrame(() => document.getElementById("aiGameReadyStart")?.focus({ preventScroll: true }));
+      }
+      return true;
+    }
+
+    function applyAiGameReadyTimeControl(next, { persist = true } = {}) {
+      const selected = setPlayAiTimeControl(next, { persist });
+      resetMatchPlayerTimer(selected.control, { running: false });
+      coachMessage = selected.mode === "none"
+        ? "No clock selected. Start when you are ready."
+        : `Clock ready: ${selected.control.replace("+", " + ")}. Start when you are ready.`;
+      updateMatchPlayerTimer();
+      updateCoachPanel();
+      renderAiGameReady();
+      return selected;
+    }
+
+    function startAiGameReadyMatch() {
+      const customDraft = getAiGameReadyCustomDraft();
+      const selected = getPlayAiTimeControlSelection();
+      if (!coachDifficulty || !isPlayAiTimeControlValid() || (selected.mode === "custom" && !customDraft.valid)) {
+        document.getElementById("aiGameReadyMoreSettings")?.setAttribute("open", "");
+        renderAiGameReady();
+        return false;
+      }
+      closeAiGameReady({ restoreFocus: false });
+      startSoloCoachGame({ playerColor: coachPlayerColor });
+      return true;
+    }
+
+    function setupAiGameReady() {
+      const dialog = document.getElementById("aiGameReady");
+      if (!dialog || dialog.dataset.ready) return;
+      dialog.dataset.ready = "true";
+      const close = document.getElementById("aiGameReadyClose");
+      close?.addEventListener("click", () => closeAiGameReady());
+      dialog.addEventListener("click", (event) => { if (event.target === dialog) closeAiGameReady(); });
+      dialog.querySelectorAll("[data-ai-game-ready-pace]").forEach((button) => {
+        button.addEventListener("click", () => applyAiGameReadyTimeControl({ mode: "preset", control: button.dataset.aiGameReadyPace }));
+      });
+      dialog.querySelectorAll("[data-ai-game-ready-control]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const control = button.dataset.aiGameReadyControl;
+          if (control === "custom") {
+            const current = getPlayAiTimeControlSelection();
+            const seed = current.mode === "none" ? playAiDefaultTimeControl : current;
+            applyAiGameReadyTimeControl({ mode: "custom", minutes: seed.minutes, seconds: seed.seconds, increment: seed.increment }, { persist: false });
+          } else applyAiGameReadyTimeControl({ mode: "preset", control });
+        });
+      });
+      ["aiGameReadyCustomMinutes", "aiGameReadyCustomSeconds", "aiGameReadyCustomIncrement"].forEach((id) => {
+        document.getElementById(id)?.addEventListener("input", () => {
+          const draft = getAiGameReadyCustomDraft();
+          if (draft.valid && draft.state) applyAiGameReadyTimeControl(draft.state, { persist: false });
+          else renderAiGameReady();
+        });
+        document.getElementById(id)?.addEventListener("change", () => {
+          const draft = getAiGameReadyCustomDraft();
+          if (draft.valid && draft.state) applyAiGameReadyTimeControl(draft.state);
+          else renderAiGameReady();
+        });
+      });
+      dialog.querySelectorAll("[data-ai-game-ready-color]").forEach((button) => {
+        button.addEventListener("click", () => {
+          setCoachPlayerColor(button.dataset.aiGameReadyColor, false);
+          renderAiGameReady();
+        });
+      });
+      document.getElementById("aiGameReadyChange")?.addEventListener("click", () => {
+        const more = document.getElementById("aiGameReadyMoreSettings");
+        if (more) more.open = true;
+        renderAiGameReady();
+      });
+      document.getElementById("aiGameReadyMoreSettings")?.addEventListener("toggle", renderAiGameReady);
+      [
+        ["aiGameReadyMatchType", "playMatchType"],
+        ["aiGameReadyEngine", "playEngine"],
+        ["aiGameReadyBoardTheme", "prefBoard"],
+        ["aiGameReadyPieceSet", "prefPieces"]
+      ].forEach(([readyId, sourceId]) => {
+        document.getElementById(readyId)?.addEventListener("change", (event) => {
+          const source = document.getElementById(sourceId);
+          if (!(source instanceof HTMLSelectElement)) return;
+          source.value = event.target.value;
+          source.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      });
+      document.getElementById("aiGameReadyStart")?.addEventListener("click", startAiGameReadyMatch);
+      document.addEventListener("keydown", (event) => {
+        if (dialog.hidden) return;
+        if (trapDialogFocus(event, dialog)) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeAiGameReady();
+        }
+      });
+    }
+
     function parseMatchClock(control = "10+0") {
       const match = String(control || "").match(/^(\d{1,3})\+(\d{1,3})$/);
       if (!match) return { baseMs: 0, incrementMs: 0 };
@@ -16172,9 +17039,7 @@
     }
 
     function getSoloMatchClockControl() {
-      const minutes = Math.max(1, Math.min(60, Number(document.getElementById("playTimeControl")?.value) || 10));
-      const increment = Math.max(0, Math.min(120, Number(document.getElementById("playIncrement")?.value) || 0));
-      return `${minutes}+${increment}`;
+      return getPlayAiTimeControlSelection().control;
     }
 
     function getActiveMatchClockControl() {
@@ -16237,6 +17102,10 @@
       if (signals.includes("__draw_accept")) return { result: "draw", termination: "draw agreement" };
       if (signals.includes("__resign:w")) return { result: "black", termination: "resignation" };
       if (signals.includes("__resign:b")) return { result: "white", termination: "resignation" };
+      // terminalOutcome is a local intent only.  It is persisted so a
+      // reconnect can retry the action, but it must not be treated as the
+      // completed game until the server returns status=completed.
+      if (state?.terminalPending && state?.remote) return null;
       if (!state?.active || !coachGame) return null;
       if (matchClockExpiredColor) return { result: matchClockExpiredColor === "w" ? "black" : "white", termination: "timeout" };
       if (callCoachRule(coachGame, "isCheckmate", "in_checkmate")) return { result: coachGame.turn() === "w" ? "black" : "white", termination: "checkmate" };
@@ -16256,6 +17125,25 @@
       if (outcome.result === "white" || outcome.result === "black") return `${getCoachColorName(outcome.result === "white" ? "w" : "b")} won by ${outcome.termination || "game end"}.`;
       if (outcome.result === "draw") return `Draw by ${outcome.termination || "agreement"}.`;
       return "Game aborted before move 2.";
+    }
+
+    function isFriendTerminalPending(state = friendChallengeState || readFriendChallengeState()) {
+      return Boolean(state?.remote && state.active && state.status === "active" && state.terminalPending);
+    }
+
+    function markFriendTerminalPending(outcome, signal = "", kind = "result") {
+      if (!friendChallengeState?.remote || !friendChallengeState.active || !outcome) return false;
+      friendChallengeState = {
+        ...friendChallengeState,
+        active: true,
+        status: "active",
+        terminalPending: true,
+        terminalSignal: String(signal || ""),
+        terminalKind: String(kind || "result"),
+        terminalOutcome: outcome
+      };
+      saveFriendChallengeState(friendChallengeState, { render: false });
+      return true;
     }
 
     function getFriendDrawOfferBy(state = friendChallengeState || readFriendChallengeState()) {
@@ -16410,8 +17298,16 @@
       if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
       const outcome = getCoachTerminalOutcome();
       coachMessage = outcome ? formatFriendGameOutcome(outcome) : `${getCoachColorName(matchClockExpiredColor)} ran out of time. The clock is paused.`;
-      if (friendChallengeState?.active && outcome) void syncFriendSignal(friendOutcomeSignal(outcome), "completed");
-      completeCoachGame(outcome);
+      if (friendChallengeState?.remote && friendChallengeState.active && outcome) {
+        // Timeout is derived from the locked server clock. Do not submit a
+        // client-invented __result marker; ask the presence RPC to run the
+        // server expiry path and return the completed payload.
+        markFriendTerminalPending(outcome, "", "timeout");
+        coachMessage = `${getCoachColorName(matchClockExpiredColor)} ran out of time. Confirming with the server…`;
+        void syncFriendClockExpiry();
+      } else {
+        completeCoachGame(outcome);
+      }
       updateCoachPanel();
       renderCoachBoard();
     }
@@ -19622,6 +20518,22 @@
       openMatchHistory(document.getElementById("postGameHistory"));
     }
 
+    function returnToPlayLobby() {
+      if (isMultiplayerPostGame()) {
+        hidePostGameDecision();
+        returnFriendLobby();
+        return;
+      }
+      hidePostGameDecision();
+      resetAiGameForSetup();
+      document.getElementById("coachPracticeLinks")?.setAttribute("hidden", "");
+      renderPlayLobbyState();
+      syncPlayLobbyGuestPlacement(true);
+      window.requestAnimationFrame(() => {
+        document.getElementById("playLobbyChangeBot")?.focus({ preventScroll: true });
+      });
+    }
+
     function playNextCoachOpponent() {
       const current = beginnerBots.findIndex((bot) => bot.id === coachDifficulty);
       const nextFriendly = current >= 0 ? beginnerBots.slice(current + 1).find((bot) => isBeginnerBotUnlocked(bot.id)) : null;
@@ -20094,6 +21006,88 @@
       }
     }
 
+    function syncPlayLobbyGuestPlacement(isPreGame) {
+      const guest = document.getElementById("playLobbyGuest");
+      const center = document.querySelector("#play .match-board-column");
+      const rightRail = document.querySelector("#play .play-right-sidebar");
+      if (!guest || !center || !rightRail) return;
+
+      let anchor = document.getElementById("playLobbyGuestAnchor");
+      if (!anchor) {
+        anchor = document.createElement("span");
+        anchor.id = "playLobbyGuestAnchor";
+        anchor.hidden = true;
+        guest.after(anchor);
+      }
+
+      const isMobileLobby = Boolean(isPreGame) && window.matchMedia("(max-width: 900px)").matches;
+      if (isMobileLobby) {
+        if (guest.parentElement !== rightRail) rightRail.appendChild(guest);
+      } else if (guest.parentElement !== center) {
+        center.insertBefore(guest, anchor);
+      }
+    }
+
+    function renderPlayLobbyState() {
+      const play = document.getElementById("play");
+      if (!play) return;
+      const inReview = Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
+      const isSpecialLobby = document.body.classList.contains("friend-challenge-mode") || document.body.classList.contains("tournament-mode");
+      const isPreGame = Boolean(coachGame && !isSpecialLobby && !coachSessionActive && !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState && !inReview);
+      // The lobby has its own layout contract. Keeping it on a dedicated
+      // class prevents its grid from competing with the active-game board
+      // workspace or Game Review.
+      play.classList.toggle("play-lobby", isPreGame);
+      play.classList.remove("is-pre-game");
+      play.classList.toggle("is-active-game", !isPreGame && !inReview && !isSpecialLobby);
+      if (!isPreGame) setupPlayAuthPrompt.close?.();
+      syncPlayLobbyGuestPlacement(isPreGame);
+
+      const selectedBot = getBeginnerBot();
+      const config = getCoachConfig();
+      const profile = getAiHeaderProfile();
+      const matchType = document.getElementById("playMatchType");
+      const matchTypeValue = matchType?.value === "rated" ? "rated" : "casual";
+      document.querySelectorAll("[data-play-match-type]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.playMatchType === matchTypeValue));
+      });
+      const start = document.getElementById("playLobbyStart");
+      const startCopy = document.getElementById("playLobbyStartCopy");
+      const startLabel = document.getElementById("playLobbyStartLabel");
+      const readyTitle = document.getElementById("playLobbyReadyTitle");
+      const readyCopy = document.getElementById("playLobbyReadyCopy");
+      const canStart = Boolean(coachDifficulty && isPlayAiTimeControlValid());
+      if (start) start.disabled = !canStart;
+      if (startLabel) startLabel.textContent = selectedBot ? "Open Game Ready" : "Choose bot";
+      if (startCopy) startCopy.textContent = selectedBot ? "Set pace and color, then start" : "Choose an opponent first";
+      if (readyTitle) readyTitle.textContent = selectedBot ? "Your opponent is ready" : "Choose an opponent";
+      if (readyCopy) readyCopy.textContent = selectedBot
+        ? "Set your pace and color, then start from one focused setup."
+        : "Your pace and color stay together in the Game Ready step.";
+      const changeBot = document.getElementById("playLobbyChangeBot");
+      if (changeBot) {
+        changeBot.textContent = selectedBot ? "Change bot" : "Choose bot";
+        changeBot.setAttribute("aria-label", selectedBot ? "Change AI opponent" : "Choose an AI opponent");
+      }
+      const difficulty = document.getElementById("playLobbyBotDifficulty");
+      const style = document.getElementById("playLobbyBotStyle");
+      const strength = document.getElementById("playLobbyBotStrength");
+      const description = document.getElementById("playLobbyBotDescription");
+      if (difficulty) difficulty.textContent = selectedBot ? config.label : "Choose a bot";
+      if (style) style.textContent = selectedBot?.style || selectedBot?.personality || "—";
+      if (strength) strength.textContent = selectedBot ? `${Math.max(400, Number(config.elo) || 0)} Elo` : "—";
+      if (description) description.textContent = selectedBot?.bio || "Choose an AI opponent to see their play style and challenge.";
+      const ratingNote = document.getElementById("playLobbyRatingNote");
+      if (ratingNote) ratingNote.hidden = true;
+      const opponentActions = document.querySelector(".play-lobby-opponent-actions");
+      if (opponentActions) {
+        opponentActions.hidden = !isPreGame;
+        opponentActions.classList.toggle("has-selection", Boolean(selectedBot));
+      }
+      document.querySelectorAll("[data-play-mode]").forEach((mode) => {
+        mode.classList.toggle("is-selected", isPreGame && mode.dataset.playMode === "ai");
+      });
+    }
     function updateCoachPanel() {
       if (!coachGame) return;
       const statusBadge = document.getElementById("gameStatusBadge");
@@ -20111,7 +21105,8 @@
       const isDrawn = Boolean(drawReason) || callCoachRule(coachGame, "isDraw", "in_draw");
       const terminalOutcome = getCoachTerminalOutcome();
       const friendOutcome = friendChallengeState?.remote ? getFriendGameOutcome(friendChallengeState) : null;
-      const friendFinished = Boolean(friendOutcome) || friendChallengeState?.status === "completed";
+      const friendTerminalPending = isFriendTerminalPending();
+      const friendFinished = !friendTerminalPending && (Boolean(friendOutcome) || friendChallengeState?.status === "completed");
       const gameFinished = Boolean(terminalOutcome);
       const waitingForSetup = !coachSessionActive && !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState;
 
@@ -20134,6 +21129,9 @@
       } else if (friendFinished) {
         statusBadge.textContent = friendOutcome?.result === "draw" ? "Draw" : friendOutcome?.result === "aborted" ? "Aborted" : "Game complete";
         coach.textContent = formatFriendGameOutcome(friendOutcome);
+      } else if (friendTerminalPending) {
+        statusBadge.textContent = "Confirming result";
+        coach.textContent = "Confirming the game result with the server…";
       } else if (matchClockExpiredColor) {
         statusBadge.textContent = `${getCoachColorName(matchClockExpiredColor)} flagged`;
         coach.textContent = `${getCoachColorName(matchClockExpiredColor)} ran out of time. The board is paused.`;
@@ -20200,6 +21198,7 @@
       updateEnginePanel();
       updateBotToggle();
       renderInGamePlayerCard();
+      renderPlayLobbyState();
     }
 
     function scheduleCoachBoardRender() {
@@ -21360,6 +22359,7 @@
       coachRenderFrame = 0;
       const board = document.getElementById("coachBoard");
       if (!board || !coachGame) return;
+      sharedInteractiveBoardWorkspace.scheduleSync();
       bindCoachBoardEvents(board);
       const boardFen = coachGame.fen();
       const boardHistoryLength = coachGame.history().length;
@@ -21511,9 +22511,14 @@
       coachLastMove = move;
       advanceMatchClock(move.color);
       coachLearnerMoveScores = { fen: "", scored: [], pending: false };
+      let friendTerminalOutcome = null;
       if (friendChallengeState?.active) {
         markFriendLocalMovePending(move, coachGame.fen(), getSyncedFriendMoves());
         setFriendConnectionState("waiting", "Waiting for server confirmation...");
+        friendTerminalOutcome = getFriendGameOutcome(friendChallengeState);
+        if (friendTerminalOutcome) {
+          markFriendTerminalPending(friendTerminalOutcome, friendOutcomeSignal(friendTerminalOutcome), "result");
+        }
       }
       scheduleCoachBoardRender();
       scheduleCoachPanelUpdate();
@@ -21522,9 +22527,10 @@
         window.setTimeout(() => {
           if (coachGame !== gameAtMove || !friendChallengeState?.active) return;
           saveFriendChallengeState({ ...friendChallengeState, active: true }, { render: false });
-          const outcome = getFriendGameOutcome(friendChallengeState);
+          const outcome = friendTerminalOutcome || friendChallengeState?.terminalOutcome || null;
+          const signal = friendChallengeState?.terminalSignal || (outcome ? friendOutcomeSignal(outcome) : "");
           void syncFriendChallengePosition(true).then((synced) => {
-            if (synced && outcome && friendChallengeState?.active) void syncFriendSignal(friendOutcomeSignal(outcome), "completed");
+            if (synced && signal && friendChallengeState?.active) void syncFriendSignal(signal, "completed");
           });
         }, 0);
       }
@@ -21953,6 +22959,19 @@
       };
     }
 
+    function friendChallengeStatusRank(status) {
+      return {
+        draft: 0,
+        pending: 1,
+        accepted: 2,
+        active: 3,
+        completed: 4,
+        declined: 4,
+        cancelled: 4,
+        expired: 4
+      }[String(status || "").toLowerCase()] ?? 0;
+    }
+
     function toFriendChallengeState(remote, previous = friendChallengeState || readFriendChallengeState()) {
       const me = getFriendCurrentUserId();
       const isCreator = Boolean(me && remote.creatorId === me);
@@ -22053,7 +23072,11 @@
       if (previous?.remoteId && previous.remoteId !== remote.id) invalidateFriendChallengeSync();
       if (remoteMatchesPendingFriendMove(remote)) clearPendingFriendMove(remote);
       else if (shouldDeferRemoteForPendingFriendMove(remote)) return true;
-      if (previous?.remoteId === remote.id && Number(remote.revision) < Number(previous.serverRevision || 0)) return true;
+      if (previous?.remoteId === remote.id) {
+        if (Number(remote.revision) < Number(previous.serverRevision || 0)) return true;
+        const reopeningCompleted = String(previous.status || "").toLowerCase() === "completed" && remote.status === "active";
+        if (!reopeningCompleted && friendChallengeStatusRank(remote.status) < friendChallengeStatusRank(previous.status)) return true;
+      }
       const previousBoardMoves = getFriendBoardMoveList(previous);
       const remoteBoardMoves = getFriendBoardMoveList(remote);
       // A chat/presence update can carry the same board position.  Only a
@@ -22077,7 +23100,16 @@
         restoredFriendGame = buildFriendChallengeGameFromMoves(next);
         next.historyBasePly = restoredFriendGame ? 0 : getFriendMoveCount(remote);
       }
+      if (remote.status === "completed") {
+        // The authoritative payload closes any locally persisted terminal
+        // intent so a reload/reconnect cannot submit it a second time.
+        next.terminalPending = false;
+        next.terminalSignal = "";
+        next.terminalKind = "";
+        next.terminalOutcome = null;
+      }
       friendChallengeState = next;
+      if (remote.status === "active") noteRealtimeMatchAuthoritativeState(remote);
       if (remote.status === "active" && (previous?.status === "completed" || Boolean(completedGameSignature || coachTerminalOutcome || coachDrawAgreed || matchClockExpiredColor))) {
         coachMoveToken += 1;
         coachBotPaused = true;
@@ -22285,23 +23317,60 @@
     }
 
     async function applyFriendInviteFromHash() {
-      try {
-        const hashQuery = location.hash.includes("?") ? location.hash.split("?")[1] : "";
-        const invite = new URLSearchParams(hashQuery);
-        const code = invite.get("challenge");
-        if (!code) return false;
-        const provider = getFriendProvider();
-        if (!provider) {
-          setFriendChallengeStatus("Sign in to open a friend invite.");
+      const hashQuery = location.hash.includes("?") ? location.hash.split("?")[1] : "";
+      const invite = new URLSearchParams(hashQuery);
+      const code = String(invite.get("challenge") || "").trim().toUpperCase();
+      if (!code) {
+        friendInviteHydrationQueued = false;
+        return false;
+      }
+      const provider = getFriendProvider();
+      if (!provider) {
+        setFriendChallengeStatus("Sign in to open a friend invite.");
+        return false;
+      }
+      const account = provider.getCachedAccount?.() || {};
+      const accountId = String(account.authUserId || account.publicId || "").trim();
+      if (!accountId) {
+        friendInviteHydrationQueued = true;
+        return false;
+      }
+      const localState = friendChallengeState || readFriendChallengeState();
+      const sameCode = friendInviteHydrationPromise && friendInviteHydrationCode === code;
+      const localNeedsAuthoritativeInvite = !localState?.remote
+        || String(localState.code || "").toUpperCase() !== code
+        || !["active", "completed"].includes(String(localState.status || "").toLowerCase());
+      if (sameCode && (!localNeedsAuthoritativeInvite || friendInviteHydrationInFlight)) return friendInviteHydrationPromise;
+      if (sameCode) {
+        friendInviteHydrationPromise = null;
+        friendInviteHydrationCode = "";
+      }
+      friendInviteHydrationQueued = false;
+      friendInviteHydrationCode = code;
+      const hydrationEpoch = friendChallengeSyncEpoch;
+      friendInviteHydrationInFlight = true;
+      friendInviteHydrationPromise = (async () => {
+        try {
+          const remote = await provider.getFriendChallenge(code);
+          if (hydrationEpoch !== friendChallengeSyncEpoch) return false;
+          applyRemoteFriendChallenge(remote, true);
+          window.setTimeout(() => document.getElementById("friendChallenge")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+          return true;
+        } catch (error) {
+          setFriendChallengeStatus(error?.message || "This invite is unavailable or has expired.");
           return false;
         }
-        const remote = await provider.getFriendChallenge(code);
-        applyRemoteFriendChallenge(remote, true);
-        window.setTimeout(() => document.getElementById("friendChallenge")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
-        return true;
-      } catch (error) {
-        setFriendChallengeStatus(error?.message || "This invite is unavailable or has expired.");
-        return false;
+      })();
+      let hydrationResult = false;
+      try {
+        hydrationResult = await friendInviteHydrationPromise;
+        return hydrationResult;
+      } finally {
+        if (hydrationEpoch === friendChallengeSyncEpoch) friendInviteHydrationInFlight = false;
+        if (hydrationEpoch === friendChallengeSyncEpoch && friendInviteHydrationCode === code && !hydrationResult) {
+          friendInviteHydrationPromise = null;
+          friendInviteHydrationCode = "";
+        }
       }
     }
 
@@ -22433,6 +23502,9 @@
     async function refreshFriendNetwork(force = false) {
       const provider = getFriendProvider();
       if (!provider) return false;
+      const account = provider.getCachedAccount?.() || {};
+      const accountId = String(account.authUserId || account.publicId || "").trim();
+      if (!accountId) return false;
       if (friendNetworkRefreshPromise) return friendNetworkRefreshPromise;
       if (!force && Date.now() - friendNetworkLastRefresh < 900) return true;
       const requestId = ++friendNetworkRequest;
@@ -22489,28 +23561,64 @@
     }
 
     async function refreshActiveFriendChallenge(code = friendChallengeState?.code, restoreBoard = true) {
-      const provider = getFriendProvider();
       const challengeCode = String(code || "").toUpperCase();
-      const spectator = isFriendSpectatorMode(friendChallengeState);
-      const fetchChallenge = spectator ? provider?.getFriendSpectatorChallenge : provider?.getFriendChallenge;
-      if (!fetchChallenge || !challengeCode) return false;
-      if (friendChallengeRefreshPromise) return friendChallengeRefreshPromise;
-      friendChallengeRefreshPromise = (async () => {
-        try {
-          const remote = await fetchChallenge(challengeCode);
-          if (remote && friendChallengeState?.code === challengeCode) {
-            const applied = applyRemoteFriendChallenge(remote, restoreBoard);
-            setFriendConnectionState("connected", isFriendSpectatorMode() ? "Watching live" : "Connected");
-            return applied;
+      if (!challengeCode) return false;
+      if (friendChallengeRefreshPromise) {
+        friendChallengeRefreshQueued = true;
+        friendChallengeRefreshQueuedCode = challengeCode;
+        friendChallengeRefreshQueuedRestoreBoard = friendChallengeRefreshQueuedRestoreBoard || restoreBoard;
+        return friendChallengeRefreshPromise;
+      }
+      const refreshEpoch = friendChallengeSyncEpoch;
+      const refreshAccountId = getFriendCurrentUserId();
+      const refreshSubscriptionGeneration = friendNetworkSubscriptionGeneration;
+      const runRefresh = async () => {
+        let nextCode = challengeCode;
+        let nextRestoreBoard = restoreBoard;
+        let result = false;
+        while (
+          refreshEpoch === friendChallengeSyncEpoch
+          && refreshSubscriptionGeneration === friendNetworkSubscriptionGeneration
+          && refreshAccountId === getFriendCurrentUserId()
+          && nextCode
+        ) {
+          friendChallengeRefreshQueued = false;
+          friendChallengeRefreshQueuedCode = "";
+          friendChallengeRefreshQueuedRestoreBoard = false;
+          const provider = getFriendProvider();
+          const spectator = isFriendSpectatorMode(friendChallengeState);
+          const fetchChallenge = spectator ? provider?.getFriendSpectatorChallenge : provider?.getFriendChallenge;
+          if (!fetchChallenge) break;
+          try {
+            const remote = await fetchChallenge(nextCode);
+            if (
+              refreshEpoch !== friendChallengeSyncEpoch
+              || refreshSubscriptionGeneration !== friendNetworkSubscriptionGeneration
+              || refreshAccountId !== getFriendCurrentUserId()
+            ) return false;
+            if (remote && String(friendChallengeState?.code || "").toUpperCase() === nextCode) {
+              result = applyRemoteFriendChallenge(remote, nextRestoreBoard);
+              setFriendConnectionState("connected", isFriendSpectatorMode() ? "Watching live" : "Connected");
+            }
+          } catch {
+            result = false;
           }
-          return false;
-        } catch {
-          return false;
-        } finally {
-          friendChallengeRefreshPromise = null;
+          if (!friendChallengeRefreshQueued) break;
+          nextCode = friendChallengeRefreshQueuedCode || nextCode;
+          nextRestoreBoard = friendChallengeRefreshQueuedRestoreBoard || nextRestoreBoard;
         }
-      })();
-      return friendChallengeRefreshPromise;
+        return result;
+      };
+      const refreshPromise = runRefresh().finally(() => {
+        if (friendChallengeRefreshPromise === refreshPromise) friendChallengeRefreshPromise = null;
+        if (refreshEpoch === friendChallengeSyncEpoch && !friendChallengeRefreshPromise) {
+          friendChallengeRefreshQueued = false;
+          friendChallengeRefreshQueuedCode = "";
+          friendChallengeRefreshQueuedRestoreBoard = false;
+        }
+      });
+      friendChallengeRefreshPromise = refreshPromise;
+      return refreshPromise;
     }
 
     function realtimeEventMatchesActiveChallenge(event) {
@@ -22554,6 +23662,7 @@
         return;
       }
       if (event?.table === "game_challenges" && realtimeEventMatchesActiveChallenge(event)) {
+        noteRealtimeMatchGameEvent();
         void refreshActiveFriendChallenge(friendChallengeState?.code, true);
         return;
       }
@@ -22577,6 +23686,7 @@
       const generation = friendNetworkSubscriptionGeneration;
       const account = provider.getCachedAccount?.() || {};
       friendNetworkSubscriptionUserId = account.authUserId || account.publicId || "";
+      if (!friendNetworkSubscriptionUserId) return;
       friendNetworkSubscribing = true;
       friendRealtimeReady = false;
       Promise.resolve(provider.subscribeFriendChallenges((event) => handleFriendRealtimeEvent(event, generation)))
@@ -23018,6 +24128,15 @@
           : await provider?.getFriendChallenge(state.code);
         if (!remote) throw new Error("Sign in to reconnect this game.");
         applyRemoteFriendChallenge(remote, true);
+        const normalized = normalizeRemoteFriendChallenge(remote);
+        const pendingTerminal = friendChallengeState?.terminalPending ? {
+          kind: friendChallengeState.terminalKind,
+          signal: friendChallengeState.terminalSignal
+        } : null;
+        if (!isFriendSpectatorMode(state) && normalized?.status === "active" && pendingTerminal) {
+          if (pendingTerminal.kind === "timeout") void syncFriendClockExpiry();
+          else if (pendingTerminal.signal) void syncFriendSignal(pendingTerminal.signal, "completed");
+        }
         if (isFriendSpectatorMode(state)) startFriendSpectatorWatch();
         setFriendConnectionState("reconnected", "Reconnected successfully");
         setFriendChallengeStatus(`Reconnected to friend challenge ${state.code}.`);
@@ -23072,6 +24191,9 @@
       friendChallengeLastPositionSignature = "";
       friendChallengePendingMove = null;
       friendChallengeRefreshPromise = null;
+      friendChallengeRefreshQueued = false;
+      friendChallengeRefreshQueuedCode = "";
+      friendChallengeRefreshQueuedRestoreBoard = false;
     }
 
     function queueFriendChallengeSync(task) {
@@ -23149,6 +24271,36 @@
       });
     }
 
+    async function syncFriendClockExpiry() {
+      return queueFriendChallengeSync(async (epoch) => {
+        const state = friendChallengeState;
+        const provider = getFriendProvider();
+        if (epoch !== friendChallengeSyncEpoch || !state?.remote || !state.active || !provider?.touchFriendChallengePresence) return false;
+        const code = state.code;
+        try {
+          setFriendConnectionState("syncing", "Confirming clock...");
+          const remote = await provider.touchFriendChallengePresence(code, true);
+          if (remote && epoch === friendChallengeSyncEpoch && friendChallengeState?.remote && friendChallengeState.code === code) {
+            applyRemoteFriendChallenge(remote, false);
+            const normalized = normalizeRemoteFriendChallenge(remote);
+            if (normalized?.status === "completed") setFriendConnectionState("connected", "Connected");
+            else {
+              setFriendConnectionState("reconnecting", "Waiting for server clock...");
+              window.setTimeout(() => void reconnectFriendChallenge(), 700);
+            }
+          }
+          return true;
+        } catch (error) {
+          if (epoch === friendChallengeSyncEpoch) {
+            setFriendConnectionState("reconnecting", "Reconnecting...");
+            setFriendChallengeStatus(error?.message || "Clock result is waiting for server confirmation.");
+            window.setTimeout(() => void reconnectFriendChallenge(), 700);
+          }
+          return false;
+        }
+      });
+    }
+
     function finishFriendGame(message, signal = "") {
       coachMoveToken += 1;
       const nextMoves = getSyncedFriendMoves(signal ? [signal] : []);
@@ -23157,11 +24309,15 @@
       if (matchClockState) matchClockState = { ...getMatchClockSnapshot(matchClockState), running: false };
       coachMessage = outcome ? formatFriendGameOutcome(outcome) : message;
       if (friendChallengeState) {
-        friendChallengeState = { ...friendChallengeState, active: true, status: "active", terminalPending: Boolean(outcome), moves: nextMoves };
+        friendChallengeState = { ...friendChallengeState, active: true, status: "active", moves: nextMoves };
+        if (outcome) {
+          markFriendTerminalPending(outcome, signal, "result");
+          coachMessage = `${formatFriendGameOutcome(outcome)} Confirming with the server…`;
+        }
         saveFriendChallengeState(friendChallengeState);
       }
-      completeCoachGame(outcome);
-      if (signal) void syncFriendSignal(signal, "completed");
+      if (!friendChallengeState?.remote) completeCoachGame(outcome);
+      else if (signal) void syncFriendSignal(signal, "completed");
       renderCoachBoard();
       updateCoachPanel();
     }
@@ -24065,10 +25221,12 @@
 
     function stopFriendNetworkSync() {
       window.clearInterval(friendNetworkTimer);
+      window.clearInterval(friendChallengeSyncTimer);
       window.clearTimeout(friendNetworkRefreshTimer);
       window.clearTimeout(friendRealtimeReconnectTimer);
       window.clearTimeout(friendSearchTimer);
       friendNetworkTimer = 0;
+      friendChallengeSyncTimer = 0;
       friendNetworkRefreshTimer = 0;
       friendNetworkRefreshQueued = false;
       friendRealtimeReconnectTimer = 0;
@@ -24082,6 +25240,14 @@
       friendNetworkSubscriptionGeneration += 1;
       friendNetworkSubscriptionUserId = "";
       friendNetworkRefreshPromise = null;
+      friendChallengeRefreshPromise = null;
+      friendChallengeRefreshQueued = false;
+      friendChallengeRefreshQueuedCode = "";
+      friendChallengeRefreshQueuedRestoreBoard = false;
+      friendInviteHydrationPromise = null;
+      friendInviteHydrationCode = "";
+      friendInviteHydrationQueued = false;
+      friendInviteHydrationInFlight = false;
       try { friendNetworkUnsubscribe?.(); } catch {}
       friendNetworkUnsubscribe = null;
       friendNetworkSubscribing = false;
@@ -24199,20 +25365,98 @@
 
     function stopRealtimeMatchLifecycle() {
       window.clearInterval(realtimeMatchHeartbeatTimer);
+      window.clearTimeout(realtimeMatchWatchdogTimer);
       realtimeMatchHeartbeatTimer = 0;
+      realtimeMatchWatchdogTimer = 0;
+      realtimeMatchWatchdogInFlight = false;
+      realtimeMatchWatchdogLastSignalAt = 0;
+      realtimeMatchWatchdogObservedRevision = 0;
+      realtimeMatchWatchdogDelay = 4500;
       if (realtimeMatchVisibilityHandler) document.removeEventListener("visibilitychange", realtimeMatchVisibilityHandler);
       realtimeMatchVisibilityHandler = null;
       void syncFriendPresence(!document.hidden);
     }
 
-    function startRealtimeMatchLifecycle() {
+    function noteRealtimeMatchGameEvent() {
       if (!isRealtimeMatchActive()) return;
-      stopRealtimeMatchLifecycle();
-      void syncRealtimeMatchPresence(true);
-      void syncFriendPresence(true);
-      realtimeMatchHeartbeatTimer = window.setInterval(() => void syncRealtimeMatchPresence(!document.hidden), 12000);
-      realtimeMatchVisibilityHandler = () => void syncRealtimeMatchPresence(!document.hidden);
-      document.addEventListener("visibilitychange", realtimeMatchVisibilityHandler);
+      realtimeMatchWatchdogLastSignalAt = Date.now();
+      realtimeMatchWatchdogDelay = 4500;
+      scheduleRealtimeMatchWatchdog(4500);
+    }
+
+    function noteRealtimeMatchAuthoritativeState(remote = null) {
+      if (!isRealtimeMatchActive()) return;
+      const revision = Number(remote?.revision ?? remote?.serverRevision ?? friendChallengeState?.serverRevision) || 0;
+      if (revision <= realtimeMatchWatchdogObservedRevision) return;
+      realtimeMatchWatchdogObservedRevision = revision;
+      realtimeMatchWatchdogLastSignalAt = Date.now();
+      realtimeMatchWatchdogDelay = 4500;
+      scheduleRealtimeMatchWatchdog(4500);
+    }
+
+    function scheduleRealtimeMatchWatchdog(delay = realtimeMatchWatchdogDelay) {
+      window.clearTimeout(realtimeMatchWatchdogTimer);
+      realtimeMatchWatchdogTimer = 0;
+      if (!isRealtimeMatchActive() || !realtimeMatchHeartbeatTimer) return;
+      realtimeMatchWatchdogTimer = window.setTimeout(async () => {
+        realtimeMatchWatchdogTimer = 0;
+        if (!isRealtimeMatchActive()) return;
+        if (document.hidden) return;
+        const staleFor = Date.now() - (realtimeMatchWatchdogLastSignalAt || Date.now());
+        if (staleFor < 4500) {
+          scheduleRealtimeMatchWatchdog(4500 - staleFor);
+          return;
+        }
+        if (realtimeMatchWatchdogInFlight) {
+          scheduleRealtimeMatchWatchdog(1000);
+          return;
+        }
+        const epoch = friendChallengeSyncEpoch;
+        const code = friendChallengeState?.code || "";
+        const beforeRevision = Number(friendChallengeState?.serverRevision) || 0;
+        realtimeMatchWatchdogInFlight = true;
+        try {
+          // Realtime remains the primary transport. This fetch is only a
+          // bounded recovery path after the active game's revision signal has
+          // gone stale, covering SUBSCRIBED channels that miss a row update.
+          await refreshActiveFriendChallenge(code, true);
+          if (epoch !== friendChallengeSyncEpoch || !isRealtimeMatchActive() || friendChallengeState?.code !== code) return;
+          const afterRevision = Number(friendChallengeState?.serverRevision) || 0;
+          if (afterRevision > beforeRevision) {
+            noteRealtimeMatchAuthoritativeState(friendChallengeState);
+            realtimeMatchWatchdogDelay = 4500;
+          } else {
+            realtimeMatchWatchdogDelay = Math.min(Math.max(realtimeMatchWatchdogDelay * 2, 4500), 15000);
+          }
+        } finally {
+          realtimeMatchWatchdogInFlight = false;
+          if (epoch === friendChallengeSyncEpoch && isRealtimeMatchActive()) scheduleRealtimeMatchWatchdog(realtimeMatchWatchdogDelay);
+        }
+      }, Math.max(250, Number(delay) || 4500));
+    }
+
+    function startRealtimeMatchLifecycle() {
+      if (!isRealtimeMatchActive()) {
+        stopRealtimeMatchLifecycle();
+        return;
+      }
+      if (!realtimeMatchHeartbeatTimer) {
+        realtimeMatchWatchdogLastSignalAt = Date.now();
+        realtimeMatchWatchdogObservedRevision = Number(friendChallengeState?.serverRevision) || 0;
+        realtimeMatchWatchdogDelay = 4500;
+        void syncRealtimeMatchPresence(true);
+        void syncFriendPresence(true);
+        realtimeMatchHeartbeatTimer = window.setInterval(() => void syncRealtimeMatchPresence(!document.hidden), 12000);
+      }
+      if (!realtimeMatchVisibilityHandler) {
+        realtimeMatchVisibilityHandler = () => {
+          if (document.hidden) return void syncRealtimeMatchPresence(false);
+          void syncRealtimeMatchPresence(true);
+          scheduleRealtimeMatchWatchdog(250);
+        };
+        document.addEventListener("visibilitychange", realtimeMatchVisibilityHandler);
+      }
+      scheduleRealtimeMatchWatchdog(realtimeMatchWatchdogDelay);
     }
 
     function stopTournamentNetworkSync() {
@@ -24260,10 +25504,12 @@
       const tournamentVisible = playVisible && activeTab === "tournaments";
       if (playVisible || friendsVisible) {
         startFriendNetworkSync();
+        if (playVisible && isRealtimeMatchActive()) startRealtimeMatchLifecycle();
       } else {
         // Release social subscriptions when no social workspace is open;
         // they are re-established when the route becomes active again.
         stopFriendNetworkSync();
+        stopRealtimeMatchLifecycle();
       }
       if (tournamentVisible) {
         startTournamentNetworkSync();
@@ -24286,6 +25532,7 @@
       if (!provider) return;
       const account = provider.getCachedAccount?.() || {};
       const activeUserId = account.authUserId || account.publicId || "";
+      if (!activeUserId) return;
       if (friendNetworkUnsubscribe && activeUserId && friendNetworkSubscriptionUserId !== activeUserId) stopFriendNetworkSync();
       ensureFriendRealtime();
       ensureSocialPresenceRealtime(provider);
@@ -24297,6 +25544,21 @@
           || document.getElementById("friends")?.classList.contains("is-active-panel");
         if (!document.hidden && socialWorkspaceVisible && !friendRealtimeReady) void refreshFriendNetwork(true);
       }, 30000);
+      if (!friendChallengeSyncTimer) friendChallengeSyncTimer = window.setInterval(() => {
+        const state = friendChallengeState || readFriendChallengeState();
+        const socialWorkspaceVisible = document.getElementById("play")?.classList.contains("is-active-panel")
+          || document.getElementById("friends")?.classList.contains("is-active-panel");
+        if (document.hidden || !socialWorkspaceVisible || !state?.remote) return;
+        if (!["pending", "accepted"].includes(String(state.status || "").toLowerCase())) {
+          window.clearInterval(friendChallengeSyncTimer);
+          friendChallengeSyncTimer = 0;
+          return;
+        }
+        // Realtime can report SUBSCRIBED while a table update is missed by
+        // the channel. Keep the pending invite authoritative without polling
+        // active games or the general social directory.
+        void refreshActiveFriendChallenge(state.code, true);
+      }, 2500);
     }
 
     function setFriendChallengeLobbyView(view = "create") {
@@ -24370,6 +25632,14 @@
         if (event.target.closest("[data-profile-challenge]")) openFriendChallengeFromProfile();
       }, options);
       window.addEventListener("hashchange", () => {
+        const hashQuery = location.hash.includes("?") ? location.hash.split("?")[1] : "";
+        const nextCode = String(new URLSearchParams(hashQuery).get("challenge") || "").trim().toUpperCase();
+        if (nextCode !== friendInviteHydrationCode) {
+          friendInviteHydrationPromise = null;
+          friendInviteHydrationCode = "";
+          friendInviteHydrationQueued = false;
+          friendInviteHydrationInFlight = false;
+        }
         if (location.hash.includes("challenge=")) void applyFriendInviteFromHash();
         if (location.hash.includes("spectate=")) void applyFriendSpectateFromHash();
       }, options);
@@ -25516,6 +26786,7 @@
     function renderRealPuzzleBoard() {
       const board = document.getElementById("realPuzzleBoard");
       if (!board) return;
+      sharedInteractiveBoardWorkspace.scheduleSync();
       bindRealPuzzleBoardEvents(board);
       const legalByTarget = new Map(realPuzzleLegalMoves.map((move) => [move.to, move]));
       const lastSquares = realPuzzleLastMove ? [realPuzzleLastMove.from, realPuzzleLastMove.to] : [];
@@ -25980,7 +27251,7 @@
     function setupPlayWorkspaceDrawers() {
       if (setupPlayWorkspaceDrawers.ready) return;
       setupPlayWorkspaceDrawers.ready = true;
-      const compactWorkspace = true;
+      const compactWorkspace = window.innerWidth <= 1180;
       document.querySelectorAll("#play details[data-play-drawer]").forEach((drawer) => {
         if (!(drawer instanceof HTMLDetailsElement)) return;
         drawer.open = drawer.dataset.playDrawer === "moves" || !compactWorkspace;
@@ -25989,10 +27260,49 @@
       if (coachLibrary instanceof HTMLDetailsElement) coachLibrary.open = !compactWorkspace;
     }
 
+    function setupPlayAuthPrompt() {
+      if (setupPlayAuthPrompt.ready) return;
+      setupPlayAuthPrompt.ready = true;
+      const prompt = document.getElementById("playLobbyGuest");
+      if (!prompt) return;
+      const isVisiblePlayLobby = () => {
+        const play = document.getElementById("play");
+        return Boolean(play && !play.hidden && play.classList.contains("is-active-panel") && play.classList.contains("play-lobby"));
+      };
+      const close = () => {
+        prompt.hidden = true;
+        prompt.classList.remove("is-open");
+        document.getElementById("play")?.classList.remove("play-auth-prompt-open");
+      };
+      const open = () => {
+        if (!isVisiblePlayLobby() || isApplicationAuthenticated() || document.body.classList.contains("interactive-board-fullscreen-active")) return;
+        document.getElementById("play")?.classList.add("play-auth-prompt-open");
+        prompt.hidden = false;
+        prompt.classList.add("is-open");
+        window.requestAnimationFrame(() => prompt.querySelector("[data-lobby-auth]")?.focus());
+      };
+      setupPlayAuthPrompt.close = close;
+      setupPlayAuthPrompt.open = open;
+      document.getElementById("playLobbyGuestClose")?.addEventListener("click", close);
+      document.getElementById("playLobbyGuestLater")?.addEventListener("click", close);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !prompt.hidden) close();
+      });
+      document.querySelectorAll("[data-lobby-auth]").forEach((link) => {
+        link.addEventListener("click", close, { capture: true });
+      });
+      document.querySelector("[data-play-auth-trigger]")?.addEventListener("click", (event) => {
+        if (!isVisiblePlayLobby() || isApplicationAuthenticated()) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        open();
+      }, { capture: true });
+    }
     async function setupPlayableChess() {
       const board = document.getElementById("coachBoard");
       if (!board || setupPlayableChess.ready) return;
       setupPlayableChess.ready = true;
+      setupPlayAuthPrompt();
 
       try {
         await loadChessRules();
@@ -26003,6 +27313,8 @@
         coachReviewMoments = [];
         coachCurrentHanging = 0;
         coachSessionActive = false;
+        syncPlayAiTimeControlFields();
+        renderPlayAiTimeControl();
         resetMatchPlayerTimer(getSoloMatchClockControl(), { running: false });
       } catch {
         document.getElementById("gameStatusBadge").textContent = "Rules failed";
@@ -26029,13 +27341,51 @@
       document.querySelectorAll("[data-coach-side]").forEach((button) => {
         button.addEventListener("click", () => setCoachPlayerColor(button.dataset.coachSide));
       });
+      document.querySelectorAll("[data-play-match-type]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (coachSessionActive || friendChallengeState?.active) return;
+          const matchType = document.getElementById("playMatchType");
+          if (!(matchType instanceof HTMLSelectElement)) return;
+          matchType.value = button.dataset.playMatchType === "rated" ? "rated" : "casual";
+          matchType.dispatchEvent(new Event("change", { bubbles: true }));
+          renderPlayLobbyState();
+        });
+      });
+      document.getElementById("prefBoard")?.addEventListener("change", (event) => {
+        const field = event.currentTarget;
+        if (field instanceof HTMLSelectElement) applySettingsPrefsPatch({ board: field.value }, "board theme");
+      });
+      document.getElementById("prefPieces")?.addEventListener("change", (event) => {
+        const field = event.currentTarget;
+        if (field instanceof HTMLSelectElement) applySettingsPrefsPatch({ pieces: field.value === "letter" ? "letter" : "classic" }, "piece set");
+      });
+      document.querySelector('[data-play-mode="ai"]')?.addEventListener("click", (event) => {
+        event.preventDefault();
+        openPlayBotDrawer({ focusFirstBot: true });
+      });
+      document.getElementById("playLobbyChangeBot")?.addEventListener("click", () => openPlayBotDrawer({ focusFirstBot: true }));
+      document.getElementById("playLobbyOpponentSettings")?.addEventListener("click", () => document.getElementById("playLobbySettings")?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+      document.getElementById("playLobbyStart")?.addEventListener("click", (event) => {
+        const selectedBot = getBeginnerBot();
+        if (selectedBot) openAiGameReady(selectedBot.id, { trigger: event.currentTarget, preserveSetup: true });
+      });
+      document.querySelectorAll("[data-lobby-auth]").forEach((link) => {
+        link.addEventListener("click", () => {
+          setupPlayAuthPrompt.close?.();
+          const tab = document.querySelector(`[data-auth-tab="${link.dataset.lobbyAuth}"]`);
+          window.setTimeout(() => tab?.click(), 0);
+        });
+      });
       ["playTimeControl", "playIncrement"].forEach((id) => {
         document.getElementById(id)?.addEventListener("change", () => {
           if (friendChallengeState?.active) return;
-          resetMatchPlayerTimer(getSoloMatchClockControl(), coachSessionActive ? null : { running: false });
+          const minutes = Number(document.getElementById("playTimeControl")?.value);
+          const increment = Number(document.getElementById("playIncrement")?.value);
+          const next = setPlayAiTimeControl({ minutes, seconds: 0, increment });
+          resetMatchPlayerTimer(next.control, coachSessionActive ? null : { running: false });
           coachMessage = coachSessionActive
-            ? `Clock set to ${getSoloMatchClockControl().replace("+", " + ")}.`
-            : `Clock ready: ${getSoloMatchClockControl().replace("+", " + ")}. Start the game when you are ready.`;
+            ? `Clock set to ${next.control.replace("+", " + ")}.`
+            : `Clock ready: ${next.control.replace("+", " + ")}. Start the game when you are ready.`;
           updateMatchPlayerTimer();
           updateCoachPanel();
         });
@@ -26081,6 +27431,7 @@
         hidePostGameDecision();
         startSoloCoachGame();
       });
+      document.getElementById("postGameDecisionLobby")?.addEventListener("click", returnToPlayLobby);
       document.getElementById("postGameDecisionClose")?.addEventListener("click", hidePostGameDecision);
       document.getElementById("postGameDecisionRematch")?.addEventListener("click", requestFriendRematch);
       document.getElementById("postGameDecisionReview")?.addEventListener("click", () => {
@@ -26425,6 +27776,7 @@
         void initializeDeferredFeature("audio");
         setupPlayWorkspaceDrawers();
         setupCoachAvatarAssets();
+        setupAiGameReady();
         renderCoordinates();
         const setup = setupPlayableChess();
         Promise.resolve(setup).then(
@@ -26483,7 +27835,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v175-social-oauth";
+    const routeModuleVersion = "review-v200-global-board-recovery";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -26547,8 +27899,8 @@
 
     function initializePanelFeatures(panel, tab = "") {
       const activationGeneration = ++routeModuleActivationGeneration;
-      const eagerRouteStyles = { friends: ["friends"], openings: ["openings"] }[panel] || [];
-      eagerRouteStyles.forEach((style) => void loadOptionalRouteStylesheet(style));
+      const eagerRouteStyles = { play: ["play-lobby"], friends: ["friends"], openings: ["openings"] }[panel] || [];
+      eagerRouteStyles.forEach((style) => void loadOptionalRouteStylesheet(style).then(() => sharedInteractiveBoardWorkspace.sync()));
       const fallbackFeatureNames = [...({
         login: ["login"],
         play: ["preferences", "play"],
@@ -26576,8 +27928,9 @@
         // attached only when a visible route needs them (rather than at boot).
         if (document.getElementById("audioPlayer")) featureNames.push("audio");
         if (featureNames.length) featureNames.unshift("persistence");
-        [...new Set(featureNames)].forEach((name) => void initializeDeferredFeature(name));
-        (Array.isArray(module?.styles) ? module.styles : []).forEach((style) => void loadOptionalRouteStylesheet(style));
+        sharedInteractiveBoardWorkspace.sync();
+        [...new Set(featureNames)].forEach((name) => void initializeDeferredFeature(name).then(() => sharedInteractiveBoardWorkspace.sync()));
+        (Array.isArray(module?.styles) ? module.styles : []).forEach((style) => void loadOptionalRouteStylesheet(style).then(() => sharedInteractiveBoardWorkspace.sync()));
       });
     }
 
@@ -27476,6 +28829,18 @@
       // newly accepted session between storage writes. Explicit logout clears
       // this recovery source before the transition is exposed as Guest.
       let activeSession = null;
+      let activeSessionGeneration = 0;
+      // signInWithPassword resolves before its queued auth notifications have
+      // necessarily finished. Keep the accepted response session tagged to
+      // the new generation during that small handoff window so an old
+      // SIGNED_OUT notification cannot clear the new account first.
+      let pendingSession = null;
+      let pendingSessionGeneration = 0;
+      const getRecoverableSession = (generation = authGeneration) => {
+        if (pendingSessionGeneration === generation && pendingSession?.refresh_token && pendingSession?.user?.id) return pendingSession;
+        if (activeSessionGeneration === generation && activeSession?.refresh_token && activeSession?.user?.id) return activeSession;
+        return null;
+      };
 
       const authDebug = (message, detail = {}) => {
         try {
@@ -27577,7 +28942,7 @@
           warmResourceOrigins("https://cdn.jsdelivr.net");
           supabaseLibraryPromise = new Promise((resolve, reject) => {
             const script = document.createElement("script");
-            script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+            script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0";
             script.async = true;
             script.onload = () => typeof window.supabase?.createClient === "function"
               ? resolve(window.supabase)
@@ -27639,9 +29004,15 @@
 
       const clearSession = ({ clearAuthStorage = true, preserveActiveSession = false } = {}) => {
         const previousSession = activeSession;
+        const previousSessionGeneration = activeSessionGeneration;
         authGeneration += 1;
         cachedAccount = null;
         activeSession = preserveActiveSession ? previousSession : null;
+        activeSessionGeneration = preserveActiveSession ? previousSessionGeneration : 0;
+        if (!preserveActiveSession) {
+          pendingSession = null;
+          pendingSessionGeneration = 0;
+        }
         stopSessionRefresh();
         if (clearAuthStorage) clearSupabaseBrowserAuthStorage();
         writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), currentEmail: "", rememberEmail: "" });
@@ -27701,6 +29072,7 @@
         if (generation !== authGeneration) return null;
         if (session?.refresh_token || session?.access_token) {
           activeSession = session;
+          activeSessionGeneration = generation;
         }
         cachedAccount = account;
         return account;
@@ -27960,7 +29332,13 @@
           try {
             return await callFriendRpc("join_matchmaking_queue", payload);
           } catch (error) {
-            // Keep the existing four-argument RPC usable while the additive queue migration rolls out.
+            // Keep the existing four-argument RPC usable only while the
+            // additive queue migration rolls out. Real auth, RLS, and queue
+            // errors must reach the caller instead of being retried as a
+            // second queue write.
+            const message = String(error?.message || error?.details || error?.hint || "");
+            const code = String(error?.code || "");
+            if (code !== "42883" && !/function .*join_matchmaking_queue|p_region.*does not exist|could not find the function/i.test(message)) throw error;
             const { p_region, ...legacyPayload } = payload;
             return callFriendRpc("join_matchmaking_queue", legacyPayload);
           }
@@ -28172,6 +29550,9 @@
           try {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
+            if (!data?.session?.user?.id) throw new Error("The new account session could not be confirmed. Please try signing in again.");
+            pendingSession = data.session;
+            pendingSessionGeneration = generation;
             // Drain auth notifications emitted by the previous logout before
             // publishing this login. The transition stays open while any
             // queued SIGNED_OUT broadcast is revalidated/recovered.
@@ -28197,6 +29578,10 @@
             await waitForAuthEventsToSettle();
             return account;
           } finally {
+            if (pendingSessionGeneration === generation) {
+              pendingSession = null;
+              pendingSessionGeneration = 0;
+            }
             if (generation === authGeneration) authTransition = "";
           }
         },
@@ -28350,7 +29735,7 @@
                     // otherwise the UI can show Account B while getSession()
                     // is empty. Explicit logout clears activeSession first,
                     // so it never gets resurrected here.
-                    const recoverableSession = activeSession;
+                    const recoverableSession = getRecoverableSession();
                     if (!session && authTransition !== "signing_out"
                       && recoverableSession?.refresh_token && recoverableSession?.user?.id) {
                       const recovered = await supabase.auth.setSession(recoverableSession).catch(() => ({ data: { session: null } }));
@@ -28381,7 +29766,7 @@
                       // written its session. Re-submit the accepted session
                       // while the login transition is still open so the stale
                       // event cannot leave Supabase storage empty.
-                      const recoverableSession = activeSession;
+                      const recoverableSession = getRecoverableSession();
                       if (recoverableSession?.refresh_token && recoverableSession?.user?.id) {
                         const recovered = await supabase.auth.setSession(recoverableSession).catch(() => ({ data: { session: null } }));
                         if (generation !== authGeneration) return;
@@ -28390,12 +29775,17 @@
                           try {
                             const account = await accountFromSession(recoveredSession, generation);
                             if (!account || generation !== authGeneration) return;
+                            authDebug("Ignored stale signed-out event after newer session", { eventGeneration: generation, currentGeneration: authGeneration });
                             callback(account, { status: "authenticated", event: "session-recovered" });
                           } catch (error) {
                             authDebug("Active session recovery failed", { message: error?.message || "unknown" });
                           }
                         }
                       }
+                      // The login transition owns this generation. Even if
+                      // the response session has not finished profile
+                      // hydration yet, an old SIGNED_OUT event must not turn
+                      // the current account into Guest.
                       return;
                     }
                     // Supabase can dispatch a delayed SIGNED_OUT notification
@@ -28427,7 +29817,7 @@
                     // session is still authoritative in memory. Re-submit
                     // that session through Supabase; revoked/expired sessions
                     // fail here and correctly fall through to Guest.
-                    const recoverableSession = activeSession;
+                    const recoverableSession = getRecoverableSession();
                     if (recoverableSession?.refresh_token && recoverableSession?.user?.id) {
                       const recovered = await supabase.auth.setSession(recoverableSession).catch(() => ({ data: { session: null } }));
                       if (generation !== authGeneration) return;
@@ -28436,7 +29826,7 @@
                         try {
                           const account = await accountFromSession(recoveredSession, generation);
                           if (!account || generation !== authGeneration) return;
-                          authDebug("Recovered active session after delayed signed-out event", { hasUsername: Boolean(account?.username) });
+                          authDebug("Ignored stale signed-out event after newer session", { eventGeneration: generation, currentGeneration: authGeneration, hasUsername: Boolean(account?.username) });
                           callback(account, { status: "authenticated", event: "session-recovered" });
                           return;
                         } catch (error) {
@@ -28820,6 +30210,7 @@
       clearServerStoreState();
       stopRealtimeMatchLifecycle();
       stopFriendPresence();
+      stopQuickMatchSearch?.();
       stopFriendNetworkSync();
       stopTournamentNetworkSync();
       clearAccountWorkspaceAfterLogout(previousAccountId);
@@ -28888,6 +30279,16 @@
       renderHomeDashboard();
       renderLeaderboards();
       renderAuthUi(account, false);
+      if (location.hash.includes("challenge=")) {
+        const hashQuery = location.hash.includes("?") ? location.hash.split("?")[1] : "";
+        const inviteCode = String(new URLSearchParams(hashQuery).get("challenge") || "").trim().toUpperCase();
+        const inviteState = friendChallengeState || readFriendChallengeState();
+        const inviteNeedsAuthoritativeRefresh = friendInviteHydrationQueued
+          || !inviteState?.remote
+          || String(inviteState.code || "").toUpperCase() !== inviteCode
+          || !["active", "completed"].includes(String(inviteState.status || "").toLowerCase());
+        if (inviteNeedsAuthoritativeRefresh) void applyFriendInviteFromHash();
+      }
       // `auth=oauth` is only an internal return marker; remove it after the
       // Supabase session has been resolved so refreshes do not re-enter the
       // OAuth callback path.  No arbitrary destination is ever retained.
@@ -29635,11 +31036,12 @@
     }
 
     function applyPlayBoardScale(prefs) {
-      const boardSizeMap = { small: 620, medium: 720, large: 820, xl: 920 };
+      const boardSizeMap = { small: 560, medium: 640, large: 720, xl: 840 };
       const scaledBoardSize = Math.round((boardSizeMap[prefs.boardSize] || boardSizeMap.large) * clampNumber(Number(prefs.boardScale) || 100, 82, 122) / 100);
       const playSection = document.getElementById("play");
       playSection?.style.setProperty("--user-board-size", `${scaledBoardSize}px`);
       playSection?.style.setProperty("--match-card-width", `${clampNumber(Math.round(scaledBoardSize * 0.58), 320, 540)}px`);
+      sharedInteractiveBoardWorkspace.applyPreferenceSize(scaledBoardSize);
     }
 
     function applyLearnerPrefs(prefs) {
@@ -29709,6 +31111,7 @@
       renderStyledUsernames();
       applyAvatarRankBadges();
       syncAudioSystem(prefs.audio);
+      sharedInteractiveBoardWorkspace.scheduleSync();
     }
 
     function applyStartupTheme(prefs = readLearnerPrefs()) {
@@ -32813,14 +34216,16 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v175-social-oauth";
+    const optionalRouteStylesheetVersion = "review-v200-global-board-recovery";
+    const optionalRouteStylesheetPaths = Object.freeze({ "play-lobby": "assets/play-lobby.css" });
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
       if (!key) return Promise.resolve(false);
       const existing = optionalRouteStylesheetPromises.get(key);
       if (existing) return existing;
       const task = new Promise((resolve) => {
-        const href = `assets/routes/${encodeURIComponent(key)}.css?v=${optionalRouteStylesheetVersion}`;
+        const path = optionalRouteStylesheetPaths[key] || `assets/routes/${encodeURIComponent(key)}.css`;
+        const href = `${path}?v=${optionalRouteStylesheetVersion}`;
         const current = document.querySelector(`link[data-route-style="${key}"]`);
         if (current) { resolve(true); return; }
         const link = document.createElement("link");
@@ -32839,8 +34244,12 @@
       if (window.__checkmateQuestPerformanceBound) return;
       window.__checkmateQuestPerformanceBound = true;
       const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-      const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4;
-      const lowCpu = typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 4;
+      // Keep the premium surface available on ordinary 4GB devices. The
+      // lightweight governor is reserved for genuinely constrained hardware
+      // or explicit network/accessibility signals, so a normal laptop does
+      // not look like the legacy shell simply because deviceMemory reports 4.
+      const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2;
+      const lowCpu = typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 2;
       const applyPerformanceMode = () => {
         const saveData = Boolean(connection?.saveData);
         const slowNetwork = /(^|-)2g$/.test(connection?.effectiveType || "");
@@ -34606,9 +36015,15 @@
            let finish;
            const finishPromise = new Promise((resolve) => { finish = resolve; });
            try {
-             const joined = normalizeMatchmakingTicket(await provider.joinMatchmakingQueue(options));
-             ticketId = joined.ticketId;
-             if (joined.status === "matched" && joined.challengeCode) {
+              const joined = normalizeMatchmakingTicket(await provider.joinMatchmakingQueue(options));
+              ticketId = joined.ticketId;
+              if (signal?.aborted) {
+                cleanup();
+                leaveQueue();
+                return null;
+              }
+              if (!ticketId) throw new Error("Matchmaking did not return a queue ticket.");
+              if (joined.status === "matched" && joined.challengeCode) {
                cleanup();
                leaveQueue();
                return { challengeCode: joined.challengeCode, ticketId };
@@ -34652,12 +36067,23 @@
         async startMatch(match) {
           const provider = getFriendProvider();
           if (!provider?.getFriendChallenge) throw new Error("Online match is unavailable.");
-          if (!match?.challengeCode) throw new Error("Matched game code is missing.");
+          const challengeCode = String(match?.challengeCode || "").trim().toUpperCase();
+          if (!challengeCode) throw new Error("Matched game code is missing.");
           await initializeDeferredFeature("play");
-          const remote = await provider.getFriendChallenge(match.challengeCode);
-          if (!remote) throw new Error("Matched game could not be loaded.");
-          applyRemoteFriendChallenge(remote, true);
+          const remote = await provider.getFriendChallenge(challengeCode);
+          const normalized = normalizeRemoteFriendChallenge(remote);
+          const currentUserId = String(getFriendCurrentUserId() || "");
+          if (!normalized) throw new Error("Matched game could not be loaded.");
+          if (normalized.status !== "active") throw new Error("This matched game is no longer active.");
+          if (!normalized.creatorId || !normalized.opponentId || !currentUserId || ![normalized.creatorId, normalized.opponentId].includes(currentUserId)) {
+            throw new Error("This matched game is not available for the signed-in account.");
+          }
+          if (!normalized.fen || !Array.isArray(normalized.moves) || !Number.isFinite(Number(normalized.revision))) {
+            throw new Error("Matched game state is incomplete. Reconnect and try again.");
+          }
+          if (!applyRemoteFriendChallenge(normalized, true)) throw new Error("Matched game could not be synchronized.");
           startFriendChallenge(false);
+          if (!friendChallengeState?.active || friendChallengeState.status !== "active") throw new Error("Matched game did not enter the Play workspace.");
           if (location.hash !== "#play") location.hash = "#play";
         }
       };
@@ -34754,6 +36180,15 @@
         state.controller?.abort();
         state.controller = null;
       };
+      const cancelForAccountTransition = () => {
+        state.token += 1;
+        clearSearch();
+        setup.hidden = true;
+        overlay.hidden = true;
+        document.body.classList.remove("quick-match-searching");
+        state.returnFocus = null;
+      };
+      stopQuickMatchSearch = cancelForAccountTransition;
       const closeSetup = ({ restoreFocus = true } = {}) => {
         setup.hidden = true;
         if (restoreFocus) {
@@ -34815,7 +36250,7 @@
         syncAiSettings(options);
         const playerColor = options.color === "random" ? (Math.random() < 0.5 ? "w" : "b") : options.color;
         const bot = chooseQuickMatchAiBot();
-        if (bot) selectAiBot(bot.id, { playerColor }); else startSoloCoachGame({ playerColor });
+        if (bot) selectAiBot(bot.id, { playerColor, startImmediately: true }); else startSoloCoachGame({ playerColor });
         coachMessage = "No online opponent joined this time. Your " + options.timeControl + " " + options.gameType + " match is ready against " + (bot ? bot.name : "the AI") + ".";
         renderCoachBoard();
       };
@@ -34855,16 +36290,23 @@
                 closeSearch({ restoreFocus: false });
                 return;
               }
-            } catch {
-              // The fallback keeps Quick Match playable if a future provider fails to start.
+              status.textContent = "The matched game could not be started. Cancel and try again.";
+            } catch (error) {
+              // A server match must not silently turn into a different AI
+              // game. Keep the dialog visible so the player can see the
+              // failure and explicitly retry or cancel.
+              status.textContent = error?.message || "The matched game could not be started. Cancel and try again.";
+              cancel?.focus({ preventScroll: true });
             }
+            return;
           }
           void launchAiFallback(token);
-        }).catch(() => {
+        }).catch((error) => {
           if (token !== state.token) return;
           window.clearInterval(state.ticker);
           state.ticker = 0;
-          void launchAiFallback(token);
+          status.textContent = error?.message || "Online matchmaking is temporarily unavailable. Cancel and try again.";
+          cancel?.focus({ preventScroll: true });
         });
       };
 

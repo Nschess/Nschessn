@@ -15,7 +15,7 @@
 #openings .opening-explorer-head p:not(.section-kicker) { max-width: 620px; margin: 0; color: var(--cq-text-muted); font-size: .86rem; }
 #openings .opening-explorer-search { display: grid; gap: 7px; width: min(260px, 100%); flex: 0 0 240px; }
 #openings .opening-explorer-search label { display: grid; gap: 5px; color: var(--cq-text-muted); font-size: .66rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
-#openings .opening-explorer-search input { width: 100%; min-height: 38px; padding: 0 11px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; background: rgba(0,0,0,.2); color: var(--cq-text-primary); }
+#openings .opening-explorer-search input { width: 100%; min-height: 44px; padding: 0 11px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; background: rgba(0,0,0,.2); color: var(--cq-text-primary); }
 #openings .opening-explorer-favorite-count { color: var(--gold); font-size: .72rem; text-align: right; }
 #openings .opening-explorer-layout { display: grid; grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr); gap: 22px; margin-top: 20px; align-items: start; }
 #openings .opening-explorer-board-wrap { position: relative; min-width: 0; }
@@ -80,13 +80,13 @@ body.perf-lite #openings .opening-explorer-square.is-check { animation: none; }
 #openings .opening-explorer-square .piece-svg,
 #openings .opening-explorer-square .piece-symbol { width: 74%; height: 74%; font-size: clamp(1.4rem, 4vw, 3rem); object-fit: contain; }
 #openings .opening-explorer-controls { display: flex; gap: 7px; margin-top: 10px; }
-#openings .opening-explorer-controls .button { flex: 1; min-height: 34px; padding: 0 8px; font-size: .7rem; }
+#openings .opening-explorer-controls .button { flex: 1; min-height: 44px; padding: 0 8px; font-size: .7rem; }
 #openings .opening-explorer-inspector { min-width: 0; padding: 16px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(0,0,0,.15); }
 #openings .opening-explorer-eyebrow { color: var(--gold); font-size: .62rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
 #openings .opening-explorer-title-row h4 { margin: 3px 0 0; color: var(--cq-text-primary); font-size: 1.2rem; }
 #openings .opening-explorer-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 #openings .opening-explorer-meta > span { padding: 5px 8px; border-radius: 7px; background: rgba(127,166,80,.16); color: var(--soft); font-size: .7rem; font-weight: 900; }
-#openings .opening-explorer-meta .button { min-height: 30px; padding: 0 9px; font-size: .68rem; }
+#openings .opening-explorer-meta .button { min-height: 44px; padding: 0 9px; font-size: .68rem; }
 #openings #openingExplorerDescription { margin: 10px 0 14px; color: var(--cq-text-muted); font-size: .83rem; line-height: 1.45; }
 #openings .opening-explorer-guidance { display: grid; gap: 3px; margin: 0 0 10px; padding: 7px 9px; border: 1px solid rgba(231,182,93,.16); border-radius: 10px; background: linear-gradient(90deg, rgba(246,196,83,.055), rgba(93,140,255,.025)); }
 #openings .opening-explorer-guidance-head { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
@@ -96,7 +96,7 @@ body.perf-lite #openings .opening-explorer-square.is-check { animation: none; }
 #openings .opening-explorer-guidance[data-mode="guided"] .opening-explorer-guidance-head strong { color: #ffe4a0; }
 #openings .opening-explorer-mode-badge { flex: 0 0 auto; padding: 3px 6px; border: 1px solid rgba(255,255,255,.13); border-radius: 999px; color: var(--cq-text-muted); font-size: .56rem; font-weight: 900; }
 #openings .opening-explorer-mode-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; background: rgba(5,12,29,.22); }
-#openings .opening-explorer-mode { min-height: 21px; padding: 0 5px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--cq-text-muted); font: inherit; font-size: .6rem; font-weight: 850; cursor: pointer; }
+#openings .opening-explorer-mode { min-height: 44px; padding: 0 5px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--cq-text-muted); font: inherit; font-size: .6rem; font-weight: 850; cursor: pointer; }
 #openings .opening-explorer-mode:hover,
 #openings .opening-explorer-mode:focus-visible { border-color: rgba(246,196,83,.55); outline: none; }
 #openings .opening-explorer-mode.is-active { border-color: rgba(246,196,83,.48); background: rgba(246,196,83,.11); color: #ffe4a0; }
@@ -140,7 +140,7 @@ body.perf-lite #openings .opening-explorer-square.is-check { animation: none; }
 #openings .opening-explorer-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; max-height: 170px; margin-top: 14px; overflow: auto; }
 #openings .opening-explorer-result { grid-template-columns: 1fr auto; align-items: center; }
 #openings .opening-explorer-result span { justify-self: end; }
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   #openings .opening-explorer-head { display: grid; }
   #openings .opening-explorer-search { width: 100%; flex-basis: auto; }
   #openings .opening-explorer-favorite-count { text-align: left; }

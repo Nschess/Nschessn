@@ -49,7 +49,7 @@ function catalogBudget() {
   const purchasable = catalog.filter((item) => String(item.unlock_method || item.unlockMethod || "").toLowerCase() === "coins" && Number(item.cost_coins || item.cost || 0) > 0);
   return {
     catalogItems: catalog.length,
-    expectedCatalogItems: Number(process.env.E2E_EXPECTED_CATALOG_COUNT || 207),
+    expectedCatalogItems: Number(process.env.E2E_EXPECTED_CATALOG_COUNT || 197),
     purchasableItems: purchasable.length,
     totalCost: purchasable.reduce((sum, item) => sum + Number(item.cost_coins || item.cost || 0), 0)
   };

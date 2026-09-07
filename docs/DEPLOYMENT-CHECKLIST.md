@@ -8,13 +8,14 @@
 - [ ] Run `node scripts/check-deploy-assets.js dist`.
 - [ ] Run `node scripts/multiplayer-regression.js`.
 - [ ] Run `git diff --check`.
-- [ ] Confirm `review-v175-social-oauth` is present in `index.html`, `assets/app.js`, and `service-worker.js`.
+- [ ] Confirm `review-v200-global-board-recovery` is present in `index.html`, `assets/app.js`, and `service-worker.js`.
 - [ ] Publish `dist/` (or the repository root for GitHub Pages) with `offline.html`, `site.webmanifest`, icons, piece assets, and `data/puzzles.json`.
 
 ## Supabase migrations
 
 - [ ] Back up the staging database.
 - [ ] Apply the legacy foundation scripts required by the project (`auth.sql`, `leaderboard.sql`, and `friends.sql`) in a clean database.
+- [ ] Apply `supabase/migrations/20260819_release_candidate_security_hardening.sql` after `friends.sql` and before enabling multiplayer; this replaces the foundation move-position RPC with server-authoritative legal-FEN validation.
 - [ ] Apply `moderation.sql`, `tournaments.sql` when enabled, then the ordered migrations documented in `README.md`.
 - [ ] Apply the privacy-schema repair before the Activity Feed migration when upgrading a database with the older privacy composite shape.
 - [ ] Apply Quick Match queue migrations in order when Quick Match is enabled.

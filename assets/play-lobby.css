@@ -1,0 +1,660 @@
+/*
+ * Play lobby
+ * ----------
+ * The pre-game view is intentionally isolated from the active match and Game
+ * Review workspaces. The interactive board controller still owns the board's
+ * actual pixel size; this layer only supplies a stable three-column frame and
+ * constrains that size to the center track.
+ */
+
+#play.play-lobby {
+  /* Keep enough center-track budget for the shared 720px desktop board while
+     retaining compact, readable side rails. The board controller still owns
+     the requested/physical size; this only prevents the lobby grid from
+     silently starving its track. */
+  --play-lobby-left: clamp(240px, 17.5vw, 270px);
+  --play-lobby-right: clamp(270px, 19.5vw, 320px);
+  --play-lobby-gap: clamp(16px, 1.2vw, 22px);
+  /* The existing drag handle is the sole owner of --interactive-board-size;
+     the surrounding grid follows that value without a second size cap. */
+  min-height: calc(100svh - 76px);
+  padding: 14px 0 28px !important;
+  background:
+    radial-gradient(760px 380px at 50% -120px, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 11%, transparent), transparent 72%),
+    transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.site-tab-mode #play.play-lobby .play-shell {
+  display: grid !important;
+  grid-template-areas: "left center right" !important;
+  grid-template-columns: var(--play-lobby-left) minmax(0, 1fr) var(--play-lobby-right) !important;
+  align-items: start !important;
+  gap: var(--play-lobby-gap) !important;
+  width: min(calc(100% - 48px), 1500px) !important;
+  max-width: 1500px !important;
+  min-height: 0 !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#play.play-lobby :is(.play-app-rail, .play-social-bar, .play-live-analysis, .review-workspace-header, .review-left-sidebar) {
+  display: none !important;
+}
+
+/* Left: choose a mode. */
+#play.play-lobby .play-left-sidebar {
+  grid-area: left !important;
+  display: grid !important;
+  width: 100% !important;
+  min-width: 0;
+  max-height: none;
+  gap: 10px;
+  align-content: start;
+  overflow: visible;
+}
+
+#play.play-lobby .play-mode-nav {
+  padding: 10px !important;
+  border: 1px solid var(--cq-border, rgba(148, 163, 184, .18));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cq-surface-glass, #0b1527) 92%, transparent);
+  box-shadow: var(--cq-inset-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+}
+
+#play.play-lobby .play-mode-head {
+  margin: 2px 3px 9px !important;
+}
+
+#play.play-lobby .play-mode-head strong {
+  color: var(--cq-text-primary, #f5f7ff);
+  font-size: .68rem;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+#play.play-lobby .play-mode-head small {
+  display: none !important;
+}
+
+#play.play-lobby .play-mode-card {
+  display: grid !important;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 56px !important;
+  margin: 0 0 5px !important;
+  padding: 8px !important;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--cq-text-primary, #f5f7ff);
+  background: transparent;
+}
+
+#play.play-lobby .play-mode-card:last-child { margin-bottom: 0 !important; }
+
+#play.play-lobby .play-mode-card > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+#play.play-lobby .play-mode-card strong {
+  color: inherit;
+  font-size: .74rem;
+  line-height: 1.1;
+}
+
+#play.play-lobby .play-mode-card small {
+  display: block !important;
+  overflow: hidden;
+  color: var(--cq-text-muted, #99a7c1) !important;
+  font-size: .6rem !important;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#play.play-lobby .play-mode-card > b {
+  color: var(--cq-text-muted, #99a7c1);
+  font-size: 1rem;
+}
+
+#play.play-lobby .play-mode-card:hover,
+#play.play-lobby .play-mode-card:focus-visible {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 48%, transparent);
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 10%, transparent);
+  outline: none;
+}
+
+#play.play-lobby .play-mode-card[data-play-mode="ai"],
+#play.play-lobby .play-mode-card.is-selected {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 76%, var(--cq-accent-primary, #e7b65d));
+  background: linear-gradient(100deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 20%, transparent), color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 8%, transparent));
+  box-shadow: inset 3px 0 0 var(--cq-accent-primary, #e7b65d);
+}
+
+#play.play-lobby .play-lobby-more,
+#play.play-lobby .coach-library {
+  overflow: hidden;
+  border: 1px solid var(--cq-border, rgba(148, 163, 184, .18));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cq-surface-glass, #0b1527) 92%, transparent);
+}
+
+#play.play-lobby .play-lobby-more > summary,
+#play.play-lobby .coach-library > summary {
+  display: flex;
+  align-items: center;
+  min-height: 39px;
+  padding: 0 10px;
+  color: var(--cq-text-primary, #f5f7ff);
+  font-size: .65rem;
+  font-weight: 850;
+  letter-spacing: .04em;
+  list-style: none;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+#play.play-lobby :is(.play-lobby-more > summary, .coach-library > summary)::-webkit-details-marker { display: none; }
+#play.play-lobby .play-lobby-more > summary::after,
+#play.play-lobby .coach-library > summary::after { content: "+"; margin-left: auto; color: var(--cq-accent-primary, #e7b65d); font-size: 1rem; }
+#play.play-lobby :is(.play-lobby-more, .coach-library)[open] > summary::after { content: "−"; }
+
+#play.play-lobby .play-lobby-more-links { display: grid; gap: 2px; padding: 0 7px 7px; }
+#play.play-lobby .play-lobby-more-links a { display: flex; align-items: center; gap: 7px; min-height: 31px; padding: 4px 5px; border-radius: 6px; color: var(--cq-text-muted, #99a7c1); font-size: .65rem; font-weight: 750; }
+#play.play-lobby .play-lobby-more-links a:hover,
+#play.play-lobby .play-lobby-more-links a:focus-visible { color: var(--cq-text-primary, #f5f7ff); background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 13%, transparent); outline: none; }
+
+/* Center: opponent, board, controls, and guest progress all share one width. */
+body.site-tab-mode #play.play-lobby .match-board-column,
+html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-board-sizing-stage {
+  grid-area: center !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-areas:
+    "opponent"
+    "board"
+    "player"
+    "controls"
+    "progress" !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  height: max-content !important;
+  max-height: none !important;
+  gap: 10px !important;
+  align-content: start;
+  justify-items: center;
+  overflow: visible !important;
+}
+
+#play.play-lobby .match-board-column > :is(.coach-setup, .match-player-card, .review-center-chart, .review-center-timeline, .review-player-strip, .play-bottom-actionbar, #playAiSetupCompatibility) {
+  display: none !important;
+}
+
+#play.play-lobby .match-board-column > .ai-player-card {
+  grid-area: opponent !important;
+  display: grid !important;
+  grid-template-columns: 46px minmax(0, 1fr) auto !important;
+  grid-template-areas: "avatar main actions" !important;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: min(calc(var(--interactive-board-workspace-size, 720px) - 8px), calc(100% - 28px), 720px) !important;
+  max-width: min(calc(var(--interactive-board-workspace-size, 720px) - 8px), calc(100% - 28px), 720px) !important;
+  min-height: 70px;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+#play.play-lobby .ai-player-card > :is(.player-frame-topline, .ai-player-timer, .player-frame-details, .player-frame-footer) { display: none; }
+#play.play-lobby .ai-player-avatar { grid-area: avatar; }
+#play.play-lobby .ai-player-main { grid-area: main; min-width: 0; }
+#play.play-lobby .ai-player-main strong { display: flex; align-items: center; gap: 6px; }
+
+#play.play-lobby .play-lobby-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border-radius: 5px;
+  color: var(--cq-text-primary, #f5f7ff);
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 64%, transparent);
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+#play.play-lobby .play-lobby-opponent-actions { grid-area: actions; display: flex; align-items: center; gap: 7px; }
+#play.play-lobby .play-lobby-opponent-actions .button { min-height: 34px; padding: 6px 10px; font-size: .67rem; white-space: nowrap; }
+#play.play-lobby .play-lobby-icon-button { display: grid; width: 34px; min-width: 34px; height: 34px; place-items: center; padding: 0; border: 1px solid var(--cq-border, rgba(148,163,184,.18)); border-radius: 8px; color: var(--cq-text-primary, #f5f7ff); background: var(--cq-surface-input, #101c31); font: inherit; cursor: pointer; }
+
+/* With no opponent selected, choosing a bot is the lobby's only next step.
+   Once selected, return the control to its quiet secondary treatment while
+   the Start action becomes the visual primary. */
+#play.play-lobby .play-lobby-opponent-actions:not(.has-selection) #playLobbyChangeBot {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 84%, transparent);
+  color: var(--cq-text-primary, #f5f7ff);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 88%, #8b5cf6), color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 66%, #2d176b));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 22%, transparent), inset 0 1px rgba(255,255,255,.16);
+}
+
+/* app.css groups unrelated board views in a :is() selector whose specificity
+   inherits the Review route's second id. Repeating this local id is deliberate:
+   it makes the lobby's one board frame the final owner without touching Review. */
+body.site-tab-mode #play#play.play-lobby .match-board-column > :is(.play-board-wrap, .puzzle-board-wrap) {
+  grid-area: board !important;
+  /* The shared stage has an 8px frame inset around the square board. Keep
+     that inset in the wrapper width so the physical board remains exactly
+     the controller's rendered size rather than rendered-size minus 8px. */
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 8px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 8px) !important;
+  height: auto !important;
+  aspect-ratio: auto !important;
+  margin-inline: auto !important;
+}
+
+body.site-tab-mode #play.play-lobby #coachBoard {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
+#play.play-lobby .play-lobby-board-actions {
+  grid-area: controls !important;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  width: min(100%, 720px) !important;
+  max-width: min(100%, 720px) !important;
+  min-width: 0;
+  padding: 1px 0;
+}
+
+#play.play-lobby .play-lobby-board-actions .button,
+#play.play-lobby .play-lobby-board-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 0;
+  padding: 5px 4px;
+  border: 0;
+  color: var(--cq-text-muted, #99a7c1);
+  background: transparent;
+  font: inherit;
+  font-size: .64rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#play.play-lobby .play-lobby-board-actions .button:hover,
+#play.play-lobby .play-lobby-board-actions .button:focus-visible,
+#play.play-lobby .play-lobby-board-menu > summary:hover,
+#play.play-lobby .play-lobby-board-menu > summary:focus-visible { color: var(--cq-text-primary, #f5f7ff); outline: none; }
+
+#play.play-lobby .play-lobby-board-menu { position: relative; min-width: 0; }
+#play.play-lobby .play-lobby-board-menu > summary { display: flex; list-style: none; }
+#play.play-lobby .play-lobby-board-menu > summary::-webkit-details-marker { display: none; }
+#play.play-lobby .play-lobby-board-menu[open] > summary { color: var(--cq-text-primary, #f5f7ff); }
+#play.play-lobby .play-lobby-board-menu select { position: absolute; z-index: 20; top: calc(100% + 4px); left: 50%; min-width: 150px; min-height: 34px; padding: 0 8px; border: 1px solid var(--cq-border-strong, rgba(148,163,184,.38)); border-radius: 8px; color: var(--cq-text-primary, #f5f7ff); background: var(--cq-surface-elevated, #101c31); font: inherit; font-size: .68rem; transform: translateX(-50%); }
+
+#play.play-lobby .play-lobby-guest {
+  grid-area: progress !important;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 720px) !important;
+  max-width: min(100%, 720px) !important;
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid var(--cq-border, rgba(148,163,184,.18));
+  border-radius: 12px;
+  background: var(--cq-surface-glass, #0b1527);
+}
+
+#play.play-lobby .play-lobby-guest[hidden] { display: none; }
+#play.play-lobby .play-lobby-guest-mark { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; color: var(--cq-accent-primary, #e7b65d); background: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 13%, transparent); }
+#play.play-lobby .play-lobby-guest > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+#play.play-lobby .play-lobby-guest strong { color: var(--cq-text-primary, #f5f7ff); font-size: .68rem; }
+#play.play-lobby .play-lobby-guest small { overflow: hidden; color: var(--cq-text-muted, #99a7c1); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+#play.play-lobby .play-lobby-guest .button { min-height: 32px; padding: 5px 9px; font-size: .62rem; white-space: nowrap; }
+
+/* Right: game settings and bot details. */
+#play.play-lobby .play-right-sidebar {
+  grid-area: right !important;
+  display: grid !important;
+  width: 100% !important;
+  min-width: 0;
+  max-height: none;
+  gap: 10px;
+  align-content: start;
+  overflow: visible;
+}
+
+#play.play-lobby .play-right-sidebar > :not(.play-lobby-settings, .play-lobby-bot-info, .play-lobby-guest) { display: none !important; }
+
+#play.play-lobby :is(.play-lobby-settings, .play-lobby-bot-info) {
+  border: 1px solid var(--cq-border, rgba(148,163,184,.18));
+  border-radius: 12px;
+  background: var(--cq-surface-glass, #0b1527);
+  box-shadow: var(--cq-inset-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+}
+
+#play.play-lobby .play-lobby-settings { padding: 14px; }
+#play.play-lobby .play-lobby-panel-heading { padding-bottom: 11px; border-bottom: 1px solid var(--cq-border, rgba(148,163,184,.18)); }
+#play.play-lobby .play-lobby-panel-heading h3 { margin: 0; color: var(--cq-text-primary, #f5f7ff); font-size: .72rem; font-weight: 900; letter-spacing: .055em; text-transform: uppercase; }
+#play.play-lobby .play-lobby-ready-summary { display: grid; gap: 5px; padding: 14px 0 12px; border-bottom: 1px solid var(--cq-border, rgba(148,163,184,.18)); }
+#play.play-lobby .play-lobby-ready-kicker { color: var(--cq-accent-tertiary, #65e7f7); font-size: .58rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+#play.play-lobby .play-lobby-ready-summary strong { color: var(--cq-text-primary, #f5f7ff); font-size: .93rem; line-height: 1.15; }
+#play.play-lobby .play-lobby-ready-summary p { margin: 0; color: var(--cq-text-muted, #99a7c1); font-size: .64rem; line-height: 1.45; }
+#play.play-lobby .play-lobby-fieldset { display: none !important; }
+#play.play-lobby .play-lobby-fieldset { min-width: 0; margin: 0; padding: 12px 0; border: 0; border-bottom: 1px solid var(--cq-border, rgba(148,163,184,.18)); }
+#play.play-lobby .play-lobby-fieldset:last-of-type { padding-bottom: 10px; }
+#play.play-lobby .play-lobby-fieldset legend { margin-bottom: 8px; padding: 0; color: var(--cq-text-muted, #99a7c1); font-size: .62rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+#play.play-lobby .play-lobby-time-presets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+#play.play-lobby :is(.play-lobby-time-presets button, .play-lobby-choice-row button) { min-height: 35px; min-width: 0; padding: 6px 5px; border: 1px solid var(--cq-border, rgba(148,163,184,.18)); border-radius: 8px; color: var(--cq-text-primary, #f5f7ff); background: var(--cq-surface-input, #101c31); font: inherit; font-size: .64rem; font-weight: 850; cursor: pointer; }
+#play.play-lobby :is(.play-lobby-time-presets button, .play-lobby-choice-row button)[aria-pressed="true"] { border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 84%, transparent); background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 24%, transparent); }
+#play.play-lobby :is(.play-lobby-time-presets button, .play-lobby-choice-row button):hover,
+#play.play-lobby :is(.play-lobby-time-presets button, .play-lobby-choice-row button):focus-visible { border-color: var(--cq-border-strong, #7650ed); outline: none; }
+#play.play-lobby .play-lobby-time-summary { min-height: 1em; margin: 7px 1px 0; color: var(--cq-text-muted, #99a7c1); font-size: .61rem; font-weight: 700; }
+#play.play-lobby .play-lobby-custom-time { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+#play.play-lobby .play-lobby-custom-time[hidden] { display: none; }
+#play.play-lobby .play-lobby-custom-time label { display: grid; min-width: 0; gap: 4px; color: var(--cq-text-muted, #99a7c1); font-size: .55rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+#play.play-lobby .play-lobby-custom-time input { min-width: 0; min-height: 34px; padding: 0 7px; border: 1px solid var(--cq-border, rgba(148,163,184,.18)); border-radius: 7px; color: var(--cq-text-primary, #f5f7ff); background: var(--cq-surface-input, #101c31); font: inherit; font-size: .7rem; }
+#play.play-lobby .play-lobby-custom-time p { grid-column: 1 / -1; margin: 0; color: var(--red, #ef7b7b); font-size: .59rem; }
+#play.play-lobby .play-lobby-choice-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+#play.play-lobby .play-lobby-choice-row button span { margin-right: 4px; }
+#play.play-lobby .play-lobby-rating-note { margin: 7px 1px 0; color: var(--cq-text-muted, #99a7c1); font-size: .61rem; }
+
+#play.play-lobby .play-lobby-start {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 66px;
+  margin-top: 12px;
+  padding: 10px 13px;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 84%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 94%, #8b5cf6), color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 72%, #2d176b));
+  box-shadow: 0 12px 25px color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 24%, transparent), inset 0 1px rgba(255,255,255,.2);
+  font-size: .86rem;
+  text-align: left;
+}
+
+#play.play-lobby .play-lobby-start small { grid-column: 2; margin-top: -5px; color: inherit; font-size: .62rem; font-weight: 700; opacity: .9; }
+#play.play-lobby .play-lobby-start:disabled { border-color: var(--cq-border, rgba(148,163,184,.18)); background: var(--cq-surface-input, #101c31); box-shadow: none; cursor: not-allowed; opacity: .62; }
+
+#play.play-lobby .play-lobby-bot-info { padding: 0; }
+#play.play-lobby .play-lobby-bot-info > summary { display: flex; align-items: center; min-height: 44px; padding: 0 14px; color: var(--cq-text-primary, #f5f7ff); font-size: .68rem; font-weight: 850; letter-spacing: .045em; list-style: none; cursor: pointer; text-transform: uppercase; }
+#play.play-lobby .play-lobby-bot-info > summary::-webkit-details-marker { display: none; }
+#play.play-lobby .play-lobby-bot-info > summary::after { content: "+"; margin-left: auto; color: var(--cq-text-muted, #99a7c1); font-size: 1rem; }
+#play.play-lobby .play-lobby-bot-info[open] > summary::after { content: "−"; }
+#play.play-lobby .play-lobby-bot-info dl { display: grid; gap: 8px; margin: 0; padding: 1px 14px 11px; }
+#play.play-lobby .play-lobby-bot-info dl div { display: flex; justify-content: space-between; gap: 12px; font-size: .65rem; }
+#play.play-lobby .play-lobby-bot-info dt { color: var(--cq-text-muted, #99a7c1); }
+#play.play-lobby .play-lobby-bot-info dd { margin: 0; color: var(--cq-text-primary, #f5f7ff); font-weight: 800; text-align: right; }
+#play.play-lobby .play-lobby-bot-info p { margin: 0; padding: 0 14px 14px; color: var(--cq-text-muted, #99a7c1); font-size: .63rem; line-height: 1.45; }
+
+/* The controller's native fullscreen affordance is the compact lobby control.
+   The old four-item appearance strip is intentionally removed from the flow. */
+#play.play-lobby .interactive-board-stage-tools { display: flex !important; }
+
+/* Once fullscreen owns the viewport, restore the shared corner control as the
+   single exit affordance and remove the duplicate lobby text button. */
+body.interactive-board-fullscreen-active #play.play-lobby .interactive-board-stage-tools {
+  display: flex !important;
+}
+
+body.interactive-board-fullscreen-active #play.play-lobby #playLobbyFullscreen {
+  display: none !important;
+}
+
+/* Fullscreen is board-led: the shared controller calculates the temporary
+   board size, then this stage uses that same track for its attached frames.
+   The duplicated id keeps this scoped override stronger than the lobby's
+   normal full-width grid rule without changing normal manual sizing. */
+html body.interactive-board-fullscreen-active #play#play.play-lobby .match-board-column.interactive-board-sizing-stage {
+  grid-template-columns: minmax(0, var(--interactive-board-size, 1200px)) !important;
+  align-content: safe center !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play.play-lobby .match-board-column.interactive-board-sizing-stage > :is(.ai-player-card, .match-player-card, .play-lobby-board-actions, .play-lobby-guest) {
+  width: min(100%, var(--interactive-board-size, 1200px)) !important;
+  max-width: var(--interactive-board-size, 1200px) !important;
+}
+
+
+/* A real three-column workspace degrades by rearranging regions, never by
+   squeezing all three into an unusable strip. */
+@media (max-width: 1180px) {
+  body.site-tab-mode #play.play-lobby .play-shell {
+    grid-template-areas: "center right" "left left" !important;
+    grid-template-columns: minmax(0, 1fr) minmax(290px, 332px) !important;
+    width: min(calc(100% - 32px), 980px) !important;
+  }
+
+  #play.play-lobby .play-right-sidebar {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #play.play-lobby .play-left-sidebar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  #play.play-lobby .play-mode-nav { grid-row: span 2; }
+}
+
+@media (max-width: 900px) {
+  body.site-tab-mode #play.play-lobby .play-shell {
+    grid-template-areas: "center" "right" "left" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: min(calc(100% - 24px), 720px) !important;
+    gap: 12px !important;
+  }
+
+  #play.play-lobby :is(.play-right-sidebar, .play-left-sidebar) { width: 100% !important; }
+  #play.play-lobby .play-left-sidebar { grid-template-columns: minmax(0, 1fr); }
+  #play.play-lobby .play-mode-nav { grid-row: auto; }
+  body.site-tab-mode #play#play.play-lobby .match-board-column { grid-template-areas: "opponent" "board" "player" "controls" !important; }
+  body.site-tab-mode #play#play.play-lobby .play-right-sidebar > .play-lobby-guest { display: grid !important; grid-area: auto !important; width: 100% !important; margin-top: 2px; }
+}
+
+@media (max-width: 560px) {
+  #play.play-lobby { padding-top: 8px !important; }
+  body.site-tab-mode #play.play-lobby .play-shell { width: min(calc(100% - 12px), 720px) !important; }
+  #play.play-lobby .play-lobby-board-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 2px; }
+  #play.play-lobby .play-lobby-board-menu select { left: auto; right: 0; transform: none; }
+  #play.play-lobby .play-lobby-guest { grid-template-columns: auto minmax(0, 1fr); }
+  #play.play-lobby .play-lobby-guest .button { width: 100%; }
+  #play.play-lobby .play-lobby-guest .button:first-of-type { grid-column: 1 / 2; }
+  #play.play-lobby .play-lobby-guest .button:last-of-type { grid-column: 2 / 3; }
+  #play.play-lobby .play-lobby-time-presets { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  #play.play-lobby .match-board-column > .ai-player-card { grid-template-columns: 40px minmax(0, 1fr) auto !important; padding: 8px; gap: 7px; }
+  #play.play-lobby .play-lobby-opponent-actions .button { max-width: 84px; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Guest progress is an explicit, temporary prompt. It must never participate
+   in the lobby grid or remain visible when the board enters fullscreen. */
+#play.play-lobby .play-lobby-guest.play-auth-overlay {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  grid-template-columns: none;
+  grid-template-rows: none;
+  width: auto !important;
+  max-width: none !important;
+  min-height: 0;
+  margin: 0;
+  padding: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: rgba(2, 8, 20, .74);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* The performance stylesheet gives inactive sections content-visibility:auto.
+   That optimization creates a containing block for fixed descendants, which
+   would clip this modal to the board column. Keep the prompt a true viewport
+   overlay while preserving the optimization everywhere else. */
+body.perf-lite #play.play-lobby .play-lobby-guest.play-auth-overlay {
+  content-visibility: visible !important;
+  contain: none !important;
+  contain-intrinsic-size: auto !important;
+}
+
+body.perf-lite #play.play-lobby.play-auth-prompt-open .match-board-column {
+  content-visibility: visible !important;
+  contain: none !important;
+  contain-intrinsic-size: auto !important;
+}
+
+/* The Play panel uses a subtle backdrop filter for its surface. Disable that
+   containing-block behavior while this fixed prompt is open so the overlay
+   is anchored to the viewport rather than the center board track. */
+body #play.play-auth-prompt-open {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+#play.play-lobby .play-lobby-guest.play-auth-overlay[hidden],
+body.interactive-board-fullscreen-active #play .play-lobby-guest.play-auth-overlay {
+  display: none !important;
+}
+
+/* The compact responsive rule adds a second #play selector and can otherwise
+   outrank the hidden attribute. An inactive auth prompt must never intercept
+   clicks on the lobby or board controls. */
+body.site-tab-mode #play#play.play-lobby .play-lobby-guest.play-auth-overlay[hidden] {
+  display: none !important;
+}
+
+#play.play-lobby .play-auth-dialog {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 12px;
+  width: min(100%, 430px);
+  padding: 24px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 58%, var(--cq-border, rgba(148,163,184,.18)));
+  border-radius: 16px;
+  background: var(--cq-surface-glass, #0b1527);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .48), var(--cq-inset-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+}
+
+#play.play-lobby .play-auth-dialog .play-lobby-guest-mark { width: 38px; height: 38px; border-radius: 11px; }
+#play.play-lobby .play-auth-copy { display: grid; align-content: center; gap: 4px; min-width: 0; }
+#play.play-lobby .play-auth-copy strong { font-size: .86rem; }
+#play.play-lobby .play-auth-copy small { font-size: .68rem; white-space: normal; }
+#play.play-lobby .play-auth-close { position: absolute; top: 10px; right: 12px; width: 30px; min-height: 30px; padding: 0; border: 0; color: var(--cq-text-muted, #99a7c1); background: transparent; font: inherit; font-size: 1.35rem; line-height: 1; cursor: pointer; }
+#play.play-lobby .play-auth-close:hover,
+#play.play-lobby .play-auth-close:focus-visible { color: var(--cq-text-primary, #f5f7ff); outline: none; }
+#play.play-lobby .play-auth-actions { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+#play.play-lobby .play-auth-actions .button { width: 100%; }
+#play.play-lobby .play-auth-later { grid-column: 1 / -1; justify-self: end; min-height: 30px; padding: 4px 10px; font-size: .62rem; }
+
+@media (max-width: 560px) {
+  #play.play-lobby .play-lobby-guest.play-auth-overlay { padding: 14px; }
+  #play.play-lobby .play-auth-dialog { padding: 20px 16px; }
+}
+
+/* The player's frame belongs directly beneath the board in the lobby. This
+   frees the board column from the old Flip / Theme / Pieces / Full screen
+   strip while keeping the shared corner fullscreen control available. */
+html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-board-sizing-stage {
+  grid-template-areas:
+    "opponent"
+    "board"
+    "player"
+    "progress" !important;
+}
+
+#play.play-lobby .match-board-column > .play-lobby-board-actions {
+  display: none !important;
+}
+
+#play.play-lobby .interactive-board-stage-tools {
+  display: flex !important;
+  position: relative;
+  z-index: 40;
+}
+
+#play .interactive-board-stage-tools {
+  position: relative;
+  z-index: 40;
+}
+
+#play .interactive-board-resize-handle {
+  position: relative;
+  z-index: 40;
+}
+
+#play .interactive-board-sizing-stage {
+  z-index: 40;
+}
+
+#play:not(.is-review-mode) .interactive-board-sizing-stage {
+  z-index: 40 !important;
+}
+
+#play:not(.is-review-mode) .play-shell {
+  grid-template-rows: max-content max-content !important;
+  align-content: start;
+}
+
+#play:not(.is-review-mode) .match-board-column {
+  height: max-content !important;
+}
+
+#play.is-active-game:not(.is-review-mode) .match-board-column {
+  min-height: calc(var(--interactive-board-workspace-size, 720px) + 160px) !important;
+}
+
+html body.site-tab-mode #play#play.play-lobby .match-board-column > .match-player-card {
+  grid-area: player !important;
+  display: grid !important;
+  box-sizing: border-box;
+  width: min(calc(var(--interactive-board-workspace-size, 720px) - 8px), calc(100% - 28px), 720px) !important;
+  max-width: min(calc(var(--interactive-board-workspace-size, 720px) - 8px), calc(100% - 28px), 720px) !important;
+  min-height: 68px;
+  margin: 0;
+  padding: 9px 12px;
+}
+
+#play.play-lobby .match-player-card .player-frame-details {
+  display: none !important;
+}
+
+#play.play-lobby .match-player-card .match-player-meta {
+  min-width: 0;
+  overflow: hidden;
+}
+
+#play.play-lobby .match-player-card .match-player-pill {
+  min-width: 0;
+  padding-inline: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Once a game has started, the setup disclosure is no longer an action the
+   player should need. The player frames carry the live identity/clock state;
+   hiding this route-local disclosure prevents setup controls from being
+   reopened beside an active board. */
+#play.is-active-game:not(.is-review-mode) .match-board-column > .coach-setup {
+  display: none !important;
+}

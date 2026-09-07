@@ -5,6 +5,13 @@ const html = fs.readFileSync("index.html", "utf8");
 
 if (!/auth\.signOut\(\{\s*scope:\s*["']local["']\s*\}\)/.test(app)) throw new Error("Supabase local logout must explicitly use the local scope.");
 if (!/let authGeneration = 0/.test(app) || !/generation !== authGeneration/.test(app)) throw new Error("Auth hydration needs generation guards against stale post-logout callbacks.");
+if (!/let pendingSession = null/.test(app)
+  || !/let pendingSessionGeneration = 0/.test(app)
+  || !/pendingSession = data\.session/.test(app)
+  || !/getRecoverableSession\(\)/.test(app)
+  || !/Ignored stale signed-out event after newer session/.test(app)) {
+  throw new Error("A newly accepted login session must remain protected while delayed logout events are drained.");
+}
 if (!/const current = await supabase\.auth\.getSession\(\)\.catch\(/.test(app)
   || !/Ignored stale signed-out event; current session restored/.test(app)) {
   throw new Error("A delayed signed-out event must revalidate the current Supabase session before it can clear a newer account.");

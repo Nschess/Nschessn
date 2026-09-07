@@ -8,6 +8,8 @@
     "test:full": "node scripts/e2e-runner.cjs full --required",
     "test:e2e": "node scripts/e2e-runner.cjs e2e",
     "test:visual": "node scripts/e2e-runner.cjs visual",
+    "test:board-sizing": "node scripts/board-sizing-regression.js",
+    "test:multiplayer": "node scripts/multiplayer-regression.js && node scripts/matchmaking-regression.js",
     "test:store-preflight": "node scripts/store-preflight.cjs",
     "provision:e2e-b": "node scripts/provision-e2e-account.cjs",
     "test:e2e-wallet": "node scripts/provision-e2e-account.cjs --wallet-only",

@@ -2,8 +2,8 @@
 
 ## Build
 
-- Asset version: `review-v175-social-oauth`
-- Service-worker cache: `nschess-shell-v175-social-oauth`
+- Asset version: `review-v200-global-board-recovery`
+- Service-worker cache: `nschess-shell-v178-global-board-recovery`
 
 ## Board interaction polish
 

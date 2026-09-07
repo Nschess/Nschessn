@@ -143,7 +143,7 @@ const requiredRegressionContracts = [
   ["collapsible move history", /id="moveHistoryDrawer"[\s\S]*?data-play-drawer="moves"[\s\S]*?id="moveHistory"/],
   ["collapsible coach tools", /id="coachToolsDrawer"[\s\S]*?data-play-drawer="coach"/],
   ["collapsible friend chat", /id="friendGameChatDrawer"[\s\S]*?data-play-drawer="chat"[\s\S]*?id="friendGameChat"/],
-  ["responsive drawer defaults", /function setupPlayWorkspaceDrawers\([\s\S]*?drawer\.dataset\.playDrawer === "moves" \|\| !compactWorkspace/],
+  ["responsive drawer defaults", /function setupPlayWorkspaceDrawers\([\s\S]*?const compactWorkspace = window\.innerWidth <= 1180;[\s\S]*?drawer\.dataset\.playDrawer === "moves" \|\| !compactWorkspace/],
   ["friend chat drawer visibility", /function renderFriendGameChat[\s\S]*?drawer\.hidden = !enabled/],
   ["visible player-strip essentials", /match-player-meta :is\(\[data-match-side\], \[data-match-rating\], \[data-match-coins\], \[data-match-online\]\)[\s\S]*?display: inline-flex/],
   ["captured-piece presentation", /#play \.captured-pieces \{\s*display: flex;/],
@@ -218,7 +218,8 @@ const requiredRegressionContracts = [
   ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/],
   ["Game Review restores every mounted source", /function restoreGameReviewWorkspace\([\s\S]*?\[\.\.\.origins\.values\(\)\]\.reverse\(\)\.forEach/],
   ["stable real-puzzle square rendering", /const pieceKey = piece[\s\S]*?\$\{pieceSvgRenderVersion\}:\$\{activePieceSvgSet\}:\$\{piece\.color\}\$\{piece\.type\}/],
-  ["post-game decision remains an overlay", /function getPostGameDecisionDialog\(\) \{\s*return document\.getElementById\("postGameDecision"\);\s*\}/]
+  ["post-game decision remains an overlay", /function getPostGameDecisionDialog\(\) \{\s*return document\.getElementById\("postGameDecision"\);\s*\}/],
+  ["conservative performance governor threshold", /const lowMemory = typeof navigator\.deviceMemory === "number" && navigator\.deviceMemory <= 2;[\s\S]*?const lowCpu = typeof navigator\.hardwareConcurrency === "number" && navigator\.hardwareConcurrency <= 2;/]
 ];
 
 const prohibitedReviewLeaks = [

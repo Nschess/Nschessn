@@ -14602,6 +14602,13 @@
       background: color-mix(in srgb, var(--panel) 64%, transparent);
     }
 
+    .real-puzzle-card[for="realPuzzleSelect"] select {
+      inline-size: 100%;
+      min-inline-size: 44px;
+      min-block-size: 44px;
+      box-sizing: border-box;
+    }
+
     .real-puzzle-card strong,
     .real-puzzle-card span {
       display: block;
@@ -14653,7 +14660,7 @@
     }
 
     .real-puzzle-select {
-      min-height: 40px;
+      min-height: 44px;
       max-width: 100%;
       border: 1px solid var(--line);
       border-radius: 7px;
@@ -16540,6 +16547,17 @@
 
     :where(img, iframe, video, canvas, svg) {
       max-width: 100%;
+    }
+
+    /* Openings loads its route stylesheet lazily. Keep the eight essential
+       Explorer controls touch-sized during that short loading window too. */
+    #openings :is(
+      #openingExplorerSearch,
+      .opening-explorer-mode,
+      #openingExplorerFavorite,
+      .opening-explorer-controls .button
+    ) {
+      min-height: 44px;
     }
 
     @media (hover: none) and (pointer: coarse) {
@@ -27098,9 +27116,17 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-actions .button {
-      min-height: 36px;
+      min-height: 44px;
       padding-inline: 10px;
       font-size: 0.72rem;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #adventureBossBattles .boss-card > .button {
+      min-height: 44px;
+    }
+
+    :is(body:not(.theme-light), body.theme-light) #settingsShell :is(.settings-tab, .settings-actions .button) {
+      min-height: 44px;
     }
 
     :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-coach {
@@ -27615,7 +27641,7 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties, .puzzle-level-picker, .puzzle-plan-selector) .mission-button {
-      min-height: 34px;
+      min-height: 44px;
       padding: 7px 9px;
       border-color: var(--cq-border);
       border-radius: var(--cq-radius-pill);
@@ -27667,7 +27693,7 @@
     }
 
     :is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-actions, .puzzle-actions) .button {
-      min-height: 35px;
+      min-height: 44px;
       padding-inline: 9px;
       font-size: 0.7rem;
     }
@@ -28239,9 +28265,9 @@
     #login .account-vault { margin-top: 10px; }
     #login .login-form { margin-top: 10px; padding: 12px; border-radius: 16px; }
     #login .login-form label { gap: 5px; font-size: 0.72rem; }
-    #login .login-form :is(input, select) { min-height: 39px; padding-inline: 10px; font-size: 0.78rem; }
+    #login .login-form :is(input, select) { min-height: 44px; padding-inline: 10px; font-size: 0.78rem; }
     #login .login-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-    #login .login-actions .button { min-height: 39px; padding-inline: 10px; font-size: 0.72rem; }
+    #login .login-actions .button { min-height: 44px; padding-inline: 10px; font-size: 0.72rem; }
     #login #loginStatus { margin: 8px 2px 0; color: var(--cq-text-subtle); font-size: 0.66rem; }
 
     /* Keep the player facts visible before optional collection and history
@@ -28373,7 +28399,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      min-height: 35px;
+      min-height: 44px;
       padding: 7px 10px;
       color: var(--cq-text-primary);
       cursor: pointer;
@@ -29907,7 +29933,8 @@
       }
 
       body:not(.theme-light) #play:not(.is-review-mode) .chess-board-area > .play-board-wrap {
-        width: 100%;
+        width: min(100%, var(--user-board-size));
+        max-width: var(--user-board-size);
         padding: 3px;
         border-radius: 11px;
       }
@@ -30079,8 +30106,8 @@
       body:not(.theme-light) #play:not(.is-review-mode) .play-panel .beginner-bot-card {
         display: grid;
         grid-template-columns: 30px minmax(0, 1fr);
-        min-height: 40px;
-        height: 40px;
+        min-height: 44px;
+        height: 44px;
         align-items: center;
       }
 
@@ -38618,8 +38645,8 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
 :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar { grid-area: right; }
 :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-social-bar { grid-area: social; }
 :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column > .play-board-wrap {
-  width: min(100%, 840px);
-  max-width: 840px;
+  width: min(100%, var(--user-board-size));
+  max-width: var(--user-board-size);
 }
 
 @media (max-width: 1180px) {
@@ -38636,5 +38663,177 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
     grid-template-areas: "center" "right" "left" "social";
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Shared interactive-board workspace. The chess renderers remain route-owned;
+   this layer owns only the common physical board size, controls, resize edge,
+   and native fullscreen host. */
+.interactive-board-sizing-stage {
+  --interactive-board-requested-size: 720px;
+  --interactive-board-size: 720px;
+  position: relative;
+  box-sizing: border-box;
+  inline-size: min(100%, calc(var(--interactive-board-size) + 20px)) !important;
+  max-width: calc(100% - 8px) !important;
+  max-inline-size: calc(100% - 8px) !important;
+  min-inline-size: 0;
+  justify-self: center;
+}
+
+.interactive-board-sizing-stage[data-board-surface="tutorial"] {
+  inline-size: min(100%, calc(var(--interactive-board-size) + 52px)) !important;
+  max-width: calc(100% - 8px) !important;
+}
+
+.interactive-board-sizing-stage > [data-interactive-board],
+.interactive-board-sizing-stage [data-interactive-board] {
+  inline-size: var(--interactive-board-size) !important;
+  block-size: var(--interactive-board-size) !important;
+  min-inline-size: 0 !important;
+  min-block-size: 0 !important;
+  max-inline-size: none !important;
+  max-block-size: none !important;
+  flex: 0 0 auto;
+}
+
+.interactive-board-sizing-stage[data-board-surface="tutorial"] .tutorial-coordinate-frame {
+  inline-size: min(100%, calc(var(--interactive-board-size) + 52px)) !important;
+  max-inline-size: none !important;
+}
+
+.match-board-column[data-interactive-board-workspace] > :is(.ai-player-card, .match-player-card) {
+  inline-size: min(100%, var(--interactive-board-workspace-size)) !important;
+  max-inline-size: var(--interactive-board-workspace-size) !important;
+}
+
+.interactive-board-stage-tools {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  inline-size: min(100%, var(--interactive-board-size));
+  margin: 10px auto 0;
+  padding: 4px 34px 4px 4px;
+  border: 1px solid color-mix(in srgb, var(--cq-border, rgba(148,163,184,.22)) 88%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cq-surface-panel, #121d31) 92%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.045);
+}
+
+.interactive-board-stage-tools .button,
+.interactive-board-control-field select {
+  min-block-size: 44px;
+}
+
+.interactive-board-stage-tools .button {
+  padding: 8px 11px;
+  font-size: .68rem;
+  white-space: nowrap;
+}
+
+.interactive-board-control-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(92px, 1fr);
+  align-items: center;
+  gap: 5px;
+  min-block-size: 44px;
+  color: var(--cq-text-muted, #9aa8bf);
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
+.interactive-board-control-field select {
+  min-inline-size: 108px;
+  max-inline-size: 146px;
+  padding: 7px 8px;
+  border: 1px solid var(--cq-border, rgba(148,163,184,.22));
+  border-radius: 8px;
+  color: var(--cq-text-primary, #f5f7ff);
+  background: var(--cq-surface-input, #0b1325);
+  font: inherit;
+}
+
+.interactive-board-resize-handle {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 7;
+  inline-size: 28px;
+  block-size: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(135deg, transparent 0 34%, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 78%, white) 35% 42%, transparent 43% 55%, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 78%, white) 56% 63%, transparent 64%);
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: .8;
+}
+
+.interactive-board-resize-handle:hover,
+.interactive-board-resize-handle:focus-visible {
+  outline: 2px solid var(--cq-accent-secondary, #7650ed);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+#play .play-extra-actions-menu #flipGame { display: none !important; }
+
+.interactive-board-fullscreen-host:fullscreen {
+  display: grid !important;
+  place-content: center;
+  justify-items: center;
+  inline-size: 100vw !important;
+  block-size: 100vh !important;
+  max-inline-size: none !important;
+  max-block-size: none !important;
+  padding: 24px 16px 82px !important;
+  overflow: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--cq-bg-primary, #07101d) !important;
+  box-shadow: none !important;
+}
+
+.interactive-board-fullscreen-host:fullscreen .interactive-board-stage-tools {
+  inline-size: min(100%, var(--interactive-board-size));
+}
+
+@media (max-width: 620px) {
+  .interactive-board-sizing-stage {
+    max-inline-size: calc(100% - 12px) !important;
+  }
+
+  .interactive-board-stage-tools {
+    justify-content: stretch;
+    gap: 6px;
+    padding-inline-end: 32px;
+  }
+
+  .interactive-board-stage-tools .button,
+  .interactive-board-control-field {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  .interactive-board-control-field {
+    grid-template-columns: 1fr;
+    gap: 2px;
+    align-content: center;
+  }
+
+  .interactive-board-control-field select {
+    inline-size: 100%;
+    max-inline-size: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive-board-stage-tools,
+  .interactive-board-resize-handle {
+    transition: none !important;
   }
 }

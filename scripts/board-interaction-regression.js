@@ -49,7 +49,7 @@ const requiredAppContracts = [
   ["Premove setting rerenders board", /function preferencesRequireBoardRender\(changedPreferences\)[\s\S]*?key === "premove"/],
   ["Premove human opponent gate", /function isLivePremoveEnabled\(\)[\s\S]*?friendChallengeState\.opponentId/],
   ["AI fallback premove isolation", /function resetRealtimeContextForAi\(\)[\s\S]*?remote: false/],
-  ["Quick Match human handoff", /async startMatch\(match\)[\s\S]*?applyRemoteFriendChallenge\(remote, true\)/],
+  ["Quick Match human handoff", /async startMatch\(match\)[\s\S]*?applyRemoteFriendChallenge\((?:remote|normalized), true\)/],
   ["Disabled setting cancels queue", /function applySettingsPrefsPatch\([\s\S]*?normalizedPatch\.premove === "off"[\s\S]*?cancelCoachPremove/],
   ["Premove revalidation", /function tryRunCoachPremove\(\)[\s\S]*?moves\(\{ square: queued\.from, verbose: true \}\)/],
   ["Remote premove wake-up", /const remotePositionChanged = Boolean\([\s\S]*?const canCheckPremove = remote\.status === "active"[\s\S]*?tryRunCoachPremove\(\)/],
@@ -288,12 +288,13 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v175-social-oauth";
-const cacheVersion = "review-v175-social-oauth";
-assert.match(html, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the v175 asset version");
-assert.match(app, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Lazy route loaders do not use the v175 asset version");
-assert.match(worker, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell assets do not use the v175 asset version");
-assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker cache name is not v175");
+const cacheName = "nschess-shell-v178-global-board-recovery";
+const cacheVersion = "review-v200-global-board-recovery";
+assert.match(html, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current asset version");
+assert.match(app, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Lazy route loaders do not use the current asset version");
+assert.match(worker, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell assets do not use the current asset version");
+assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker cache name is not current");
+assert.match(worker, /assets\/vendor\/chess\.js-1\.0\.0\.mjs/, "Service worker shell does not include the local chess.js vendor module");
 assert.match(worker, /isStoreAudioAsset[\s\S]*?assets\/audio[\s\S]*?cache\.put/, "Store piano recordings must be cacheable after first preview");
 assert.match(pianoMigration, /music-quiet-calculation[\s\S]*?music-rising-position[\s\S]*?music-midnight-strategy[\s\S]*?music-beyond-the-board[\s\S]*?music-subtle-triumph[\s\S]*?CC0 1\.0 Universal/);
 assert.match(pianoMigration, /set active = false[\s\S]*?music-calm[\s\S]*?sfx-classic/);

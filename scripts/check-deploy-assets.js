@@ -6,9 +6,17 @@ const indexPath = path.join(siteDir, "index.html");
 const html = fs.readFileSync(indexPath, "utf8");
 const required = [
   "index.html",
-  "assets/kingnorbert-coach.png",
   "assets/stockfish/stockfish-nnue-16-single.js",
-  "assets/stockfish/stockfish-nnue-16-single.wasm"
+  "assets/stockfish/stockfish-nnue-16-single.wasm",
+  "THIRD-PARTY-NOTICES.md",
+  "docs/ASSET-LICENSE-LEDGER.md",
+  "docs/STORE-MUSIC-LICENSES.md",
+  "docs/THIRD-PARTY-SOURCE-MANIFEST.md",
+  "docs/STOCKFISH-CORRESPONDING-SOURCE.md",
+  "docs/licenses/GPL-2.0.txt",
+  "docs/licenses/GPL-3.0.txt",
+  "docs/licenses/AGPL-3.0.txt",
+  "docs/licenses/PIECE-THEME-NOTICES.md"
 ];
 
 const refs = new Set(required);

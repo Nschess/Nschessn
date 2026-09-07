@@ -15,6 +15,7 @@ const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
 const E2E_WALLET_BALANCE = 1_000_000_000;
 const walletOnly = process.argv.includes("--wallet-only");
+const fixtureOnly = process.argv.includes("--fixture-only");
 
 function fail(message) {
   throw new Error(`E2E Account B provisioning blocked: ${message}`);
@@ -235,6 +236,40 @@ async function main() {
   if (!nameStyle || nameStyle.item_type !== "nameStyle") fail(`active Store catalog item ${nameStyleItem} is unavailable`);
   const users = await listAdminUsers(baseUrl, serviceKey);
   const primaryUser = await resolveExactUser(users, primaryEmail, "primary E2E");
+
+  if (fixtureOnly) {
+    const secondaryEmail = configuredEmail;
+    if (!secondaryEmail || !configuredPassword) fail("fixture-only reset requires the already-provisioned generated Account B credentials");
+    const secondaryUser = await resolveExactUser(users, secondaryEmail, "secondary E2E", { role: "account_b" });
+    const fixtureProfile = await updateProfile(baseUrl, serviceKey, secondaryUser.id, {
+      username,
+      display_name: username,
+      avatar: "♞",
+      country_flag: "JP",
+      title: "E2E B Marshal",
+      rating: 1520,
+      coins: E2E_WALLET_BALANCE,
+      xp: 840,
+      wins: 7,
+      losses: 2,
+      draws: 1,
+      updated_at: new Date().toISOString()
+    });
+    if (Number(fixtureProfile?.coins) !== E2E_WALLET_BALANCE || Number(fixtureProfile?.xp) !== 840) {
+      fail("fixture-only reset did not return the canonical Account B profile baseline");
+    }
+    await equipDistinctiveNameStyle(baseUrl, serviceKey, secondaryUser.id, nameStyleItem);
+    const session = await passwordLogin(baseUrl, anonKey, secondaryEmail, configuredPassword);
+    const store = await verifyStoreState(baseUrl, anonKey, session.access_token, nameStyleItem);
+    if (Number(store?.coins) !== E2E_WALLET_BALANCE) fail("fixture-only reset did not verify the canonical Account B wallet through the authenticated Store RPC");
+    console.log(JSON.stringify({
+      result: "Dedicated E2E Account B fixture reset and verified",
+      accountBAuthUserId: mask(secondaryUser.id),
+      profileBaseline: { xp: 840, coins: E2E_WALLET_BALANCE, rating: 1520, title: "E2E B Marshal" },
+      accountScope: "only the generated E2E secondary account"
+    }, null, 2));
+    return;
+  }
 
   if (walletOnly) {
     const secondaryEmail = configuredEmail;

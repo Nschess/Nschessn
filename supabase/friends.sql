@@ -686,170 +686,13 @@ begin
 end;
 $$;
 
+-- Canonical foundation install: remove every legacy overload, but do not
+-- create save_game_challenge_position here. The release-candidate security
+-- hardening migration is the only installation path for that RPC; until it
+-- runs, multiplayer position writes fail closed because the RPC is absent.
 drop function if exists public.save_game_challenge_position(text, text, jsonb, text);
 drop function if exists public.save_game_challenge_position(text, text, jsonb, text, boolean);
 drop function if exists public.save_game_challenge_position(text, text, jsonb, text, boolean, bigint);
-create or replace function public.save_game_challenge_position(
-  p_code text,
-  p_fen text,
-  p_moves jsonb,
-  p_status text default 'active',
-  p_move_applied boolean default false,
-  p_expected_revision bigint default null
-)
-returns jsonb
-language plpgsql
-security definer set search_path = public
-as $$
-declare
-  current_user_id uuid := auth.uid();
-  found public.game_challenges;
-  active_user_id uuid;
-  actor_color text;
-  elapsed_ms bigint;
-  remaining_ms bigint;
-  existing_count integer;
-  submitted_count integer;
-  board_move_count integer;
-  move_index integer;
-  new_item text;
-  active_draw_offer text := '';
-  completion_result text := 'aborted';
-  completion_termination text := 'ended';
-begin
-  if current_user_id is null then raise exception 'Sign in to save a friend game'; end if;
-  perform public.expire_game_challenges();
-  select * into found from public.game_challenges where code = upper(trim(p_code)) for update;
-  if found.id is null then raise exception 'Challenge not found'; end if;
-  if current_user_id <> found.creator_id and current_user_id <> found.opponent_id then raise exception 'You are not in this game'; end if;
-  if found.status <> 'active' then raise exception 'This challenge is not ready to play'; end if;
-  if length(coalesce(p_fen, '')) < 8 or length(p_fen) > 256 or jsonb_typeof(coalesce(p_moves, '[]'::jsonb)) <> 'array' then raise exception 'Game state is invalid'; end if;
-  if p_expected_revision is not null and p_expected_revision <> found.revision then
-    raise exception 'This game changed on another device. Reconnecting…' using errcode = '40001';
-  end if;
-
-  existing_count := jsonb_array_length(found.moves);
-  submitted_count := jsonb_array_length(p_moves);
-  if submitted_count < existing_count or submitted_count > existing_count + 1 then
-    raise exception 'Game history must advance one action at a time';
-  end if;
-  if existing_count > 0 then
-    for move_index in 0..existing_count - 1 loop
-      if found.moves -> move_index is distinct from p_moves -> move_index then
-        raise exception 'Game history changed on another device. Reconnecting…' using errcode = '40001';
-      end if;
-      new_item := found.moves ->> move_index;
-      if new_item ~ '^__draw_offer:[wb]$' then
-        active_draw_offer := new_item;
-      elsif new_item in ('__draw_decline', '__draw_accept') then
-        active_draw_offer := '';
-      end if;
-    end loop;
-  end if;
-  if submitted_count = existing_count then
-    if p_fen <> found.fen or p_status <> 'active' or p_move_applied then
-      raise exception 'Game update did not contain a new action';
-    end if;
-    return public.challenge_payload(found);
-  end if;
-
-  new_item := p_moves ->> existing_count;
-  actor_color := case
-    when current_user_id = found.creator_id then found.creator_color
-    else case when found.creator_color = 'w' then 'b' else 'w' end
-  end;
-
-  select count(*) into board_move_count
-  from jsonb_array_elements_text(found.moves) as item(value)
-  where item.value ~ '^[a-h][1-8][a-h][1-8][qrbn]?$';
-
-  if new_item ~ '^[a-h][1-8][a-h][1-8][qrbn]?$' then
-    if not p_move_applied or p_status <> 'active' then raise exception 'A board move must be submitted as an active turn'; end if;
-    active_user_id := case
-      when found.active_color = 'w' and found.creator_color = 'w' then found.creator_id
-      when found.active_color = 'w' then found.opponent_id
-      when found.creator_color = 'b' then found.creator_id
-      else found.opponent_id
-    end;
-    if active_user_id is distinct from current_user_id then raise exception 'It is not your turn'; end if;
-
-    if found.clock <> 'none' then
-      elapsed_ms := greatest(0, floor(extract(epoch from now() - coalesce(found.turn_started_at, now())) * 1000));
-      remaining_ms := case when found.active_color = 'w'
-        then greatest(0, found.white_ms - elapsed_ms)
-        else greatest(0, found.black_ms - elapsed_ms)
-      end;
-      if remaining_ms = 0 then
-        update public.game_challenges
-        set white_ms = case when found.active_color = 'w' then 0 else white_ms end,
-            black_ms = case when found.active_color = 'b' then 0 else black_ms end,
-            revision = revision + 1,
-            updated_at = now()
-        where id = found.id
-        returning * into found;
-        select * into found from public.finalize_game_challenge(found.id, case when found.active_color = 'w' then 'black' else 'white' end, 'timeout');
-        return public.challenge_payload(found);
-      end if;
-      if found.active_color = 'w' then
-        update public.game_challenges
-        set white_ms = remaining_ms + increment_ms, active_color = 'b', turn_started_at = now(), revision = revision + 1, updated_at = now()
-        where id = found.id
-        returning * into found;
-      else
-        update public.game_challenges
-        set black_ms = remaining_ms + increment_ms, active_color = 'w', turn_started_at = now(), revision = revision + 1, updated_at = now()
-        where id = found.id
-        returning * into found;
-      end if;
-    else
-      update public.game_challenges
-      set active_color = case when found.active_color = 'w' then 'b' else 'w' end, revision = revision + 1, updated_at = now()
-      where id = found.id
-      returning * into found;
-    end if;
-    update public.game_challenges
-    set fen = p_fen,
-        moves = p_moves,
-        updated_at = now()
-    where id = found.id
-    returning * into found;
-    return public.challenge_payload(found);
-  end if;
-
-  if p_move_applied or p_fen <> found.fen then raise exception 'Only a legal board move may change the position'; end if;
-  if new_item ~ '^__draw_offer:[wb]$' then
-    if p_status <> 'active' or split_part(new_item, ':', 2) <> actor_color then raise exception 'Draw offer is invalid'; end if;
-  elsif new_item = '__draw_decline' then
-    if p_status <> 'active' or active_draw_offer = '' or split_part(active_draw_offer, ':', 2) = actor_color then raise exception 'There is no draw offer to decline'; end if;
-  elsif new_item = '__draw_accept' then
-    if p_status <> 'completed' or active_draw_offer = '' or split_part(active_draw_offer, ':', 2) = actor_color then raise exception 'There is no draw offer to accept'; end if;
-    completion_result := 'draw'; completion_termination := 'draw agreement';
-  elsif new_item ~ '^__resign:[wb]$' then
-    if p_status <> 'completed' or split_part(new_item, ':', 2) <> actor_color then raise exception 'Resignation is invalid'; end if;
-    completion_result := case when actor_color = 'w' then 'black' else 'white' end; completion_termination := 'resignation';
-  elsif new_item = '__abort' then
-    if p_status <> 'completed' or board_move_count >= 2 then raise exception 'Abort is only available before move 2'; end if;
-    completion_result := 'aborted'; completion_termination := 'aborted';
-  elsif new_item ~ '^__result:(white|black|draw|aborted):[a-z_]+$' then
-    if p_status <> 'completed' then raise exception 'Game result is invalid'; end if;
-    completion_result := split_part(new_item, ':', 2);
-    completion_termination := replace(split_part(new_item, ':', 3), '_', ' ');
-  else
-    raise exception 'Game action is invalid';
-  end if;
-
-  update public.game_challenges
-  set moves = p_moves,
-      revision = revision + 1,
-      updated_at = now()
-  where id = found.id
-  returning * into found;
-  if p_status = 'completed' then
-    select * into found from public.finalize_game_challenge(found.id, completion_result, completion_termination);
-  end if;
-  return public.challenge_payload(found);
-end;
-$$;
 
 create or replace function public.send_game_challenge_message(p_code text, p_body text)
 returns jsonb
@@ -901,7 +744,6 @@ revoke all on function public.search_registered_players(text) from public;
 revoke all on function public.create_game_challenge(uuid, text, text, text, text, text) from public;
 revoke all on function public.get_game_challenge(text) from public;
 revoke all on function public.respond_game_challenge(text, text) from public;
-revoke all on function public.save_game_challenge_position(text, text, jsonb, text, boolean, bigint) from public;
 revoke all on function public.list_game_challenges() from public;
 revoke all on function public.send_game_challenge_message(text, text) from public;
 grant execute on function public.search_registered_players(text) to authenticated;
@@ -909,6 +751,5 @@ grant execute on function public.create_game_challenge(uuid, text, text, text, t
 grant execute on function public.get_game_challenge(text) to authenticated;
 grant execute on function public.touch_game_challenge_presence(text, boolean) to authenticated;
 grant execute on function public.respond_game_challenge(text, text) to authenticated;
-grant execute on function public.save_game_challenge_position(text, text, jsonb, text, boolean, bigint) to authenticated;
 grant execute on function public.list_game_challenges() to authenticated;
 grant execute on function public.send_game_challenge_message(text, text) to authenticated;

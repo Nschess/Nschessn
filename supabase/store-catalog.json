@@ -519,24 +519,6 @@
     }
   },
   {
-    "item_id": "skin-alpha",
-    "item_type": "skin",
-    "name": "Alpha Pieces",
-    "cost_coins": 100,
-    "rarity": "Rare",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "alpha",
-      "tag": "Chess Pieces",
-      "description": "Elegant high-contrast pieces with smooth contours.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "100 coins"
-    }
-  },
-  {
     "item_id": "skin-merida",
     "item_type": "skin",
     "name": "Merida Pieces",
@@ -555,42 +537,6 @@
     }
   },
   {
-    "item_id": "skin-dubrovny",
-    "item_type": "skin",
-    "name": "Dubrovny Pieces",
-    "cost_coins": 210,
-    "rarity": "Epic",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "dubrovny",
-      "tag": "Chess Pieces",
-      "description": "A poised set with confident tournament lines.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "210 coins"
-    }
-  },
-  {
-    "item_id": "skin-fresca",
-    "item_type": "skin",
-    "name": "Fresca Pieces",
-    "cost_coins": 170,
-    "rarity": "Rare",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "fresca",
-      "tag": "Chess Pieces",
-      "description": "Crisp geometric pieces for fast tactical sessions.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "170 coins"
-    }
-  },
-  {
     "item_id": "skin-pirouetti",
     "item_type": "skin",
     "name": "Pirouetti Pieces",
@@ -606,60 +552,6 @@
       "previewText": "K Q R B N P",
       "surface": "Pieces · Play, Puzzles & Game Review",
       "unlockLabel": "260 coins"
-    }
-  },
-  {
-    "item_id": "skin-gioco",
-    "item_type": "skin",
-    "name": "Gioco Pieces",
-    "cost_coins": 190,
-    "rarity": "Epic",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "gioco",
-      "tag": "Chess Pieces",
-      "description": "Warm, traditional pieces for relaxed practice.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "190 coins"
-    }
-  },
-  {
-    "item_id": "skin-governor",
-    "item_type": "skin",
-    "name": "Governor Pieces",
-    "cost_coins": 300,
-    "rarity": "Epic",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "governor",
-      "tag": "Chess Pieces",
-      "description": "Confident ceremonial forms with crisp detail.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "300 coins"
-    }
-  },
-  {
-    "item_id": "skin-icpieces",
-    "item_type": "skin",
-    "name": "Ice Pieces Pieces",
-    "cost_coins": 220,
-    "rarity": "Epic",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "icpieces",
-      "tag": "Chess Pieces",
-      "description": "Cool, clean silhouettes for focused calculation.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "220 coins"
     }
   },
   {
@@ -699,24 +591,6 @@
     }
   },
   {
-    "item_id": "skin-leipzig",
-    "item_type": "skin",
-    "name": "Leipzig Pieces",
-    "cost_coins": 120,
-    "rarity": "Rare",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "leipzig",
-      "tag": "Chess Pieces",
-      "description": "Minimal classic forms for distraction-free games.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "120 coins"
-    }
-  },
-  {
     "item_id": "skin-letter",
     "item_type": "skin",
     "name": "Letter Pieces",
@@ -732,25 +606,6 @@
       "previewText": "K Q R B N P",
       "surface": "Pieces · Play, Puzzles & Game Review",
       "unlockLabel": "90 coins"
-    }
-  },
-  {
-    "item_id": "skin-maestro",
-    "item_type": "skin",
-    "name": "Maestro Pieces",
-    "cost_coins": 420,
-    "rarity": "Legendary",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "maestro",
-      "tag": "Chess Pieces",
-      "description": "A polished champion set for your strongest games.",
-      "previewText": "K Q R B N P",
-      "collection": "Royal Court",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "420 coins"
     }
   },
   {
@@ -770,42 +625,6 @@
       "collection": "Space Explorer",
       "surface": "Pieces · Play, Puzzles & Game Review",
       "unlockLabel": "460 coins"
-    }
-  },
-  {
-    "item_id": "skin-staunty",
-    "item_type": "skin",
-    "name": "Staunty Pieces",
-    "cost_coins": 300,
-    "rarity": "Epic",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "staunty",
-      "tag": "Chess Pieces",
-      "description": "Bold compact forms with reliable small-board clarity.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "300 coins"
-    }
-  },
-  {
-    "item_id": "skin-tatiana",
-    "item_type": "skin",
-    "name": "Tatiana Pieces",
-    "cost_coins": 480,
-    "rarity": "Legendary",
-    "unlock_method": "Coins",
-    "giftable": true,
-    "active": true,
-    "metadata": {
-      "value": "tatiana",
-      "tag": "Chess Pieces",
-      "description": "A graceful collector set with high-contrast detail.",
-      "previewText": "K Q R B N P",
-      "surface": "Pieces · Play, Puzzles & Game Review",
-      "unlockLabel": "480 coins"
     }
   },
   {

@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=review-v175-social-oauth" />
+  <link rel="stylesheet" href="assets/app.css?v=review-v200-global-board-recovery" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -379,11 +379,11 @@
               <h3 id="tutorialLessonTitle">Board setup</h3>
               <p id="tutorialLessonText">Learn where the pieces begin and why the board always starts with a light square on the right.</p>
             </div>
-            <div class="tutorial-board-wrap board-border-frame" data-board-context="lesson">
+            <div class="tutorial-board-wrap board-border-frame interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-board-context="lesson" data-interactive-board-stage data-board-surface="tutorial">
               <div class="tutorial-coordinate-frame" id="tutorialCoordinateFrame">
                 <div class="tutorial-coords tutorial-files tutorial-files-top" id="tutorialFilesTop" aria-hidden="true"></div>
                 <div class="tutorial-coords tutorial-ranks tutorial-ranks-left" id="tutorialRanksLeft" aria-hidden="true"></div>
-                <div class="tutorial-board" id="tutorialBoard" role="group" aria-roledescription="chess board" aria-label="Interactive beginner chess board. Select a piece, then its highlighted destination."></div>
+                <div class="tutorial-board" id="tutorialBoard" role="group" aria-roledescription="chess board" aria-label="Interactive beginner chess board. Select a piece, then its highlighted destination." data-interactive-board></div>
                 <div class="tutorial-coords tutorial-ranks tutorial-ranks-right" id="tutorialRanksRight" aria-hidden="true"></div>
                 <div class="tutorial-coords tutorial-files tutorial-files-bottom" id="tutorialFilesBottom" aria-hidden="true"></div>
               </div>
@@ -1770,8 +1770,8 @@
         </div>
 
         <div class="adventure-play" aria-labelledby="adventurePlayTitle">
-          <div class="adventure-board-wrap" aria-label="Playable adventure board">
-            <div class="adventure-board" id="adventureBoard"></div>
+            <div class="adventure-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="adventure" aria-label="Playable adventure board">
+            <div class="adventure-board" id="adventureBoard" data-interactive-board></div>
           </div>
           <div class="adventure-panel">
             <div class="mission-selector" id="adventureMissionList" aria-label="Adventure mission list"></div>
@@ -1872,8 +1872,8 @@
             </div>
           </header>
           <div class="opening-explorer-layout">
-            <div class="opening-explorer-board-wrap">
-              <div class="opening-explorer-board" id="openingExplorerBoard" role="group" aria-label="Interactive opening board"></div>
+            <div class="opening-explorer-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="openings">
+              <div class="opening-explorer-board" id="openingExplorerBoard" data-interactive-board role="group" aria-label="Interactive opening board"></div>
               <div class="opening-explorer-controls" aria-label="Opening board controls">
                 <button class="button secondary" id="openingExplorerPrev" type="button">Previous</button>
                 <button class="button secondary" id="openingExplorerReset" type="button">Reset</button>
@@ -3156,7 +3156,7 @@
                 <span class="play-mode-icon" aria-hidden="true">+</span><span><strong>Custom Match</strong><small>Choose color and clock</small></span><b aria-hidden="true">›</b>
               </a>
             </nav>
-            <details class="coach-library cq-panel" open>
+            <details class="coach-library cq-panel" id="playBotDrawer">
               <summary><span>Choose an AI bot</span><small>Ready opponents</small></summary>
               <div class="coach-library-body">
                 <div class="beginner-bot-panel" aria-labelledby="beginnerBotsTitle">
@@ -3342,7 +3342,7 @@
                 <span class="review-graph-legend-note">Height = evaluation swing</span>
               </div>
             </section>
-            <div class="puzzle-board-wrap play-board-wrap cq-glass-container" aria-label="Playable chess board">
+            <div class="puzzle-board-wrap play-board-wrap cq-glass-container interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="coach" aria-label="Playable chess board">
               <div class="review-eval-rail" id="reviewEvalRail" aria-label="Review evaluation bar" hidden>
                 <span class="review-eval-side review-eval-black">Black</span>
                 <span class="review-eval-fill" id="reviewEvalFill"></span>
@@ -3350,8 +3350,20 @@
                 <span class="review-eval-score" id="reviewEvalScore">0.00</span>
                 <span class="review-eval-side review-eval-white">White</span>
               </div>
-              <div class="puzzle-board play-board" id="coachBoard" role="group" aria-roledescription="chess board" aria-label="Player versus AI chess board. Select a piece, then its legal destination."></div>
+              <div class="puzzle-board play-board" id="coachBoard" role="group" aria-roledescription="chess board" aria-label="Player versus AI chess board. Select a piece, then its legal destination." data-interactive-board></div>
             </div>
+            <section class="play-lobby-guest play-auth-overlay cq-panel" id="playLobbyGuest" hidden role="dialog" aria-modal="true" aria-labelledby="playLobbyGuestTitle" aria-describedby="playLobbyGuestDescription">
+              <div class="play-auth-dialog">
+                <button class="play-auth-close" type="button" id="playLobbyGuestClose" aria-label="Close sign-in prompt">×</button>
+                <span class="play-lobby-guest-mark" aria-hidden="true">♜</span>
+                <span class="play-auth-copy"><strong id="playLobbyGuestTitle">Track your progress</strong><small id="playLobbyGuestDescription">Sign in to save games, stats, and rewards.</small></span>
+                <div class="play-auth-actions">
+                  <a class="button" href="#login" data-site-tab="login" data-site-panel="login" data-lobby-auth="login">Sign In</a>
+                  <a class="button secondary" href="#login" data-site-tab="login" data-site-panel="login" data-lobby-auth="register">Create Account</a>
+                </div>
+                <button class="button secondary play-auth-later" type="button" id="playLobbyGuestLater">Not now</button>
+              </div>
+            </section>
             <nav class="review-center-timeline" id="reviewCenterTimeline" aria-label="Review move timeline"></nav>
             <div class="review-player-strip" aria-label="Players in this review">
               <span class="review-player-chip"><i class="review-player-avatar" id="reviewPlayerAvatar" aria-hidden="true">P</i><span><small>You</small><strong id="reviewPlayerIdentity">Player</strong></span><b id="reviewPlayerRating">--</b></span>
@@ -3433,6 +3445,56 @@
             <div class="play-live-chat-slot" id="playLiveChatSlot" aria-label="Game chat"></div>
           </aside>
           <aside class="puzzle-info coach-panel play-right-sidebar analysis-panel cq-sidebar cq-sidebar--insight" aria-label="Game analysis and coaching">
+            <section class="play-lobby-settings cq-panel" id="playLobbySettings" aria-labelledby="playLobbySettingsTitle">
+              <div class="play-lobby-panel-heading"><h3 id="playLobbySettingsTitle">Game Ready</h3></div>
+              <div class="play-lobby-ready-summary" aria-live="polite">
+                <span class="play-lobby-ready-kicker">One focused setup</span>
+                <strong id="playLobbyReadyTitle">Choose an opponent</strong>
+                <p id="playLobbyReadyCopy">Your pace and color stay together in the Game Ready step.</p>
+              </div>
+              <fieldset class="play-lobby-fieldset" id="playAiTimeControlPanel">
+                <legend>Time control</legend>
+                <div class="play-lobby-time-presets" id="playTimeControlPresets" role="group" aria-label="Time control presets">
+                  <button type="button" data-play-time-control="1+0" aria-pressed="false">1+0</button>
+                  <button type="button" data-play-time-control="3+2" aria-pressed="false">3+2</button>
+                  <button type="button" data-play-time-control="5+0" aria-pressed="false">5+0</button>
+                  <button type="button" data-play-time-control="10+5" aria-pressed="false">10+5</button>
+                  <button type="button" data-play-time-control="custom" aria-pressed="false">Custom</button>
+                </div>
+                <p class="play-lobby-time-summary" id="playTimeControlSummary" aria-live="polite"></p>
+                <div class="play-lobby-custom-time" id="playCustomTime" hidden>
+                  <label>Minutes<input id="playCustomMinutes" type="number" min="1" max="60" step="1" value="5" inputmode="numeric" /></label>
+                  <label>Seconds<input id="playCustomSeconds" type="number" min="0" max="59" step="1" value="0" inputmode="numeric" /></label>
+                  <label>Increment<input id="playCustomIncrement" type="number" min="0" max="120" step="1" value="0" inputmode="numeric" /></label>
+                  <p id="playCustomTimeError" role="alert" hidden>Use 1–60 minutes, 0–59 seconds, and a 0–120 second increment.</p>
+                </div>
+              </fieldset>
+              <fieldset class="play-lobby-fieldset">
+                <legend>Play as</legend>
+                <div class="play-lobby-choice-row" role="group" aria-label="Choose your color">
+                  <button type="button" data-coach-side="w" aria-pressed="true"><span aria-hidden="true">●</span> White</button>
+                  <button type="button" data-coach-side="b" aria-pressed="false"><span aria-hidden="true">●</span> Black</button>
+                </div>
+              </fieldset>
+              <fieldset class="play-lobby-fieldset">
+                <legend>Game type</legend>
+                <div class="play-lobby-choice-row" role="group" aria-label="Choose game type">
+                  <button type="button" data-play-match-type="rated" aria-pressed="false">Rated</button>
+                  <button type="button" data-play-match-type="casual" aria-pressed="true">Practice</button>
+                </div>
+                <p class="play-lobby-rating-note" id="playLobbyRatingNote" hidden></p>
+              </fieldset>
+              <button class="button play-lobby-start" type="button" id="playLobbyStart"><span aria-hidden="true">▶</span> <span id="playLobbyStartLabel">Open Game Ready</span><small id="playLobbyStartCopy">Choose an opponent first</small></button>
+            </section>
+            <details class="play-lobby-bot-info cq-panel" id="playLobbyBotInfo">
+              <summary>Bot profile</summary>
+              <dl>
+                <div><dt>Difficulty</dt><dd id="playLobbyBotDifficulty">Choose a bot</dd></div>
+                <div><dt>Play style</dt><dd id="playLobbyBotStyle">—</dd></div>
+                <div><dt>Strength</dt><dd id="playLobbyBotStrength">—</dd></div>
+              </dl>
+              <p id="playLobbyBotDescription">Choose an AI opponent to see their play style and challenge.</p>
+            </details>
             <section class="engine-panel cq-panel" id="enginePanel" aria-live="polite" aria-labelledby="gameAnalysisTitle" hidden>
               <div class="engine-panel-head">
                 <span><small>Post-game engine</small><strong id="gameAnalysisTitle">Quick game analysis</strong></span>
@@ -3453,7 +3515,7 @@
               <summary><span>Coach Advice</span><small>Open insights</small></summary>
               <div class="play-rail-drawer-content">
             <article class="featured-coach-card cq-panel cq-panel--featured" aria-label="KingNorbert Coach Bot profile">
-              <span class="featured-coach-avatar" data-coach-avatar="assets/kingnorbert-coach.png" data-coach-fallback="KN" role="img" aria-label="KingNorbert Coach Bot"></span>
+              <span class="featured-coach-avatar" data-coach-fallback="KN" role="img" aria-label="KingNorbert Coach Bot">KN</span>
               <div class="featured-coach-copy">
                 <span>Featured coach bot</span>
                 <h4>KingNorbert <span aria-hidden="true">♛</span></h4>
@@ -3683,6 +3745,66 @@
       </div>
     </section>
 
+    <div class="ai-game-ready-overlay" id="aiGameReady" role="dialog" aria-modal="true" aria-labelledby="aiGameReadyTitle" aria-describedby="aiGameReadyDescription" hidden>
+        <section class="ai-game-ready-dialog" tabindex="-1">
+          <button class="ai-game-ready-close" type="button" id="aiGameReadyClose" aria-label="Close Game Ready setup">&times;</button>
+          <span class="ai-game-ready-symbol" aria-hidden="true">&#9822;</span>
+          <p class="section-kicker">Game Ready</p>
+          <h2 id="aiGameReadyTitle">Ready to play <span id="aiGameReadyBotName">your bot</span>?</h2>
+          <p class="ai-game-ready-description" id="aiGameReadyDescription">Pick a pace, then start when you are ready.</p>
+          <div class="ai-game-ready-opponent" aria-label="Selected opponent">
+            <span class="ai-game-ready-avatar" id="aiGameReadyAvatar" aria-hidden="true">&#9822;</span>
+            <span><strong id="aiGameReadyBotMeta">Bot selected</strong><small id="aiGameReadyColorSummary">You play White</small></span>
+          </div>
+          <p class="ai-game-ready-saved" id="aiGameReadySaved" hidden>Using your saved setup. <button type="button" id="aiGameReadyChange">Change</button></p>
+          <fieldset class="ai-game-ready-paces" aria-label="Choose your pace">
+            <legend>Choose your pace</legend>
+            <button class="ai-game-ready-pace" type="button" data-ai-game-ready-pace="none" aria-pressed="false"><strong>No clock</strong><small>Learn at your pace</small></button>
+            <button class="ai-game-ready-pace" type="button" data-ai-game-ready-pace="10+0" aria-pressed="false"><strong>10 min</strong><small>Relaxed · recommended</small></button>
+            <button class="ai-game-ready-pace" type="button" data-ai-game-ready-pace="5+0" aria-pressed="false"><strong>5 min</strong><small>Quick</small></button>
+          </fieldset>
+          <p class="ai-game-ready-selection" id="aiGameReadySelection" aria-live="polite">No clock · Learn at your pace</p>
+          <div class="ai-game-ready-actions"><button class="button" type="button" id="aiGameReadyStart"><span aria-hidden="true">&#9654;</span> Start a calm game</button></div>
+          <details class="ai-game-ready-more" id="aiGameReadyMoreSettings">
+            <summary>More settings</summary>
+            <div class="ai-game-ready-more-body">
+              <fieldset class="ai-game-ready-advanced-time" aria-label="Full time control options">
+                <legend>Time control</legend>
+                <div class="ai-game-ready-advanced-grid" role="group" aria-label="Time control presets">
+                  <button type="button" data-ai-game-ready-control="1+0" aria-pressed="false"><strong>1+0</strong><small>1 minute</small></button>
+                  <button type="button" data-ai-game-ready-control="2+1" aria-pressed="false"><strong>2+1</strong><small>2 min + 1 sec</small></button>
+                  <button type="button" data-ai-game-ready-control="3+0" aria-pressed="false"><strong>3+0</strong><small>3 minutes</small></button>
+                  <button type="button" data-ai-game-ready-control="3+2" aria-pressed="false"><strong>3+2</strong><small>3 minutes, plus 2 seconds after each move</small></button>
+                  <button type="button" data-ai-game-ready-control="5+0" aria-pressed="false"><strong>5+0</strong><small>5 minutes</small></button>
+                  <button type="button" data-ai-game-ready-control="5+3" aria-pressed="false"><strong>5+3</strong><small>5 min + 3 sec</small></button>
+                  <button type="button" data-ai-game-ready-control="10+0" aria-pressed="false"><strong>10+0</strong><small>10 minutes</small></button>
+                  <button type="button" data-ai-game-ready-control="10+5" aria-pressed="false"><strong>10+5</strong><small>10 min + 5 sec</small></button>
+                  <button type="button" data-ai-game-ready-control="15+10" aria-pressed="false"><strong>15+10</strong><small>15 min + 10 sec</small></button>
+                  <button type="button" data-ai-game-ready-control="30+0" aria-pressed="false"><strong>30+0</strong><small>30 minutes</small></button>
+                  <button type="button" data-ai-game-ready-control="custom" aria-pressed="false"><strong>Custom</strong><small>Build yours</small></button>
+                </div>
+                <div class="ai-game-ready-custom-time" id="aiGameReadyCustomTime" hidden>
+                  <label>Minutes<input id="aiGameReadyCustomMinutes" type="number" min="1" max="60" step="1" value="10" inputmode="numeric" /></label>
+                  <label>Seconds<input id="aiGameReadyCustomSeconds" type="number" min="0" max="59" step="1" value="0" inputmode="numeric" /></label>
+                  <label>Increment<input id="aiGameReadyCustomIncrement" type="number" min="0" max="120" step="1" value="0" inputmode="numeric" /></label>
+                  <p id="aiGameReadyCustomError" role="alert" hidden>Use 1–60 minutes, 0–59 seconds, and a 0–120 second increment.</p>
+                </div>
+              </fieldset>
+              <fieldset class="ai-game-ready-color" aria-label="Choose your color">
+                <legend>Color</legend>
+                <div role="group" aria-label="Player color"><button type="button" data-ai-game-ready-color="w" aria-pressed="true">White</button><button type="button" data-ai-game-ready-color="b" aria-pressed="false">Black</button></div>
+              </fieldset>
+              <div class="ai-game-ready-options" aria-label="Advanced game options">
+                <label>Game type<select id="aiGameReadyMatchType" aria-label="Game type"></select></label>
+                <label>Engine<select id="aiGameReadyEngine" aria-label="Chess engine"></select></label>
+                <label>Board theme<select id="aiGameReadyBoardTheme" aria-label="Board theme"></select></label>
+                <label>Piece set<select id="aiGameReadyPieceSet" aria-label="Piece set"></select></label>
+              </div>
+            </div>
+          </details>
+        </section>
+    </div>
+
     <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" hidden>
       <div class="post-game-decision-card">
         <div class="post-game-decision-result">
@@ -3714,6 +3836,7 @@
           <button class="button" type="button" id="postGameDecisionReview">Review Game</button>
           <button class="button secondary" type="button" id="postGameDecisionRematch" hidden>Rematch</button>
           <button class="button secondary" type="button" id="postGameDecisionNew">Play Again</button>
+          <button class="button secondary" type="button" id="postGameDecisionLobby">Back to Lobby</button>
           <button class="button secondary" type="button" id="postGameDecisionClose">Close</button>
         </div>
       </div>
@@ -4023,8 +4146,8 @@
             <button type="button" data-puzzle-plan="Puzzle Streaks" aria-pressed="false">Puzzle Streak</button>
             <button type="button" data-puzzle-plan="Puzzle Rush" aria-pressed="false">Puzzle Storm</button>
           </nav>
-          <div class="puzzle-board-wrap" aria-label="Chess puzzle position">
-            <div class="puzzle-board" id="puzzleBoard" role="group" aria-roledescription="chess board" aria-label="Puzzle board. Select a piece, then its highlighted destination."></div>
+          <div class="puzzle-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="legacy-puzzle" aria-label="Chess puzzle position">
+            <div class="puzzle-board" id="puzzleBoard" role="group" aria-roledescription="chess board" aria-label="Puzzle board. Select a piece, then its highlighted destination." data-interactive-board></div>
             <div class="coordinates" aria-hidden="true" id="coordinates"></div>
           </div>
           <div class="puzzle-info">
@@ -4205,8 +4328,8 @@
 
           <div class="real-puzzle-shell">
             <div class="real-board-stack">
-              <div class="puzzle-board-wrap real-puzzle-board-wrap" aria-label="Real chess puzzle board">
-                <div class="puzzle-board play-board" id="realPuzzleBoard" role="group" aria-roledescription="chess board" aria-label="Real puzzle board. Select a piece, then its highlighted destination."></div>
+              <div class="puzzle-board-wrap real-puzzle-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="real-puzzle" aria-label="Real chess puzzle board">
+                <div class="puzzle-board play-board" id="realPuzzleBoard" role="group" aria-roledescription="chess board" aria-label="Real puzzle board. Select a piece, then its highlighted destination." data-interactive-board></div>
               </div>
               <div class="real-board-quick-actions" aria-label="Quick puzzle actions">
                 <button class="button secondary" type="button" id="realPuzzleBoardRestart">Restart</button>
@@ -4557,7 +4680,7 @@
     </div>
   </aside>
 
-  <script defer src="assets/auth-redirect-policy.js?v=review-v175-social-oauth"></script>
-  <script defer src="assets/app.js?v=review-v175-social-oauth"></script>
+  <script defer src="assets/auth-redirect-policy.js?v=review-v200-global-board-recovery"></script>
+  <script defer src="assets/app.js?v=review-v200-global-board-recovery"></script>
 </body>
 </html>

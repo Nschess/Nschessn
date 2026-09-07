@@ -1,15 +1,16 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v175-social-oauth";
+const CACHE_NAME = "nschess-shell-v178-global-board-recovery";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v175-social-oauth",
-  "./assets/auth-redirect-policy.js?v=review-v175-social-oauth",
-  "./assets/app.js?v=review-v175-social-oauth",
+  "./assets/app.css?v=review-v200-global-board-recovery",
+  "./assets/auth-redirect-policy.js?v=review-v200-global-board-recovery",
+  "./assets/app.js?v=review-v200-global-board-recovery",
+  "./assets/vendor/chess.js-1.0.0.mjs",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"

@@ -1,6 +1,6 @@
 # Nschess Piano Music Collection
 
-The Store collection contains five locally bundled, secular instrumental recordings. Each exact FMA track page was checked on 2026-08-19; all five pages identify the recording as licensed under the **CC0 1.0 Universal License**. The FMA metadata also identifies these recordings as piano/instrumental, with no vocals or religious themes. Audio is bundled in `assets/audio/` so playback does not depend on a remote request.
+The Store collection contains five locally bundled, secular instrumental recordings. The exact FMA track pages were checked on 2026-08-19 and the public FMA records were rechecked on 2026-09-06; all five identify the recording as licensed under the **CC0 1.0 Universal License**. The FMA metadata also identifies these recordings as piano/instrumental, with no vocals or religious themes. Audio is bundled in `assets/audio/` so playback does not depend on a remote request. Retain the creator/source links below and recheck them again immediately before publication.
 
 | Store name | Original track | Creator | Duration | Tier / price | Official source | Exact license |
 | --- | --- | --- | ---: | --- | --- | --- |

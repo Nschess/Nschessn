@@ -38,6 +38,13 @@ and `moderation.sql`. It creates server-owned privacy, block, rate-limit, and
 notification records and adds validation around friend requests, challenges,
 and challenge chat. Do not bypass these RPCs with direct table writes.
 
+Before enabling live multiplayer, also apply
+`supabase/migrations/20260819_release_candidate_security_hardening.sql`. This is
+mandatory: it replaces the foundation `save_game_challenge_position` RPC with the
+server-authoritative move/FEN validation used by the release candidate. A database
+that has only `friends.sql` must not be exposed as a production multiplayer
+deployment.
+
 Apply `supabase/migrations/20260812_messaging_privacy.sql` after that migration
 to enable persistent direct conversations, message history, unread state,
 typing indicators, mute controls, realtime delivery, and server-side
@@ -139,7 +146,7 @@ never use a service-role key. The local E2E server exposes the public values
 only through its development `/api/auth-config` response; if a value is still
 missing, it fails with `E2E_SUPABASE_NOT_CONFIGURED` instead of silently
 running as Guest Explorer. `test:full` also runs a read-only Store preflight:
-it reports the 207-item catalog budget and the authenticated account's
+it reports the 197-item catalog budget and the authenticated account's
 authoritative `public.profiles.coins` balance before any optional purchase
 test.
 
@@ -161,7 +168,7 @@ The repository now includes a Trusted Web Activity Android project. An upload ke
 
 1. Host the production app over HTTPS and use that production domain in the Android wrapper.
 2. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and the server-only `SUPABASE_SERVICE_ROLE_KEY` in the Vercel environment. Never expose the service-role key in browser code.
-3. Apply `supabase/auth.sql`, `supabase/leaderboard.sql`, `supabase/friends.sql`, `supabase/tournaments.sql` when tournaments are enabled, `supabase/moderation.sql` for private player reports, then the social-security, messaging, and Store-authority migrations under `supabase/migrations/`.
+3. Apply `supabase/auth.sql`, `supabase/leaderboard.sql`, `supabase/friends.sql`, `supabase/tournaments.sql` when tournaments are enabled, `supabase/moderation.sql` for private player reports, then the social-security, messaging, Store-authority, and `supabase/migrations/20260819_release_candidate_security_hardening.sql` migrations under `supabase/migrations/`. The hardening migration is mandatory before live multiplayer is enabled.
 4. Verify the public URLs for `privacy.html`, `terms.html`, and `account-deletion.html` on the production domain. Replace the support email in those pages if your production support address differs.
 5. Use the checked-in TWA project in `android/` (`com.nschess.game`) and follow [android/README.md](android/README.md) to create an ignored upload keystore, publish Digital Asset Links, and build the signed `.aab`.
 6. Complete Play Console Data Safety, content rating, target audience, ads declaration, app access/reviewer instructions, store listing assets, and testing requirements before production rollout.
