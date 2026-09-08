@@ -4811,6 +4811,164 @@
       Advanced: "Deep classics for positional thinking, structure, and serious review."
     };
     const bookCategories = ["Openings", "Middlegame", "Endgame", "Tactics", "Strategy", "Biographies"];
+    // Keep the verified public-domain shelf local and deterministic.  The
+    // reader is intentionally a summary/source-link experience; it never
+    // mirrors third-party book files into the application bundle.
+    const freeChessBooks = Object.freeze([
+      {
+        id: "chess-fundamentals",
+        title: "Chess Fundamentals",
+        author: "José Raúl Capablanca",
+        year: "1921",
+        edition: "First edition",
+        level: "Beginner",
+        categories: ["Openings", "Middlegame", "Endgame", "Strategy"],
+        topics: ["Piece value", "King safety", "Endgames"],
+        summary: "A clear tour of the habits that make a position easy to understand: develop, coordinate, and finish accurately.",
+        bestUse: "Read one section before a calm game, then name the principle you want to use.",
+        importantDetails: ["Development beats early wandering.", "The king becomes an active piece in the ending.", "Simple plans are easier to execute than memorized tricks."],
+        printableContent: "Print this summary for study notes; use the linked Project Gutenberg edition for the complete text.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/33870",
+        legal: "Project Gutenberg identifies this United States edition as public domain. Check local rights before redistribution."
+      },
+      {
+        id: "chess-strategy",
+        title: "Chess Strategy",
+        author: "Edward Lasker",
+        year: "1915",
+        edition: "English translation",
+        level: "Intermediate",
+        categories: ["Middlegame", "Strategy", "Openings"],
+        topics: ["Planning", "Piece activity", "Position evaluation"],
+        summary: "A practical bridge from legal moves to plans, explaining how to judge activity, weaknesses, and exchanges.",
+        bestUse: "Use the chapter themes as a post-game checklist: worst piece, target, and useful exchange.",
+        importantDetails: ["Improve the least active piece.", "A plan should answer the opponent's threat.", "Material is only one part of a position's value."],
+        printableContent: "Print this summary for a review checklist; the complete public-domain source is linked below.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/5614",
+        legal: "Project Gutenberg identifies this edition as public domain in the United States. Check local rights before redistribution."
+      },
+      {
+        id: "blue-book-of-chess",
+        title: "The Blue Book of Chess",
+        author: "Howard Staunton",
+        year: "1847",
+        edition: "Teaching the rudiments and openings",
+        level: "Beginner",
+        categories: ["Openings", "Biographies", "Strategy"],
+        topics: ["Rules", "Opening ideas", "Chess history"],
+        summary: "A welcoming historical primer covering the board, the pieces, recognized openings, and practical habits.",
+        bestUse: "Start here when you want a gentle rules refresher before entering Play or Puzzles.",
+        importantDetails: ["Know the board before memorizing moves.", "Opening names are labels, not a substitute for a plan.", "Use the source chapters as a slow reference."],
+        printableContent: "Print this summary for a beginner reference; open the linked source for the complete text.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/16377",
+        legal: "Project Gutenberg identifies this historical edition as public domain in the United States. Check local rights before redistribution."
+      },
+      {
+        id: "chess-and-checkers",
+        title: "Chess and Checkers: The Way to Mastership",
+        author: "Edward Lasker",
+        year: "1918",
+        edition: "Complete instructional guide",
+        level: "Beginner",
+        categories: ["Openings", "Middlegame", "Tactics"],
+        topics: ["Rules", "Tactics", "Illustrative games"],
+        summary: "A broad guide that makes the game's rules and tactical vocabulary approachable through examples and annotated play.",
+        bestUse: "Read the fundamentals, then test one idea in a short game rather than trying to finish the whole book at once.",
+        importantDetails: ["Tactical patterns grow from piece activity.", "Annotated games show decisions in context.", "Chess and checkers share discipline but not the same move logic."],
+        printableContent: "Print this summary for quick review; use the linked public-domain source for the full guide.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/4913",
+        legal: "Project Gutenberg identifies this edition as public domain in the United States. Check local rights before redistribution."
+      },
+      {
+        id: "morphy-exploits",
+        title: "The Exploits and Triumphs of Paul Morphy",
+        author: "Frederick Milnes Edge",
+        year: "1859",
+        edition: "Chess biography and games",
+        level: "Intermediate",
+        categories: ["Biographies", "Middlegame", "Strategy"],
+        topics: ["Morphy", "Open lines", "Historical games"],
+        summary: "A lively account of Paul Morphy's European tour and the games that made his attacking coordination famous.",
+        bestUse: "Pair a chapter with the Featured Game Study and look for development, open files, and forcing moves.",
+        importantDetails: ["Fast development creates concrete threats.", "Open lines matter when every piece can use them.", "Historical games reward replay more than passive reading."],
+        printableContent: "Print this summary for study prompts; follow the linked public-domain source for the complete biography.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/34180",
+        legal: "Project Gutenberg identifies this edition as public domain in the United States. Check local rights before redistribution."
+      },
+      {
+        id: "chess-history-reminiscences",
+        title: "Chess History and Reminiscences",
+        author: "Henry Edward Bird",
+        year: "1893",
+        edition: "Historical essays and games",
+        level: "Intermediate",
+        categories: ["Biographies", "Openings"],
+        topics: ["Chess history", "Players", "Classic games"],
+        summary: "Historical stories and chess recollections that give classic games a human setting and a broader cultural context.",
+        bestUse: "Read between practice sessions when you want context without adding another technical drill.",
+        importantDetails: ["Classic games reflect the ideas of their era.", "Player stories make recurring principles memorable.", "Replay a position after reading its context."],
+        printableContent: "Print this summary for historical study; the complete source is available at Project Gutenberg.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/4902",
+        legal: "Project Gutenberg identifies this historical edition as public domain in the United States. Check local rights before redistribution."
+      },
+      {
+        id: "chess-generalship",
+        title: "Chess Generalship, Vol. I",
+        author: "Franklin K. Young",
+        year: "1911",
+        edition: "Grand Reconnaissance",
+        level: "Advanced",
+        categories: ["Strategy", "Middlegame"],
+        topics: ["Strategy", "Decision-making", "Position judgment"],
+        summary: "A serious study of chess as disciplined planning, connecting board vision with leadership and decision-making.",
+        bestUse: "Use it after a review when you can name the strategic question you want to investigate.",
+        importantDetails: ["Plans depend on accurate reconnaissance.", "Good decisions include limits and trade-offs.", "Strategic language should still lead to concrete moves."],
+        printableContent: "Print this summary for a strategic prompt; use the linked public-domain source for the complete volume.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/55278",
+        legal: "Project Gutenberg identifies this edition as public domain in the United States. Check local rights before redistribution."
+      },
+      {
+        id: "checkmates-three-pieces",
+        title: "Checkmates for Three Pieces",
+        author: "William Brett Fishburne",
+        year: "1903",
+        edition: "Endgame positions",
+        level: "Advanced",
+        categories: ["Endgame", "Tactics"],
+        topics: ["Checkmate", "Coordinates", "Calculation"],
+        summary: "Compact mating positions for learning how a small number of pieces can still create exact, forcing geometry.",
+        bestUse: "Set up one position at a time and explain every escape square before checking the solution.",
+        importantDetails: ["Count flight squares before calculating checks.", "Coordinate pieces rather than chasing the king.", "Small material does not mean simple decisions."],
+        printableContent: "Print this summary as a mating-pattern prompt; use the linked source for the full positions.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/4542",
+        legal: "Project Gutenberg identifies this edition as public domain in the United States. Check local rights before redistribution."
+      },
+      {
+        id: "chess-maxims",
+        title: "Maxims and Hints on Chess",
+        author: "Richard Penn",
+        year: "1833",
+        edition: "Chess maxims and practical advice",
+        level: "Beginner",
+        categories: ["Strategy", "Openings"],
+        topics: ["Principles", "Sportsmanship", "Practical play"],
+        summary: "Short, memorable advice on chess thinking, patience, and practical decisions from a nineteenth-century player.",
+        bestUse: "Read a few maxims before a game and choose one behavior to practice, such as checking threats first.",
+        importantDetails: ["Good habits are easier to remember as short prompts.", "Patience protects calculation quality.", "Sportsmanship belongs in a complete chess practice."],
+        printableContent: "Print this summary for a pre-game checklist; open the linked source for the complete collection.",
+        sourceName: "Project Gutenberg",
+        sourceUrl: "https://www.gutenberg.org/ebooks/36821",
+        legal: "Project Gutenberg identifies this historical edition as public domain in the United States. Check local rights before redistribution."
+      }
+    ]);
     const bookReaderStorageKey = "checkmateQuest.bookReader.v1";
     const customBooksStorageKey = "checkmateQuest.localBooks.v1";
     const dailyTrainingStorageKey = "checkmateQuest.dailyTraining.v1";
@@ -4838,6 +4996,7 @@
     let activeReaderChapter = 0;
     let readerTheme = "light";
     let readerFontScale = 1.08;
+    let firstVisitSetupClose = null;
 
     function buildHeroBoard() {
       [["heroBoard", "hero-square"], ["homeMainBoard", "home-main-square"]].forEach(([id, squareClass]) => {
@@ -7857,14 +8016,18 @@
     function renderStoreSyncFeedback() {
       const status = document.getElementById("storeStatus");
       const retry = document.getElementById("storeSyncRetry");
+      const storeRoot = document.getElementById("store");
+      const guest = !isApplicationAuthenticated();
+      storeRoot?.classList.toggle("is-guest-store", guest);
       document.documentElement.dataset.storeSyncStatus = serverStoreSyncStatus;
       if (!status) return;
       if (!storeServerRequiresAuthority()) {
         if (retry) retry.hidden = true;
         if (/^(Store sync failed|Syncing Store|Checking your secure account)/i.test(status.textContent || "")) {
-          status.textContent = "Pick a reward to unlock or equip.";
+          status.textContent = guest ? "Sign in to save cosmetics and unlock your collection." : "Pick a reward to unlock or equip.";
           status.removeAttribute("title");
         }
+        if (guest && status.textContent === "Choose a reward.") status.textContent = "Sign in to save cosmetics and unlock your collection.";
         return;
       }
       if (serverStoreSyncStatus === "error") {
@@ -10070,6 +10233,7 @@
       const tabs = document.getElementById("storeCategoryTabs");
       const catalogToolsHost = document.getElementById("storeCatalogToolsHost");
       if (!grid || !balance || !inventory) return;
+      document.getElementById("store")?.classList.toggle("is-guest-store", !isApplicationAuthenticated());
       renderStoreSyncFeedback();
       grid.setAttribute("aria-busy", "false");
       grid.classList.remove("is-loading");
@@ -24572,6 +24736,41 @@
       updateCoachPanel();
     }
 
+    let resignDialogReturnFocus = null;
+    function closeResignConfirmation({ restoreFocus = true } = {}) {
+      const dialog = document.getElementById("resignConfirmDialog");
+      if (dialog) dialog.hidden = true;
+      if (restoreFocus) resignDialogReturnFocus?.focus?.({ preventScroll: true });
+      resignDialogReturnFocus = null;
+    }
+
+    function openResignConfirmation() {
+      const dialog = document.getElementById("resignConfirmDialog");
+      const confirmButton = document.getElementById("resignConfirmButton");
+      if (!dialog || !confirmButton || !coachGame || isCoachGameOver() || coachDrawAgreed) return;
+      resignDialogReturnFocus = document.activeElement;
+      dialog.hidden = false;
+      confirmButton.focus({ preventScroll: true });
+    }
+
+    function setupResignConfirmation() {
+      const dialog = document.getElementById("resignConfirmDialog");
+      if (!dialog || dialog.dataset.ready) return;
+      dialog.dataset.ready = "true";
+      document.getElementById("resignConfirmCancel")?.addEventListener("click", () => closeResignConfirmation());
+      document.getElementById("resignConfirmButton")?.addEventListener("click", () => {
+        closeResignConfirmation({ restoreFocus: false });
+        resignCoachGame();
+      });
+      dialog.addEventListener("click", (event) => { if (event.target === dialog) closeResignConfirmation(); });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !dialog.hidden) {
+          event.preventDefault();
+          closeResignConfirmation();
+        }
+      });
+    }
+
     function abortFriendGame() {
       if (!friendChallengeState?.active || !isBeforeMoveTwo()) {
         coachMessage = "Abort is only available before move 2 in friend games.";
@@ -27685,7 +27884,8 @@
       document.getElementById("acceptDraw")?.addEventListener("click", acceptFriendDraw);
       document.getElementById("declineDraw")?.addEventListener("click", declineFriendDraw);
       document.getElementById("abortGame")?.addEventListener("click", abortFriendGame);
-      document.getElementById("resignGame")?.addEventListener("click", resignCoachGame);
+      setupResignConfirmation();
+      document.getElementById("resignGame")?.addEventListener("click", openResignConfirmation);
       document.getElementById("returnLobby")?.addEventListener("click", returnFriendLobby);
       document.getElementById("cancelPremove")?.addEventListener("click", () => cancelCoachPremove());
       document.getElementById("exportPgn").addEventListener("click", exportCoachPgn);
@@ -28085,7 +28285,10 @@
       const existing = routeModulePromises.get(name);
       if (existing) return existing;
       const href = `assets/routes/${encodeURIComponent(name)}.js?v=${routeModuleVersion}`;
-      const task = import(href).catch(() => null);
+      const task = import(href).catch((error) => {
+        console.warn(`[Nschess] Route module ${name} failed to load.`, error);
+        return { routeError: true, routeName: name, features: [], styles: [] };
+      });
       routeModulePromises.set(name, task);
       return task;
     }
@@ -28107,10 +28310,66 @@
       return task;
     }
 
+    function showRouteFeatureFailure(panel, featureName) {
+      if (!panel) return;
+      let status = panel.querySelector("[data-route-status]");
+      if (!status) {
+        status = document.createElement("div");
+        status.className = "route-status cq-status cq-status--danger";
+        status.dataset.routeStatus = "";
+        status.setAttribute("role", "status");
+        status.setAttribute("aria-live", "polite");
+        const message = document.createElement("span");
+        message.className = "route-status-message";
+        const retry = document.createElement("button");
+        retry.className = "button secondary";
+        retry.type = "button";
+        retry.textContent = "Retry section";
+        status.append(message, retry);
+        panel.prepend(status);
+      }
+      const message = status.querySelector(".route-status-message");
+      const retry = status.querySelector("button");
+      if (message) message.textContent = "This section could not load. Your saved work is safe.";
+      status.hidden = false;
+      retry?.focus({ preventScroll: true });
+      if (retry) {
+        retry.onclick = () => {
+          status.hidden = true;
+          if (featureName.startsWith("route:")) {
+            const routeName = featureName.slice("route:".length);
+            routeModulePromises.delete(routeName);
+            routeModuleActivationGeneration += 1;
+            initializePanelFeatures(panel.id, panel.dataset.routeTab || "");
+            return;
+          }
+          deferredFeaturePromises.delete(featureName);
+          void initializeDeferredFeature(featureName).then((ok) => {
+            if (!ok) showRouteFeatureFailure(panel, featureName);
+            sharedInteractiveBoardWorkspace.sync();
+          });
+        };
+      }
+    }
+
+    function syncOptionalRouteStylesheets(styles = []) {
+      const desired = new Set((Array.isArray(styles) ? styles : []).map((style) => String(style || "").trim().toLowerCase()).filter(Boolean));
+      if (document.body.classList.contains("perf-lite")) desired.add("perf-lite");
+      document.querySelectorAll("link[data-route-style]").forEach((link) => {
+        const key = String(link.dataset.routeStyle || "");
+        if (desired.has(key)) return;
+        link.remove();
+        optionalRouteStylesheetPromises.delete(key);
+      });
+      return Promise.all([...desired].map((style) => loadOptionalRouteStylesheet(style)));
+    }
+
     function initializePanelFeatures(panel, tab = "") {
       const activationGeneration = ++routeModuleActivationGeneration;
+      const panelElement = document.getElementById(panel);
+      panelElement?.setAttribute("data-route-tab", tab);
       const eagerRouteStyles = { play: ["play-lobby"], friends: ["friends"], openings: ["openings"] }[panel] || [];
-      eagerRouteStyles.forEach((style) => void loadOptionalRouteStylesheet(style).then(() => sharedInteractiveBoardWorkspace.sync()));
+      void syncOptionalRouteStylesheets(eagerRouteStyles).then(() => sharedInteractiveBoardWorkspace.sync());
       const fallbackFeatureNames = [...({
         login: ["login"],
         play: ["preferences", "play"],
@@ -28133,14 +28392,19 @@
       }[panel] || [])];
       void loadRouteModule(panel, tab).then((module) => {
         if (activationGeneration !== routeModuleActivationGeneration) return;
+        if (module?.routeError) showRouteFeatureFailure(panelElement, `route:${module.routeName || panel}`);
         const featureNames = Array.isArray(module?.features) && module.features.length ? [...module.features] : fallbackFeatureNames;
         // The audio player is shared markup, but its listeners are still
         // attached only when a visible route needs them (rather than at boot).
         if (document.getElementById("audioPlayer")) featureNames.push("audio");
         if (featureNames.length) featureNames.unshift("persistence");
         sharedInteractiveBoardWorkspace.sync();
-        [...new Set(featureNames)].forEach((name) => void initializeDeferredFeature(name).then(() => sharedInteractiveBoardWorkspace.sync()));
-        (Array.isArray(module?.styles) ? module.styles : []).forEach((style) => void loadOptionalRouteStylesheet(style).then(() => sharedInteractiveBoardWorkspace.sync()));
+        [...new Set(featureNames)].forEach((name) => void initializeDeferredFeature(name).then((ok) => {
+          if (ok === false) showRouteFeatureFailure(panelElement, name);
+          sharedInteractiveBoardWorkspace.sync();
+        }));
+        const routeStyles = [...new Set([...eagerRouteStyles, ...(Array.isArray(module?.styles) ? module.styles : [])])];
+        void syncOptionalRouteStylesheets(routeStyles).then(() => sharedInteractiveBoardWorkspace.sync());
       });
     }
 
@@ -28283,6 +28547,9 @@
         }
         document.body.classList.remove("site-tab-mode");
         document.body.classList.remove("friend-challenge-mode", "tournament-mode");
+        document.body.classList.remove("is-board-route");
+        firstVisitSetupClose = null;
+        void syncOptionalRouteStylesheets([]);
         clearActiveTabs();
         homeLink?.classList.add("is-active-tab");
         homeLink?.setAttribute("aria-current", "page");
@@ -28311,6 +28578,7 @@
         }
         boardInteractionEngine.cancelAll({ type: "routechange" });
         cancelCoachPremove();
+        firstVisitSetupClose?.({ restoreFocus: false });
         routeModuleActivationGeneration += 1;
 
         if (config.panel !== "store") stopStorePreview({ silent: true });
@@ -28343,6 +28611,7 @@
         document.body.classList.add("site-tab-mode");
         document.body.classList.toggle("friend-challenge-mode", config.tab === "friendChallenge");
         document.body.classList.toggle("tournament-mode", config.tab === "tournaments");
+        document.body.classList.toggle("is-board-route", ["play", "puzzles", "gameReview"].includes(config.panel));
         if (activePanel !== panel) {
           if (activePanel) {
             rememberPanelScroll(activePanel);
@@ -28544,7 +28813,9 @@
         dialog.hidden = true;
         if (restoreFocus && returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
         returnFocus = null;
+        if (firstVisitSetupClose === close) firstVisitSetupClose = null;
       };
+      firstVisitSetupClose = close;
       const finishLater = () => {
         writeJsonStorage(firstVisitSetupStorageKey, { done: true, skipped: true, completedAt: new Date().toISOString() });
         trackProductSignal("onboarding_skipped");
@@ -35907,8 +36178,31 @@
           );
         } else {
           const emptyKey = "friends-empty";
-          const existingEmpty = list.firstElementChild?.dataset?.renderKey === emptyKey ? list.firstElementChild : null;
-          const empty = existingEmpty || (() => { const node = document.createElement("div"); node.className = "friends-hub-empty"; node.append(createBookText("strong", "", query ? "No players found" : friendHubState.view === "online" ? "No friends are online" : "Nothing here yet"), createBookText("span", "", query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")); node.dataset.renderKey = emptyKey; return node; })();
+          const guest = !isApplicationAuthenticated();
+          const existingEmpty = list.firstElementChild?.dataset?.renderKey === emptyKey
+            && list.firstElementChild?.dataset?.guest === String(guest)
+            ? list.firstElementChild
+            : null;
+          const empty = existingEmpty || (() => {
+            const node = document.createElement("div");
+            node.className = "friends-hub-empty";
+            node.append(
+              createBookText("strong", "", guest ? "Connect to find players" : query ? "No players found" : friendHubState.view === "online" ? "No friends are online" : "Nothing here yet"),
+              createBookText("span", "", guest ? "Sign in to search, message, and challenge players." : query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")
+            );
+            if (guest) {
+              const signIn = document.createElement("a");
+              signIn.className = "button secondary friends-empty-sign-in";
+              signIn.href = "#login";
+              signIn.dataset.siteTab = "login";
+              signIn.dataset.sitePanel = "login";
+              signIn.textContent = "Sign in";
+              node.appendChild(signIn);
+            }
+            node.dataset.renderKey = emptyKey;
+            node.dataset.guest = String(guest);
+            return node;
+          })();
           list.replaceChildren(empty);
         }
       }

@@ -39108,3 +39108,70 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   .featured-study-board,
   .featured-study-square { transition: none !important; }
 }
+
+/* Release interaction contracts: keep compact routes readable and safe. */
+.nav-mobile-menu:not([open]) > .nav-mobile-panel { display: none !important; }
+.nav-mobile-menu[open] > .nav-mobile-panel { display: grid; }
+.route-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100% - 28px, 1120px);
+  margin: 12px auto;
+  padding: 10px 12px;
+}
+.route-status[hidden] { display: none !important; }
+.route-status-message { min-width: 0; }
+.resign-confirm-dialog { width: min(100%, 470px); }
+.resign-confirm-symbol { color: #fff4d1; background: linear-gradient(135deg, #b45309, #dc2626); }
+.resign-confirm-actions { justify-content: center; width: 100%; }
+
+:is(body:not(.theme-light), body.theme-light) .site-header .nav-mobile-panel > a,
+:is(body:not(.theme-light), body.theme-light) .site-header .nav-mobile-community > summary,
+:is(body:not(.theme-light), body.theme-light) .nav-mobile-menu > summary { min-height: 44px; }
+
+:is(body:not(.theme-light), body.theme-light) .button.danger {
+  border-color: color-mix(in srgb, var(--cq-danger, #fb7185) 62%, transparent);
+  color: #ffe4e6;
+  background: color-mix(in srgb, var(--cq-danger, #fb7185) 15%, var(--cq-surface-elevated, #101c33));
+}
+:is(body:not(.theme-light), body.theme-light) .button.danger:hover,
+:is(body:not(.theme-light), body.theme-light) .button.danger:focus-visible {
+  border-color: var(--cq-danger, #fb7185);
+  color: #fff1f2;
+  background: color-mix(in srgb, var(--cq-danger, #fb7185) 25%, var(--cq-surface-elevated, #101c33));
+}
+/* Guest empty states should expose one useful next action, not account-only
+   controls that can only fail until the player signs in. */
+.store-page.is-guest-store .store-inventory-open,
+.store-page.is-guest-store .store-gift-open,
+.store-page.is-guest-store .store-ambience-control { display: none !important; }
+.friends-hub-empty { display: grid; justify-items: center; gap: 8px; text-align: center; }
+.friends-empty-sign-in { min-width: 112px; margin-top: 4px; }
+
+/* One compact Play source of truth: modes first, board second, insight last.
+   This final rule intentionally supersedes older breakpoint fragments. */
+@media (max-width: 860px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas: "left" "center" "right" "social" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-left-sidebar { grid-area: left; }
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column { grid-area: center; }
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-right-sidebar { grid-area: right; }
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-social-bar { grid-area: social; }
+  .ai-bot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; width: 100%; }
+}
+@media (max-width: 390px) {
+  .ai-bot-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* A board owns the compact viewport. The top header remains available while
+   the fixed mobile dock yields so it can never cover playable squares. */
+body.is-board-route .mobile-bottom-nav { display: none !important; }
+body.is-board-route { padding-bottom: 0; }
+
+/* Keep the Home command deck focused: the session card and hero action are
+   the continuation paths; the duplicate fourth quick card is not. */
+:is(body:not(.theme-light), body.theme-light) #top .hero-dashboard > #homeContinueAction { display: none; }

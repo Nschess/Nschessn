@@ -455,7 +455,7 @@ html body.interactive-board-fullscreen-active #play#play.play-lobby .match-board
 
 @media (max-width: 900px) {
   body.site-tab-mode #play.play-lobby .play-shell {
-    grid-template-areas: "center" "right" "left" !important;
+    grid-template-areas: "left" "center" "right" !important;
     grid-template-columns: minmax(0, 1fr) !important;
     width: min(calc(100% - 24px), 720px) !important;
     gap: 12px !important;

@@ -4016,6 +4016,19 @@
       </form>
     </div>
 
+    <div class="quick-match-overlay" id="resignConfirmDialog" role="dialog" aria-modal="true" aria-labelledby="resignConfirmTitle" aria-describedby="resignConfirmDescription" hidden>
+      <section class="quick-match-dialog resign-confirm-dialog">
+        <span class="quick-match-symbol resign-confirm-symbol" aria-hidden="true">!</span>
+        <p class="section-kicker">Game safety</p>
+        <h2 id="resignConfirmTitle">Resign this game?</h2>
+        <p class="quick-match-status" id="resignConfirmDescription">Your opponent will receive the win and this game will move to your history.</p>
+        <div class="quick-match-setup-actions resign-confirm-actions">
+          <button class="button secondary" type="button" id="resignConfirmCancel">Keep playing</button>
+          <button class="button secondary danger" type="button" id="resignConfirmButton">Resign game</button>
+        </div>
+      </section>
+    </div>
+
     <div class="quick-match-overlay" id="matchHistoryDialog" role="dialog" aria-modal="true" aria-labelledby="matchHistoryTitle" aria-describedby="matchHistorySummary" hidden>
       <section class="quick-match-dialog match-history-dialog">
         <button class="quick-match-close" type="button" id="matchHistoryClose" aria-label="Close match history">×</button>

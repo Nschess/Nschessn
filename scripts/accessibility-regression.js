@@ -114,6 +114,27 @@ async function checkPlay(page) {
     return board?.querySelectorAll("[data-square]").length === 64
       && [...board.querySelectorAll("[data-square]")].some((square) => square.draggable);
   }, null, { timeout: 12000 });
+  await page.locator("#resignGame").click();
+  await page.locator("#resignConfirmDialog").waitFor({ state: "visible" });
+  await page.locator("#resignConfirmCancel").click();
+  await page.locator("#resignConfirmDialog").waitFor({ state: "hidden" });
+  const compactPlayLayout = await page.evaluate(() => {
+    const top = (selector) => document.querySelector(selector)?.getBoundingClientRect().top ?? 0;
+    const viewport = document.documentElement.clientWidth;
+    const dock = document.querySelector(".mobile-bottom-nav");
+    return {
+      viewport,
+      modeTop: top("#play .play-left-sidebar"),
+      boardTop: top("#play .match-board-column"),
+      dockDisplay: dock ? getComputedStyle(dock).display : "none"
+    };
+  });
+  if (compactPlayLayout.viewport <= 860) {
+    assert(compactPlayLayout.modeTop < compactPlayLayout.boardTop,
+      `play: compact mode controls must precede the board: ${JSON.stringify(compactPlayLayout)}.`);
+    assert.equal(compactPlayLayout.dockDisplay, "none",
+      `play: mobile bottom navigation must yield to the board: ${JSON.stringify(compactPlayLayout)}.`);
+  }
   await assertNoHorizontalOverflow(page, "play");
   return botMeasurements;
 }
