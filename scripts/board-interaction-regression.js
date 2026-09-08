@@ -288,8 +288,8 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v178-global-board-recovery";
-const cacheVersion = "review-v200-global-board-recovery";
+const cacheName = "nschess-shell-v179-featured-study-signature-audio";
+const cacheVersion = "review-v201-featured-study-signature-audio";
 assert.match(html, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current asset version");
 assert.match(app, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Lazy route loaders do not use the current asset version");
 assert.match(worker, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell assets do not use the current asset version");

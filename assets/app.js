@@ -195,6 +195,45 @@
       "R", "", "B", "Q", "K", "B", "", "R"
     ];
 
+    // The nine checkpoints below are taken from the verified score of Paul
+    // Morphy's 1858 Paris Opera Game. The first checkpoint is the legal
+    // position immediately before the study's starting idea, 10.Nxb5!;
+    // every later position is reached by the real game line.
+    const featuredStudyOpeningLine = Object.freeze([
+      "e4", "e5", "Nf3", "d6", "d4", "Bg4", "dxe5", "Bxf3", "Qxf3", "dxe5",
+      "Bc4", "Nf6", "Qb3", "Qe7", "Nc3", "c6", "Bg5", "b5"
+    ]);
+    const featuredStudyMoves = Object.freeze([
+      { ply: 19, move: "10.", san: "Nxb5", notation: "Nxb5!", from: "c3", to: "b5", cue: "brilliant" },
+      { ply: 20, move: "10...", san: "cxb5", notation: "cxb5", from: "c6", to: "b5", cue: "capture" },
+      { ply: 21, move: "11.", san: "Bxb5+", notation: "Bxb5+", from: "c4", to: "b5", cue: "check" },
+      { ply: 22, move: "11...", san: "Nbd7", notation: "Nbd7", from: "b8", to: "d7", cue: "move" },
+      { ply: 23, move: "12.", san: "O-O-O", notation: "O-O-O", from: "e1", to: "c1", cue: "castle" },
+      { ply: 24, move: "12...", san: "Rd8", notation: "Rd8", from: "a8", to: "d8", cue: "move" },
+      { ply: 25, move: "13.", san: "Rxd7", notation: "Rxd7", from: "d1", to: "d7", cue: "capture" },
+      { ply: 26, move: "13...", san: "Rxd7", notation: "Rxd7", from: "d8", to: "d7", cue: "capture" },
+      { ply: 27, move: "14.", san: "Rd1", notation: "Rd1", from: "h1", to: "d1", cue: "move" },
+      { ply: 28, move: "14...", san: "Qe6", notation: "Qe6", from: "e7", to: "e6", cue: "move" },
+      { ply: 29, move: "15.", san: "Bxd7+", notation: "Bxd7+", from: "b5", to: "d7", cue: "check" },
+      { ply: 30, move: "15...", san: "Nxd7", notation: "Nxd7", from: "f6", to: "d7", cue: "capture" },
+      { ply: 31, move: "16.", san: "Qb8+", notation: "Qb8+", from: "b3", to: "b8", cue: "check" },
+      { ply: 32, move: "16...", san: "Nxb8", notation: "Nxb8", from: "d7", to: "b8", cue: "capture" },
+      { ply: 33, move: "17.", san: "Rd8#", notation: "Rd8#", from: "d1", to: "d8", cue: "checkmate" }
+    ]);
+    const featuredStudyPositions = Object.freeze([
+      { ply: 18, fen: "rn2kb1r/p3qppp/2p2n2/1p2p1B1/2B1P3/1QN5/PPP2PPP/R3K2R w KQkq - 0 10", moveLabel: "10. Nxb5!", turnLabel: "White to move", title: "White prepares the sacrifice.", explanation: "White has completed development. The knight sacrifice opens the b-file and removes the pawn shield around the king.", cue: "", lastMove: [] },
+      { ply: 19, fen: "rn2kb1r/p3qppp/2p2n2/1N2p1B1/2B1P3/1Q6/PPP2PPP/R3K2R b KQkq - 0 10", moveLabel: "10. Nxb5!", turnLabel: "Black to move", title: "The knight enters on b5.", explanation: "Morphy gives up the knight to tear open the queenside. Black's only practical answer is to take it.", cue: "brilliant", lastMove: ["c3", "b5"] },
+      { ply: 21, fen: "rn2kb1r/p3qppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/R3K2R b KQkq - 0 11", moveLabel: "11. Bxb5+", turnLabel: "Black to move", title: "Check with tempo.", explanation: "Bxb5+ brings the bishop with tempo. The d7-knight is pinned and Black cannot untangle.", cue: "check", lastMove: ["c4", "b5"] },
+      { ply: 23, fen: "r3kb1r/p2nqppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/2KR3R b kq - 2 12", moveLabel: "12. O-O-O", turnLabel: "Black to move", title: "Castling joins the attack.", explanation: "O-O-O is an attacking move: the rook arrives on the open d-file while the king steps to safety.", cue: "castle", lastMove: ["e1", "c1"] },
+      { ply: 25, fen: "3rkb1r/p2Rqppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/2K4R b k - 0 13", moveLabel: "13. Rxd7", turnLabel: "Black to move", title: "The pinned knight falls.", explanation: "Rxd7 removes the pinned knight. Black's pieces are overloaded and the rook on d7 cannot hold.", cue: "capture", lastMove: ["d1", "d7"] },
+      { ply: 27, fen: "4kb1r/p2rqppp/5n2/1B2p1B1/4P3/1Q6/PPP2PPP/2KR4 b k - 1 14", moveLabel: "14. Rd1", turnLabel: "Black to move", title: "Every piece arrives.", explanation: "After ...Rxd7, Rd1 adds the last attacker to the d-file. White has coordinated every piece.", cue: "move", lastMove: ["h1", "d1"] },
+      { ply: 29, fen: "4kb1r/p2B1ppp/4qn2/4p1B1/4P3/1Q6/PPP2PPP/2KR4 b k - 0 15", moveLabel: "15. Bxd7+", turnLabel: "Black to move", title: "The final defender is removed.", explanation: "Bxd7+ clears the d-file and forces the knight to recapture, setting up the queen sacrifice.", cue: "check", lastMove: ["b5", "d7"] },
+      { ply: 31, fen: "1Q2kb1r/p2n1ppp/4q3/4p1B1/4P3/8/PPP2PPP/2KR4 b k - 1 16", moveLabel: "16. Qb8+", turnLabel: "Black to move", title: "The queen sacrifice is forced.", explanation: "Qb8+ offers the queen to drag the knight away from d7 and clear d8 for the rook.", cue: "check", lastMove: ["b3", "b8"] },
+      { ply: 33, fen: "1n1Rkb1r/p4ppp/4q3/4p1B1/4P3/8/PPP2PPP/2K5 b k - 1 17", moveLabel: "17. Rd8#", turnLabel: "Checkmate · 1–0", title: "A complete piece-coordination finish.", explanation: "Rd8# is the finish: the rook mates because the king has no flight square and the queen controls the escape.", cue: "checkmate", lastMove: ["d1", "d8"] }
+    ]);
+    const featuredStudyState = { index: 0, verified: false, playing: false, timer: 0 };
+    let featuredStudyValidationError = "";
+
     const pieceMap = {
       K: "K", Q: "Q", R: "R", B: "B", N: "N", P: "P",
       k: "k", q: "q", r: "r", b: "b", n: "n", p: "p"
@@ -3407,6 +3446,7 @@
     ]);
     const audioSfxPacks = {
       classic: { label: "Classic", accent: "#e7b65d", glow: "rgba(231, 182, 93, 0.22)", wave: "triangle", pitch: 1, gain: 1, room: 0.1, pan: 0.08, noise: 0.55, description: "Warm wooden-board clicks and clean training sounds." },
+      signature: { label: "Nschess Signature", accent: "#5cffe0", glow: "rgba(92, 255, 224, 0.24)", wave: "triangle", pitch: 1, gain: 0.96, room: 0.24, pan: 0.06, noise: 0.5, description: "Tactile board contact, a restrained interval, and quiet glass resonance." },
       modern: { label: "Modern", accent: "#7fa650", glow: "rgba(127, 166, 80, 0.24)", wave: "sine", pitch: 1.08, gain: 0.95, room: 0.08, pan: 0.1, noise: 0.42, description: "Polished, crisp UI sounds for focused play." },
       medieval: { label: "Medieval", accent: "#d19a45", glow: "rgba(209, 154, 69, 0.26)", wave: "triangle", pitch: 0.84, gain: 1.04, room: 0.2, pan: 0.12, noise: 0.62, description: "Soft bells and shield taps for story battles." },
       fantasy: { label: "Fantasy", accent: "#ae87ff", glow: "rgba(174, 135, 255, 0.28)", wave: "sine", pitch: 1.18, gain: 0.98, room: 0.24, pan: 0.14, noise: 0.36, description: "Light magical chimes for puzzles and rewards." },
@@ -4817,6 +4857,162 @@
           board.appendChild(square);
         });
         board.dataset.pieceRenderKey = renderKey;
+      });
+    }
+
+    function verifyFeaturedStudyData(Chess) {
+      try {
+        const game = new Chess();
+        featuredStudyOpeningLine.forEach((san) => {
+          if (!game.move(san)) throw new Error(`Opening move rejected: ${san}`);
+        });
+        if (game.fen() !== featuredStudyPositions[0].fen) return false;
+        featuredStudyMoves.forEach((move) => {
+          const played = game.move(move.san);
+          if (!played) throw new Error(`Study move rejected: ${move.san}`);
+          const checkpoint = featuredStudyPositions.find((position) => position.ply === move.ply);
+          if (checkpoint && game.fen() !== checkpoint.fen) throw new Error(`FEN mismatch at ${move.ply}`);
+        });
+        const finalPosition = new Chess(featuredStudyPositions.at(-1).fen);
+        return featuredStudyPositions.length === 9
+          && featuredStudyPositions.every((position) => fenToSquares(position.fen.split(/\s+/)[0]).length === 64)
+          && typeof finalPosition.isCheckmate === "function"
+          && finalPosition.isCheckmate();
+      } catch (error) {
+        featuredStudyValidationError = error?.message || "The verified study line could not be loaded.";
+        return false;
+      }
+    }
+
+    function renderFeaturedStudyNotation(position) {
+      const notation = document.getElementById("featuredStudyNotation");
+      const status = document.getElementById("featuredStudyNotationStatus");
+      if (!notation || !position) return;
+      const completed = featuredStudyMoves.filter((move) => move.ply <= position.ply);
+      notation.replaceChildren();
+      if (!completed.length) {
+        const next = document.createElement("span");
+        next.className = "featured-study-notation-next";
+        next.textContent = "Next · 10. Nxb5!";
+        notation.appendChild(next);
+      } else {
+        completed.forEach((move) => {
+          const item = document.createElement("span");
+          item.className = `featured-study-notation-move${move.ply === position.ply ? " is-current" : ""}`;
+          item.innerHTML = `<small>${move.move}</small><strong>${move.notation}</strong>`;
+          item.setAttribute("aria-label", `${move.move} ${move.notation}`);
+          notation.appendChild(item);
+        });
+        const nextMove = featuredStudyMoves.find((move) => move.ply > position.ply);
+        if (nextMove) {
+          const next = document.createElement("span");
+          next.className = "featured-study-notation-next";
+          next.textContent = `Next · ${nextMove.move} ${nextMove.notation}`;
+          notation.appendChild(next);
+        }
+      }
+      if (status) status.textContent = position.moveLabel;
+    }
+
+    function renderFeaturedStudy() {
+      const board = document.getElementById("featuredStudyBoard");
+      const position = featuredStudyPositions[featuredStudyState.index];
+      if (!board || !position) return;
+      const squares = fenToSquares(position.fen.split(/\s+/)[0]);
+      if (squares.length !== 64) return;
+      const lastMove = new Set(position.lastMove || []);
+      const fragment = document.createDocumentFragment();
+      squares.forEach((piece, index) => {
+        const squareNameValue = squareName(index);
+        const row = Math.floor(index / 8);
+        const col = index % 8;
+        const square = document.createElement("span");
+        square.className = `featured-study-square ${(row + col) % 2 === 0 ? "light" : "dark"}${lastMove.has(squareNameValue) ? " is-last" : ""}`;
+        square.dataset.square = squareNameValue;
+        square.setAttribute("role", "gridcell");
+        square.setAttribute("aria-label", getAccessibleSquareLabel(squareNameValue, piece, lastMove.has(squareNameValue) ? ["last move"] : []));
+        renderPieceOnSquare(square, piece);
+        fragment.appendChild(square);
+      });
+      board.replaceChildren(fragment);
+      board.dataset.fen = position.fen;
+      board.dataset.studyPosition = String(featuredStudyState.index + 1);
+      const count = document.getElementById("featuredStudyPositionCount");
+      const moveLabel = document.getElementById("featuredStudyMoveLabel");
+      const turn = document.getElementById("featuredStudyTurn");
+      const currentMove = document.getElementById("featuredStudyCurrentMove");
+      const explanation = document.getElementById("featuredStudyExplanation");
+      const hint = document.getElementById("featuredStudyHint");
+      if (count) count.textContent = `Position ${featuredStudyState.index + 1} / ${featuredStudyPositions.length}`;
+      if (moveLabel) moveLabel.textContent = position.moveLabel;
+      if (turn) turn.textContent = position.turnLabel;
+      if (currentMove) currentMove.textContent = position.title;
+      if (explanation) explanation.textContent = position.explanation;
+      if (hint) hint.textContent = featuredStudyValidationError
+        ? "This study could not be verified by the bundled chess rules engine."
+        : featuredStudyState.index === featuredStudyPositions.length - 1
+          ? "The real game ends here: 17. Rd8# · White wins."
+          : `Study position ${featuredStudyState.index + 1} begins ${featuredStudyState.index === 0 ? "before" : "after"} ${position.moveLabel}.`;
+      renderFeaturedStudyNotation(position);
+      const previous = document.getElementById("featuredStudyPrevious");
+      const next = document.getElementById("featuredStudyNext");
+      if (previous) previous.disabled = featuredStudyState.index === 0;
+      if (next) next.disabled = featuredStudyState.index === featuredStudyPositions.length - 1;
+      const play = document.getElementById("featuredStudyPlay");
+      if (play) {
+        play.textContent = featuredStudyState.playing ? "Pause study" : featuredStudyState.index === featuredStudyPositions.length - 1 ? "Replay study" : "Play study";
+        play.setAttribute("aria-pressed", String(featuredStudyState.playing));
+      }
+    }
+
+    function stopFeaturedStudyPlayback() {
+      window.clearTimeout(featuredStudyState.timer);
+      featuredStudyState.timer = 0;
+      featuredStudyState.playing = false;
+      renderFeaturedStudy();
+    }
+
+    function advanceFeaturedStudy(direction = 1) {
+      const nextIndex = Math.max(0, Math.min(featuredStudyPositions.length - 1, featuredStudyState.index + direction));
+      if (nextIndex === featuredStudyState.index) {
+        if (direction > 0) stopFeaturedStudyPlayback();
+        return;
+      }
+      featuredStudyState.index = nextIndex;
+      const cue = featuredStudyPositions[nextIndex]?.cue;
+      if (cue) playAudioCue(cue);
+      renderFeaturedStudy();
+      if (featuredStudyState.playing) {
+        featuredStudyState.timer = window.setTimeout(() => advanceFeaturedStudy(1), 1750);
+      }
+    }
+
+    function setupFeaturedGameStudy() {
+      const board = document.getElementById("featuredStudyBoard");
+      if (!board || setupFeaturedGameStudy.ready) return;
+      setupFeaturedGameStudy.ready = true;
+      renderFeaturedStudy();
+      document.getElementById("featuredStudyPrevious")?.addEventListener("click", () => {
+        featuredStudyState.playing = false;
+        advanceFeaturedStudy(-1);
+      });
+      document.getElementById("featuredStudyNext")?.addEventListener("click", () => advanceFeaturedStudy(1));
+      document.getElementById("featuredStudyPlay")?.addEventListener("click", () => {
+        if (featuredStudyState.playing) {
+          stopFeaturedStudyPlayback();
+          return;
+        }
+        if (featuredStudyState.index === featuredStudyPositions.length - 1) featuredStudyState.index = 0;
+        featuredStudyState.playing = true;
+        renderFeaturedStudy();
+        featuredStudyState.timer = window.setTimeout(() => advanceFeaturedStudy(1), 160);
+      });
+      void loadChessRules().then((Chess) => {
+        featuredStudyState.verified = verifyFeaturedStudyData(Chess);
+        renderFeaturedStudy();
+      }).catch((error) => {
+        featuredStudyValidationError = error?.message || "The bundled chess rules engine is unavailable.";
+        renderFeaturedStudy();
       });
     }
 
@@ -10313,9 +10509,9 @@
       save: { notes: [659.25, 880], duration: 0.042, volume: 0.009, channel: "notifications", priority: 34, gap: 0.025, cooldown: 130, cutoff: 5200 },
       purchase: { notes: [523.25, 659.25, 1046.5], duration: 0.07, volume: 0.018, channel: "notifications", priority: 58, gap: 0.038, cooldown: 180, cutoff: 6600, reverb: 0.2 },
       equip: { notes: [440, 659.25, 880], duration: 0.06, volume: 0.014, channel: "notifications", priority: 46, gap: 0.032, cooldown: 150, cutoff: 5800, reverb: 0.16 },
-      move: { notes: [164.81, 220], duration: 0.058, volume: 0.017, noise: 0.062, noiseDuration: 0.078, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.018, cooldown: 42, cutoff: 1300, q: 0.65, release: 0.034 },
+      move: { notes: [164.81, 220], duration: 0.058, volume: 0.017, noise: 0.062, noiseDuration: 0.078, noiseFilter: "bandpass", toneFilter: "lowpass", resonance: { note: 659.25, duration: 0.14, volume: 0.007 }, channel: "game", priority: 28, gap: 0.018, cooldown: 42, cutoff: 1300, q: 0.65, release: 0.034 },
       "bot-move": { notes: [146.83, 196], duration: 0.06, volume: 0.016, noise: 0.058, noiseDuration: 0.08, noiseFilter: "bandpass", toneFilter: "lowpass", channel: "game", priority: 28, gap: 0.019, cooldown: 42, cutoff: 1180, pan: -0.06, q: 0.7, release: 0.034 },
-      capture: { notes: [92, 138, 220], duration: 0.066, volume: 0.02, noise: 0.056, channel: "game", priority: 60, gap: 0.026, cutoff: 1450, cooldown: 58, reverb: 0.09, q: 1.1 },
+      capture: { notes: [92, 138, 220], duration: 0.066, volume: 0.02, noise: 0.056, resonance: { note: 523.25, duration: 0.16, volume: 0.006 }, channel: "game", priority: 60, gap: 0.026, cutoff: 1450, cooldown: 58, reverb: 0.09, q: 1.1 },
       check: { notes: [587.33, 880, 1318.51], duration: 0.066, volume: 0.018, noise: 0.006, channel: "game", priority: 76, gap: 0.035, cooldown: 95, reverb: 0.24, cutoff: 7200 },
       checkmate: { notes: [220, 330, 523.25, 987.77], duration: 0.118, volume: 0.026, noise: 0.03, channel: "coach", priority: 100, gap: 0.052, cooldown: 260, reverb: 0.28, cutoff: 6200 },
       castle: { notes: [98, 196, 392], duration: 0.082, volume: 0.018, noise: 0.036, channel: "game", priority: 52, gap: 0.036, cooldown: 130, reverb: 0.12, cutoff: 1800 },
@@ -10326,6 +10522,7 @@
       defeat: { notes: [220, 185, 146.83], duration: 0.11, volume: 0.017, noise: 0.017, channel: "coach", priority: 88, gap: 0.055, cooldown: 300, cutoff: 2200, glide: 0.9 },
       draw: { notes: [261.63, 293.66, 261.63], duration: 0.088, volume: 0.016, noise: 0.008, channel: "coach", priority: 84, gap: 0.048, cooldown: 240, reverb: 0.12 },
       correct: { notes: [493.88, 739.99], duration: 0.076, volume: 0.019, noise: 0.005, channel: "puzzle", priority: 48, gap: 0.04, cooldown: 90, reverb: 0.18 },
+      brilliant: { notes: [369.99, 554.37, 739.99, 1318.51], duration: 0.128, volume: 0.026, noise: 0.006, resonance: { note: 1567.98, duration: 0.2, volume: 0.006 }, channel: "coach", priority: 98, gap: 0.048, cooldown: 300, reverb: 0.36, cutoff: 7600, release: 0.06 },
       milestone: { notes: [392, 523.25, 783.99, 1174.66], duration: 0.11, volume: 0.027, noise: 0.012, channel: "puzzle", priority: 82, gap: 0.05, cooldown: 260, reverb: 0.3 },
       achievement: { notes: [392, 523.25, 783.99, 1174.66], duration: 0.11, volume: 0.025, noise: 0.01, channel: "notifications", priority: 80, gap: 0.05, cooldown: 260, reverb: 0.28, cutoff: 6800 },
       "game-start": { notes: [130.81, 196, 392], duration: 0.082, volume: 0.017, noise: 0.015, channel: "game", priority: 48, gap: 0.044, cooldown: 220, reverb: 0.14 },
@@ -10333,6 +10530,7 @@
       "puzzle-step": { notes: [440, 659.25], duration: 0.062, volume: 0.018, noise: 0.006, channel: "puzzle", priority: 48, gap: 0.034, cooldown: 80, reverb: 0.15 },
       "puzzle-wrong": { notes: [196, 155.56], duration: 0.074, volume: 0.013, noise: 0.022, channel: "puzzle", priority: 42, gap: 0.04, cooldown: 130, cutoff: 1800, glide: 0.86 },
       "puzzle-solved": { notes: [392, 587.33, 783.99, 1174.66], duration: 0.105, volume: 0.027, noise: 0.014, channel: "puzzle", priority: 86, gap: 0.048, cooldown: 260, reverb: 0.28 },
+      "puzzle-success": { notes: [440, 659.25, 880, 1318.51], duration: 0.108, volume: 0.024, noise: 0.008, resonance: { note: 1760, duration: 0.18, volume: 0.005 }, channel: "puzzle", priority: 88, gap: 0.046, cooldown: 260, reverb: 0.3, cutoff: 7800 },
       hint: { notes: [349.23, 523.25, 698.46], duration: 0.055, volume: 0.013, noise: 0.004, channel: "coach", priority: 38, gap: 0.035, cooldown: 120, reverb: 0.18 },
       replay: { notes: [293.66, 440, 587.33], duration: 0.064, volume: 0.014, noise: 0.006, channel: "coach", priority: 36, gap: 0.04, cooldown: 160, reverb: 0.16 },
       "page-home": { notes: [196, 293.66, 392], duration: 0.07, volume: 0.013, noise: 0.008, output: "ui", channel: "ui", priority: 24, gap: 0.04, cooldown: 220, reverb: 0.15 },
@@ -10983,7 +11181,7 @@
 
     function playAudioCue(type = "ui") {
       const prefs = readLearnerPrefs().audio;
-      const aliases = { button: "ui", click: "ui", navigation: "menu", wrong: "illegal", win: "victory", loss: "defeat", "checkmate-win": "checkmate" };
+      const aliases = { button: "ui", click: "ui", navigation: "menu", wrong: "illegal", win: "victory", loss: "defeat", "checkmate-win": "checkmate", "puzzle-successful": "puzzle-success" };
       const cueType = aliases[type] || type || "ui";
       if (cueType === "hover" && !audioManager.unlocked) return;
       if (prefs.muted || !ensureAudioGraph()) return;
@@ -11026,6 +11224,17 @@
           pan: cue.pan || pack.pan,
           reverb: (cue.reverb ?? pack.room) * 0.7,
           rate: pack.pitch,
+          priority: event.priority,
+          channel: event.channel
+        });
+      }
+      if (cue.resonance?.note) {
+        playAudioTone(cue.resonance.note * pack.pitch, cue.resonance.duration || 0.14, scaleAudioSourceGain((cue.resonance.volume || 0.006) * pack.gain * balance), "sine", output, Math.max(0.02, (cue.notes.length - 1) * (cue.gap || 0.045) + 0.025), {
+          cutoff: 6200,
+          q: 1.8,
+          reverb: Math.max(0.18, cue.reverb ?? pack.room),
+          attack: 0.012,
+          release: 0.12,
           priority: event.priority,
           channel: event.channel
         });
@@ -15004,7 +15213,7 @@
 
     function playPuzzleTone(type) {
       if (!puzzleSoundOn) return;
-      const puzzleCueMap = { correct: "puzzle-step", wrong: "puzzle-wrong", milestone: "puzzle-solved" };
+      const puzzleCueMap = { correct: "puzzle-step", wrong: "puzzle-wrong", milestone: "puzzle-success" };
       playAudioCue(puzzleCueMap[type] || type);
     }
 
@@ -18586,7 +18795,7 @@
 
     const reviewQualityMeta = {
       "Opening Book": { icon: "OB", color: "#82c9ff", cue: "menu" },
-      Brilliant: { icon: "!!", color: "#ffd36b", cue: "milestone" },
+      Brilliant: { icon: "!!", color: "#ffd36b", cue: "brilliant" },
       Best: { icon: "1", color: "#8be28b", cue: "correct" },
       Excellent: { icon: "!", color: "#9fe870", cue: "correct" },
       Great: { icon: "+", color: "#74d6ff", cue: "notification" },
@@ -27819,6 +28028,7 @@
         setupDailyGoals();
         setupMatchHistory();
         setupFirstVisitSetup();
+        setupFeaturedGameStudy();
         void initializeDeferredFeature("audio");
         buildHeroBoard();
       },
@@ -27835,7 +28045,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v200-global-board-recovery";
+    const routeModuleVersion = "review-v201-featured-study-signature-audio";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -30905,7 +31115,7 @@
       const fallbackAudio = {
         master: 70, game: 70, ui: 55, notifications: 62, puzzle: 72, coach: 66, ambience: 45,
         // Keep the legacy keys mirrored so existing saved preferences and controls remain compatible.
-        music: 45, sfx: 70, muted: false, playing: false, musicPack: "calm", sfxPack: "classic",
+        music: 45, sfx: 70, muted: false, playing: false, musicPack: "calm", sfxPack: "signature",
         shuffle: false, loop: true, crossfade: true, backgroundMusic: true, pieceSounds: true, captureSounds: true,
         checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true,
         ambientEnabled: true, hoverSounds: true, storeAmbience: false
@@ -30956,7 +31166,7 @@
       if (!audioMusicThemes[prefs.audio.musicPack] && !premiumPianoTracks[prefs.audio.musicPack]) prefs.audio.musicPack = "calm";
       const legacySfxPackMap = { arcade: "modern", crystal: "fantasy", royal: "medieval", shadow: "minimal" };
       if (legacySfxPackMap[prefs.audio.sfxPack]) prefs.audio.sfxPack = legacySfxPackMap[prefs.audio.sfxPack];
-      if (!audioSfxPacks[prefs.audio.sfxPack]) prefs.audio.sfxPack = "classic";
+      if (!audioSfxPacks[prefs.audio.sfxPack]) prefs.audio.sfxPack = "signature";
       if (prefs.audio.game == null) prefs.audio.game = prefs.audio.sfx;
       if (prefs.audio.ambience == null) prefs.audio.ambience = prefs.audio.music;
       ["master", "game", "ui", "notifications", "puzzle", "coach", "ambience"].forEach((key) => {
@@ -31135,7 +31345,7 @@
     function getDefaultAudioSettings() {
       return {
         master: 70, game: 70, ui: 55, notifications: 62, puzzle: 72, coach: 66, ambience: 45,
-        music: 45, sfx: 70, muted: false, playing: false, musicPack: "calm", sfxPack: "classic",
+        music: 45, sfx: 70, muted: false, playing: false, musicPack: "calm", sfxPack: "signature",
         shuffle: false, loop: true, crossfade: true, backgroundMusic: true, pieceSounds: true, captureSounds: true,
         checkSound: true, checkmateSound: true, promotionSound: true, timerWarning: true, outcomeSounds: true,
         ambientEnabled: true, hoverSounds: true, storeAmbience: false
@@ -31202,9 +31412,10 @@
         const key = field.dataset.audioSetting;
         if (field.tagName === "SELECT" && key === "sfxPack") {
           const owned = new Set(storeState.owned || []);
-          const options = audioSfxStoreItems
+          const builtIn = ["classic", "signature"].map((value) => ({ value, label: `${getAudioSfxPack(value).label} (built-in)` }));
+          const options = [...builtIn, ...audioSfxStoreItems
             .filter((item) => owned.has(item.id) || item.value === audio.sfxPack || !item.cost)
-            .map((item) => ({ value: item.value, label: `${getAudioSfxPack(item.value).label} (${item.rarity})` }));
+            .map((item) => ({ value: item.value, label: `${getAudioSfxPack(item.value).label} (${item.rarity})` }))];
           setSelectOptions(field, options, audio.sfxPack);
         } else if (field.tagName === "SELECT" && key === "musicPack") {
           const owned = new Set(storeState.owned || []);
@@ -31338,6 +31549,7 @@
         playAudioCue("move");
         window.setTimeout(() => playAudioCue("capture"), 130);
         window.setTimeout(() => playAudioCue("check"), 280);
+        window.setTimeout(() => playAudioCue("brilliant"), 460);
       });
       document.getElementById("settingsResetAudio")?.addEventListener("click", () => {
         writeAudioPrefs(getDefaultAudioSettings());
@@ -36383,6 +36595,10 @@
     }
     primeHomeRankings();
     void setupSupabaseAuthUi();
+    // The study is homepage content. Mount it eagerly so a delayed optional
+    // route manifest or an offline route-module fetch cannot leave the board
+    // empty while the rest of the home dashboard is already visible.
+    setupFeaturedGameStudy();
     setupSiteSearch();
     setupSiteNotifications();
     window.requestAnimationFrame(() => {
