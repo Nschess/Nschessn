@@ -94,6 +94,13 @@ after `friends.sql`, then apply
 existing queue rows in place, adds heartbeat/region/state fields, serializes
 human pairing, and authoritatively resolves the casual (12s) or rated (25s) AI
 fallback. It is safe to rerun on an existing queue without deleting player data.
+After the release-candidate security hardening migration, apply
+`supabase/migrations/20260908_matchmaking_rating_hardening.sql` so only rated
+multiplayer games update Elo; casual games retain their existing progression
+rewards without changing ratings.
+Then apply `supabase/migrations/20260908_matchmaking_pairing_security.sql` so
+the authenticated queue caller owns the server-created matchmaking challenge,
+as required by the challenge security trigger.
 
 For private in-app player reports, apply `supabase/moderation.sql` after `supabase/friends.sql`.
 
@@ -115,6 +122,24 @@ Supabase project, copy `.env.e2e.example` to `.env.e2e`, and fill in only those
 test credentials. `.env.e2e`, Playwright storage state, screenshots, and test
 artifacts are ignored by Git.
 
+### Permanent Stability Gate environment check
+
+Any test that uses Supabase privileged operations, multiple accounts, Realtime,
+matchmaking, migrations, or another external service must pass the disposable
+non-production environment gate before it is considered testable. The one
+documented setup check is:
+
+```powershell
+npm run test:environment
+```
+
+It detects the complete configuration, rejects production/personal fixture
+accounts and file-stored privileged keys, validates disposable account
+creation/reset/isolation, probes the required migration surface, and opens the
+live Realtime path. A missing prerequisite is reported as
+`BLOCKED/ENVIRONMENT`, never silently skipped or downgraded to a mock. See
+[the full test-environment contract](docs/TEST-ENVIRONMENT.md).
+
 ```powershell
 npm install
 npm run test:affected
@@ -122,8 +147,9 @@ npm run test:full
 ```
 
 `test:affected` maps changed application files to the relevant static and
-browser checks. `test:full` requires `E2E_EMAIL`/`E2E_PASSWORD`, runs the full
-regression/build/deploy suite, authenticates automatically, and verifies
+browser checks. `test:full` runs `test:environment` first, requires the
+complete disposable two-account environment, runs the full regression/build/
+deploy suite, authenticates automatically, and verifies
 session/logout, Store pending and duplicate-click behavior, wallet/ownership
 updates (when `E2E_PURCHASE_ITEM_ID` is configured), shared Name Style identity
 surfaces, board/puzzle interaction, and 1366/1024/768/390px layouts. The first
@@ -139,25 +165,24 @@ so the responsive navbar captures were regenerated after visual review. This
 records the intended compositing change; it does not weaken the pixel assertion
 or change navbar behavior.
 
-For a local E2E URL, the harness first reuses a public Supabase URL/key from
-the process environment, local project env files, or the linked
-`supabase/.temp/project-ref`. Set only the missing public value in `.env.e2e`;
-never use a service-role key. The local E2E server exposes the public values
-only through its development `/api/auth-config` response; if a value is still
-missing, it fails with `E2E_SUPABASE_NOT_CONFIGURED` instead of silently
-running as Guest Explorer. `test:full` also runs a read-only Store preflight:
+For a local E2E URL, configure the dedicated non-production public
+`E2E_SUPABASE_URL` and `E2E_SUPABASE_ANON_KEY` explicitly in `.env.e2e`; the
+environment gate does not infer a potentially production project from
+`.env.example` or `supabase/.temp/project-ref`. The local E2E server exposes
+the public values only through its development `/api/auth-config` response; if
+a value is still missing, it fails with `E2E_SUPABASE_NOT_CONFIGURED` instead
+of silently running as Guest Explorer. `test:full` also runs an authoritative
+Store preflight:
 it reports the 197-item catalog budget and the authenticated account's
 authoritative `public.profiles.coins` balance before any optional purchase
 test.
 
-If a dedicated account is not already available, run the single generated
-SQL block in the ignored `e2e-account-setup.sql` file in the production
-Supabase SQL Editor. It creates/resets only the generated `nschess-e2e-*`
-account, confirms it, provisions an isolated test wallet, and equips a test
-cosmetic. It never uses a service-role key in the browser and refuses to
-reset an account with cross-user gift relationships. The local `.env.e2e`
-already contains the matching generated credentials; no personal account is
-used.
+If a dedicated account is not already available, use the documented
+`npm run test:environment` check against the dedicated staging/test project;
+it creates or resets only generated `nschess-e2e-*` fixtures through the
+supported Auth Admin API and verifies the authoritative wallet/profile state.
+Never provision disposable fixtures in production or through a browser-held
+service key, and never use a personal account.
 
 ## Chess piece assets
 

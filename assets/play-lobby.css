@@ -407,14 +407,176 @@ body.site-tab-mode #play.play-lobby #coachBoard {
 #play.play-lobby .play-lobby-bot-info dd { margin: 0; color: var(--cq-text-primary, #f5f7ff); font-weight: 800; text-align: right; }
 #play.play-lobby .play-lobby-bot-info p { margin: 0; padding: 0 14px 14px; color: var(--cq-text-muted, #99a7c1); font-size: .63rem; line-height: 1.45; }
 
-/* The controller's native fullscreen affordance is the compact lobby control.
-   The old four-item appearance strip is intentionally removed from the flow. */
-#play.play-lobby .interactive-board-stage-tools { display: flex !important; }
+/* Lobby essentials stay visible before an opponent is selected. The shared
+   board controller still owns the generated utility rail and board size; the
+   lobby row only exposes the same existing actions in a readable position. */
+html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 82;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 6px;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  margin: 8px 0 0;
+  padding: 0;
+}
 
-/* Once fullscreen owns the viewport, restore the shared corner control as the
-   single exit affordance and remove the duplicate lobby text button. */
-body.interactive-board-fullscreen-active #play.play-lobby .interactive-board-stage-tools {
+html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .interactive-board-actions {
+  display: none !important;
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-actions > :is(.button, .play-lobby-board-control) {
+  min-width: 0;
+  min-height: 34px;
+  box-sizing: border-box;
+  border: 1px solid var(--cq-border, rgba(148,163,184,.22));
+  border-radius: 8px;
+  color: var(--cq-text-primary, #f5f7ff);
+  background: var(--cq-surface-input, #101c31);
+  font: inherit;
+  font-size: .62rem;
+  font-weight: 850;
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-actions > .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 7px;
+  cursor: pointer;
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-actions > .interactive-board-settings-button {
+  display: none !important;
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-actions > .button:hover,
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-actions > .button:focus-visible,
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-control:focus-within {
+  border-color: var(--cq-accent-secondary, #7650ed);
+  outline: none;
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 18%, var(--cq-surface-input, #101c31));
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  color: var(--cq-text-muted, #99a7c1);
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-control span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-control select {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  color: var(--cq-text-primary, #f5f7ff);
+  background: transparent;
+  font: inherit;
+  font-size: .62rem;
+  font-weight: 850;
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-board-control select:focus-visible { outline: none; }
+
+html body.site-tab-mode #play#play.play-lobby .play-lobby-time-summary {
+  color: var(--cq-text-primary, #f5f7ff);
+  font-size: .68rem;
+  font-weight: 850;
+}
+
+/* The same stage markup is reused after a bot starts. Keep that state on the
+   existing compact edge utility so the lobby-only row never adds height to an
+   active-game board or changes its sizing budget. */
+html body.site-tab-mode #play#play:not(.play-lobby):not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions,
+html body #play#play.is-active-game:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions {
+  position: absolute !important;
+  inset: 50% auto auto calc(100% + 8px) !important;
+  z-index: 120 !important;
   display: flex !important;
+  flex-direction: column;
+  gap: 4px;
+  width: 34px !important;
+  margin: 0;
+  padding: 0;
+  transform: translateY(-50%);
+}
+
+html body.site-tab-mode #play#play:not(.play-lobby):not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > :not([data-board-fullscreen-action]),
+html body #play#play.is-active-game:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > :not([data-board-fullscreen-action]) {
+  display: none !important;
+}
+
+html body.site-tab-mode #play#play:not(.play-lobby):not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action],
+html body #play#play.is-active-game:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] {
+  inline-size: 34px;
+  min-inline-size: 34px;
+  block-size: 34px;
+  min-block-size: 34px;
+  padding: 0;
+  overflow: hidden;
+}
+
+html body.site-tab-mode #play#play:not(.play-lobby):not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] [data-board-fullscreen-label],
+html body #play#play.is-active-game:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] [data-board-fullscreen-label] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* In focus mode the board host already allocates its own player/board tracks.
+   Keep the exit control attached to the board edge without adding a normal
+   flow row that could create internal fullscreen scrolling. */
+html body.interactive-board-fullscreen-active #play:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions {
+  position: absolute !important;
+  inset: 50% 4px auto auto !important;
+  z-index: 120 !important;
+  display: flex !important;
+  flex-direction: column;
+  gap: 4px;
+  width: 34px !important;
+  margin: 0;
+  padding: 0;
+  transform: translateY(-50%);
+}
+
+html body.interactive-board-fullscreen-active #play:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > :not([data-board-fullscreen-action]) {
+  display: none !important;
+}
+
+html body.interactive-board-fullscreen-active #play:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] {
+  inline-size: 34px;
+  min-inline-size: 34px;
+  block-size: 34px;
+  min-block-size: 34px;
+  padding: 0;
+  overflow: hidden;
+}
+
+html body.interactive-board-fullscreen-active #play:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] [data-board-fullscreen-label] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 body.interactive-board-fullscreen-active #play.play-lobby #playLobbyFullscreen {
@@ -478,6 +640,7 @@ html body.interactive-board-fullscreen-active #play#play.play-lobby .match-board
   #play.play-lobby .play-lobby-guest .button:first-of-type { grid-column: 1 / 2; }
   #play.play-lobby .play-lobby-guest .button:last-of-type { grid-column: 2 / 3; }
   #play.play-lobby .play-lobby-time-presets { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 420px) {
@@ -572,9 +735,427 @@ body.site-tab-mode #play#play.play-lobby .play-lobby-guest.play-auth-overlay[hid
   #play.play-lobby .play-auth-dialog { padding: 20px 16px; }
 }
 
+/* Active games keep both identity rails in the same reading order as the
+   board. The board controller reserves their height automatically; this
+   route-local layout only gives the three pieces a clear, stable column. */
+#play.is-active-game:not(.is-review-mode) {
+  padding-top: 14px !important;
+  padding-bottom: 28px !important;
+}
+
+#play.is-active-game:not(.is-review-mode) .play-shell {
+  min-height: 0 !important;
+}
+
+#play.is-active-game:not(.is-review-mode) .match-board-column {
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-areas:
+    "opponent"
+    "board"
+    "player"
+    "actions"
+    "options" !important;
+  width: min(100%, max(var(--cq-play-board-max, 836px), calc(100svh - 240px))) !important;
+  max-width: max(var(--cq-play-board-max, 836px), calc(100svh - 240px)) !important;
+  gap: 8px !important;
+}
+
+#play.is-active-game:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+  display: grid !important;
+  width: min(100%, var(--interactive-board-workspace-size, 720px)) !important;
+  max-width: var(--interactive-board-workspace-size, 720px) !important;
+  min-height: 64px !important;
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 9px 12px !important;
+}
+
+#play.is-active-game:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: opponent !important; }
+#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap { grid-area: board !important; }
+#play.is-active-game:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: player !important; }
+
+#play.is-active-game:not(.is-review-mode) .match-player-pill[data-match-rating] {
+  display: inline-flex !important;
+}
+
+#play.is-active-game:not(.is-review-mode) .player-frame-topline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+#play.is-active-game:not(.is-review-mode) .player-frame-side {
+  color: var(--cq-text-muted, #99a7c1);
+  font-size: .62rem;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+#play.is-active-game:not(.is-review-mode) .player-frame-topline .ai-player-status,
+#play.is-active-game:not(.is-review-mode) .player-frame-topline .player-frame-side {
+  margin-left: auto;
+}
+
+/* Native fullscreen owns the complete board workspace, not just the square,
+   so identity, side, clock, and active-turn state stay attached to the game. */
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  /* The board has its own calculated square size. Do not let an auto grid
+     row stretch underneath it and turn unused viewport height into a blank
+     tail. */
+  grid-template-rows: max-content max-content max-content max-content !important;
+  grid-template-areas:
+    "opponent"
+    "board"
+    "player"
+    "controls" !important;
+  align-content: center;
+  justify-items: center;
+  width: 100vw !important;
+  max-width: none !important;
+  min-height: 100svh;
+  padding: 20px !important;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 8%, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 14%, transparent), transparent 34rem),
+    var(--cq-surface-page, #071222);
+}
+
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > :is(.ai-player-card, .match-player-card, .play-board-wrap) {
+  width: min(100%, var(--interactive-board-size, 720px)) !important;
+  max-width: var(--interactive-board-size, 720px) !important;
+}
+
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar {
+  grid-area: controls !important;
+  width: min(100%, var(--interactive-board-size, 720px)) !important;
+  max-width: var(--interactive-board-size, 720px) !important;
+}
+
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > :not(.ai-player-card):not(.match-player-card):not(.play-board-wrap):not(.play-bottom-actionbar) {
+  display: none !important;
+}
+
+@media (max-width: 699px) {
+  #play.is-active-game:not(.is-review-mode) .match-board-column {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  #play.is-active-game:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+    min-height: 68px !important;
+    padding: 8px 10px !important;
+  }
+
+  html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen {
+    align-content: start;
+    padding: 10px !important;
+  }
+}
+
+/* Final Play workspace contract -----------------------------------------
+   The shared board controller owns only --interactive-board-size.  These
+   explicit grid templates keep the identity cards in fixed layout tracks so
+   a board resize cannot turn a card into part of the board's size equation.
+   The shorthand is intentional: older Play rules also set grid-template and
+   must not be able to recreate implicit action/progress rows. */
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+    grid-template: "player board opponent" max-content / minmax(158px, 172px) minmax(0, 1fr) minmax(214px, 232px) !important;
+    grid-auto-rows: max-content !important;
+    align-items: start !important;
+    justify-items: stretch !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 92px !important;
+    block-size: 104px !important;
+    align-self: start !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card {
+    grid-area: player !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    grid-area: opponent !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+    grid-template: "board opponent" minmax(0, 1fr) "board player" minmax(0, 1fr) / minmax(0, 1fr) minmax(188px, 214px) !important;
+    align-items: start !important;
+    justify-items: stretch !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 88px !important;
+    block-size: 100px !important;
+    align-self: start !important;
+    box-sizing: border-box !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card {
+    grid-area: player !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    grid-area: opponent !important;
+  }
+}
+
+@media (max-width: 900px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+    grid-template: "player" max-content "board" max-content "opponent" max-content / minmax(0, 1fr) !important;
+    grid-auto-rows: max-content !important;
+    align-items: start !important;
+    justify-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    width: min(100%, 560px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 64px !important;
+    block-size: 76px !important;
+    align-self: start !important;
+    box-sizing: border-box !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card {
+    grid-area: player !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    grid-area: opponent !important;
+  }
+}
+
+/* Hidden setup slots must not create implicit tracks. Active controls live in
+   the stable right rail; any transient bottom toolbar can overlay the board
+   without changing either player-card track. */
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-bottom-actionbar,
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .coach-setup,
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .game-options-panel {
+  grid-area: board !important;
+}
+
+/* Fullscreen uses the same player → board → opponent order, but keeps the
+   identity cards independent from the temporary board size. */
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen {
+  grid-template: "player" max-content "board" max-content "opponent" max-content "controls" max-content / minmax(0, 1fr) !important;
+  grid-auto-rows: max-content !important;
+  align-content: center !important;
+  justify-items: center !important;
+  gap: clamp(6px, 1dvh, 12px) !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card,
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card {
+  width: min(100%, 560px) !important;
+  max-width: 560px !important;
+  min-width: 0 !important;
+  block-size: clamp(58px, 7dvh, 68px) !important;
+  min-height: clamp(58px, 7dvh, 68px) !important;
+  align-self: start !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card {
+  grid-area: player !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card {
+  grid-area: opponent !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap {
+  grid-area: board !important;
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 20px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 20px) !important;
+  min-width: 0 !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar {
+  grid-area: controls !important;
+  width: min(100%, var(--interactive-board-size, 720px)) !important;
+  max-width: var(--interactive-board-size, 720px) !important;
+  min-width: 0 !important;
+}
+
+/* Center-column correction: the sidebars own the outer three-column shell;
+   both identity cards stay in the center column above/below the board. The
+   board stage gets one stable numeric grid column so the shared sizing
+   controller measures the center track rather than a card track. */
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+  grid-template: "opponent" max-content "board" minmax(0, auto) "player" max-content / minmax(0, 1fr) !important;
+  grid-template-rows: max-content minmax(0, auto) max-content !important;
+  grid-auto-rows: max-content !important;
+  align-items: start !important;
+  justify-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: max-content !important;
+  min-height: 0 !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+  grid-area: 2 / 1 / 3 / 2 !important;
+  justify-self: center !important;
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 8px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 8px) !important;
+  min-width: 0 !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card) {
+  display: grid !important;
+  width: min(100%, 560px) !important;
+  max-width: 560px !important;
+  min-width: 0 !important;
+  min-height: 76px !important;
+  block-size: 88px !important;
+  align-self: start !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+  grid-area: 1 / 1 / 2 / 2 !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card {
+  grid-area: 3 / 1 / 4 / 2 !important;
+}
+
+/* These transient slots remain in the board row when they are present, so
+   they cannot create an implicit side track or move either player card. */
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > :is(.play-bottom-actionbar, .coach-setup, .game-options-panel) {
+  grid-area: 2 / 1 / 3 / 2 !important;
+}
+
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .play-shell,
+  html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    width: min(calc(100% - 40px), 1600px) !important;
+    grid-template-columns: clamp(190px, 14vw, 220px) minmax(0, 1fr) clamp(220px, 15vw, 250px) !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card) {
+    block-size: 84px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+    grid-template: "opponent" max-content "board" minmax(0, auto) "player" max-content / minmax(0, 1fr) !important;
+    grid-template-rows: max-content minmax(0, auto) max-content !important;
+    gap: 8px !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card) {
+    width: min(100%, 560px) !important;
+    max-width: 100% !important;
+    block-size: 76px !important;
+  }
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen {
+  grid-template: "opponent" max-content "board" max-content "player" max-content "controls" max-content / minmax(0, 1fr) !important;
+  grid-template-rows: max-content max-content max-content max-content !important;
+  grid-auto-rows: max-content !important;
+  align-content: center !important;
+  justify-items: center !important;
+  gap: clamp(6px, 1dvh, 12px) !important;
+  inline-size: 100dvw !important;
+  block-size: 100dvh !important;
+  max-inline-size: none !important;
+  max-block-size: 100dvh !important;
+  min-block-size: 100dvh !important;
+  box-sizing: border-box !important;
+  padding: clamp(8px, 1.25dvh, 16px) clamp(8px, 1.5dvw, 24px) !important;
+  overflow: hidden !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap {
+  grid-area: 2 / 1 / 3 / 2 !important;
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 20px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 20px) !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card {
+  grid-area: 1 / 1 / 2 / 2 !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card {
+  grid-area: 3 / 1 / 4 / 2 !important;
+}
+
+@media (min-width: 1181px) {
+  /* Active Play previously restored the wide navigation rails after a bot
+     was chosen. Keep those rails compact so the board retains the center
+     track it had in the lobby. */
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    width: min(calc(100% - 16px), 1600px) !important;
+    grid-template-columns: clamp(132px, 10vw, 148px) minmax(0, 1fr) clamp(184px, 14vw, 204px) !important;
+  }
+
+  html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    width: min(calc(100% - 16px), 1600px) !important;
+    grid-template-columns: clamp(132px, 10vw, 148px) minmax(0, 1fr) clamp(184px, 14vw, 204px) !important;
+  }
+}
+
+/* Give the controller an explicit starting grid track.  With a named area
+   alone, getComputedStyle(grid-column-start) is `auto`; the shared controller
+   then conservatively reads the first fixed player-card track (about 152px)
+   instead of the board track. */
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+    grid-area: 1 / 2 / 2 / 3 !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+    grid-area: 1 / 1 / 3 / 2 !important;
+  }
+}
+
+@media (max-width: 900px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+    grid-area: 2 / 1 / 3 / 2 !important;
+  }
+}
+
 /* The player's frame belongs directly beneath the board in the lobby. This
    frees the board column from the old Flip / Theme / Pieces / Full screen
-   strip while keeping the shared corner fullscreen control available. */
+   strip while keeping the shared right-edge resize/fullscreen gesture. */
 html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-board-sizing-stage {
   grid-template-areas:
     "opponent"
@@ -588,7 +1169,7 @@ html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-bo
 }
 
 #play.play-lobby .interactive-board-stage-tools {
-  display: flex !important;
+  display: none !important;
   position: relative;
   z-index: 40;
 }
@@ -599,8 +1180,13 @@ html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-bo
 }
 
 #play .interactive-board-resize-handle {
-  position: relative;
-  z-index: 40;
+  position: absolute;
+  top: auto;
+  right: -46px;
+  bottom: -8px;
+  inline-size: 58px;
+  block-size: 58px;
+  z-index: 80;
 }
 
 #play .interactive-board-sizing-stage {
@@ -621,7 +1207,10 @@ html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-bo
 }
 
 #play.is-active-game:not(.is-review-mode) .match-board-column {
-  min-height: calc(var(--interactive-board-workspace-size, 720px) + 160px) !important;
+  /* Live actions now live in the right rail. Do not reserve a second
+     action-bar-sized tail below the board or the controls disappear below
+     the fold on ordinary laptop viewports. */
+  min-height: 0 !important;
 }
 
 html body.site-tab-mode #play#play.play-lobby .match-board-column > .match-player-card {
@@ -657,4 +1246,1310 @@ html body.site-tab-mode #play#play.play-lobby .match-board-column > .match-playe
    reopened beside an active board. */
 #play.is-active-game:not(.is-review-mode) .match-board-column > .coach-setup {
   display: none !important;
+}
+
+/* Active match controls ---------------------------------------------------
+   Popular chess layouts keep draw/resign beside the board and ask for a
+   confirmation before resignation. Nschess keeps that familiar hierarchy in
+   its own Live match card so the Game Ready setup can never leak into an
+   active game. */
+#play.play-lobby #playActiveControls,
+#play:not(.is-active-game) #playActiveControls,
+#play.is-review-mode #playActiveControls {
+  display: none !important;
+}
+
+#play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+  display: grid !important;
+  align-content: start;
+  gap: 10px;
+  max-height: calc(100svh - 112px);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+#play.is-active-game:not(.is-review-mode) #playLobbySettings {
+  display: none !important;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls {
+  display: grid !important;
+  order: -3;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 50%, var(--cq-border, rgba(148,163,184,.18)));
+  border-radius: 14px;
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 14%, transparent), transparent 52%),
+    var(--cq-surface-glass, #0b1527);
+  box-shadow: var(--cq-inset-highlight, inset 0 1px 0 rgba(255,255,255,.05)), 0 14px 28px rgba(2, 8, 18, .2);
+}
+
+#play.is-active-game:not(.is-review-mode) .play-active-controls-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cq-border, rgba(148,163,184,.18));
+}
+
+#play.is-active-game:not(.is-review-mode) .play-active-controls-heading .section-kicker {
+  color: var(--cq-accent-tertiary, #65e7f7);
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+#play.is-active-game:not(.is-review-mode) .play-active-controls-heading h3 {
+  margin: 0;
+  color: var(--cq-text-primary, #f5f7ff);
+  font-size: .9rem;
+  line-height: 1.15;
+}
+
+#play.is-active-game:not(.is-review-mode) .play-active-controls-heading p {
+  margin: 0;
+  color: var(--cq-text-muted, #99a7c1);
+  font-size: .64rem;
+  line-height: 1.4;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-primary-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-primary-actions > .button,
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions {
+  min-width: 0;
+  min-height: 42px;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-primary-actions > [hidden],
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions:not([open]) > .play-extra-actions-menu {
+  display: none !important;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-start-button {
+  grid-column: 1 / -1;
+  min-height: 44px;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-draw-action,
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-resign-action {
+  min-height: 42px;
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-resign-action {
+  border-color: color-mix(in srgb, var(--red, #ef7b7b) 60%, var(--cq-border, rgba(148,163,184,.18)));
+  color: #ffd9dd;
+  background: color-mix(in srgb, var(--red, #ef7b7b) 13%, var(--cq-surface-input, #101c31));
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions {
+  grid-column: 1 / -1;
+  position: relative;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 8px;
+  border: 1px solid var(--cq-border, rgba(148,163,184,.18));
+  border-radius: 8px;
+  color: var(--cq-text-muted, #99a7c1);
+  background: var(--cq-surface-input, #101c31);
+  font-size: .66rem;
+  font-weight: 850;
+  list-style: none;
+  cursor: pointer;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions > summary::-webkit-details-marker { display: none; }
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions-menu {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--cq-border, rgba(148,163,184,.18));
+  border-radius: 10px;
+  background: var(--cq-surface-elevated, #101c31);
+  box-shadow: none;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions-menu .button {
+  min-height: 34px;
+  padding: 6px 7px;
+  font-size: .62rem;
+}
+
+#play.is-active-game:not(.is-review-mode) #playActiveControls .play-flip-action {
+  border-color: color-mix(in srgb, var(--cq-accent-tertiary, #65e7f7) 42%, var(--cq-border, rgba(148,163,184,.18)));
+  color: var(--cq-text-primary, #f5f7ff);
+  background: color-mix(in srgb, var(--cq-accent-tertiary, #65e7f7) 9%, var(--cq-surface-input, #101c31));
+}
+
+@media (min-width: 901px) {
+  #play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+    position: sticky;
+    top: 12px;
+  }
+}
+
+@media (max-width: 900px) {
+  #play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* Focus mode uses a temporary board size calculated by the shared controller.
+   Keep the native fullscreen host in viewport coordinates so the board can
+   consume the available space instead of inheriting its normal-mode width. */
+html body.interactive-board-fullscreen-active {
+  overflow: hidden !important;
+}
+
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen {
+  width: 100vw !important;
+  width: 100dvw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  min-height: 100dvh !important;
+  box-sizing: border-box !important;
+  padding: clamp(12px, 2dvh, 24px) clamp(12px, 2vw, 28px) !important;
+  gap: clamp(6px, 1dvh, 12px) !important;
+  align-content: center !important;
+  overflow: hidden !important;
+}
+
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > :is(.ai-player-card, .match-player-card) {
+  width: min(100%, var(--interactive-board-workspace-size, 720px)) !important;
+  max-width: var(--interactive-board-workspace-size, 720px) !important;
+}
+
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap {
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 20px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 20px) !important;
+  min-width: 0 !important;
+}
+
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen .interactive-board-actions {
+  opacity: .42;
+  transition: opacity 160ms ease;
+}
+
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen .interactive-board-actions:hover,
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen .interactive-board-actions:focus-within {
+  opacity: 1;
+}
+
+@media (max-width: 899px) {
+  /* The compact Play shell clips horizontal overflow. Keep the utility rail
+     inside the board edge at tablet/mobile widths so Fullscreen remains a
+     real pointer target instead of a visually present, clipped control. */
+  #play:not(.is-review-mode) .interactive-board-actions {
+    inset: 50% 4px auto auto;
+    transform: translateY(-50%);
+  }
+
+  html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen .interactive-board-actions {
+    inset: 50% 4px auto auto;
+    transform: translateY(-50%);
+  }
+}
+
+/* Board-first Play workspace correction ----------------------------------
+   Keep the shared interactive-board controller as the only owner of the
+   square's size.  The surrounding player rails use fixed tracks, so a manual
+   board resize can never reflow, compress, or hide either identity card. */
+@media (min-width: 1181px) {
+  body.site-tab-mode #play.play-lobby .play-shell {
+    --play-lobby-left: clamp(190px, 14vw, 220px);
+    --play-lobby-right: clamp(220px, 15vw, 250px);
+    grid-template-columns: var(--play-lobby-left) minmax(0, 1fr) var(--play-lobby-right) !important;
+    width: min(calc(100% - 40px), 1600px) !important;
+  }
+
+  body.site-tab-mode #play.play-lobby .match-board-column,
+  html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-board-sizing-stage {
+    grid-template-columns: minmax(158px, 172px) minmax(0, 1fr) minmax(214px, 232px) !important;
+    grid-template-areas:
+      "player board opponent"
+      "player board progress"
+      "player board controls" !important;
+    align-items: start !important;
+    justify-items: stretch !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > .match-player-card,
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > .ai-player-card {
+    align-self: start !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 92px !important;
+    block-size: 104px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > .match-player-card {
+    grid-area: player !important;
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    padding: 8px !important;
+    gap: 5px 8px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > .ai-player-card {
+    grid-area: opponent !important;
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    padding: 8px !important;
+    gap: 5px 8px !important;
+  }
+
+  #play.play-lobby .match-board-column > .match-player-card .match-player-avatar,
+  #play.play-lobby .match-board-column > .ai-player-card .ai-player-avatar {
+    width: 38px !important;
+    height: 38px !important;
+    grid-column: 1 !important;
+    grid-row: 1 / 3 !important;
+  }
+
+  #play.play-lobby .match-board-column > .match-player-card .match-player-main,
+  #play.play-lobby .match-board-column > .ai-player-card .ai-player-main {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    min-width: 0 !important;
+  }
+
+  #play.play-lobby .match-board-column > .match-player-card .match-player-meta {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #play.play-lobby .match-board-column > .match-player-card .match-player-timer,
+  #play.play-lobby .match-board-column > .ai-player-card .ai-player-timer,
+  #play.play-lobby .match-board-column > .match-player-card .player-frame-details,
+  #play.play-lobby .match-board-column > .ai-player-card .player-frame-details,
+  #play.play-lobby .match-board-column > .match-player-card .player-frame-topline,
+  #play.play-lobby .match-board-column > .ai-player-card .player-frame-topline,
+  #play.play-lobby .match-board-column > .match-player-card .player-frame-footer,
+  #play.play-lobby .match-board-column > .ai-player-card .player-frame-footer {
+    display: none !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > .play-board-wrap {
+    grid-area: board !important;
+    justify-self: center !important;
+    min-width: 0 !important;
+    width: min(100%, calc(var(--interactive-board-size, 720px) + 8px)) !important;
+    max-width: calc(var(--interactive-board-size, 720px) + 8px) !important;
+  }
+
+  /* Do not let the fixed side rails inherit the board's requested size. */
+  #play.play-lobby .match-board-column > :is(.match-player-card, .ai-player-card) {
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  body.site-tab-mode #play.play-lobby .match-board-column,
+  html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-board-sizing-stage {
+    grid-template-columns: minmax(0, 1fr) minmax(188px, 214px) !important;
+    grid-template-areas:
+      "board opponent"
+      "board player" !important;
+    align-items: start !important;
+    justify-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > .play-board-wrap {
+    grid-area: board !important;
+    justify-self: center !important;
+    min-width: 0 !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > :is(.match-player-card, .ai-player-card) {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 88px !important;
+    block-size: 100px !important;
+    box-sizing: border-box !important;
+    padding: 8px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  body.site-tab-mode #play.play-lobby .match-board-column,
+  html body.site-tab-mode #play#play.play-lobby .match-board-column.interactive-board-sizing-stage {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas:
+      "player"
+      "board"
+      "opponent" !important;
+    align-items: start !important;
+    justify-items: center !important;
+    gap: 8px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > :is(.match-player-card, .ai-player-card) {
+    width: min(100%, 560px) !important;
+    max-width: 100% !important;
+    min-height: 64px !important;
+    block-size: 76px !important;
+    box-sizing: border-box !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .match-board-column > .play-board-wrap {
+    grid-area: board !important;
+    width: min(100%, calc(var(--interactive-board-size, 720px) + 8px)) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Final cascade boundary: this block intentionally stays last in the route
+   stylesheet. It overrides the legacy Play compositions without touching the
+   shared sizing/drag controller. */
+@media (min-width: 1181px) {
+  /* Active Play previously restored the wide navigation rails after a bot
+     was chosen. Keep those rails compact so the board retains the center
+     track it had in the lobby. */
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    width: min(calc(100% - 16px), 1600px) !important;
+    grid-template-columns: clamp(132px, 10vw, 148px) minmax(0, 1fr) clamp(184px, 14vw, 204px) !important;
+  }
+
+  html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    width: min(calc(100% - 16px), 1600px) !important;
+    grid-template-columns: clamp(132px, 10vw, 148px) minmax(0, 1fr) clamp(184px, 14vw, 204px) !important;
+  }
+}
+
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+    grid-template: "player board opponent" max-content / minmax(114px, 116px) minmax(0, 1fr) minmax(152px, 154px) !important;
+    grid-auto-rows: max-content !important;
+    align-items: start !important;
+    justify-items: stretch !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+    grid-area: 1 / 2 / 2 / 3 !important;
+    justify-self: center !important;
+    min-width: 0 !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 92px !important;
+    block-size: 104px !important;
+    align-self: start !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    gap: 4px 6px !important;
+    padding: 7px !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card .match-player-avatar,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card .ai-player-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    grid-column: 1 !important;
+    grid-row: 1 / 3 !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card .match-player-main,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card .ai-player-main {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    min-width: 0 !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card .match-player-meta {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card .match-player-timer,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card .ai-player-timer,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card .player-frame-details,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card .player-frame-details,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card .player-frame-topline,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card .player-frame-topline,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card .player-frame-footer,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card .player-frame-footer {
+    display: none !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: player !important; }
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: opponent !important; }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+    grid-template: "board opponent" minmax(0, 1fr) "board player" minmax(0, 1fr) / minmax(0, 1fr) minmax(188px, 214px) !important;
+    align-items: start !important;
+    justify-items: stretch !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+    grid-area: 1 / 1 / 3 / 2 !important;
+    justify-self: center !important;
+    min-width: 0 !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 88px !important;
+    block-size: 100px !important;
+    align-self: start !important;
+    box-sizing: border-box !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: player !important; }
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: opponent !important; }
+}
+
+@media (max-width: 900px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+    grid-template: "player" max-content "board" max-content "opponent" max-content / minmax(0, 1fr) !important;
+    grid-auto-rows: max-content !important;
+    align-items: start !important;
+    justify-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+    grid-area: 2 / 1 / 3 / 2 !important;
+    justify-self: center !important;
+    min-width: 0 !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card,
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card {
+    width: min(100%, 560px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 64px !important;
+    block-size: 76px !important;
+    align-self: start !important;
+    box-sizing: border-box !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: player !important; }
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: opponent !important; }
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-bottom-actionbar,
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .coach-setup,
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .game-options-panel {
+  grid-area: board !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen {
+  grid-template: "player" max-content "board" max-content "opponent" max-content "controls" max-content / minmax(0, 1fr) !important;
+  grid-auto-rows: max-content !important;
+  align-content: center !important;
+  justify-items: center !important;
+  gap: clamp(6px, 1dvh, 12px) !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card,
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card {
+  width: min(100%, 560px) !important;
+  max-width: 560px !important;
+  min-width: 0 !important;
+  min-height: clamp(58px, 7dvh, 68px) !important;
+  block-size: clamp(58px, 7dvh, 68px) !important;
+  align-self: start !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card { grid-area: player !important; }
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card { grid-area: opponent !important; }
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap {
+  grid-area: board !important;
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 20px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 20px) !important;
+  min-width: 0 !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar {
+  grid-area: controls !important;
+  width: min(100%, var(--interactive-board-size, 720px)) !important;
+  max-width: var(--interactive-board-size, 720px) !important;
+  min-width: 0 !important;
+}
+/* Final center-column layout boundary. This intentionally stays at EOF so
+   older Play compositions cannot put the player cards beside the board. */
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+  grid-template: "opponent" max-content "board" minmax(0, auto) "player" max-content / minmax(0, 1fr) !important;
+  grid-template-rows: max-content minmax(0, auto) max-content !important;
+  grid-auto-rows: max-content !important;
+  align-items: start !important;
+  justify-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: max-content !important;
+  min-height: 0 !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .play-board-wrap {
+  grid-area: 2 / 1 / 3 / 2 !important;
+  justify-self: center !important;
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 8px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 8px) !important;
+  min-width: 0 !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card) {
+  display: grid !important;
+  width: min(100%, 560px) !important;
+  max-width: 560px !important;
+  min-width: 0 !important;
+  min-height: 76px !important;
+  block-size: 88px !important;
+  align-self: start !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .ai-player-card { grid-area: 1 / 1 / 2 / 2 !important; }
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > .match-player-card { grid-area: 3 / 1 / 4 / 2 !important; }
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > :is(.play-bottom-actionbar, .coach-setup, .game-options-panel) { grid-area: 2 / 1 / 3 / 2 !important; }
+
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .play-shell,
+  html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    width: min(calc(100% - 40px), 1600px) !important;
+    grid-template-columns: clamp(190px, 14vw, 220px) minmax(0, 1fr) clamp(220px, 15vw, 250px) !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card) { block-size: 84px !important; }
+}
+
+@media (max-width: 900px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area {
+    grid-template: "opponent" max-content "board" minmax(0, auto) "player" max-content / minmax(0, 1fr) !important;
+    grid-template-rows: max-content minmax(0, auto) max-content !important;
+    gap: 8px !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column > :is(.match-player-card, .ai-player-card) {
+    width: min(100%, 560px) !important;
+    max-width: 100% !important;
+    block-size: 76px !important;
+  }
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen {
+  grid-template: "opponent" max-content "board" max-content "player" max-content "controls" max-content / minmax(0, 1fr) !important;
+  grid-template-rows: max-content max-content max-content max-content !important;
+  grid-auto-rows: max-content !important;
+  align-content: center !important;
+  justify-items: center !important;
+  gap: clamp(6px, 1dvh, 12px) !important;
+  inline-size: 100dvw !important;
+  block-size: 100dvh !important;
+  max-inline-size: none !important;
+  max-block-size: 100dvh !important;
+  min-block-size: 100dvh !important;
+  box-sizing: border-box !important;
+  padding: clamp(8px, 1.25dvh, 16px) clamp(8px, 1.5dvw, 24px) !important;
+  overflow: hidden !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap {
+  grid-area: 2 / 1 / 3 / 2 !important;
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 20px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 20px) !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card { grid-area: 1 / 1 / 2 / 2 !important; }
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card { grid-area: 3 / 1 / 4 / 2 !important; }
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar {
+  grid-area: 4 / 1 / 5 / 2 !important;
+  width: min(100%, var(--interactive-board-size, 720px)) !important;
+  max-width: var(--interactive-board-size, 720px) !important;
+  min-width: 0 !important;
+}
+@media (min-width: 1181px) {
+  /* Match the lobby's full three-column shell after the game starts too. */
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .play-shell,
+html body #play#play.is-active-game.is-active-game:not(.is-review-mode) .play-shell {
+    width: min(calc(100% - 40px), 1600px) !important;
+    grid-template-columns: clamp(190px, 14vw, 220px) minmax(0, 1fr) clamp(220px, 15vw, 250px) !important;
+  }
+}
+
+/* Enter fullscreen with the Play host already in its viewport-sized layout.
+   fullscreenchange updates the shared board controller before it toggles the
+   body marker class, so this :fullscreen-only boundary prevents the first
+   measurement from reading the normal, narrow center-column track. */
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen {
+  display: grid !important;
+  grid-template: "opponent" max-content "board" max-content "player" max-content "controls" max-content / minmax(0, 1fr) !important;
+  grid-template-rows: max-content max-content max-content max-content !important;
+  grid-auto-rows: max-content !important;
+  align-content: center !important;
+  justify-items: center !important;
+  gap: clamp(6px, 1dvh, 12px) !important;
+  inline-size: 100dvw !important;
+  block-size: 100dvh !important;
+  max-inline-size: none !important;
+  max-block-size: 100dvh !important;
+  min-block-size: 100dvh !important;
+  box-sizing: border-box !important;
+  padding: clamp(8px, 1.25dvh, 16px) clamp(8px, 1.5dvw, 24px) !important;
+  overflow: hidden !important;
+}
+
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap {
+  grid-area: 2 / 1 / 3 / 2 !important;
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 20px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 20px) !important;
+  min-width: 0 !important;
+}
+
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card {
+  grid-area: 1 / 1 / 2 / 2 !important;
+  width: min(100%, 560px) !important;
+  max-width: 560px !important;
+  min-width: 0 !important;
+  min-height: clamp(58px, 7dvh, 68px) !important;
+  block-size: clamp(58px, 7dvh, 68px) !important;
+}
+
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card {
+  grid-area: 3 / 1 / 4 / 2 !important;
+  width: min(100%, 560px) !important;
+  max-width: 560px !important;
+  min-width: 0 !important;
+  min-height: clamp(58px, 7dvh, 68px) !important;
+  block-size: clamp(58px, 7dvh, 68px) !important;
+}
+
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar {
+  grid-area: 4 / 1 / 5 / 2 !important;
+  width: min(100%, var(--interactive-board-size, 720px)) !important;
+  max-width: var(--interactive-board-size, 720px) !important;
+  min-width: 0 !important;
+}
+
+/* The shared fullscreen rail remains the source of truth. During an active
+   game it sits just outside the board stage, on the boundary of the secondary
+   rail; lift its normal discovery opacity so the existing control is actually
+   discoverable without changing the board geometry or focus-mode math. */
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions {
+  z-index: 120 !important;
+  opacity: .56;
+}
+
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions:hover,
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions:focus-within,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions:hover,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions:focus-within {
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  /* Keep the active-game utility rail outside the square at compact widths.
+     The board stage retains enough measured side room for this 34px rail;
+     placing it back inside the square would put the focus control on top of
+     the piece interaction surface. */
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions,
+  html body #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions {
+    inset: 50% auto auto calc(100% + 8px);
+    transform: translateY(-50%);
+  }
+}
+
+@media (max-width: 700px) {
+  /* Compact Play shells intentionally clip horizontal overflow. Use the
+     measured two-pixel frame edge as the rail anchor and a compact utility
+     control so the fullscreen action stays outside the board without being
+     clipped by the shell. */
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions,
+  html body #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions {
+    inset-inline-start: calc(100% - 2px);
+    inset-inline-end: auto;
+    inline-size: 24px;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions :is(.interactive-board-fullscreen-button, .interactive-board-settings-button),
+  html body #play#play.is-active-game:not(.is-review-mode) .match-board-column > .play-board-wrap > .interactive-board-actions :is(.interactive-board-fullscreen-button, .interactive-board-settings-button) {
+    inline-size: 24px;
+    block-size: 24px;
+    min-block-size: 24px;
+    border-radius: 8px;
+    font-size: .78rem;
+  }
+}
+
+/* Active games keep the existing compact player strips, but their live
+   clocks are essential game state. The earlier lobby-density cascade hides
+   these fields; restore only the two active-card timer elements without
+   changing the card tracks or board sizing. */
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column > .ai-player-card .ai-player-timer,
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column > .match-player-card .match-player-timer,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column > .ai-player-card .ai-player-timer,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column > .match-player-card .match-player-timer {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* A manual resize changes only the square. Keep the normal active-game
+   player strips on their established workspace width, clamped only by the
+   viewport so the visible clocks do not reflow with the board. Fullscreen
+   continues to use its existing viewport-fit card rules above. */
+html body.site-tab-mode:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card),
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+  inline-size: var(--play-strip-size, var(--interactive-board-workspace-size, 720px)) !important;
+  width: var(--play-strip-size, var(--interactive-board-workspace-size, 720px)) !important;
+  max-inline-size: min(var(--play-strip-size, var(--interactive-board-workspace-size, 720px)), calc(100vw - 24px)) !important;
+  max-width: min(var(--play-strip-size, var(--interactive-board-workspace-size, 720px)), calc(100vw - 24px)) !important;
+}
+
+/* During the native fullscreen transition dvw/dvh briefly describe the
+   pre-fullscreen visual viewport. Large viewport units keep the first
+   controller measurement on the same stable fullscreen coordinate space. */
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen,
+html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen {
+  inline-size: 100lvw !important;
+  block-size: 100lvh !important;
+}
+
+/* Active mobile Play is board-first. Keep mode/settings rails available, but
+   place them after the playable workspace so the first useful viewport is the
+   board and its two identity cards. The fullscreen host is outside this
+   normal-flow shell and remains governed by the frozen focus rules above. */
+@media (max-width: 900px) {
+  body.site-tab-mode:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "right" "left" "social" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* On compact fullscreen widths the board can legitimately fill the viewport.
+   Keep the resize hit area inside the stage instead of placing its center past
+   the right edge, which would make a real pointer drag unreachable. */
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap > [data-board-resize-handle],
+html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap > [data-board-resize-handle] {
+  inset-inline-end: 0 !important;
+  inline-size: 28px !important;
+  inset-block-start: 24px !important;
+  inset-block-end: 24px !important;
+}
+
+
+/* Final compact player-strip contract. The shared board controller already
+   measures these rendered cards when fitting focus mode; this boundary only
+   gives that measurement the smallest useful, stable strips and keeps the
+   board in the center column at every Play breakpoint. */
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area {
+  grid-template: "opponent" max-content "board" max-content "player" max-content / minmax(0, 1fr) !important;
+  grid-template-rows: max-content max-content max-content !important;
+  grid-auto-rows: max-content !important;
+  align-items: start !important;
+  justify-items: center !important;
+  gap: clamp(6px, .7dvh, 10px) !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: max-content !important;
+  min-height: 0 !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > .play-board-wrap,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > .play-board-wrap {
+  grid-area: board !important;
+  justify-self: center !important;
+  min-width: 0 !important;
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 8px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 8px) !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card),
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) {
+  display: grid !important;
+  inline-size: min(100%, var(--play-strip-size, var(--user-board-size, var(--interactive-board-workspace-size, 720px)))) !important;
+  max-inline-size: var(--play-strip-size, var(--user-board-size, var(--interactive-board-workspace-size, 720px))) !important;
+  width: min(100%, var(--play-strip-size, var(--user-board-size, var(--interactive-board-workspace-size, 720px)))) !important;
+  max-width: var(--play-strip-size, var(--user-board-size, var(--interactive-board-workspace-size, 720px))) !important;
+  min-width: 0 !important;
+  min-height: 52px !important;
+  block-size: 58px !important;
+  max-block-size: 60px !important;
+  align-self: start !important;
+  margin: 0 !important;
+  padding: 6px 10px !important;
+  box-sizing: border-box !important;
+  grid-template-columns: 34px minmax(0, 1fr) auto !important;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 0 8px !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > .ai-player-card,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > .ai-player-card {
+  grid-area: opponent !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > .match-player-card,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > .match-player-card {
+  grid-area: player !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.player-frame-topline, .player-frame-details, .player-frame-footer),
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.player-frame-topline, .player-frame-details, .player-frame-footer) {
+  display: none !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-avatar, .match-player-avatar),
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-avatar, .match-player-avatar) {
+  grid-column: 1 !important;
+  grid-row: 1 / 3 !important;
+  align-self: center !important;
+  justify-self: start !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 10px !important;
+  font-size: .9rem !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-main, .match-player-main),
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-main, .match-player-main) {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  min-width: 0 !important;
+  display: grid !important;
+  gap: 1px !important;
+  overflow: hidden !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-main strong, .match-player-main strong),
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-main strong, .match-player-main strong) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .78rem !important;
+  line-height: 1.05 !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-main small, .match-player-main small, .match-player-subline),
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-main small, .match-player-main small, .match-player-subline) {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cq-text-muted, #99a7c1);
+  font-size: .58rem !important;
+  line-height: 1.05 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > .ai-player-card .ai-player-last,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > .ai-player-card .ai-player-last {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  align-self: center !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  background: transparent !important;
+  font-size: .55rem !important;
+  line-height: 1 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > .match-player-card .match-player-meta,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > .match-player-card .match-player-meta {
+  grid-column: 2 / 4 !important;
+  grid-row: 2 !important;
+  align-self: center !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  gap: 4px !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > .match-player-card .match-player-pill,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > .match-player-card .match-player-pill {
+  min-height: 0 !important;
+  padding: 0 5px !important;
+  font-size: .55rem !important;
+  line-height: 1.05 !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > .match-player-card .match-player-pill[data-match-rating],
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > .match-player-card .match-player-pill[data-match-rating] {
+  display: inline-flex !important;
+}
+
+html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-timer, .match-player-timer),
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-timer, .match-player-timer) {
+  grid-column: 3 !important;
+  grid-row: 1 / 3 !important;
+  align-self: center !important;
+  justify-self: end !important;
+  min-width: 48px !important;
+  min-height: 26px !important;
+  padding: 4px 7px !important;
+  font-size: .68rem !important;
+  line-height: 1 !important;
+}
+
+/* Focus mode uses the same strips, then lets the existing fullscreen fit
+   calculation spend the recovered height on the square board. */
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > :is(.ai-player-card, .match-player-card) {
+  inline-size: min(100%, var(--interactive-board-workspace-size, 720px)) !important;
+  max-inline-size: var(--interactive-board-workspace-size, 720px) !important;
+  width: min(100%, var(--interactive-board-workspace-size, 720px)) !important;
+  max-width: var(--interactive-board-workspace-size, 720px) !important;
+  min-height: 52px !important;
+  block-size: 58px !important;
+  max-block-size: 60px !important;
+}
+
+/* The older active-game fullscreen selectors include one extra class in
+   their specificity. Repeat the two concrete strips here so the compact
+   contract remains the final owner without touching board-size math. */
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card,
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card,
+html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card,
+html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card {
+  inline-size: min(100%, var(--interactive-board-workspace-size, 720px)) !important;
+  max-inline-size: var(--interactive-board-workspace-size, 720px) !important;
+  width: min(100%, var(--interactive-board-workspace-size, 720px)) !important;
+  max-width: var(--interactive-board-workspace-size, 720px) !important;
+  min-height: 52px !important;
+  block-size: 58px !important;
+  max-block-size: 60px !important;
+}
+
+@media (max-width: 700px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card),
+  html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card),
+  html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > :is(.ai-player-card, .match-player-card) {
+    block-size: 54px !important;
+    min-height: 50px !important;
+    padding-inline: 7px !important;
+    grid-template-columns: 30px minmax(0, 1fr) auto !important;
+    column-gap: 6px !important;
+  }
+
+  html body.site-tab-mode #play#play:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-avatar, .match-player-avatar),
+  html body #play#play.is-active-game:not(.is-review-mode) .match-board-column.chess-board-area > :is(.ai-player-card, .match-player-card) :is(.ai-player-avatar, .match-player-avatar),
+  html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > :is(.ai-player-card, .match-player-card) :is(.ai-player-avatar, .match-player-avatar) {
+    width: 28px !important;
+    height: 28px !important;
+  }
+}
+
+/* Wide Play density ------------------------------------------------------
+   The board controller still owns the square's requested/physical size. The
+   shell only makes its center track follow the already-rendered board stage,
+   which removes the unused dark gutter without changing board-size math.
+   app.js measures the shell's available center budget independently so this
+   max-content track cannot feed back into the normal resize calculation. */
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play.play-lobby .play-shell,
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .play-shell,
+  html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    grid-template-columns:
+      clamp(204px, 12.5vw, 240px)
+      max-content
+      clamp(224px, 14vw, 260px) !important;
+    column-gap: clamp(12px, .85vw, 16px) !important;
+    justify-content: center !important;
+  }
+}
+
+/* The Play social strip is intentionally absent from the markup. Keep its
+   former named grid area from creating an empty row at any breakpoint. */
+html body.site-tab-mode #play#play:not(.is-review-mode) .play-shell,
+html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+  grid-template-areas: "left center right" !important;
+  grid-template-rows: max-content !important;
+}
+
+@media (max-width: 1180px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .play-shell,
+  html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center center" "left right" !important;
+    grid-template-rows: max-content max-content !important;
+  }
+}
+
+@media (max-width: 860px) {
+  html body.site-tab-mode #play#play:not(.is-review-mode) .play-shell,
+  html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "right" "left" !important;
+    grid-template-rows: max-content max-content max-content !important;
+  }
+}
+
+@media (max-width: 900px) {
+  /* The active-game mobile contract is more specific than the shared
+     responsive shell rule above; repeat the same three tracks here so the
+     removed social area cannot survive as a zero-height implicit row. */
+  html body.site-tab-mode:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "right" "left" !important;
+    grid-template-rows: max-content max-content max-content !important;
+  }
+
+}
+
+@media (max-width: 700px) {
+  /* Keep the active game's fullscreen control inside the board frame on
+     narrow phone/tablet layouts. The board wrapper clips its horizontal
+     overflow, while wider tablet widths still have room for the edge rail. */
+  html body.site-tab-mode #play#play:not(.play-lobby):not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions,
+  html body #play#play.is-active-game:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions {
+    inset: auto 4px 4px auto !important;
+    transform: none !important;
+  }
+}
+
+/* The lobby keeps only the existing Fullscreen action from this stage hook.
+   The removed customization controls must not leave an empty controls row or
+   contribute height to the board workspace. With the hook flattened, the
+   fullscreen action is positioned against the existing board wrapper. */
+html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions {
+  display: contents !important;
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] {
+  position: absolute !important;
+  inset: auto 4px 4px auto !important;
+  z-index: 120 !important;
+  inline-size: 34px !important;
+  min-inline-size: 34px !important;
+  max-inline-size: none !important;
+  block-size: 34px !important;
+  min-block-size: 34px !important;
+  max-block-size: none !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+@media (min-width: 701px) {
+  html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] {
+    inset-inline-start: calc(100% + 8px) !important;
+    inset-inline-end: auto !important;
+    inset-block-start: calc((var(--interactive-board-size, 720px) / 2) - 13px) !important;
+    inset-block-end: auto !important;
+  }
+}
+
+/* Wider fullscreen viewports have enough edge space for the existing focus
+   action to live as a fixed overlay. Keep it outside the board's pointer
+   surface without reserving a permanent rail in the board fit calculation. */
+@media (min-width: 901px) {
+  html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen .play-board-wrap > .play-lobby-board-actions {
+    position: fixed !important;
+    inset-block-start: 50% !important;
+    inset-inline-start: calc(50% + 50dvw - 34px - var(--interactive-board-utility-shift, 0px)) !important;
+    inset-inline-end: auto !important;
+    inset-block-end: auto !important;
+    transform: translateY(-50%) !important;
+    z-index: 200 !important;
+    inline-size: 34px !important;
+    width: 34px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* The active Play edge action can extend beyond the board stage in normal
+   mode. Let the existing control remain hit-testable at the edge of a
+   narrow desktop shell; this changes no board geometry or scrolling model. */
+@media (min-width: 701px) {
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .play-shell,
+  html body #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    overflow: visible !important;
+  }
+}
+
+/* Spend only the space genuinely needed by the two compact identity strips
+   in wider fullscreen Play. The board controller measures these rendered
+   heights, so the square grows with the space recovered here. */
+@media (min-width: 701px) {
+  html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen {
+    gap: clamp(4px, .6dvh, 6px) !important;
+    padding: clamp(6px, .75dvh, 8px) clamp(6px, .8dvw, 10px) !important;
+  }
+
+  html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card,
+  html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card {
+    min-height: 44px !important;
+    block-size: 48px !important;
+    max-block-size: 50px !important;
+  }
+}
+
+/* Fullscreen centers the complete board-plus-utility composition. The shared
+   controller measures the actual edge rail and publishes the half-rail shift;
+   moving the three board-workspace tracks together prevents the control from
+   forcing the square to remain needlessly narrow on narrow desktop widths. */
+html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > :is(.ai-player-card, .match-player-card, .play-board-wrap) {
+  translate: var(--interactive-board-utility-shift, 0px) 0 !important;
+}
+
+/* Manual resizing belongs to normal Play mode. In fullscreen the controller
+   already computes the maximum safe square from the viewport; keeping the
+   lower-right drag affordance visible only adds a misleading interaction
+   target at the board edge. */
+html body.interactive-board-fullscreen-active #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen .interactive-board-resize-handle {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* The lobby control row follows the square board in normal flow. At a large
+   board size that row can begin below the current viewport, which made the
+   existing fullscreen action look as if it had disappeared. Keep the row
+   and its other controls unchanged, but attach this one existing action to
+   the board edge so it remains discoverable at every desktop/tablet size. */
+@media (min-width: 701px) {
+  html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions {
+    overflow: visible !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] {
+    position: absolute !important;
+    inset-inline-start: calc(100% + 8px) !important;
+    inset-block-start: calc((var(--interactive-board-size, 720px) / -2) - 25px) !important;
+    z-index: 120 !important;
+    inline-size: 34px !important;
+    min-inline-size: 34px !important;
+    max-inline-size: none !important;
+    block-size: 34px !important;
+    min-block-size: 34px !important;
+    max-block-size: none !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+}
+
+/* The premove rail is an empty 38px shell until a premove is queued. It was
+   being assigned a permanent fullscreen grid row, so the shared controller
+   reserved that empty height and reduced the safe board square. Let the
+   hidden/empty shell contribute no grid box; its status child remains
+   available to the existing premove behavior when it is shown. */
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen {
+  grid-template: "opponent" max-content "board" max-content "player" max-content / minmax(0, 1fr) !important;
+  grid-template-rows: max-content max-content max-content !important;
+}
+
+html body.interactive-board-fullscreen-active #play#play:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar {
+  display: contents !important;
+  grid-area: auto !important;
+  inline-size: auto !important;
+  max-inline-size: none !important;
+  min-inline-size: 0 !important;
+}
+
+/* The active-game fullscreen rule has a deliberately stronger selector than
+   the shared focus-mode rule above. Repeat the same three-track correction at
+   that specificity so it cannot reintroduce a zero-height controls track. */
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen {
+  grid-template: "opponent" max-content "board" max-content "player" max-content / minmax(0, 1fr) !important;
+  grid-template-rows: max-content max-content max-content !important;
+}
+
+html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar,
+html body #play#play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar {
+  display: contents !important;
+  grid-area: auto !important;
+}
+
+/* Final lobby-only cleanup: after the three customization controls are
+   removed, flatten the stage hook so it cannot create a blank controls row.
+   Fullscreen remains the sole existing action and stays attached to the
+   board edge. */
+html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions {
+  display: contents !important;
+}
+
+html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] {
+  position: absolute !important;
+  inset: auto 4px 4px auto !important;
+  z-index: 120 !important;
+  inline-size: 34px !important;
+  min-inline-size: 34px !important;
+  max-inline-size: none !important;
+  block-size: 34px !important;
+  min-block-size: 34px !important;
+  max-block-size: none !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+@media (min-width: 701px) {
+  html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] {
+    inset-inline-start: calc(100% + 8px) !important;
+    inset-inline-end: auto !important;
+    inset-block-start: calc((var(--interactive-board-size, 720px) / 2) - 13px) !important;
+    inset-block-end: auto !important;
+  }
 }

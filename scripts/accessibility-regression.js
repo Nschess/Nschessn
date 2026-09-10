@@ -37,12 +37,31 @@ function waitForServer() {
 
 async function waitForRoute(page, route) {
   await page.goto(`${baseUrl}/#${route}`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction((id) => {
-    const section = document.getElementById(id);
-    if (!section || section.hidden || getComputedStyle(section).display === "none") return false;
-    const rect = section.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  }, route, { timeout: 12000 });
+  try {
+    await page.waitForFunction((id) => {
+      const section = document.getElementById(id);
+      if (!section || section.hidden || getComputedStyle(section).display === "none") return false;
+      const rect = section.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }, route, { timeout: 12000 });
+  } catch (error) {
+    const probe = await page.evaluate((id) => {
+      const section = document.getElementById(id);
+      const rect = section?.getBoundingClientRect();
+      const style = section ? getComputedStyle(section) : null;
+      return {
+        route: id,
+        url: location.href,
+        viewport: [innerWidth, innerHeight],
+        exists: Boolean(section),
+        hidden: section?.hidden ?? null,
+        display: style?.display || "",
+        rect: rect ? [rect.width, rect.height] : null,
+        activePanel: document.querySelector("main > .is-active-panel")?.id || ""
+      };
+    }, route);
+    throw new Error(`Route readiness timed out: ${JSON.stringify(probe)}`, { cause: error });
+  }
   await page.waitForTimeout(180);
 }
 
@@ -130,8 +149,8 @@ async function checkPlay(page) {
     };
   });
   if (compactPlayLayout.viewport <= 860) {
-    assert(compactPlayLayout.modeTop < compactPlayLayout.boardTop,
-      `play: compact mode controls must precede the board: ${JSON.stringify(compactPlayLayout)}.`);
+    assert(compactPlayLayout.boardTop < compactPlayLayout.modeTop,
+      `play: compact active-game board must precede secondary mode controls: ${JSON.stringify(compactPlayLayout)}.`);
     assert.equal(compactPlayLayout.dockDisplay, "none",
       `play: mobile bottom navigation must yield to the board: ${JSON.stringify(compactPlayLayout)}.`);
   }

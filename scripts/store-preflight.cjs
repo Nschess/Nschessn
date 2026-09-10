@@ -10,9 +10,11 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { discoverSupabaseConfig } = require("./e2e-config.cjs");
+const { run: runTestEnvironment } = require("./test-environment.cjs");
 
 const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
+const environmentPreflighted = process.argv.includes("--environment-preflighted") || process.env.NSCHESS_ENVIRONMENT_PRECHECKED === "1";
 
 function loadDotEnv(file) {
   if (!fs.existsSync(file)) return;
@@ -20,7 +22,7 @@ function loadDotEnv(file) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
     const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!match || process.env[match[1]] !== undefined) continue;
+    if (!match || ["SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"].includes(match[1]) || process.env[match[1]] !== undefined) continue;
     let value = match[2].trim();
     if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
     process.env[match[1]] = value;
@@ -108,6 +110,10 @@ async function resolveSupabaseConfig() {
 }
 
 async function main() {
+  if (!environmentPreflighted) {
+    await runTestEnvironment();
+    process.env.NSCHESS_ENVIRONMENT_PRECHECKED = "1";
+  }
   const budget = catalogBudget();
   const configReport = safeSupabaseConfigReport();
   if (budget.catalogItems !== budget.expectedCatalogItems) {
@@ -171,4 +177,11 @@ async function main() {
   }
 }
 
-main().catch((error) => fail(`Store preflight crashed: ${error.message || error}`));
+main().catch((error) => {
+  if (error.status === "BLOCKED/ENVIRONMENT") {
+    console.error(error.message || error);
+    process.exitCode = error.exitCode || 2;
+    return;
+  }
+  fail(`Store preflight crashed: ${error.message || error}`);
+});

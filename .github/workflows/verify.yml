@@ -20,3 +20,34 @@ jobs:
       - run: node --check api/_supabase.js && node --check api/auth-config.js && node --check api/health.js && node --check api/leaderboard.js
       - run: node scripts/build-pages.js
       - run: node scripts/check-deploy-assets.js dist
+
+  stability-gate:
+    name: Live Stability Gate
+    runs-on: ubuntu-latest
+    # The job intentionally has no fallback for missing secrets. The
+    # environment gate reports BLOCKED/ENVIRONMENT and exits non-zero.
+    env:
+      E2E_ENVIRONMENT: staging
+      E2E_BASE_URL: http://127.0.0.1:4173
+      E2E_REALTIME_ENABLED: "1"
+      E2E_REQUIRED: "1"
+      E2E_HEADLESS: "1"
+      E2E_SUPABASE_URL: ${{ secrets.NSCHESS_E2E_SUPABASE_URL }}
+      E2E_SUPABASE_ANON_KEY: ${{ secrets.NSCHESS_E2E_SUPABASE_ANON_KEY }}
+      E2E_EMAIL: ${{ secrets.NSCHESS_E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.NSCHESS_E2E_PASSWORD }}
+      E2E_SECOND_EMAIL: ${{ secrets.NSCHESS_E2E_SECOND_EMAIL }}
+      E2E_SECOND_PASSWORD: ${{ secrets.NSCHESS_E2E_SECOND_PASSWORD }}
+      SUPABASE_SECRET_KEY: ${{ secrets.NSCHESS_SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Validate live test environment
+        run: npm run test:environment
+      - name: Run live matchmaking Stability Gate
+        run: npm run test:matchmaking-live

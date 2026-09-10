@@ -78,7 +78,7 @@
 @keyframes openingCheckPulse { 0%,100% { box-shadow: inset 0 0 0 2px rgba(255,184,77,.36); } 50% { box-shadow: inset 0 0 0 5px rgba(255,239,190,.9), inset 0 0 24px rgba(255,184,77,.5); } }
 body.perf-lite #openings .opening-explorer-square.is-check { animation: none; }
 #openings .opening-explorer-square .piece-svg,
-#openings .opening-explorer-square .piece-symbol { width: 74%; height: 74%; font-size: clamp(1.4rem, 4vw, 3rem); object-fit: contain; }
+#openings .opening-explorer-square .piece-symbol { width: 86%; height: 86%; font-size: clamp(1.4rem, 4vw, 3rem); object-fit: contain; }
 #openings .opening-explorer-controls { display: flex; gap: 7px; margin-top: 10px; }
 #openings .opening-explorer-controls .button { flex: 1; min-height: 44px; padding: 0 8px; font-size: .7rem; }
 #openings .opening-explorer-inspector { min-width: 0; padding: 16px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(0,0,0,.15); }

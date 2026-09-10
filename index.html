@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=review-v201-featured-study-signature-audio" />
+  <link rel="stylesheet" href="assets/app.css?v=review-v218-focus-fit-pieces" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -32,18 +32,21 @@
         <span class="brand-copy"><strong>Nschess</strong><small>Chess platform</small></span>
       </a>
       <div class="nav-links cq-navigation-list" aria-label="Primary navigation">
-        <a class="cq-navigation-item" href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" data-lucide="swords" aria-hidden="true">&#9822;</span><span>Play</span></a>
+        <a class="cq-navigation-item nav-primary-link" href="#play" data-site-tab="play" data-site-panel="play"><span class="nav-icon" data-lucide="swords" aria-hidden="true">&#9822;</span><span>Play</span></a>
         <a class="cq-navigation-item" href="#bots" data-site-tab="bots" data-site-panel="bots"><span class="nav-icon" data-lucide="bot" aria-hidden="true">&#9823;</span><span>AI Bots</span></a>
         <a class="cq-navigation-item" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles"><span class="nav-icon" data-lucide="puzzle" aria-hidden="true">&#9671;</span><span>Puzzles</span></a>
         <a class="cq-navigation-item" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="nav-icon" data-lucide="graduation-cap" aria-hidden="true">&#8961;</span><span>Learn</span></a>
-        <a class="cq-navigation-item" href="#videos" data-site-tab="videos" data-site-panel="videos"><span class="nav-icon" data-lucide="play-square" aria-hidden="true">&#9654;</span><span>Videos</span></a>
-        <a class="cq-navigation-item" href="#friends" data-site-tab="friends" data-site-panel="friends"><span class="nav-icon" data-lucide="users" aria-hidden="true">&#9673;</span><span>Friends</span><span class="friends-nav-badge" id="friendsNavBadge" hidden>0</span></a>
-        <a class="cq-navigation-item" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span><span>Tournaments</span></a>
-        <a class="cq-navigation-item" href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
-        <a class="cq-navigation-item" href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span><span>Store</span></a>
         <details class="nav-group cq-navigation-group">
-          <summary class="nav-group-label cq-navigation-item"><span class="nav-icon" data-lucide="users" aria-hidden="true">&#9673;</span><span>Community</span></summary>
-          <div class="nav-menu" aria-label="Community and more chess features">
+          <summary class="nav-group-label cq-navigation-item"><span class="nav-icon" data-lucide="layers-3" aria-hidden="true">&#9673;</span><span>More</span></summary>
+          <div class="nav-menu" aria-label="More chess destinations">
+            <div class="nav-menu-heading">Explore</div>
+            <a href="#videos" data-site-tab="videos" data-site-panel="videos"><span class="nav-menu-icon" data-lucide="play-square" aria-hidden="true">&#9654;</span><span>Videos</span></a>
+            <a href="#friends" data-site-tab="friends" data-site-panel="friends"><span class="nav-menu-icon" data-lucide="users" aria-hidden="true">&#9673;</span><span>Friends</span><span class="friends-nav-badge" id="friendsNavBadge" hidden>0</span></a>
+            <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span class="nav-menu-icon" data-lucide="trophy" aria-hidden="true">&#9819;</span><span>Tournaments</span></a>
+            <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span class="nav-menu-icon" data-lucide="bar-chart-3" aria-hidden="true">&uarr;</span><span>Leaderboard</span></a>
+            <a href="#store" data-site-tab="store" data-site-panel="store"><span class="nav-menu-icon" data-lucide="shopping-bag" aria-hidden="true">&#10022;</span><span>Store</span></a>
+            <div class="nav-menu-divider" role="separator"></div>
+            <div class="nav-menu-heading">Community &amp; study</div>
             <a href="#academy" data-site-tab="academy" data-site-panel="academy">Academy</a>
             <a href="#paths" data-site-tab="paths" data-site-panel="paths">Learning Path</a>
             <a href="#adventures" data-site-tab="adventures" data-site-panel="adventures">Adventures</a>
@@ -132,279 +135,101 @@
         <span class="hero-float hero-float-queen">&#9819;</span>
         <span class="hero-float hero-float-rook">&#9820;</span>
       </div>
-      <div class="hero-inner">
-        <div class="hero-layout">
-          <div class="hero-copy hero-copy--welcome">
-            <p class="hero-welcome-badge"><span class="hero-welcome-dot"></span><span id="homeWelcome">Welcome back.</span></p>
-            <p class="hero-welcome-note" id="homeWelcomeDelta">Your move is ready.</p>
-            <h1 id="hero-title">Ready to <span>play?</span></h1>
-            <p class="hero-description">Choose your next move.</p>
-            <div class="hero-actions">
-              <a class="button" href="#play" id="heroContinueLearning" data-site-tab="play" data-site-panel="play">Play Now</a>
-              <a class="button secondary" href="#puzzles" id="newToChessButton" data-site-tab="puzzles" data-site-panel="puzzles">Daily Puzzle</a>
-            </div>
-            <div class="hero-stat-row" aria-label="Your chess progress">
-              <span class="home-stat hero-stat cq-stat-chip"><strong id="homeGamesPlayed">0</strong><small>Games</small></span>
-              <span class="home-stat hero-stat cq-stat-chip"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
-              <span class="home-stat hero-stat is-highlight cq-stat-chip"><strong id="homeStreak">0 days</strong><small>Day streak</small></span>
-            </div>
-            <div class="hero-player-card hero-player-card--you home-command-rank" aria-label="Your player card">
-              <span class="hero-player-avatar hero-player-avatar--you">Y</span>
-              <span><strong data-profile-field="name">You</strong><small data-profile-field="title">Ready to play</small></span>
-              <b data-profile-field="gameRating">600</b>
-            </div>
+      <div class="home-command-shell">
+        <header class="home-command-header">
+          <div class="home-command-intro">
+            <p class="home-command-kicker"><span class="hero-welcome-dot"></span><span id="homeWelcome">Welcome back.</span></p>
+            <p class="home-welcome-note" id="homeWelcomeDelta">Your next clear idea is waiting.</p>
+            <h1 id="hero-title">Make your next move count.</h1>
+            <p class="home-command-description">A focused chess workspace for the game, puzzle, or lesson that helps you improve today.</p>
           </div>
-
-          <div class="hero-stage" aria-label="Chess board preview">
-            <div class="hero-stage-halo" aria-hidden="true"></div>
-            <div class="hero-board hero-board--center" aria-hidden="true">
-              <div class="hero-board-grid" id="heroBoard"></div>
-            </div>
-            <div class="hero-player-card hero-player-card--opponent" aria-label="Featured coach">
-              <span class="hero-player-avatar">N</span>
-              <span><strong>Nova Rookie</strong><small>Friendly chess coach</small></span>
-              <b>1050</b>
-            </div>
+          <div class="home-command-player" aria-label="Your player identity">
+            <span class="home-command-avatar">Y</span>
+            <span><strong data-profile-field="name">You</strong><small data-profile-field="title">Ready to play</small></span>
+            <b><span data-profile-field="gameRating">600</span><small>Elo</small></b>
           </div>
+        </header>
 
-          <section class="home-session-card home-command-session" id="homeSessionCard" aria-live="polite">
-            <div class="home-session-copy"><span class="home-session-kicker">Daily session</span><strong id="homeSessionTitle">One calm move</strong><p id="homeSessionCopy">Your next step appears here.</p><span class="home-session-meta" id="homeSessionMeta">On this device</span></div>
-            <a class="button secondary" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Continue</a>
-            <div class="home-session-ritual" id="homeSessionRitual" aria-label="Today's three-step ritual"></div>
-            <details class="home-mission-dock" id="homeDailyGoals" aria-label="Daily and weekly missions">
-              <summary class="home-mission-summary"><span>Daily missions</span><strong id="dailyGoalsProgress">0/3</strong></summary>
-              <div class="home-mission-dock-content">
+        <nav class="home-primary-actions" aria-label="Start an activity">
+          <a class="home-primary-action is-primary" id="homePlayAction" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick"><span class="home-action-glyph" aria-hidden="true">&#9816;</span><span><strong>Play</strong><small>Start a focused game</small></span><b aria-hidden="true">&#8594;</b></a>
+          <a class="home-primary-action" id="newToChessButton" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles" data-home-action="daily-puzzle"><span class="home-action-glyph" aria-hidden="true">&#9671;</span><span><strong>Daily Puzzle</strong><small>Find today's pattern</small></span><b aria-hidden="true">&#8594;</b></a>
+          <a class="home-primary-action" id="homeContinueLearningAction" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="home-action-glyph" aria-hidden="true">&#8961;</span><span><strong>Continue Learning</strong><small>Build one useful skill</small></span><b aria-hidden="true">&#8594;</b></a>
+        </nav>
+
+        <div class="home-command-grid">
+          <section class="home-next-move" aria-labelledby="home-next-move-title">
+            <div class="home-card-heading"><div><p class="home-command-kicker">Personalized focus</p><h2 id="home-next-move-title">Your Next Move</h2></div><span class="home-next-mark" aria-hidden="true">&#10022;</span></div>
+            <p class="home-next-reason" id="homeNextReason">Solve today's puzzle for XP and coins.</p>
+            <a class="button home-next-action" href="#puzzles" id="homeNextAction" data-home-action="daily-puzzle">Start daily puzzle</a>
+            <p class="home-insight" id="homeInsight">One clear idea is enough for today's session.</p>
+            <div class="home-next-recommendations" id="homeRecommendations" aria-label="Other useful activities"></div>
+          </section>
+
+          <section class="home-progress-panel" aria-labelledby="home-progress-title">
+            <div class="home-card-heading"><div><p class="home-command-kicker">Your position</p><h2 id="home-progress-title">Progress</h2></div><span class="home-progress-summary">Small gains, clearly tracked</span></div>
+            <div class="home-progress-stats" aria-label="Your chess progress">
+              <span class="home-command-stat home-progress-rating"><strong id="homeMainRating">450</strong><small>Elo</small><em id="homeMainRatingMeta">Play a game to establish your rating.</em></span>
+              <span class="home-command-stat"><strong id="homeStreak">0 days</strong><small>Streak</small></span>
+              <span class="home-command-stat"><strong id="homePuzzleAccuracy">—</strong><small>Puzzle accuracy</small></span>
+              <span class="home-command-stat is-highlight"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
+            </div>
+            <div class="home-progress-goal-line"><a id="homeWeeklyGoal" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Week goal: 0/120 XP</a><a id="homeDailyGoal" href="#puzzles" data-home-action="daily-puzzle">Daily: 0/3</a></div>
+            <div class="home-progress-legacy" aria-hidden="true"><span id="homeGamesPlayed">0</span><span id="homeThemesMastered">0</span><span id="homeLearningTime">0 min</span><span id="homeSkillsUnlocked">0</span></div>
+            <div class="home-milestone-row"><span class="home-command-kicker">Next milestone</span><div id="homeUnlocks" aria-label="Achievement roadmap"></div></div>
+          </section>
+        </div>
+
+        <section class="home-continue-section" aria-labelledby="home-continue-section-title">
+          <div class="home-section-heading"><div><p class="home-command-kicker">Continue</p><h2 id="home-continue-section-title">Where you left off</h2></div><a href="#history" data-home-action="match-history">View history</a></div>
+          <div class="home-continue-strip">
+            <a class="home-continue-card" id="homeContinueAction" href="#bots" data-site-tab="bots" data-site-panel="bots"><span class="home-action-glyph" aria-hidden="true">&#8634;</span><span><strong id="homeContinueTitle">Choose an AI bot</strong><small id="homeContinueNote">Start a focused game</small></span><b aria-hidden="true">&#8594;</b></a>
+            <div class="home-continue-history" id="homeRecentGames" aria-live="polite" aria-busy="true"><div class="home-continue-empty"><span aria-hidden="true">G</span><span><strong>No recent game yet</strong><small>Play one game and it will appear here.</small></span><a href="#play" data-site-tab="play" data-site-panel="play">Play</a></div></div>
+          </div>
+        </section>
+
+        <section class="home-session-card home-command-session" id="homeSessionCard" aria-live="polite">
+          <div class="home-session-copy"><span class="home-session-kicker">Daily session</span><strong id="homeSessionTitle">One calm move</strong><p id="homeSessionCopy">Your next step appears here.</p><span class="home-session-meta" id="homeSessionMeta">On this device</span></div>
+          <a class="button secondary" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Continue</a>
+          <div class="home-session-ritual" id="homeSessionRitual" aria-label="Today's three-step ritual"></div>
+          <details class="home-mission-dock" id="homeDailyGoals" aria-label="Daily and weekly missions">
+            <summary class="home-mission-summary"><span>Daily missions</span><strong id="dailyGoalsProgress">0/3</strong></summary>
+            <div class="home-mission-dock-content">
               <div class="home-mission-dock-head"><div><span class="home-mission-kicker">Today</span><strong id="dailyMissionStreak">0 day streak</strong></div></div>
               <ul class="daily-goals-list" id="dailyGoalsList"></ul>
               <div class="home-mission-weekly"><div class="home-mission-dock-head"><div><span class="home-mission-kicker">Weekly challenges</span><strong>Build your rhythm</strong></div><strong id="weeklyGoalsProgress">0/3</strong></div><ul class="daily-goals-list" id="weeklyGoalsList"></ul></div>
               <div class="home-mission-rewards"><span id="dailyGoalsReward">Daily reward: +50 XP · +50 coins</span><span id="weeklyGoalsReward">Weekly reward: +180 XP · +180 coins</span><small class="home-mission-reset">Resets daily · weekly resets Monday · cosmetic rewards only</small><button class="button" type="button" id="claimWeeklyGoals" disabled>Claim weekly</button></div>
-              </div>
-            </details>
-            <div class="home-session-reward" id="homeSessionReward" hidden>
-              <div><span class="home-session-reward-kicker">Daily ritual complete</span><strong id="homeSessionRewardText">Your 50 coin reward is ready.</strong></div>
-              <button class="button" type="button" id="homeSessionClaim" data-home-action="claim-daily-ritual">Claim +50</button>
             </div>
-            <details><summary>Why this session?</summary><p id="homeSessionWhy">Small, deliberate practice builds lasting confidence.</p></details>
-          </section>
+          </details>
+          <div class="home-session-reward" id="homeSessionReward" hidden><div><span class="home-session-reward-kicker">Daily ritual complete</span><strong id="homeSessionRewardText">Your 50 coin reward is ready.</strong></div><button class="button" type="button" id="homeSessionClaim" data-home-action="claim-daily-ritual">Claim +50</button></div>
+          <details><summary>Why this session?</summary><p id="homeSessionWhy">Small, deliberate practice builds lasting confidence.</p></details>
+        </section>
 
-          <aside class="home-dashboard hero-dashboard" aria-label="Quick chess actions">
-            <div class="home-today-heading"><span>Today</span><h2>Choose your next move</h2><p>Pick one thing.</p></div>
-            <a class="hero-quick-card hero-quick-card--play" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick">
-              <span class="hero-quick-icon">Play</span>
-              <span><strong>Quick Play</strong><small>Start a game</small></span>
-              <b aria-hidden="true">&gt;</b>
-            </a>
-            <a class="hero-quick-card" href="#puzzles" data-home-action="daily-puzzle">
-              <span class="hero-quick-icon">Daily</span>
-              <span><strong>Daily Puzzle</strong><small>One tactic</small></span>
-              <b aria-hidden="true">&gt;</b>
-            </a>
-            <a class="hero-quick-card hero-quick-card--learn" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">
-              <span class="hero-quick-icon">Learn</span>
-              <span><strong>Learn</strong><small>Build a skill</small></span>
-              <b aria-hidden="true">&gt;</b>
-            </a>
-            <section class="hero-progress-card" aria-label="Progress">
-              <div><strong>Progress</strong><span class="hero-progress-goals"><a class="home-weekly-goal-link" id="homeWeeklyGoal" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Week goal: 0/120 XP</a><a class="home-daily-goal-link" id="homeDailyGoal" href="#puzzles" data-home-action="daily-puzzle">Daily: 0/3</a></span></div>
-              <div class="hero-progress-metrics">
-                <span class="home-stat"><strong id="homeThemesMastered">0</strong><small>Themes</small></span>
-                <span class="home-stat"><strong id="homeLearningTime">0 min</strong><small>Learning</small></span>
-                <span class="home-stat"><strong id="homeSkillsUnlocked">0</strong><small>Skills</small></span>
-              </div>
-            </section>
-            <a class="hero-quick-card" id="homeContinueAction" href="#bots" data-site-tab="bots" data-site-panel="bots">
-              <span class="hero-quick-icon">Next</span>
-              <span><strong id="homeContinueTitle">Choose an AI bot</strong><small id="homeContinueNote">Start a game</small></span>
-              <b aria-hidden="true">&gt;</b>
-            </a>
-            <div class="hero-logic-cache" aria-hidden="true">
-              <div class="next-step-card"><span id="homeNextReason">Solve one puzzle, then stop while it still feels fun.</span><a href="#puzzles" id="homeNextAction">Start 3-minute quest</a></div>
-              <div class="quick-practice"><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">2-minute practice</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Puzzle Rush">5 puzzles</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Endgames">One endgame</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Checkmates">Checkmate challenge</a></div>
-              <p id="homeInsight">One puzzle today is better than none.</p>
-              <div id="homeUnlocks"></div>
-              <div id="homeRecommendations"></div>
-            </div>
-          </aside>
+        <div class="hero-logic-cache" aria-hidden="true">
+          <div class="quick-practice"><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">2-minute practice</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Puzzle Rush">5 puzzles</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Endgames">One endgame</a><a href="#puzzles" data-home-action="puzzle-plan" data-home-plan="Checkmates">Checkmate challenge</a></div>
         </div>
       </div>
     </section>
 
-    <section class="featured-study" id="featuredGameStudy" aria-labelledby="featuredGameStudyTitle">
-      <div class="wrap featured-study-shell">
-        <div class="featured-study-heading">
-          <div>
-            <p class="section-kicker">Featured Game Study <span class="featured-study-kicker-dot" aria-hidden="true"></span> Paris · 1858</p>
-            <h2 id="featuredGameStudyTitle">Morphy’s Opera Game</h2>
-            <p class="featured-study-lede">A real masterpiece in development, open files, and one unforgettable queen sacrifice.</p>
-          </div>
-          <div class="featured-study-source" aria-label="Game details">
-            <span>Paul Morphy</span><span>vs Duke Karl &amp; Count Isouard</span><span>1–0 · C41</span>
-          </div>
+    <section class="home-discovery-section" aria-labelledby="home-discovery-title">
+      <div class="wrap home-discovery-shell">
+        <div class="home-section-heading"><div><p class="home-command-kicker">Explore</p><h2 id="home-discovery-title">Choose your next arena</h2></div><span>Secondary paths when you want them</span></div>
+        <nav class="home-discovery-nav" aria-label="Explore Nschess">
+          <a href="#bots" data-site-tab="bots" data-site-panel="bots"><span aria-hidden="true">&#9816;</span><strong>Bots</strong><small>Play your style</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby"><span aria-hidden="true">&#9819;</span><strong>Tournaments</strong><small>Compete live</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards"><span aria-hidden="true">&#9650;</span><strong>Leaderboard</strong><small>See your climb</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="#openings" data-site-tab="openings" data-site-panel="openings"><span aria-hidden="true">&#8961;</span><strong>Openings</strong><small>Build a plan</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="#store" data-site-tab="store" data-site-panel="store"><span aria-hidden="true">&#10022;</span><strong>Store</strong><small>Style your board</small><b aria-hidden="true">&#8594;</b></a>
+        </nav>
+        <div class="home-discovery-status" aria-label="Live chess activity">
+          <article class="home-status-line">
+            <div class="home-status-line-head"><span class="home-status-icon" aria-hidden="true">T</span><strong>Upcoming tournaments</strong><a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">View lobby</a></div>
+            <div class="home-status-content" id="homeTournaments" aria-live="polite" aria-busy="true"><span>Loading live events</span></div>
+          </article>
+          <article class="home-status-line">
+            <div class="home-status-line-head"><span class="home-status-icon" aria-hidden="true">&#9650;</span><strong>Leaderboard</strong><a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">View standings</a></div>
+            <ol class="home-status-content home-lower-rankings" id="homeTopPlayers" aria-label="Top ranked players" aria-busy="true"><li><span>Loading rankings</span></li></ol>
+          </article>
         </div>
-        <div class="featured-study-layout">
-          <div class="featured-study-stage">
-            <div class="featured-study-stage-head">
-              <span class="featured-study-eyebrow">The critical line</span>
-              <span class="featured-study-position" id="featuredStudyPositionCount">Position 1 / 9</span>
-            </div>
-            <div class="featured-study-board-frame">
-              <div class="featured-study-board" id="featuredStudyBoard" role="grid" aria-roledescription="chess board" aria-label="Morphy’s Opera Game study board"></div>
-            </div>
-            <div class="featured-study-board-footer">
-              <strong id="featuredStudyMoveLabel" aria-live="polite">10. Nxb5!</strong>
-              <span id="featuredStudyTurn">White to move</span>
-            </div>
-          </div>
-          <aside class="featured-study-card" aria-label="Featured Game Study controls">
-            <div class="featured-study-card-top"><span class="featured-study-badge">BRILLIANT IDEA</span><span class="featured-study-live"><i aria-hidden="true"></i> Verified line</span></div>
-            <h3>Development is faster than defense.</h3>
-            <p class="featured-study-card-copy">Start with Morphy’s <strong>10. Nxb5!</strong> sacrifice. Follow the pressure as every white piece joins the attack.</p>
-            <div class="featured-study-current" aria-live="polite">
-              <span class="featured-study-current-label">Now on the board</span>
-              <strong id="featuredStudyCurrentMove">White prepares the sacrifice.</strong>
-              <p id="featuredStudyExplanation">White has completed development. The knight sacrifice opens the b-file and removes the pawn shield around the king.</p>
-            </div>
-            <div class="featured-study-notation-wrap">
-              <div class="featured-study-notation-head"><span>Live notation</span><span id="featuredStudyNotationStatus">10. Nxb5!</span></div>
-              <div class="featured-study-notation" id="featuredStudyNotation" aria-live="polite"></div>
-            </div>
-            <div class="featured-study-controls" aria-label="Study controls">
-              <button class="button secondary" type="button" id="featuredStudyPrevious" aria-label="Previous study position">Previous</button>
-              <button class="button" type="button" id="featuredStudyPlay" aria-pressed="false">Play study</button>
-              <button class="button secondary" type="button" id="featuredStudyNext" aria-label="Next study position">Next move</button>
-            </div>
-            <p class="featured-study-hint" id="featuredStudyHint">Study position 1 begins before the famous 10. Nxb5! sacrifice.</p>
-          </aside>
-        </div>
-      </div>
-    </section>
-
-    <section class="home-feature-strip" aria-label="Explore Nschess">
-      <div class="wrap home-feature-grid">
-        <a class="home-feature-card" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles">
-          <span class="home-feature-icon" aria-hidden="true">&#9671;</span>
-          <span><strong>Puzzles</strong><small>Train your tactics</small></span>
-          <b aria-hidden="true">&gt;</b>
-        </a>
-        <a class="home-feature-card" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial">
-          <span class="home-feature-icon" aria-hidden="true">&#8961;</span>
-          <span><strong>Learn</strong><small>Lessons in small steps</small></span>
-          <b aria-hidden="true">&gt;</b>
-        </a>
-        <a class="home-feature-card" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">
-          <span class="home-feature-icon" aria-hidden="true">&#9819;</span>
-          <span><strong>Tournaments</strong><small>Compete at your pace</small></span>
-          <b aria-hidden="true">&gt;</b>
-        </a>
-        <a class="home-feature-card" href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">
-          <span class="home-feature-icon" aria-hidden="true">&#9650;</span>
-          <span><strong>Leaderboard</strong><small>See your progress</small></span>
-          <b aria-hidden="true">&gt;</b>
-        </a>
-        <a class="home-feature-card" href="#store" data-site-tab="store" data-site-panel="store">
-          <span class="home-feature-icon" aria-hidden="true">&#10022;</span>
-          <span><strong>Store</strong><small>Style your board</small></span>
-          <b aria-hidden="true">&gt;</b>
-        </a>
-      </div>
-    </section>
-
-    <section class="home-main-section" aria-labelledby="home-board-title">
-      <div class="wrap home-main-grid">
-        <article class="home-board-panel">
-          <div class="home-board-heading">
-            <h2 id="home-board-title">Your board</h2>
-            <p>Start from your board.</p>
-          </div>
-          <a class="home-main-board-link" href="#play" data-site-tab="play" data-site-panel="play" aria-label="Open the interactive chessboard">
-            <div class="home-main-board" id="homeMainBoard" aria-hidden="true"></div>
-          </a>
-        </article>
-
-        <aside class="home-quick-column" aria-label="Quick chess actions">
-          <article class="home-quick-card is-featured">
-            <div class="home-quick-card-head"><h3>Quick Play</h3><span class="badge">Ready</span></div>
-            <p>Start a game against the coach.</p>
-            <a class="button secondary" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick">Play Now</a>
-          </article>
-          <article class="home-quick-card">
-            <div class="home-quick-card-head"><h3>Player Rating</h3></div>
-            <strong class="home-quick-value" id="homeMainRating">400</strong>
-            <p id="homeMainRatingMeta">Play a game to establish your rating.</p>
-          </article>
-          <article class="home-quick-card">
-            <div class="home-quick-card-head"><h3>Daily Puzzle</h3></div>
-            <p>One tactic and a hint.</p>
-            <a class="button secondary" href="#puzzles" data-home-action="daily-puzzle">Solve Puzzle</a>
-          </article>
-          <article class="home-quick-card">
-            <div class="home-quick-card-head"><h3 id="homeFriendsHeading">Play with friends</h3></div>
-            <p id="homeFriendsCopy">Find a friend or create a private challenge when you are ready.</p>
-            <a class="button secondary" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Challenge Friend</a>
-          </article>
-        </aside>
-
-      </div>
-    </section>
-    <section class="home-command-secondary" aria-label="Recent progress and recommended next step">
-      <div class="wrap home-command-secondary-grid"><article class="home-dna-card">
-        <div class="home-dna-heading"><span>Your Chess DNA</span><h2 id="homeDnaTitle">Your game, in focus</h2><p id="homeDnaSummary">Your focus appears here.</p></div>
-        <div class="home-dna-skills" id="homeDnaSkills" aria-live="polite"></div>
-        <a class="button secondary" id="homeDnaAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Build my focus</a>
-      </article>
-      <article class="home-momentum-card" aria-labelledby="homeMomentumTitle">
-        <div class="home-momentum-copy"><span>Weekly momentum</span><h2 id="homeMomentumTitle">A week that adds up</h2><p id="homeMomentumCopy">One session starts your week.</p></div>
-        <div class="home-momentum-progress">
-          <div class="home-momentum-progress-head"><strong id="homeMomentumProgress">0 / 120 XP</strong><span id="homeMomentumStatus">One small session starts your rhythm.</span></div>
-          <div class="home-momentum-meter" id="homeMomentumMeter" role="progressbar" aria-label="Weekly XP progress" aria-valuemin="0" aria-valuemax="120" aria-valuenow="0"><span id="homeMomentumMeterFill"></span></div>
-          <div class="home-momentum-days" id="homeMomentumDays" role="list" aria-label="Activity across the last seven days"></div>
-          <a class="home-momentum-milestone" id="homeMomentumMilestone" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">
-            <span>Next unlock</span><span class="home-momentum-milestone-copy"><strong id="homeMomentumMilestoneTitle">Explorer</strong><small id="homeMomentumMilestoneCopy">Solve 3 puzzles</small></span><b aria-hidden="true">&gt;</b>
-          </a>
-        </div>
-        <a class="button secondary" id="homeMomentumAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Build momentum</a>
-      </article></div>
-    </section>
-    <section class="home-lower-dashboard" aria-label="Chess activity overview">
-      <div class="wrap home-lower-grid">
-        <article class="home-lower-card home-lower-card--recent">
-          <div class="home-lower-card-head">
-            <h3>Recent Games</h3>
-            <a href="#history" data-home-action="match-history">View all</a>
-          </div>
-          <div class="home-lower-games" id="homeRecentGames" aria-live="polite" aria-busy="true">
-            <div class="home-lower-game-row">
-              <span class="home-lower-mark home-lower-mark--game" aria-hidden="true">G</span>
-              <div><strong>Your latest board</strong><p>Play a game and it will appear here.</p></div>
-              <a class="home-lower-row-action" href="#play" data-site-tab="play" data-site-panel="play" aria-label="Open Play">&gt;</a>
-            </div>
-          </div>
-          <a class="home-lower-footer" href="#play" data-site-tab="play" data-site-panel="play">Play a new game <span aria-hidden="true">&gt;</span></a>
-        </article>
-
-        <article class="home-lower-card home-lower-card--tournaments">
-          <div class="home-lower-card-head">
-            <h3>Upcoming Tournaments</h3>
-            <a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">View all</a>
-          </div>
-          <div class="home-tournament-list" id="homeTournaments" aria-live="polite" aria-busy="true">
-            <div class="home-lower-tournament">
-              <span class="home-lower-mark home-lower-mark--tournament" aria-hidden="true">T</span>
-              <div><strong>Loading tournaments</strong><p>Checking the live tournament lobby.</p></div>
-            </div>
-          </div>
-          <a class="home-lower-footer" href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">Open tournament lobby <span aria-hidden="true">&gt;</span></a>
-        </article>
-
-        <article class="home-lower-card home-lower-card--players">
-          <div class="home-lower-card-head">
-            <h3>Top Players</h3>
-            <a href="#leaderboards" data-site-tab="leaderboards" data-site-panel="leaderboards">View all</a>
-          </div>
-          <ol class="home-lower-rankings" id="homeTopPlayers" aria-label="Top ranked players" aria-busy="true">
-            <li><b>#1</b><span><strong>Loading rankings</strong><small>Preparing player standings</small></span></li>
-          </ol>
-        </article>
       </div>
     </section>
 
@@ -506,33 +331,33 @@
         <div class="section-head">
           <div>
             <p class="section-kicker">Player pass</p>
-            <h2 id="login-title">Save your chess adventure</h2>
+            <h2 id="login-title">Make every move count</h2>
           </div>
-          <p class="section-intro">Make a local profile for this device. No password, no pressure, just your name, goal, and next step.</p>
+          <p class="section-intro">Keep a local Player Pass, or create a secure account when you’re ready.</p>
         </div>
         <div class="login-shell">
           <div class="login-card">
-            <p class="eyebrow">Start friendly</p>
-            <h3>Your <span>quest</span> remembers you</h3>
-            <p>Pick a chess name and Nschess turns your practice into a tiny RPG: one goal, one reward, one friendly coach tip at a time.</p>
+            <p class="eyebrow">Your chess home</p>
+            <h3>Your board <span>remembers.</span></h3>
+            <p>Set a name, choose a goal, and let your next move do the talking.</p>
             <div class="login-perks" aria-label="Profile perks">
-              <span><strong>XP path</strong><small>Level up from Explorer to Legend with lessons, puzzles, and calm games.</small></span>
-              <span><strong>Daily streak</strong><small>Keep a small habit alive with short no-pressure practice.</small></span>
-              <span><strong>Coach tips</strong><small>Get one simple next step instead of confusing analysis.</small></span>
+              <span><strong>Progress</strong><small>Lessons, puzzles, and games move you forward.</small></span>
+              <span><strong>Rhythm</strong><small>Short sessions are easier to keep.</small></span>
+              <span><strong>Direction</strong><small>One useful idea at a time.</small></span>
             </div>
             <ul class="login-quest-list" aria-label="Player pass benefits">
-              <li><b>1</b><span>Resume your last lesson and recommended puzzle instantly.</span></li>
-              <li><b>2</b><span>Unlock avatars, board themes, badges, and titles as you improve.</span></li>
-              <li><b>3</b><span>Turn mistakes into practice: forks, hanging pieces, king safety, or endgames.</span></li>
+              <li><b>1</b><span>Pick up where you left off.</span></li>
+              <li><b>2</b><span>Earn avatars, themes, and badges.</span></li>
+              <li><b>3</b><span>Turn mistakes into the next puzzle.</span></li>
             </ul>
             <div class="login-progress-preview" aria-label="Sample player progress">
-              <span>Next tiny win: +20 XP</span>
+              <span>Next move: +20 XP</span>
               <div aria-hidden="true"><i></i></div>
-              <p>Save your pass, solve one puzzle, then the coach suggests tomorrow's move.</p>
+              <p>Save. Solve. Play. Come back stronger.</p>
             </div>
             <div class="login-card-actions">
-              <a class="button" href="#plan">See Today's Plan</a>
-              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Try 2-minute practice</a>
+              <a class="button" href="#plan">See your plan</a>
+              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Try a puzzle</a>
             </div>
           </div>
           <div class="login-pass">
@@ -540,7 +365,7 @@
               <div class="login-avatar" id="loginAvatar" aria-hidden="true">&#10022;</div>
               <div class="login-pass-title">
                 <h3 id="loginDisplayName">Guest Explorer</h3>
-                <p id="loginDisplayMeta">Create your Player Pass to personalize the journey.</p>
+              <p id="loginDisplayMeta">Local pass · saved on this device.</p>
               </div>
             </div>
             <div class="login-pass-grid">
@@ -656,6 +481,26 @@
                 <div class="player-profile-progress" aria-hidden="true">
                   <span data-profile-progress-fill></span>
                 </div>
+              </section>
+
+              <section class="profile-progress-insights" aria-label="Player progress insights">
+                <article class="home-dna-card profile-dna-card" aria-labelledby="profileDnaTitle">
+                  <div class="home-dna-heading"><span>Your Chess DNA</span><h2 id="profileDnaTitle">How your game is growing</h2><p id="profileDnaSummary">Your focus appears here.</p></div>
+                  <div class="home-dna-skills" id="profileDnaSkills" aria-live="polite"></div>
+                  <a class="button secondary" id="profileDnaAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Practice my focus</a>
+                </article>
+                <article class="home-momentum-card profile-momentum-card" aria-labelledby="profileMomentumTitle">
+                  <div class="home-momentum-copy"><span>Weekly momentum</span><h2 id="profileMomentumTitle">A week that adds up</h2><p id="profileMomentumCopy">One session starts your week.</p></div>
+                  <div class="home-momentum-progress">
+                    <div class="home-momentum-progress-head"><strong id="profileMomentumProgress">0 / 120 XP</strong><span id="profileMomentumStatus">One small session starts your rhythm.</span></div>
+                    <div class="home-momentum-meter" id="profileMomentumMeter" role="progressbar" aria-label="Weekly XP progress" aria-valuemin="0" aria-valuemax="120" aria-valuenow="0"><span id="profileMomentumMeterFill"></span></div>
+                    <div class="home-momentum-days" id="profileMomentumDays" role="list" aria-label="Activity across the last seven days"></div>
+                    <a class="home-momentum-milestone" id="profileMomentumMilestone" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">
+                      <span>Next unlock</span><span class="home-momentum-milestone-copy"><strong id="profileMomentumMilestoneTitle">Explorer</strong><small id="profileMomentumMilestoneCopy">Solve 3 puzzles</small></span><b aria-hidden="true">&gt;</b>
+                    </a>
+                  </div>
+                  <a class="button secondary" id="profileMomentumAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Add a focus session</a>
+                </article>
               </section>
 
               <details class="profile-activity profile-detail-section">
@@ -815,12 +660,12 @@
             <p id="loginStatus" aria-live="polite">Saved only in this browser.</p>
               </div>
               <div class="login-pass-panel">
-                <h4>Secure Account</h4>
+                <h4>Sync your progress</h4>
             <div class="auth-panel" aria-labelledby="authTitle">
               <div data-auth-guest>
-                <p class="eyebrow">Secure account</p>
-                <h3 id="authTitle">Start your chess adventure</h3>
-                <p>Create your account in under one minute and keep your progress ready for the next challenge.</p>
+                <p class="eyebrow">Secure sync</p>
+                <h3 id="authTitle">Keep your progress in sync</h3>
+                <p>Create an account in under a minute and carry your Player Pass across devices.</p>
               </div>
               <div class="auth-tabs" role="tablist" aria-label="Account actions" data-auth-guest>
                 <button class="auth-tab" type="button" role="tab" aria-selected="true" data-auth-tab="register">Register</button>
@@ -843,7 +688,7 @@
                   <input id="authConfirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required />
                   <small data-auth-error="confirmPassword">Passwords must match.</small>
                 </label>
-                <button class="button" type="submit">Create Secure Account</button>
+                <button class="button" type="submit">Create account</button>
                 <button class="button secondary" type="button" id="authResendConfirmation" hidden>Resend confirmation email</button>
               </form>
               <form class="auth-form" id="authLoginForm" data-auth-guest hidden novalidate>
@@ -886,13 +731,8 @@
                 </span>
               </div>
               <p class="auth-status" id="authStatus" data-auth-guest aria-live="polite">Welcome! Let's begin your chess adventure.</p>
-              <ul class="auth-security" data-auth-guest aria-label="Password security requirements">
-                <li>Never store plain-text passwords in this page or browser storage.</li>
-                <li>Hash passwords on the server with Argon2id or bcrypt.</li>
-                <li>Rate-limit repeated login attempts and reset requests.</li>
-                <li>Use HttpOnly secure sessions or signed tokens over HTTPS.</li>
-              </ul>
-              <p class="auth-note" data-auth-guest>When your secure account service is connected, this will sync your Player Pass and progress across devices.</p>
+              <p class="auth-security-note" data-auth-guest>Protected account · your pass and progress travel with you.</p>
+              <p class="auth-note" data-auth-guest>Already have a pass? Sign in and continue.</p>
             </div>
               </div>
             </div>
@@ -2957,6 +2797,16 @@
 
     <section id="bots" class="section-dark" aria-labelledby="bots-title">
       <div class="wrap"><div class="section-head cq-section-header"><div><p class="section-kicker">AI opponents</p><h2 id="bots-title">Choose your next bot</h2></div><p class="section-intro">Find a practice partner that fits your level, pace, and preferred kind of challenge.</p></div>
+        <article class="ai-featured-coach cq-panel" aria-label="Featured AI coach: KingNorbert">
+          <span class="ai-featured-coach-avatar featured-coach-avatar" id="aiFeaturedCoachAvatar" data-coach-fallback="KN" role="img" aria-label="KingNorbert coach avatar">KN</span>
+          <div class="ai-featured-coach-copy">
+            <p class="ai-featured-coach-kicker">Featured coach</p>
+            <h3>KingNorbert <span aria-hidden="true">♛</span></h3>
+            <p>Calm pressure, clear plans, and practical calculation for your next serious game.</p>
+            <div class="ai-featured-coach-meta"><strong>2000 Elo</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Balanced</span><span>Tactical</span></div>
+          </div>
+          <button class="button" type="button" id="aiFeaturedCoachPlay">Play KingNorbert</button>
+        </article>
         <section class="ai-bot-browser cq-panel" aria-label="AI bot roster"><div class="ai-bot-controls"><label>Search bots<input id="aiBotSearch" type="search" placeholder="Name, style, or opening" autocomplete="off" /></label><label>Difficulty<select id="aiBotFilter"><option value="All">All difficulties</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option><option value="Master">Master</option></select></label></div><div class="ai-bot-roster" id="aiBotRoster" aria-live="polite"></div></section>
       </div>
     </section>
@@ -3328,6 +3178,7 @@
             <aside class="ai-player-card player-frame player-frame--opponent cq-player-card" id="aiPlayerCard" data-ai-rarity="Common" aria-label="Opponent player frame">
               <div class="player-frame-topline">
                 <span class="player-frame-kicker">Opponent</span>
+                <span class="player-frame-side" data-ai-frame-side>Black</span>
                 <span class="ai-player-status" id="aiPlayerStatus">Waiting</span>
               </div>
               <span class="ai-player-avatar" id="aiPlayerAvatar" aria-hidden="true">♟</span>
@@ -3411,6 +3262,9 @@
                 <span class="review-eval-side review-eval-white">White</span>
               </div>
               <div class="puzzle-board play-board" id="coachBoard" role="group" aria-roledescription="chess board" aria-label="Player versus AI chess board. Select a piece, then its legal destination." data-interactive-board></div>
+              <div class="play-lobby-board-actions" data-board-stage-actions aria-label="Board controls">
+                <button class="button" type="button" data-board-fullscreen-action="play"><span aria-hidden="true">⛶</span><span data-board-fullscreen-label>Fullscreen</span></button>
+              </div>
             </div>
             <section class="play-lobby-guest play-auth-overlay cq-panel" id="playLobbyGuest" hidden role="dialog" aria-modal="true" aria-labelledby="playLobbyGuestTitle" aria-describedby="playLobbyGuestDescription">
               <div class="play-auth-dialog">
@@ -3435,31 +3289,6 @@
                 <span class="premove-status-icon" aria-hidden="true">◷</span>
                 <span class="premove-status-copy"><strong>Premove queued</strong><span data-premove-status-move></span></span>
                 <button class="premove-status-cancel" type="button" id="cancelPremove" aria-label="Cancel queued premove" hidden>×</button>
-              </div>
-              <div class="puzzle-actions play-actions play-primary-actions">
-                <button class="button play-start-button" type="button" id="restartGame" disabled><span aria-hidden="true">&#9654;</span> Start Game</button>
-                <button class="button secondary play-draw-action" type="button" id="offerDraw">Agree Draw</button>
-                <button class="button secondary danger play-resign-action" type="button" id="resignGame">Resign</button>
-                <details class="play-extra-actions">
-                  <summary aria-label="More game controls">More</summary>
-                  <div class="play-extra-actions-menu">
-                    <button class="button secondary" type="button" id="flipGame">Flip Board</button>
-                    <button class="button secondary" type="button" id="openBoardEditor">Board Editor</button>
-                    <a class="button secondary" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Invite Friend</a>
-                    <a class="button secondary" href="#settings" data-site-tab="settings" data-site-panel="settings">Settings</a>
-                    <button class="button secondary" type="button" id="undoGame">Undo</button>
-                    <button class="button secondary" type="button" id="toggleBot">Bot On</button>
-                    <button class="button secondary" type="button" id="whyGame">Why?</button>
-                    <button class="button secondary" type="button" id="replayMistake">Replay Mistake</button>
-                    <button class="button secondary" type="button" id="showThreats">Threats</button>
-                    <button class="button secondary" type="button" id="acceptDraw" hidden>Accept Draw</button>
-                    <button class="button secondary" type="button" id="declineDraw" hidden>Decline</button>
-                    <button class="button secondary danger" type="button" id="abortGame">Abort</button>
-                    <button class="button secondary" type="button" id="returnLobby">Lobby</button>
-                    <button class="button" type="button" id="exportPgn">Copy PGN</button>
-                    <button class="button secondary" type="button" id="importPgn">Import PGN</button>
-                  </div>
-                </details>
               </div>
             </div>
             <section class="game-options-panel cq-panel" aria-labelledby="gameOptionsTitle">
@@ -3492,7 +3321,7 @@
                 <label>Piece set
                   <select id="prefPieces"><option value="classic">Classic</option><option value="letter">Letters</option></select>
                 </label>
-                <label>Board size
+                <label hidden>Board size
                   <select id="prefBoardSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="xl">Extra Large</option></select>
                 </label>
               </div>
@@ -3545,6 +3374,38 @@
                 <p class="play-lobby-rating-note" id="playLobbyRatingNote" hidden></p>
               </fieldset>
               <button class="button play-lobby-start" type="button" id="playLobbyStart"><span aria-hidden="true">▶</span> <span id="playLobbyStartLabel">Open Game Ready</span><small id="playLobbyStartCopy">Choose an opponent first</small></button>
+            </section>
+            <section class="play-active-controls cq-panel" id="playActiveControls" aria-labelledby="playActiveControlsTitle">
+              <div class="play-active-controls-heading">
+                <span class="section-kicker">Live match</span>
+                <h3 id="playActiveControlsTitle">Match controls</h3>
+                <p>Keep the essentials close while you read the board.</p>
+              </div>
+              <div class="puzzle-actions play-actions play-primary-actions" aria-label="Live game actions">
+                <button class="button play-start-button" type="button" id="restartGame" disabled><span aria-hidden="true">&#9654;</span> Start Game</button>
+                <button class="button secondary play-draw-action" type="button" id="offerDraw">Agree Draw</button>
+                <button class="button secondary danger play-resign-action" type="button" id="resignGame">Resign</button>
+                <button class="button secondary play-flip-action" type="button" id="flipGame">Flip Board</button>
+                <details class="play-extra-actions">
+                  <summary aria-label="More game controls">More</summary>
+                  <div class="play-extra-actions-menu">
+                    <button class="button secondary" type="button" id="openBoardEditor">Board Editor</button>
+                    <a class="button secondary" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Invite Friend</a>
+                    <a class="button secondary" id="playActiveSettings" href="#settings" data-site-tab="settings" data-site-panel="settings">Settings</a>
+                    <button class="button secondary" type="button" id="undoGame">Undo</button>
+                    <button class="button secondary" type="button" id="toggleBot">Bot On</button>
+                    <button class="button secondary" type="button" id="whyGame">Why?</button>
+                    <button class="button secondary" type="button" id="replayMistake">Replay Mistake</button>
+                    <button class="button secondary" type="button" id="showThreats">Threats</button>
+                    <button class="button secondary" type="button" id="acceptDraw" hidden>Accept Draw</button>
+                    <button class="button secondary" type="button" id="declineDraw" hidden>Decline</button>
+                    <button class="button secondary danger" type="button" id="abortGame">Abort</button>
+                    <button class="button secondary" type="button" id="returnLobby">Lobby</button>
+                    <button class="button" type="button" id="exportPgn">Copy PGN</button>
+                    <button class="button secondary" type="button" id="importPgn">Import PGN</button>
+                  </div>
+                </details>
+              </div>
             </section>
             <details class="play-lobby-bot-info cq-panel" id="playLobbyBotInfo">
               <summary>Bot profile</summary>
@@ -3791,16 +3652,6 @@
               </div>
             </details>
           </aside>
-          <section class="play-social-bar cq-panel" aria-label="Friends and game chat">
-            <div class="play-social-presence"><span class="play-social-online is-offline" id="playSocialStatus" aria-hidden="true"></span><strong id="playSocialTitle">Friends</strong><small id="playSocialMeta">Connect a friend to play</small></div>
-            <div class="play-social-avatars" id="playSocialAvatars" aria-label="Friend presence"></div>
-            <form class="play-social-message" id="playSocialMessageForm">
-              <label class="sr-only" for="playSocialMessageInput">Game chat message</label>
-              <input id="playSocialMessageInput" maxlength="240" autocomplete="off" placeholder="Chat opens during friendly games" disabled />
-              <button class="button secondary" id="playSocialMessageSend" type="submit" disabled>Send</button>
-            </form>
-            <div class="play-social-tools" aria-label="Social tools"><span aria-hidden="true">&#9733;</span><span aria-hidden="true">&#9673;</span><span aria-hidden="true">&#9834;</span></div>
-          </section>
         </div>
       </div>
     </section>
@@ -4325,7 +4176,7 @@
                 </div>
                 <div class="rpg-level-path" id="rpgLevelPath" aria-label="RPG level ladder"></div>
                 <p class="habit-reward" id="dailyReward">Reward locked: finish today's puzzle.</p>
-                <p class="simple-coach" id="simpleCoach">Simple coach: Try one move. Learning counts more than winning.</p>
+                <p class="simple-coach" id="simpleCoach">Take one calm move at a time. Learning counts more than winning.</p>
                 <div class="achievement-row" id="achievementBadges" aria-label="Achievement badges"></div>
                 <div class="weekly-chart" id="weeklyChart" aria-label="Weekly progress chart"></div>
                 <div class="mini-game-row" aria-label="Mini-games">
@@ -4753,7 +4604,7 @@
     </div>
   </aside>
 
-  <script defer src="assets/auth-redirect-policy.js?v=review-v201-featured-study-signature-audio"></script>
-  <script defer src="assets/app.js?v=review-v201-featured-study-signature-audio"></script>
+  <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
+  <script defer src="assets/app.js?v=review-v226-startup-performance"></script>
 </body>
 </html>

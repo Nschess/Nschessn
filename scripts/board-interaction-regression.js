@@ -23,6 +23,15 @@ const pianoMigration = read("supabase/migrations/20260819_premium_piano_store.sq
 const requiredAppContracts = [
   ["one-registration map", /const registrations = new WeakMap\(\)/],
   ["active registration set", /const activeRegistrations = new Set\(\)/],
+  ["fullscreen-safe square geometry", /function squareAtPoint\(board, selector, event\)[\s\S]*?document\.elementsFromPoint[\s\S]*?getBoundingClientRect\(\)[\s\S]*?return squares\[row \* 8 \+ col\]/],
+  ["piece gestures suppress native drag defaults", /if \(state\.pointerMode === "piece" \|\| event\.pointerType === "touch"\) event\.preventDefault\(\)/],
+  ["active piece drags suppress browser defaults", /if \(state\.phase === boardInteractionPhases\.DRAGGING\) \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?moveGhost\(event\)/],
+  ["fullscreen promotion stays in active host", /const fullscreenHost = board\.closest\(":fullscreen"\)/],
+  ["real puzzle promotion commits through shared picker", /function handleRealPuzzleSquare\([\s\S]*?legalMoves\.some\(\(move\) => move\.promotion\)[\s\S]*?choosePromotion\(/],
+  ["fullscreen geometry refresh API", /refreshAll\(\) \{ activeRegistrations\.forEach\(\(registration\) => registration\.refresh\?\.\(\)\); \}/],
+  ["fullscreen refresh lifecycle", /document\.addEventListener\("fullscreenchange", \(\) => \{[\s\S]*?boardInteractionEngine\.refreshAll\(\);/],
+  ["rerender-safe control binding", /function bindControlEvents\(stage, state\)[\s\S]*?state\.controlBindings = \{[\s\S]*?cleanup\(\)/],
+  ["control binding replacement guard", /const sameElements = previous[\s\S]*?previous\?\.cleanup\?\.\(\)/],
   ["board-scoped cancellation API", /cancel\(board, event = null\) \{ registrations\.get\(board\)\?\.cancel\(event\); \}/],
   ["idle ghost cancellation", /cancel\(event = null\) \{[\s\S]*?state\.pointerId === null && state\.phase === boardInteractionPhases\.IDLE[\s\S]*?cleanupInteraction\(event\)/],
   ["shared idempotent cleanup", /const cleanupInteraction = \(event = null,[\s\S]*?state\.cleanupInProgress[\s\S]*?board\.querySelectorAll\("\.dragging"\)[\s\S]*?clearGhost\(\)[\s\S]*?releasePointer\(event\)/],
@@ -54,7 +63,6 @@ const requiredAppContracts = [
   ["Premove revalidation", /function tryRunCoachPremove\(\)[\s\S]*?moves\(\{ square: queued\.from, verbose: true \}\)/],
   ["Remote premove wake-up", /const remotePositionChanged = Boolean\([\s\S]*?const canCheckPremove = remote\.status === "active"[\s\S]*?tryRunCoachPremove\(\)/],
   ["Idle lifecycle premove cleanup", /onLifecycleCancel\(\)[\s\S]*?isLivePremoveEnabled\(\)[\s\S]*?cancelCoachPremove\(\)/],
-  ["Route premove cleanup", /boardInteractionEngine\.cancelAll\(\{ type: "routechange" \}\);\s*cancelCoachPremove\(\);/],
   ["Opening render cancels active drag", /function renderOpeningExplorerBoard\(\{ skipInteractionCancel = false \} = \{\}[\s\S]*?interactionState\.phase === boardInteractionPhases\.DRAGGING \|\| interactionState\.ghost[\s\S]*?boardInteractionEngine\.cancel\(board, \{ type: "opening-render" \}\)/],
   ["Opening cancel restores authoritative pieces", /onCancel\(source, event, state\)[\s\S]*?renderOpeningExplorerBoard\(\{ skipInteractionCancel: true \}\)/],
   ["Opening audio uses composed-path guard", /const isOpeningExplorerBoardEvent = \(event\)[\s\S]*?event\.composedPath\(\)[\s\S]*?opening-explorer-board, \.opening-explorer-square/],
@@ -97,6 +105,27 @@ const requiredAppContracts = [
 ];
 requiredAppContracts.forEach(([name, pattern]) => {
   assert.match(app, pattern, `Missing board lifecycle contract: ${name}`);
+});
+
+// Route cleanup is intentionally validated at the function boundary instead
+// of requiring unrelated cleanup calls to be adjacent in source. Promotion
+// UI cleanup may sit before, between, or after interaction/premove cleanup,
+// but all three operations must remain in each route transition path.
+const routeCleanupContract = [
+  ["showHome", "activateSiteTab"],
+  ["activateSiteTab", "syncTabsFromHash"]
+];
+routeCleanupContract.forEach(([name, nextName]) => {
+  const start = app.indexOf(`function ${name}(`);
+  const end = app.indexOf(`function ${nextName}(`, start + 1);
+  assert.ok(start >= 0 && end > start, `Missing route cleanup function boundary: ${name}`);
+  const body = app.slice(start, end);
+  assert.match(body, /boardInteractionEngine\.cancelAll\(\{ type: "routechange" \}\)/,
+    `Missing route interaction cancellation in ${name}`);
+  assert.match(body, /cancelCoachPremove\(\);/,
+    `Missing route premove cancellation in ${name}`);
+  assert.match(body, /clearPromotionPicker\(\{ cancel: false \}\);/,
+    `Missing promotion-picker cleanup in ${name}`);
 });
 const storePurchaseBody = app.slice(app.indexOf("async function buyOrEquipStoreItem("), app.indexOf("async function runStoreItemAction("));
 assert.doesNotMatch(storePurchaseBody, /renderStore\(\)/, "Store purchase must not rebuild the full catalog");
@@ -288,13 +317,15 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v179-featured-study-signature-audio";
-const cacheVersion = "review-v201-featured-study-signature-audio";
+const cacheName = "nschess-shell-v182-startup-performance";
+const cacheVersion = "review-v226-startup-performance";
 assert.match(html, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current asset version");
 assert.match(app, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Lazy route loaders do not use the current asset version");
 assert.match(worker, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell assets do not use the current asset version");
 assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker cache name is not current");
-assert.match(worker, /assets\/vendor\/chess\.js-1\.0\.0\.mjs/, "Service worker shell does not include the local chess.js vendor module");
+const installShell = worker.slice(worker.indexOf("const APP_SHELL"), worker.indexOf('self.addEventListener("install"'));
+assert.doesNotMatch(installShell, /assets\/vendor\/chess\.js-1\.0\.0\.mjs/, "Route-specific chess.js vendor module must not block first shell install");
+assert.match(worker, /caches\.match\(request\)\.then\(\(cached\) => cached \|\| fetch\(request\)/, "Route-specific assets must remain cacheable after first request");
 assert.match(worker, /isStoreAudioAsset[\s\S]*?assets\/audio[\s\S]*?cache\.put/, "Store piano recordings must be cacheable after first preview");
 assert.match(pianoMigration, /music-quiet-calculation[\s\S]*?music-rising-position[\s\S]*?music-midnight-strategy[\s\S]*?music-beyond-the-board[\s\S]*?music-subtle-triumph[\s\S]*?CC0 1\.0 Universal/);
 assert.match(pianoMigration, /set active = false[\s\S]*?music-calm[\s\S]*?sfx-classic/);
@@ -308,6 +339,8 @@ assert.doesNotMatch(identityCompatibilitySelectors, /data-friend-name|data-chat-
 assert.match(app, /function normalizeDirectMessage\([\s\S]*?sender_name_style: String\(/, "Direct messages must retain sender Name Style metadata");
 assert.match(app, /function createTournamentPairingIdentity\([\s\S]*?renderSharedIdentityLine/, "Tournament pairings must use the shared identity renderer");
 assert.match(css, /Final identity authority: cosmetics belong to the username text itself/, "Identity CSS must keep effects on the text node");
+assert.match(css, /\.piece-svg\s*\{[\s\S]*?width: 94%;[\s\S]*?height: 94%;[\s\S]*?max-width: none;[\s\S]*?max-height: none;/, "Board pieces must scale with large squares instead of stopping at a fixed pixel ceiling");
+assert.match(openingsCss, /opening-explorer-square \.piece-svg[\s\S]*?width: 86%;[\s\S]*?height: 86%;/, "Opening Explorer pieces must keep the shared readable scale");
 [
   ["index.html", html],
   ["assets/app.js", app],

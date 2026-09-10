@@ -12,6 +12,7 @@ const html = read("index.html");
 
 assert.match(app, /function showRouteFeatureFailure\(panel, featureName\)/, "Deferred route failures must have a visible recovery boundary.");
 assert.match(app, /This section could not load\. Your saved work is safe\./, "Route failures must explain the safe recovery state without leaking internals.");
+assert.match(app, /new URL\(\s*`\.\/assets\/routes\/\$\{encodeURIComponent\(name\)\}\.js\?v=\$\{encodeURIComponent\(routeModuleVersion\)\}`,\s*document\.baseURI\s*\)\.href/, "Lazy route imports must use a browser-resolvable URL, including repository sub-path deployments.");
 assert.match(app, /Route module \$\{name\} failed to load\.[\s\S]*?routeError: true/, "Route-module import failures must become visible recovery state instead of null.");
 assert.match(app, /if \(module\?\.routeError\) showRouteFeatureFailure\(panelElement, `route:\$\{module\.routeName \|\| panel\}`\)/, "Route-module failures must render their retry boundary on the active panel.");
 assert.match(app, /if \(ok === false\) showRouteFeatureFailure\(panelElement, name\)/, "Deferred initializer failures must surface on the active route.");
@@ -32,5 +33,14 @@ assert.match(css, /#top \.hero-dashboard > #homeContinueAction\s*\{\s*display: n
 assert.match(css, /\.store-page\.is-guest-store \.store-gift-open/, "Guest Store empty state must hide account-only gifting controls.");
 assert.match(css, /\.friends-empty-sign-in\s*\{/, "Friends empty state must offer one clear sign-in action.");
 assert.match(css, /\.button\.danger[\s\S]*?background:/, "Destructive buttons must have a distinct visual hierarchy.");
+assert.match(css, /\.ai-game-ready-overlay\s*\{[\s\S]*?position: fixed;[\s\S]*?z-index: 1200;/, "Game Ready must render as a viewport modal instead of falling into document flow.");
+assert.match(css, /\.ai-game-ready-overlay\[hidden\]\s*\{\s*display: none !important;/, "Closed Game Ready must remain hidden without leaving a document-flow gap.");
+assert.match(app, /dialog\.hidden = false;\s*document\.body\.classList\.add\("ai-game-ready-open"\)/, "Opening Game Ready must lock the background scroll state.");
+assert.match(app, /dialog\.hidden = true;\s*document\.body\.classList\.remove\("ai-game-ready-open"\)/, "Closing Game Ready must release the background scroll state.");
+assert.match(html, /class="play-active-controls[\s\S]*?id="playActiveControls"[\s\S]*?id="offerDraw"[\s\S]*?id="resignGame"/, "Active Play must keep live draw and resign actions in a dedicated control card.");
+assert.match(playCss, /#play\.is-active-game:not\(\.is-review-mode\) #playLobbySettings\s*\{\s*display: none !important;/, "Game Ready setup must disappear once an active game starts.");
+assert.match(playCss, /#play\.is-active-game:not\(\.is-review-mode\) #playActiveControls\s*\{\s*display: grid !important;/, "Active Play must expose its live control card in the right rail.");
+assert.match(playCss, /#play\.is-active-game:not\(\.is-review-mode\) \.play-right-sidebar\s*\{[\s\S]*?overflow: auto;/, "The active control rail must remain reachable while the board is taller than the viewport.");
+assert.match(playCss, /#play\.is-active-game:not\(\.is-review-mode\) \.match-board-column\s*\{[\s\S]*?min-height: 0 !important;/, "Active Play must not reserve a hidden action-bar tail below the board.");
 
-console.log("PASS route interaction regression: route errors, CSS isolation, compact Play order, menu state, onboarding, empty states, and resign safety are covered.");
+console.log("PASS route interaction regression: route errors, CSS isolation, compact Play order, active controls, menu state, onboarding, empty states, and resign safety are covered.");

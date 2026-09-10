@@ -11,6 +11,7 @@ const http = require("http");
 const crypto = require("crypto");
 const { spawn, spawnSync } = require("child_process");
 const { discoverSupabaseConfig } = require("./e2e-config.cjs");
+const { run: runTestEnvironment } = require("./test-environment.cjs");
 
 const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
@@ -25,6 +26,8 @@ fs.mkdirSync(sharedAuthDir, { recursive: true });
 const runAuthDir = fs.mkdtempSync(path.join(sharedAuthDir, "run-"));
 const mode = process.argv[2] || "affected";
 const visualOnly = mode === "visual";
+const matchmakingOnly = mode === "matchmaking";
+const environmentPreflighted = process.argv.includes("--environment-preflighted");
 
 function loadDotEnv(file) {
   if (!fs.existsSync(file)) return;
@@ -32,7 +35,7 @@ function loadDotEnv(file) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
     const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!match || process.env[match[1]] !== undefined) continue;
+    if (!match || ["SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"].includes(match[1]) || process.env[match[1]] !== undefined) continue;
     let value = match[2].trim();
     if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
     process.env[match[1]] = value;
@@ -41,9 +44,10 @@ function loadDotEnv(file) {
 loadDotEnv(envFile);
 const required = process.argv.includes("--required") || process.env.E2E_REQUIRED === "1";
 
-const results = { passed: [], skipped: [], failed: [] };
+const results = { passed: [], skipped: [], blocked: [], failed: [] };
 function pass(name) { results.passed.push(name); console.log(`PASS  ${name}`); }
 function skip(name, reason) { results.skipped.push(`${name} — ${reason}`); console.log(`SKIP  ${name} — ${reason}`); }
+function blocked(name, reason) { results.blocked.push(`${name} — ${reason}`); console.error(`BLOCKED/ENVIRONMENT  ${name} — ${reason}`); }
 function fail(name, error) { results.failed.push(`${name} — ${error.message || error}`); console.error(`FAIL  ${name}\n      ${error.stack || error}`); }
 function assert(condition, message) { if (!condition) throw new Error(message); }
 
@@ -238,10 +242,20 @@ function runNode(script, args = []) {
   if (result.status !== 0) throw new Error(`${script} exited with ${result.status}`);
 }
 
+function requireLiveE2EAdminCredential() {
+  const source = String(process.env.SUPABASE_SECRET_KEY || "").trim()
+    ? "SUPABASE_SECRET_KEY"
+    : String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim()
+      ? "SUPABASE_SERVICE_ROLE_KEY"
+      : "";
+  if (source) return source;
+  throw new Error(
+    "Live matchmaking E2E is blocked before browser/database work: set SUPABASE_SECRET_KEY (preferred) or SUPABASE_SERVICE_ROLE_KEY (legacy fallback) only in the current server-side shell, then run `npm.cmd run test:matchmaking-live`. The fixture reset was not attempted; never put either key in .env.e2e or browser code."
+  );
+}
+
 function resetLiveE2eAccountBFixture() {
-  if (!String(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim()) {
-    throw new Error("Live multiplayer E2E requires the existing server-side credential in the invoking environment to reset the generated Account B fixture; no credential was found and no fixture reset was attempted.");
-  }
+  requireLiveE2EAdminCredential();
   runNode("scripts/provision-e2e-account.cjs", ["--fixture-only"]);
 }
 
@@ -256,7 +270,7 @@ function changedFiles() {
 function runStaticChecks(full) {
   const checks = [
     ["JavaScript syntax", () => runNode("--check", ["assets/app.js"])],
-    ["E2E harness syntax", () => ["scripts/e2e-config.cjs", "scripts/e2e-runner.cjs", "scripts/e2e-server.cjs", "scripts/store-preflight.cjs", "scripts/oauth-auth-regression.js", "scripts/auth-logout-regression.js"].forEach((file) => runNode("--check", [file]))],
+    ["E2E harness syntax", () => ["scripts/e2e-config.cjs", "scripts/e2e-runner.cjs", "scripts/e2e-server.cjs", "scripts/test-environment.cjs", "scripts/provision-e2e-account.cjs", "scripts/store-preflight.cjs", "scripts/store-auth-boundary-regression.cjs", "scripts/oauth-auth-regression.js", "scripts/auth-logout-regression.js"].forEach((file) => runNode("--check", [file]))],
     ["OAuth redirect policy", () => runNode("scripts/oauth-auth-regression.js")],
     ["auth logout regression", () => runNode("scripts/auth-logout-regression.js")],
     ["board interaction regression", () => runNode("scripts/board-interaction-regression.js")],
@@ -710,8 +724,10 @@ async function waitForStoreHydration(page, label) {
   }
 }
 
-function expectedNameStyleForE2eAccount(label) {
-  const isSecondary = /^(?:secondary)(?:-|$)/i.test(String(label || "").trim());
+function expectedNameStyleForE2eAccount(label, accountRole = "") {
+  const normalizedRole = String(accountRole || "").trim().toLowerCase();
+  const isSecondary = normalizedRole === "secondary"
+    || /(?:^|-)secondary(?:-|$)/i.test(String(label || "").trim());
   const variable = isSecondary ? "E2E_SECOND_EXPECTED_NAME_STYLE" : "E2E_EXPECTED_NAME_STYLE";
   return String(process.env[variable] || "").trim();
 }
@@ -875,6 +891,8 @@ async function assertIsolationGuestState(page, label, priorIdentity = {}) {
 
 async function prepareAuth(browser, baseUrl, email, password, label, options = {}) {
   if (!email || !password) return null;
+  const accountRole = String(options.accountRole || "").trim().toLowerCase()
+    || (/(?:^|-)secondary(?:-|$)/i.test(String(label || "")) ? "secondary" : "primary");
   const envSummary = authEnvironmentSummary(email, password, baseUrl);
   console.log(`[e2e auth] ${label} environment`, envSummary);
   if (envSummary.emailLooksPlaceholder || envSummary.passwordLooksPlaceholder) {
@@ -916,7 +934,7 @@ async function prepareAuth(browser, baseUrl, email, password, label, options = {
     await waitForAuthHydration(cachedPage, `${label} cached auth`).catch(() => {});
     const cachedAuth = await readAuthRuntimeSnapshot(cachedPage);
     let cachedStoreReady = false;
-    let cachedExpectedStyleReady = !expectedNameStyleForE2eAccount(label);
+    let cachedExpectedStyleReady = !expectedNameStyleForE2eAccount(label, accountRole);
     if (cachedAuth.authState === "authenticated" && cachedAuth.session?.present && cachedAuth.supabaseClientReady) {
       // A valid auth token can still carry a pre-hydration Classic preference.
       // Reuse cached state only after the authoritative Store state has been
@@ -925,7 +943,7 @@ async function prepareAuth(browser, baseUrl, email, password, label, options = {
       await waitForAuthenticatedHydration(cachedPage, `${label} cached identity`).catch(() => {});
       await waitForStoreHydration(cachedPage, `${label} cached Store`).catch(() => {});
       cachedStoreReady = await cachedPage.evaluate(() => document.documentElement.dataset.storeSyncStatus === "ready");
-      const expectedStyle = expectedNameStyleForE2eAccount(label);
+      const expectedStyle = expectedNameStyleForE2eAccount(label, accountRole);
       if (expectedStyle) {
         try {
           // Cached browser state can retain an old local preference even when
@@ -1014,7 +1032,7 @@ async function prepareAuth(browser, baseUrl, email, password, label, options = {
   await gotoHash(page, baseUrl, "#top");
   await waitForAuthenticatedHydration(page, `${label} identity hydration`);
   await waitForStoreHydration(page, `${label} identity Store hydration`);
-  const expectedStyle = expectedNameStyleForE2eAccount(label);
+  const expectedStyle = expectedNameStyleForE2eAccount(label, accountRole);
   if (expectedStyle) {
     await ensureExpectedE2eNameStyle(page, label, expectedStyle);
     try {
@@ -1353,9 +1371,7 @@ function selectE2eStoreItem(state, preferredId = "", excludedIds = []) {
 async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, secondState) {
   if (!primaryState) {
     const reason = "E2E_EMAIL/E2E_PASSWORD are not configured in .env.e2e";
-    if (required) throw new Error(reason);
-    skip("browser: authenticated session/store/identity tests", reason);
-    return;
+    throw new Error(`BLOCKED/ENVIRONMENT: ${reason}`);
   }
   let context = await browser.newContext({ storageState: primaryState, viewport: { width: 1366, height: 900 }, serviceWorkers: "allow" });
   let page = await context.newPage();
@@ -1994,9 +2010,7 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
 async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState) {
   if (!primaryState || !secondState) {
     const reason = "two dedicated E2E account states are required";
-    if (required) throw new Error(reason);
-    skip("browser: two-account live-game E2E", reason);
-    return;
+    throw new Error(`BLOCKED/ENVIRONMENT: ${reason}`);
   }
 
   const contextA = await browser.newContext({ storageState: primaryState, viewport: { width: 1366, height: 900 }, serviceWorkers: "allow" });
@@ -2408,10 +2422,679 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
   }
 }
 
+async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState) {
+  if (!primaryState || !secondState) {
+    const reason = "two dedicated E2E account states are required";
+    throw new Error(`BLOCKED/ENVIRONMENT: ${reason}`);
+  }
+
+  const contextA = await browser.newContext({ storageState: primaryState, viewport: { width: 1366, height: 900 }, serviceWorkers: "allow" });
+  const contextB = await browser.newContext({ storageState: secondState, viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
+  const pageA = await contextA.newPage();
+  const pageB = await contextB.newPage();
+  const rpcCalls = { a: [], b: [] };
+  const leaveCalls = { a: [], b: [] };
+  const runtimeTrace = {
+    a: { consoleErrors: [], pageErrors: [], requestFailures: [], rpcFailures: [], browserEvents: [] },
+    b: { consoleErrors: [], pageErrors: [], requestFailures: [], rpcFailures: [], browserEvents: [] }
+  };
+  const installQuickMatchDiagnostics = async (page, key) => {
+    await page.addInitScript((traceKey) => {
+      const trace = [];
+      let sequence = 0;
+      const append = (event) => {
+        trace.push({ seq: ++sequence, at: Date.now(), perf: Math.round(performance.now()), ...event });
+        if (trace.length > 200) trace.splice(0, trace.length - 200);
+      };
+      const formDetails = (form, submitter = document.activeElement) => {
+        return {
+          hash: String(location.hash || ""),
+          formId: String(form?.id || ""),
+          setupHidden: document.getElementById("quickMatchSetup")?.hidden === true,
+          overlayHidden: document.getElementById("quickMatchOverlay")?.hidden === true,
+          bodySearching: document.body.classList.contains("quick-match-searching"),
+          activeElement: String(submitter?.id || submitter?.tagName || ""),
+          submitterId: String(submitter?.id || "")
+        };
+      };
+      const bodyDetails = (body) => {
+        if (typeof body !== "string") return body || null;
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed || typeof parsed !== "object") return parsed;
+          return {
+            p_queue: String(parsed.p_queue || ""),
+            p_clock: String(parsed.p_clock || ""),
+            p_game_type: String(parsed.p_game_type || ""),
+            p_preferred_color: String(parsed.p_preferred_color || ""),
+            p_region: String(parsed.p_region || "")
+          };
+        } catch { return String(body).slice(0, 600); }
+      };
+      window.__nschessQuickMatchTrace = trace;
+      window.__nschessReadQuickMatchTrace = () => trace.map((event) => ({ ...event }));
+      window.__nschessMarkQuickMatchTrace = (label, details = {}) => append({ kind: "e2e-marker", label: String(label || ""), ...details });
+
+      const originalAddEventListener = EventTarget.prototype.addEventListener;
+      EventTarget.prototype.addEventListener = function(type, listener, options) {
+        if (String(type) === "submit" && this?.id === "quickMatchSetupForm") {
+          append({ kind: "submit-listener-add", target: this.id, listenerType: typeof listener, stack: String(new Error().stack || "").slice(0, 1800) });
+        }
+        return originalAddEventListener.call(this, type, listener, options);
+      };
+      const originalRemoveEventListener = EventTarget.prototype.removeEventListener;
+      EventTarget.prototype.removeEventListener = function(type, listener, options) {
+        if (String(type) === "submit" && this?.id === "quickMatchSetupForm") {
+          append({ kind: "submit-listener-remove", target: this.id, listenerType: typeof listener, stack: String(new Error().stack || "").slice(0, 1800) });
+        }
+        return originalRemoveEventListener.call(this, type, listener, options);
+      };
+      document.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const submitButton = target?.closest?.("#quickMatchSetupForm button[type=submit]");
+        if (!submitButton) return;
+        append({
+          kind: "submit-button-click",
+          trusted: event.isTrusted === true,
+          ...formDetails(submitButton.form || document.getElementById("quickMatchSetupForm"), submitButton),
+          submitterId: String(submitButton.id || ""),
+          submitterText: String(submitButton.textContent || "").trim().slice(0, 120),
+          stack: String(new Error().stack || "").slice(0, 1800)
+        });
+      }, true);
+      document.addEventListener("submit", (event) => {
+        const form = event.target instanceof HTMLFormElement ? event.target : null;
+        if (!form || form.id !== "quickMatchSetupForm") return;
+        append({
+          kind: "form-submit",
+          trusted: event.isTrusted === true,
+          defaultPrevented: event.defaultPrevented === true,
+          ...formDetails(form, event.submitter),
+          submitterId: String(event.submitter?.id || ""),
+          submitterText: String(event.submitter?.textContent || "").trim().slice(0, 120),
+          stack: String(new Error().stack || "").slice(0, 1800)
+        });
+      }, true);
+      const originalRequestSubmit = HTMLFormElement.prototype.requestSubmit;
+      HTMLFormElement.prototype.requestSubmit = function(submitter) {
+        if (this?.id === "quickMatchSetupForm") {
+          append({
+            kind: "form-requestSubmit",
+            ...formDetails(this, submitter),
+            submitterId: String(submitter?.id || ""),
+            stack: String(new Error().stack || "").slice(0, 1800)
+          });
+        }
+        return originalRequestSubmit.call(this, submitter);
+      };
+      const originalFormSubmit = HTMLFormElement.prototype.submit;
+      HTMLFormElement.prototype.submit = function() {
+        if (this?.id === "quickMatchSetupForm") {
+          append({ kind: "form-submit-method", ...formDetails(this), stack: String(new Error().stack || "").slice(0, 1800) });
+        }
+        return originalFormSubmit.call(this);
+      };
+      const originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        const url = typeof input === "string" ? input : input?.url || "";
+        if (!/\/rpc\/join_matchmaking_queue(?:\?|$)/i.test(String(url))) return originalFetch.apply(this, arguments);
+        const requestInit = init || (typeof input === "object" ? input : null) || {};
+        const method = String(requestInit.method || input?.method || "GET").toUpperCase();
+        const body = requestInit.body ?? input?.body ?? null;
+        const event = {
+          kind: "join-fetch-start",
+          method,
+          url: String(url).split("?")[0],
+          payload: bodyDetails(typeof body === "string" ? body : ""),
+          stack: String(new Error().stack || "").slice(0, 2400)
+        };
+        append(event);
+        return originalFetch.apply(this, arguments).then((response) => {
+          const clone = response.clone();
+          void clone.text().then((rawBody) => append({
+            kind: "join-fetch-response",
+            method,
+            url: String(url).split("?")[0],
+            status: response.status,
+            responseBody: String(rawBody || "").slice(0, 1200)
+          })).catch((error) => append({ kind: "join-fetch-response-read-error", method, status: response.status, error: String(error?.message || error) }));
+          return response;
+        }, (error) => {
+          append({ kind: "join-fetch-error", method, url: String(url).split("?")[0], error: String(error?.message || error) });
+          throw error;
+        });
+      };
+      const installMethodTrace = (owner, name, kind) => {
+        if (!owner || typeof owner[name] !== "function" || owner[`__nschessTraced_${name}`]) return;
+        const original = owner[name];
+        const traced = function(...args) {
+          append({
+            kind: `${kind}-start`,
+            options: args[0] && typeof args[0] === "object" ? {
+              queue: String(args[0].queue || ""),
+              timeControl: String(args[0].timeControl || args[0].clock || ""),
+              gameType: String(args[0].gameType || ""),
+              preferredColor: String(args[0].preferredColor || ""),
+              hasSignal: Boolean(args[0].signal)
+            } : null,
+            stack: String(new Error().stack || "").slice(0, 2400)
+          });
+          let result;
+          try { result = original.apply(this, args); } catch (error) {
+            append({ kind: `${kind}-throw`, error: String(error?.message || error) });
+            throw error;
+          }
+          return Promise.resolve(result).then((value) => {
+            append({ kind: `${kind}-result`, result: value && typeof value === "object" ? {
+              status: String(value.status || ""),
+              queueState: String(value.queueState || value.queue_state || ""),
+              ticketId: String(value.ticketId || value.ticket_id || ""),
+              challengeCode: String(value.challengeCode || value.challenge_code || "")
+            } : value });
+            return value;
+          }, (error) => {
+            append({ kind: `${kind}-error`, error: String(error?.message || error), code: String(error?.code || "") });
+            throw error;
+          });
+        };
+        try {
+          owner[name] = traced;
+          Object.defineProperty(owner, `__nschessTraced_${name}`, { value: true, configurable: true });
+        } catch { /* diagnostic wrapping is best effort */ }
+      };
+      const installAvailableMethodTraces = () => {
+        installMethodTrace(window.CheckmateQuestAuthProvider, "joinMatchmakingQueue", "provider-join");
+        installMethodTrace(window.NschessOnlineMatchmaking, "findMatch", "adapter-findMatch");
+      };
+      installAvailableMethodTraces();
+      window.setInterval(installAvailableMethodTraces, 25);
+    }, key);
+  };
+  const attachQueueTrace = (page, key) => {
+    const pendingJoinRequests = new Map();
+    const trace = runtimeTrace[key];
+    const append = (collection, value, limit = 40) => {
+      if (collection.length < limit) collection.push(value);
+    };
+    page.on("console", (message) => {
+      if (message.type() !== "error") return;
+      append(trace.consoleErrors, redactDiagnosticText(message.text()));
+    });
+    page.on("pageerror", (error) => {
+      append(trace.pageErrors, redactDiagnosticText(error?.stack || error?.message || error));
+    });
+    page.on("requestfailed", (request) => {
+      const url = request.url();
+      if (!/supabase|realtime|\/rpc\//i.test(url)) return;
+      append(trace.requestFailures, {
+        method: request.method(),
+        url: redactTraceUrl(url),
+        failure: redactDiagnosticText(request.failure()?.errorText || "request failed")
+      });
+    });
+    page.on("request", (request) => {
+      if (/\/rpc\/leave_matchmaking_queue(?:\?|$)/i.test(request.url())) {
+        if (request.method() !== "POST") return;
+        let body = null;
+        try { body = JSON.parse(request.postData() || "null"); } catch {}
+        leaveCalls[key].push(String(body?.p_ticket_id || ""));
+        return;
+      }
+      // Supabase may issue an OPTIONS CORS preflight for the same RPC URL.
+      // It is not a queue submission and must never count as a ticket
+      // attempt in the two-account pairing contract.
+      if (request.method() !== "POST" || !/\/rpc\/join_matchmaking_queue(?:\?|$)/i.test(request.url())) return;
+      let body = null;
+      try { body = JSON.parse(request.postData() || "null"); } catch {}
+      const entry = {
+        requestSequence: rpcCalls[key].length + 1,
+        requestAt: Date.now(),
+        method: request.method(),
+        payload: body,
+        clock: String(body?.p_clock || ""),
+        gameType: String(body?.p_game_type || ""),
+        preferredColor: String(body?.p_preferred_color || ""),
+        ticketId: "",
+        responseStatus: null,
+        response: null
+      };
+      rpcCalls[key].push(entry);
+      pendingJoinRequests.set(request, entry);
+    });
+    page.on("response", (response) => {
+      const request = response.request();
+      const url = request.url();
+      const entry = pendingJoinRequests.get(request);
+      if (!entry && !/\/rpc\//i.test(url)) return;
+      void (async () => {
+        const status = response.status();
+        let payload = null;
+        let rawBody = "";
+        try {
+          rawBody = await response.text();
+          payload = rawBody ? JSON.parse(rawBody) : null;
+        } catch {}
+        const summary = payload && typeof payload === "object" ? {
+          status: String(payload.status || ""),
+          queueState: String(payload.queueState || payload.queue_state || ""),
+          ticketId: String(payload.ticketId || payload.ticket_id || ""),
+          challengeCode: String(payload.challengeCode || payload.challenge_code || ""),
+          reason: String(payload.reason || "")
+        } : null;
+        if (entry) {
+          entry.responseStatus = status;
+          entry.response = summary;
+          entry.responseAt = Date.now();
+          entry.responseBody = rawBody.slice(0, 1200);
+          entry.ticketId = String(summary?.ticketId || "");
+          pendingJoinRequests.delete(request);
+        }
+        if (status >= 400) append(trace.rpcFailures, {
+          method: request.method(),
+          url: redactTraceUrl(url),
+          status,
+          response: summary || redactDiagnosticText(rawBody || JSON.stringify(payload || {}))
+        });
+      })().catch((error) => {
+        append(trace.rpcFailures, {
+          method: request.method(),
+          url: redactTraceUrl(url),
+          status: response.status(),
+          response: redactDiagnosticText(error?.message || error)
+        });
+      });
+    });
+  };
+  await Promise.all([
+    installQuickMatchDiagnostics(pageA, "a"),
+    installQuickMatchDiagnostics(pageB, "b")
+  ]);
+  attachQueueTrace(pageA, "a");
+  attachQueueTrace(pageB, "b");
+
+  const readLocal = (page) => page.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem("checkmateQuest.friendChallenge.v1") || "null"); } catch { return null; }
+  });
+  const readRemote = (page) => page.evaluate(async () => {
+    const local = (() => {
+      try { return JSON.parse(localStorage.getItem("checkmateQuest.friendChallenge.v1") || "null"); } catch { return null; }
+    })();
+    const remote = await window.CheckmateQuestAuthProvider?.getFriendChallenge?.(local?.code || "");
+    return {
+      local,
+      remote: remote ? {
+        id: String(remote.id || ""),
+        code: String(remote.code || "").toUpperCase(),
+        creatorId: String(remote.creatorId || remote.creator_id || ""),
+        opponentId: String(remote.opponentId || remote.opponent_id || ""),
+        gameType: String(remote.gameType || remote.game_type || ""),
+        clock: String(remote.clock || ""),
+        status: String(remote.status || ""),
+        revision: Number(remote.revision || 0),
+        moves: Array.isArray(remote.moves) ? remote.moves.map(String) : []
+      } : null
+    };
+  });
+  const readMatchmakingDiagnostics = async (page, key) => page.evaluate(async (ticketIds) => {
+    const safeJson = (value) => {
+      try { return JSON.parse(JSON.stringify(value)); } catch { return null; }
+    };
+    const readLocal = (storageKey) => {
+      try { return JSON.parse(localStorage.getItem(storageKey) || "null"); } catch { return null; }
+    };
+    const provider = window.CheckmateQuestAuthProvider;
+    const client = window.CheckmateQuestSupabaseClient?.client;
+    let authUserId = "";
+    let authError = "";
+    try {
+      const result = await client?.auth?.getUser?.();
+      authUserId = String(result?.data?.user?.id || "");
+      authError = String(result?.error?.message || "");
+    } catch (error) {
+      authError = String(error?.message || error || "");
+    }
+    const queueStatuses = [];
+    for (const ticketId of Array.isArray(ticketIds) ? ticketIds.filter(Boolean).slice(-3) : []) {
+      try {
+        const status = await provider?.getMatchmakingStatus?.(ticketId);
+        queueStatuses.push({ ticketId, status: safeJson(status) });
+      } catch (error) {
+        queueStatuses.push({ ticketId, error: String(error?.message || error || "") });
+      }
+    }
+    const channels = typeof client?.getChannels === "function"
+      ? client.getChannels().map((channel) => ({
+        topic: String(channel?.topic || ""),
+        state: String(channel?.state || ""),
+        subscribed: String(channel?.state || "") === "joined"
+      }))
+      : [];
+    const localStorageKeys = Object.keys(localStorage).filter((key) => /match|queue|friendChallenge/i.test(key));
+    const setup = document.getElementById("quickMatchSetup");
+    const setupForm = document.getElementById("quickMatchSetupForm");
+    const overlay = document.getElementById("quickMatchOverlay");
+    const status = document.getElementById("quickMatchStatus");
+    const stop = document.getElementById("quickMatchStop");
+    const play = document.getElementById("play");
+    const state = readLocal("checkmateQuest.friendChallenge.v1");
+    let authoritativeGame = null;
+    if (state?.code) {
+      try {
+        const remote = await provider?.getFriendChallenge?.(state.code);
+        authoritativeGame = remote ? {
+          id: String(remote.id || ""),
+          code: String(remote.code || "").toUpperCase(),
+          creatorId: String(remote.creatorId || remote.creator_id || ""),
+          opponentId: String(remote.opponentId || remote.opponent_id || ""),
+          status: String(remote.status || ""),
+          gameType: String(remote.gameType || remote.game_type || ""),
+          clock: String(remote.clock || "")
+        } : null;
+      } catch (error) {
+        authoritativeGame = { error: String(error?.message || error || "") };
+      }
+    }
+    const cachedAccount = safeJson(provider?.getCachedAccount?.() || null);
+    return {
+      location: { href: String(location.origin + location.pathname + location.hash), hash: String(location.hash) },
+      auth: { userId: authUserId, error: authError },
+      cachedAccount: cachedAccount ? {
+        publicId: String(cachedAccount.publicId || ""),
+        authUserId: String(cachedAccount.authUserId || cachedAccount.userId || ""),
+        username: String(cachedAccount.username || "")
+      } : null,
+      matchmaking: {
+        localChallenge: state ? {
+          active: state.active === true,
+          remote: state.remote === true,
+          status: String(state.status || ""),
+          remoteId: String(state.remoteId || ""),
+          code: String(state.code || ""),
+          color: String(state.color || ""),
+          moves: Array.isArray(state.moves) ? state.moves.length : 0
+        } : null,
+        authoritativeGame,
+        queueStatuses
+      },
+      realtime: { channels },
+      dom: {
+        bodyClass: String(document.body.className || ""),
+        setup: setup ? { hidden: setup.hidden, display: getComputedStyle(setup).display } : null,
+        setupForm: setupForm ? { hidden: setupForm.hidden, display: getComputedStyle(setupForm).display } : null,
+        overlay: overlay ? { hidden: overlay.hidden, display: getComputedStyle(overlay).display } : null,
+        status: status ? String(status.textContent || "").trim() : "",
+        stop: stop ? { hidden: stop.hidden, disabled: stop.disabled } : null,
+        play: play ? { hidden: play.hidden, display: getComputedStyle(play).display } : null,
+        boardSquares: document.querySelectorAll("#coachBoard [data-square]").length,
+        bodyText: String(document.body.innerText || "").replace(/\s+/g, " ").trim().slice(0, 1200)
+      },
+      localStorageKeys
+    };
+  }, rpcCalls[key].map((entry) => entry.ticketId));
+  const readBrowserQuickMatchTrace = async (page, key) => {
+    try {
+      return await page.evaluate(() => typeof window.__nschessReadQuickMatchTrace === "function"
+        ? window.__nschessReadQuickMatchTrace()
+        : []);
+    } catch (error) {
+      return [{ kind: "trace-read-error", error: redactDiagnosticText(error?.message || error), key }];
+    }
+  };
+  const attachBrowserTrace = async () => {
+    runtimeTrace.a.browserEvents = await readBrowserQuickMatchTrace(pageA, "a");
+    runtimeTrace.b.browserEvents = await readBrowserQuickMatchTrace(pageB, "b");
+  };
+  const pairingDiagnostics = async () => {
+    await attachBrowserTrace();
+    return {
+      accountA: {
+        ...await readMatchmakingDiagnostics(pageA, "a"),
+        trace: runtimeTrace.a,
+        joins: rpcCalls.a,
+        leaves: leaveCalls.a
+      },
+      accountB: {
+        ...await readMatchmakingDiagnostics(pageB, "b"),
+        trace: runtimeTrace.b,
+        joins: rpcCalls.b,
+        leaves: leaveCalls.b
+      }
+    };
+  };
+  const waitForQueueJoinTrace = async (key, expectedCount, label) => {
+    const deadline = Date.now() + 10000;
+    while (rpcCalls[key].length < expectedCount && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert(rpcCalls[key].length >= expectedCount,
+      `${label} did not submit the expected real matchmaking join RPC: ${JSON.stringify(rpcCalls[key])}`);
+  };
+  const waitForQueueTicketTrace = async (key, index, label) => {
+    const deadline = Date.now() + 10000;
+    while (!(rpcCalls[key][index]?.ticketId && Number(rpcCalls[key][index]?.responseStatus) >= 200
+      && Number(rpcCalls[key][index]?.responseStatus) < 300) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert(rpcCalls[key][index]?.ticketId
+      && Number(rpcCalls[key][index]?.responseStatus) >= 200
+      && Number(rpcCalls[key][index]?.responseStatus) < 300,
+      `${label} did not return a real matchmaking ticket: ${JSON.stringify(rpcCalls[key])}`);
+  };
+  const waitForActive = async (page, label) => {
+    await page.waitForFunction(() => {
+      try {
+        const state = JSON.parse(localStorage.getItem("checkmateQuest.friendChallenge.v1") || "null");
+        return Boolean(state?.active && state?.remote && state?.status === "active" && state?.remoteId);
+      } catch { return false; }
+    }, null, { timeout: 30000 });
+    await page.waitForFunction(() => document.querySelectorAll("#coachBoard [data-square]").length === 64, null, { timeout: 15000 });
+    assert(await page.locator("#coachBoard [data-square]").count() === 64, `${label} did not render the shared multiplayer board.`);
+  };
+  const waitForRemoteStatus = async (page, code, expectedStatus, label) => {
+    await page.waitForFunction(async ({ challengeCode, status }) => {
+      try {
+        const remote = await window.CheckmateQuestAuthProvider?.getFriendChallenge?.(challengeCode);
+        return String(remote?.status || "") === status;
+      } catch { return false; }
+    }, { challengeCode: code, status: expectedStatus }, { timeout: 25000 });
+    pass(label);
+  };
+  const openQuickMatch = async (page, label) => {
+    await gotoHash(page, baseUrl, "#play?mode=quick");
+    await waitForAuthenticatedHydration(page, label);
+    await page.waitForFunction(() => {
+      const setup = document.getElementById("quickMatchSetup");
+      return Boolean(setup && !setup.hidden);
+    }, null, { timeout: 15000 });
+    assert(await page.locator("#quickMatchSetupForm").isVisible(), `${label} Quick Match setup did not open.`);
+  };
+  let challengeCode = "";
+  let completed = false;
+  try {
+    await Promise.all([openQuickMatch(pageA, "live matchmaking account A"), openQuickMatch(pageB, "live matchmaking account B")]);
+    const readMatchmakingFixtureProfile = (page) => page.evaluate(async () => {
+      const client = window.CheckmateQuestSupabaseClient?.client;
+      const { data: userData, error: userError } = await client?.auth?.getUser?.() || {};
+      const userId = String(userData?.user?.id || "");
+      if (!userId || userError) return { userId, userError: userError?.message || "missing user", rating: null };
+      const result = await client.from("profiles").select("rating").eq("id", userId).limit(1);
+      const profile = Array.isArray(result?.data) ? result.data[0] || null : null;
+      return { userId, userError: result?.error?.message || "", rating: profile ? Number(profile.rating) : null };
+    });
+    const [accountAFixture, accountBFixture] = await Promise.all([
+      readMatchmakingFixtureProfile(pageA),
+      readMatchmakingFixtureProfile(pageB)
+    ]);
+    assert(accountAFixture.userId && accountBFixture.userId
+      && accountAFixture.userId !== accountBFixture.userId
+      && !accountAFixture.userError && !accountBFixture.userError
+      && accountAFixture.rating === 1450 && accountBFixture.rating === 1520
+      && Math.abs(accountAFixture.rating - accountBFixture.rating) <= 100,
+    `live matchmaking fixtures did not satisfy the compatible authoritative rating contract: ${JSON.stringify({ accountAFixture, accountBFixture })}`);
+    pass("browser: both disposable matchmaking fixtures use distinct compatible authoritative ratings");
+    await pageA.locator("#quickMatchSetupForm button[type=submit]").click();
+    await pageA.waitForFunction(() => !document.getElementById("quickMatchOverlay")?.hidden, null, { timeout: 10000 });
+    assert(/Searching for a human opponent/i.test(await pageA.locator("#quickMatchStatus").textContent()), "Account A did not enter the online searching state.");
+    await pageA.locator("#quickMatchStop").click();
+    await pageA.waitForFunction(() => document.getElementById("quickMatchOverlay")?.hidden === true, null, { timeout: 10000 });
+    await pageA.waitForTimeout(250);
+    assert(leaveCalls.a.length >= 1 && leaveCalls.a[0], "cancelling a live Quick Match search did not call the server queue-leave RPC with a ticket.");
+    await pageA.waitForFunction(async (ticketId) => {
+      try {
+        const status = await window.CheckmateQuestAuthProvider?.getMatchmakingStatus?.(ticketId);
+        return String(status?.status || "") === "expired";
+      } catch { return false; }
+    }, leaveCalls.a[0], { timeout: 15000 });
+    pass("browser: Quick Match cancellation removed the real queue ticket");
+    assert(await pageA.evaluate(() => window.location.hash === "#play"
+      && document.getElementById("quickMatchOverlay")?.hidden === true
+      && !document.body.classList.contains("quick-match-searching")),
+    "cancelled Quick Match did not return the Play workspace to the ready state.");
+    await openQuickMatch(pageA, "live matchmaking account A after cancellation");
+    await Promise.all([
+      pageA.evaluate(() => window.__nschessMarkQuickMatchTrace?.("e2e-second-search-before-click", {
+        hash: String(location.hash || ""),
+        setupHidden: document.getElementById("quickMatchSetup")?.hidden === true,
+        overlayHidden: document.getElementById("quickMatchOverlay")?.hidden === true
+      })),
+      pageB.evaluate(() => window.__nschessMarkQuickMatchTrace?.("e2e-second-search-before-click", {
+        hash: String(location.hash || ""),
+        setupHidden: document.getElementById("quickMatchSetup")?.hidden === true,
+        overlayHidden: document.getElementById("quickMatchOverlay")?.hidden === true
+      }))
+    ]);
+    try {
+      await Promise.all([
+        pageA.locator("#quickMatchSetupForm button[type=submit]").click(),
+        pageB.locator("#quickMatchSetupForm button[type=submit]").click()
+      ]);
+    } catch (error) {
+      await attachBrowserTrace();
+      throw new Error(`${error.message || error}\nQUICK_MATCH_SUBMISSION_DIAGNOSTIC ${JSON.stringify({ accountA: { joins: rpcCalls.a, browserEvents: runtimeTrace.a.browserEvents }, accountB: { joins: rpcCalls.b, browserEvents: runtimeTrace.b.browserEvents } })}`);
+    }
+    await Promise.all([
+      pageA.waitForFunction(() => !document.getElementById("quickMatchOverlay")?.hidden, null, { timeout: 10000 }),
+      pageB.waitForFunction(() => !document.getElementById("quickMatchOverlay")?.hidden, null, { timeout: 10000 })
+    ]);
+    try {
+      await Promise.all([
+        waitForQueueJoinTrace("a", 2, "Account A second Quick Match search"),
+        waitForQueueJoinTrace("b", 1, "Account B Quick Match search")
+      ]);
+      await Promise.all([
+        waitForQueueTicketTrace("a", 1, "Account A second Quick Match search"),
+        waitForQueueTicketTrace("b", 0, "Account B Quick Match search")
+      ]);
+    } catch (error) {
+      await attachBrowserTrace();
+      throw new Error(`${error.message || error}\nQUICK_MATCH_SUBMISSION_DIAGNOSTIC ${JSON.stringify({ accountA: { joins: rpcCalls.a, browserEvents: runtimeTrace.a.browserEvents }, accountB: { joins: rpcCalls.b, browserEvents: runtimeTrace.b.browserEvents } })}`);
+    }
+    if (!(rpcCalls.a.length === 2 && rpcCalls.b.length === 1)) {
+      await attachBrowserTrace();
+      throw new Error(`the second Quick Match phase submitted more than one valid join per account: ${JSON.stringify({ accountA: rpcCalls.a, accountB: rpcCalls.b, browserEventsA: runtimeTrace.a.browserEvents, browserEventsB: runtimeTrace.b.browserEvents })}`);
+    }
+    if (!(rpcCalls.a[1]?.ticketId && rpcCalls.b[0]?.ticketId
+      && rpcCalls.a[1].ticketId !== rpcCalls.b[0].ticketId)) {
+      await attachBrowserTrace();
+      throw new Error(`the second Quick Match attempt did not create two distinct real queue tickets: ${JSON.stringify({ accountA: rpcCalls.a, accountB: rpcCalls.b, browserEventsA: runtimeTrace.a.browserEvents, browserEventsB: runtimeTrace.b.browserEvents })}`);
+    }
+    pass("browser: second Quick Match attempt created two distinct real queue tickets");
+    try {
+      await Promise.all([waitForActive(pageA, "Account A"), waitForActive(pageB, "Account B")]);
+    } catch (error) {
+      let diagnostic = null;
+      try { diagnostic = await pairingDiagnostics(); } catch (diagnosticError) {
+        diagnostic = { diagnosticError: redactDiagnosticText(diagnosticError?.message || diagnosticError) };
+      }
+      throw new Error(`${error.message || error}\nLIVE_MATCHMAKING_PAIRING_DIAGNOSTIC ${JSON.stringify(diagnostic)}`);
+    }
+    assert(rpcCalls.a.length >= 1 && rpcCalls.b.length >= 1, `both accounts did not submit the real matchmaking RPC: ${JSON.stringify(rpcCalls)}`);
+    assert(rpcCalls.a[0].clock === "5+0" && rpcCalls.b[0].clock === "5+0"
+      && rpcCalls.a[0].gameType === "casual" && rpcCalls.b[0].gameType === "casual"
+      && rpcCalls.a[0].preferredColor === "random" && rpcCalls.b[0].preferredColor === "random",
+    `Quick Match did not submit the selected server options: ${JSON.stringify(rpcCalls)}`);
+
+    const [matchA, matchB] = await Promise.all([readRemote(pageA), readRemote(pageB)]);
+    challengeCode = String(matchA.remote?.code || "").toUpperCase();
+    assert(challengeCode && challengeCode === String(matchB.remote?.code || "").toUpperCase(), "the two accounts did not receive the same matched game code.");
+    assert(matchA.remote?.id && matchA.remote.id === matchB.remote?.id, "the two accounts did not hydrate the same server game row.");
+    assert(matchA.remote.creatorId && matchA.remote.opponentId && matchA.remote.creatorId !== matchA.remote.opponentId, "the matched game did not contain two distinct authenticated players.");
+    assert(matchA.remote.gameType === "casual" && matchA.remote.clock === "5+0",
+      `server matchmaking options were not preserved: ${JSON.stringify({ a: matchA.remote, b: matchB.remote })}`);
+    assert(matchA.local?.color && matchB.local?.color && matchA.local.color !== matchB.local.color, "server color assignment was not preserved for both matched players.");
+    pass("browser: real Quick Match queue paired two accounts into one server-authoritative game");
+
+    const whitePage = matchA.local.color === "w" ? pageA : pageB;
+    const blackPage = whitePage === pageA ? pageB : pageA;
+    await whitePage.locator('#coachBoard [data-square="e2"]').click();
+    await whitePage.locator('#coachBoard [data-square="e4"]').click();
+    await blackPage.waitForFunction((code) => {
+      try {
+        const state = JSON.parse(localStorage.getItem("checkmateQuest.friendChallenge.v1") || "null");
+        return state?.code === code && Array.isArray(state.moves) && state.moves.includes("e2e4");
+      } catch { return false; }
+    }, challengeCode, { timeout: 20000 });
+    pass("browser: Quick Match move synchronized through the authoritative server path");
+
+    await blackPage.reload({ waitUntil: "domcontentloaded" });
+    await waitForAuthenticatedHydration(blackPage, "Quick Match reconnect account");
+    await waitForActive(blackPage, "reconnected account");
+    const recovered = await readLocal(blackPage);
+    assert(recovered?.code === challengeCode && recovered.moves.includes("e2e4"), "refresh recovery did not restore the matched game's authoritative move history.");
+    pass("browser: Quick Match refresh recovery restored the active game");
+
+    await pageB.locator("#resignGame").click();
+    await pageB.waitForFunction(() => !document.getElementById("resignConfirmDialog")?.hidden, null, { timeout: 5000 });
+    await pageB.locator("#resignConfirmButton").click();
+    await Promise.all([
+      waitForRemoteStatus(pageA, challengeCode, "completed", "browser: Quick Match resignation completed on the server"),
+      waitForRemoteStatus(pageB, challengeCode, "completed", "browser: Quick Match result reached both accounts")
+    ]);
+    await pageB.waitForFunction(() => !document.getElementById("postGameDecision")?.hidden, null, { timeout: 20000 });
+    await pageB.locator("#postGameDecisionReview").click();
+    await pageB.waitForFunction(() => document.getElementById("gameReview")?.classList.contains("is-review-page"), null, { timeout: 20000 });
+    assert(await pageB.locator("#gameReview").isVisible(), "completed Quick Match did not open the existing Game Review workspace.");
+    pass("browser: Quick Match Game Over opened the existing Review workspace");
+
+    await gotoHash(pageB, baseUrl, "#login");
+    await pageB.locator("#authPanelLogout").click({ noWaitAfter: true });
+    await pageB.waitForFunction(() => document.documentElement.dataset.authState === "guest"
+      && !localStorage.getItem("checkmateQuest.friendChallenge.v1"), null, { timeout: 10000 });
+    const accountARemains = await pageA.evaluate(async () => {
+      const session = await window.CheckmateQuestSupabaseClient?.client?.auth?.getSession?.();
+      return Boolean(session?.data?.session?.user?.id);
+    });
+    assert(accountARemains, "logging out the second account changed the first account's authenticated session.");
+    completed = true;
+    pass("browser: Quick Match logout preserved account isolation for the other player");
+  } finally {
+    if (!completed && challengeCode) {
+      try {
+        await pageB.evaluate(async (code) => {
+          const state = (() => { try { return JSON.parse(localStorage.getItem("checkmateQuest.friendChallenge.v1") || "null"); } catch { return null; } })();
+          const remote = await window.CheckmateQuestAuthProvider?.getFriendChallenge?.(code);
+          if (!remote || remote.status !== "active" || !state?.color) return;
+          await window.CheckmateQuestAuthProvider.saveFriendChallengePosition({
+            ...remote,
+            moves: [...(Array.isArray(remote.moves) ? remote.moves : []), `__resign:${state.color}`],
+            status: "completed",
+            moveApplied: false,
+            serverRevision: remote.revision
+          });
+        }, challengeCode);
+      } catch {
+        // The disposable account owns the test game; preserve the primary
+        // assertion while allowing the surrounding fixture reset to run.
+      }
+    }
+    await contextA.close();
+    await contextB.close();
+  }
+}
+
 async function runDeepAuthenticatedQa(browser, baseUrl, primaryState) {
   if (!primaryState) {
-    skip("browser: deep authenticated QA", "dedicated E2E credentials are not configured");
-    return;
+    throw new Error("BLOCKED/ENVIRONMENT: dedicated E2E credentials are not configured");
   }
   const routes = [
     ["home", "#top"], ["profile", "#login"], ["play", "#play"], ["bots", "#bots"],
@@ -2591,6 +3274,7 @@ async function runBrowserTests() {
   const local = !configuredBaseUrl || /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?$/i.test(configuredBaseUrl.replace(/\/$/, ""));
   const port = Number(process.env.E2E_PORT || 4173);
   const baseUrl = (configuredBaseUrl || `http://127.0.0.1:${port}`).replace(/\/$/, "");
+  if (matchmakingOnly) requireLiveE2EAdminCredential();
   if (required && (!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD)) {
     throw new Error(`Authenticated E2E tests are required but ${envFile} does not contain E2E_EMAIL and E2E_PASSWORD. Copy .env.e2e.example, use dedicated test accounts, and retry.`);
   }
@@ -2612,6 +3296,17 @@ async function runBrowserTests() {
       await runVisualSmokeTests(browser, baseUrl);
       return;
     }
+    if (matchmakingOnly) {
+      const primaryState = await prepareAuth(browser, baseUrl, process.env.E2E_EMAIL, process.env.E2E_PASSWORD, "matchmaking-primary", { accountRole: "primary" });
+      resetLiveE2eAccountBFixture();
+      const secondState = await prepareAuth(browser, baseUrl, process.env.E2E_SECOND_EMAIL, process.env.E2E_SECOND_PASSWORD, "matchmaking-secondary", { forceFresh: true, accountRole: "secondary" });
+      try {
+        await runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState);
+      } finally {
+        resetLiveE2eAccountBFixture();
+      }
+      return;
+    }
     await runOAuthButtonTests(browser, baseUrl);
     const primaryState = await prepareAuth(browser, baseUrl, process.env.E2E_EMAIL, process.env.E2E_PASSWORD, "primary");
     await runGuestBrowserTests(browser, baseUrl, [[1366, 900], [1024, 800], [768, 900], [390, 844]]);
@@ -2621,11 +3316,22 @@ async function runBrowserTests() {
     // audit into a Guest Explorer run even though the account setup is valid.
     await runDeepAuthenticatedQa(browser, baseUrl, primaryState);
     resetLiveE2eAccountBFixture();
-    const secondState = await prepareAuth(browser, baseUrl, process.env.E2E_SECOND_EMAIL, process.env.E2E_SECOND_PASSWORD, "secondary", { forceFresh: true });
+    const secondState = await prepareAuth(browser, baseUrl, process.env.E2E_SECOND_EMAIL, process.env.E2E_SECOND_PASSWORD, "secondary", { forceFresh: true, accountRole: "secondary" });
     await runAuthenticatedBrowserTests(browser, baseUrl, primaryState, secondState);
     resetLiveE2eAccountBFixture();
-    const liveSecondState = await prepareAuth(browser, baseUrl, process.env.E2E_SECOND_EMAIL, process.env.E2E_SECOND_PASSWORD, "secondary-live-fixture", { forceFresh: true });
-    await runLiveMultiplayerE2E(browser, baseUrl, primaryState, liveSecondState);
+    const liveSecondState = await prepareAuth(browser, baseUrl, process.env.E2E_SECOND_EMAIL, process.env.E2E_SECOND_PASSWORD, "secondary-live-fixture", { forceFresh: true, accountRole: "secondary" });
+    try {
+      await runLiveMatchmakingE2E(browser, baseUrl, primaryState, liveSecondState);
+    } finally {
+      resetLiveE2eAccountBFixture();
+    }
+    resetLiveE2eAccountBFixture();
+    const friendSecondState = await prepareAuth(browser, baseUrl, process.env.E2E_SECOND_EMAIL, process.env.E2E_SECOND_PASSWORD, "secondary-live-game", { forceFresh: true, accountRole: "secondary" });
+    try {
+      await runLiveMultiplayerE2E(browser, baseUrl, primaryState, friendSecondState);
+    } finally {
+      resetLiveE2eAccountBFixture();
+    }
   } finally {
     if (browser) await browser.close();
     if (server) server.kill();
@@ -2633,9 +3339,10 @@ async function runBrowserTests() {
 }
 
 function printSummary() {
-  console.log(`\nE2E summary: ${results.passed.length} passed, ${results.skipped.length} skipped, ${results.failed.length} failed.`);
+  console.log(`\nE2E summary: ${results.passed.length} passed, ${results.skipped.length} skipped, ${results.blocked.length} blocked/environment, ${results.failed.length} failed.`);
   if (results.skipped.length) results.skipped.forEach((entry) => console.log(`  ${entry}`));
-  if (results.failed.length || (required && results.skipped.length)) process.exitCode = 1;
+  if (results.blocked.length) process.exitCode = 2;
+  else if (results.failed.length || (required && results.skipped.length)) process.exitCode = 1;
 }
 
 async function main() {
@@ -2643,12 +3350,15 @@ async function main() {
   if (mode !== "e2e" && mode !== "visual") {
     const files = changedFiles();
     const appAffected = full || files.length === 0 || files.some((file) => /^(index\.html|assets\/|service-worker\.js|tests\/e2e\/|scripts\/e2e-)/.test(file));
+    const needsBrowserEnvironment = mode !== "affected" || appAffected;
+    if (needsBrowserEnvironment && !environmentPreflighted) await runTestEnvironment();
+    if (needsBrowserEnvironment) process.env.NSCHESS_ENVIRONMENT_PRECHECKED = "1";
     runStaticChecks(full);
     const purchaseTestConfigured = Boolean(String(process.env.E2E_PURCHASE_ITEM_ID || "").trim());
     // Any run that can execute a real Store purchase must prove the disposable
     // account's authoritative wallet first. This prevents affected-only runs
     // from silently exercising a guest/localStorage purchase path.
-    if (full || purchaseTestConfigured) {
+    if (!matchmakingOnly && (full || purchaseTestConfigured)) {
       try {
         runNode("scripts/store-preflight.cjs");
         pass("static: authoritative Store budget preflight");
@@ -2663,12 +3373,16 @@ async function main() {
     if (!appAffected && mode === "affected") skip("browser: affected E2E", "changed files do not touch the application or E2E harness");
     else await runBrowserTests();
   } else {
+    if (!environmentPreflighted) await runTestEnvironment();
+    process.env.NSCHESS_ENVIRONMENT_PRECHECKED = "1";
     await runBrowserTests();
   }
   printSummary();
 }
 
 main().catch((error) => {
-  console.error(error.stack || error);
-  process.exitCode = 1;
+  const message = error.message || String(error);
+  if (/^BLOCKED\/ENVIRONMENT:/i.test(message)) console.error(message);
+  else console.error(`FAIL: ${error.stack || error}`);
+  process.exitCode = /^BLOCKED\/ENVIRONMENT:/i.test(message) ? 2 : 1;
 });

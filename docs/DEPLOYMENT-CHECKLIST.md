@@ -16,6 +16,8 @@
 - [ ] Back up the staging database.
 - [ ] Apply the legacy foundation scripts required by the project (`auth.sql`, `leaderboard.sql`, and `friends.sql`) in a clean database.
 - [ ] Apply `supabase/migrations/20260819_release_candidate_security_hardening.sql` after `friends.sql` and before enabling multiplayer; this replaces the foundation move-position RPC with server-authoritative legal-FEN validation.
+- [ ] Apply `supabase/migrations/20260908_matchmaking_rating_hardening.sql` after the security hardening and Quick Match migrations; this keeps Elo updates exclusive to rated multiplayer games.
+- [ ] Apply `supabase/migrations/20260908_matchmaking_pairing_security.sql` after the Quick Match migrations; this keeps the authenticated queue caller aligned with the protected challenge creator identity during server pairing.
 - [ ] Apply `moderation.sql`, `tournaments.sql` when enabled, then the ordered migrations documented in `README.md`.
 - [ ] Apply the privacy-schema repair before the Activity Feed migration when upgrading a database with the older privacy composite shape.
 - [ ] Apply Quick Match queue migrations in order when Quick Match is enabled.
@@ -24,6 +26,8 @@
 
 ## Authenticated staging tests
 
+- [ ] Copy `.env.e2e.example` to the ignored `.env.e2e`, configure only the dedicated non-production target, and run `npm run test:environment` before live/integration work.
+- [ ] Confirm the CI `Live Stability Gate` has all `NSCHESS_E2E_*` and `NSCHESS_SUPABASE_SECRET_KEY` secrets; missing secrets must fail as `BLOCKED/ENVIRONMENT`.
 - [ ] Login/logout and refresh preserve the session.
 - [ ] Two users complete friend request, challenge, white move, black move, rapid moves, refresh, temporary disconnect/reconnect, checkmate, resign, draw, timeout, rematch, and Review Game.
 - [ ] Verify no duplicate moves, rollback after server acknowledgement, stale realtime overwrite, clock drift, or duplicate subscriptions.
@@ -47,6 +51,7 @@
 
 ## Release decision
 
+- [ ] A live test reported `PASS` only after the environment gate passed; `BLOCKED/ENVIRONMENT` is not a Stability Gate pass and `FAIL` is a regression.
 - [ ] No console errors/warnings or missing assets in staging.
 - [ ] No unresolved security, migration, or multiplayer synchronization blockers.
 - [ ] Record rollback owner, Supabase backup, deployment commit, and cache version before production rollout.

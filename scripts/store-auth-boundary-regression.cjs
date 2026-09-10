@@ -5,10 +5,13 @@ const http = require("http");
 const { spawn } = require("child_process");
 const { chromium } = require("playwright");
 const { parseEnvFile, discoverSupabaseConfig } = require("./e2e-config.cjs");
+const { run: runTestEnvironment } = require("./test-environment.cjs");
 
 const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
+const environmentPreflighted = process.argv.includes("--environment-preflighted") || process.env.NSCHESS_ENVIRONMENT_PRECHECKED === "1";
 for (const [key, value] of Object.entries(parseEnvFile(envFile))) {
+  if (["SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"].includes(key)) continue;
   if (!String(process.env[key] || "").trim()) process.env[key] = value;
 }
 
@@ -103,6 +106,10 @@ async function logout(page, label) {
 }
 
 async function main() {
+  if (!environmentPreflighted) {
+    await runTestEnvironment();
+    process.env.NSCHESS_ENVIRONMENT_PRECHECKED = "1";
+  }
   const accountAEmail = requireEnv("E2E_EMAIL");
   const accountAPassword = requireEnv("E2E_PASSWORD");
   const accountBEmail = requireEnv("E2E_SECOND_EMAIL");
@@ -215,6 +222,11 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`TARGETED STORE/AUTH BOUNDARY FAILED: ${error.message}`);
+  if (error.status === "BLOCKED/ENVIRONMENT") {
+    console.error(error.message || error);
+    process.exitCode = error.exitCode || 2;
+    return;
+  }
+  console.error(`FAIL: TARGETED STORE/AUTH BOUNDARY: ${error.message}`);
   process.exitCode = 1;
 });

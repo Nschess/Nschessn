@@ -109,9 +109,9 @@ if (expectedAiBotConfigs.filter((config) => config.elo < 2400).some((config) => 
 const requiredRegressionContracts = [
   ["homepage top-player target", /id="homeTopPlayers"/],
   ["homepage rankings renderer", /function renderHomeTopPlayers\(entries = buildLeaderboardEntries\("ai"\)\)/],
-  ["homepage rankings startup priming", /function primeHomeRankings\(\) \{[\s\S]*?hydrateSharedLeaderboardSnapshot\(\);[\s\S]*?renderHomeTopPlayers\(\);[\s\S]*?ensureSharedLeaderboardSync\(\);/],
+  ["homepage rankings startup priming", /function primeHomeRankings\(\) \{[\s\S]*?hydrateSharedLeaderboardSnapshot\(\);[\s\S]*?renderHomeTopPlayers\(\);[\s\S]*?scheduleBackgroundTask\(\(\) => \{\s*ensureSharedLeaderboardSync\(\);[\s\S]*?"home-leaderboard-sync"/],
   ["homepage rankings snapshot cache", /const leaderboardSnapshotStorageKey = "checkmateQuest\.leaderboardSnapshot\.v1";[\s\S]*?function cacheSharedLeaderboardSnapshot\(/],
-  ["startup session detection", /setupSiteTabs\(\);\s*(?:const oauthReturnParams = new URLSearchParams\(location\.search\);[\s\S]*?)?primeHomeRankings\(\);\s*void setupSupabaseAuthUi\(\);/],
+  ["startup session detection", /setupSiteTabs\(\);\s*(?:const oauthReturnParams = new URLSearchParams\(location\.search\);[\s\S]*?)?primeHomeRankings\(\);[\s\S]*?scheduleBackgroundTask\(\(\) => \{\s*void setupSupabaseAuthUi\(\);[\s\S]*?"startup-auth-hydration"/],
   ["homepage recent-game target", /id="homeRecentGames"/],
   ["homepage tournaments target", /id="homeTournaments"/],
   ["homepage tournaments renderer", /function renderHomeTournaments\([\s\S]*?tournamentRuntime\.events/],
@@ -163,8 +163,10 @@ const requiredRegressionContracts = [
   ["player pass compact breakpoint", /@media \(max-width: 760px\) \{[\s\S]*?#login \.login-shell \{ grid-template-columns: minmax\(0, 1fr\); grid-template-rows: none; \}/],
   ["profile stats first", /grid-template-areas:\s*\n\s*"overview"\s*\n\s*"stats"\s*\n\s*"ratings"\s*\n\s*"progress"/],
   ["premium daily session", /id="homeSessionCard"[\s\S]*?id="homeSessionAction"[\s\S]*?id="homeSessionWhy"/],
-  ["homepage daily command deck", /class="hero hero-command-center home-command-deck"[\s\S]*?home-command-session[\s\S]*?hero-quick-card--learn[\s\S]*?class="home-command-secondary"[\s\S]*?home-command-secondary-grid/],
-  ["Chess DNA dashboard", /id="homeDnaTitle"[\s\S]*?id="homeDnaSkills"[\s\S]*?id="homeDnaAction"/],
+  ["homepage daily command deck", /class="hero hero-command-center home-command-deck"[\s\S]*?home-command-session[\s\S]*?hero-quick-card--learn/],
+  ["profile Chess DNA dashboard", /class="profile-progress-insights"[\s\S]*?id="profileDnaTitle"[\s\S]*?id="profileDnaSkills"[\s\S]*?id="profileDnaAction"/],
+  ["profile progress insights renderer", /function renderProfileProgressInsights\([\s\S]*?profileDnaSkills[\s\S]*?profileMomentumDays/],
+  ["profile progress insights mount", /renderProfileProgressInsights\(profile\);/],
   ["focused onboarding duration", /id="firstVisitSession" name="sessionMinutes"[\s\S]*?sessionMinutes: String\(data\.get\("sessionMinutes"\)/],
   ["one-moment review loop", /id="reviewOneMoment"[\s\S]*?id="reviewOneMomentPractice"[\s\S]*?function practiceReviewOneMoment\(/],
   ["review self-analysis workspace", /id="reviewSelfAnalysis"[\s\S]*?id="reviewSelfAnalysisLine"[\s\S]*?id="reviewSelfAnalysisEngineLine"[\s\S]*?id="reviewSelfAnalyze"[\s\S]*?id="reviewSelfUndo"[\s\S]*?id="reviewSelfCopy"[\s\S]*?function startReviewSelfAnalysis\([\s\S]*?function undoReviewSelfAnalysisMove\([\s\S]*?function getReviewSelfAnalysisPgn\([\s\S]*?function copyReviewSelfAnalysis\([\s\S]*?function formatReviewSelfAnalysisPrincipalVariation\([\s\S]*?function analyzeReviewSelfPosition\([\s\S]*?function makeReviewSelfAnalysisMove\(/],
@@ -187,8 +189,8 @@ const requiredRegressionContracts = [
   ["premium home renderer", /function renderPremiumHomeExperience\([\s\S]*?renderPremiumHomeExperience\(\{ focus, focusPuzzlePlan, nextStep, latestReadyReview \}\);/],
   ["daily ritual progress loop", /id="homeSessionRitual"[\s\S]*?function renderPremiumHomeExperience\([\s\S]*?daily_ritual_opened/],
   ["visible daily ritual reward", /id="homeSessionReward"[\s\S]*?id="homeSessionClaim"[\s\S]*?action === "claim-daily-ritual"[\s\S]*?claimDailyGoalsReward\(/],
-  ["weekly momentum runway", /id="homeMomentumTitle"[\s\S]*?id="homeMomentumMeter"[\s\S]*?id="homeMomentumDays"[\s\S]*?function getWeeklyMomentumDays\(/],
-  ["next unlock milestone", /id="homeMomentumMilestone"[\s\S]*?id="homeMomentumMilestoneTitle"[\s\S]*?function getNextAchievementMilestone\([\s\S]*?function setPremiumHomeMilestone\(/],
+  ["profile weekly momentum runway", /id="profileMomentumTitle"[\s\S]*?id="profileMomentumMeter"[\s\S]*?id="profileMomentumDays"[\s\S]*?function getWeeklyMomentumDays\(/],
+  ["profile next unlock milestone", /id="profileMomentumMilestone"[\s\S]*?id="profileMomentumMilestoneTitle"[\s\S]*?function getNextAchievementMilestone\([\s\S]*?function setPremiumHomeMilestone\(/],
   ["active coach tone", /data-profile-setting="coachTone"[\s\S]*?function getCoachTone\([\s\S]*?function getPremiumSessionVoice\([\s\S]*?function getPremiumMomentumCopy\(/],
   ["premium home reduced motion", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-session-ritual-item[\s\S]*?\.home-momentum-milestone[\s\S]*?\.home-momentum-meter span/],
   ["cacheable application asset split", /href="assets\/app\.css(?:\?v=[^"]+)?"[\s\S]*?src="assets\/app\.js(?:\?v=[^"]+)?"/],
@@ -229,6 +231,10 @@ const prohibitedReviewLeaks = [
 
 for (const [label, pattern] of prohibitedReviewLeaks) {
   if (pattern.test(regressionSource)) throw new Error(`Forbidden Game Review leak: ${label}.`);
+}
+
+if (/<section class="home-command-secondary"/.test(html) || /id="home(?:Dna|Momentum)/.test(html)) {
+  throw new Error("Large Chess DNA and Weekly Momentum cards must not be mounted in the global Home surface.");
 }
 
 for (const [label, pattern] of requiredRegressionContracts) {

@@ -32,7 +32,6 @@
       "checkmateQuest.firstVisitSetup.v1",
       "checkmateQuest.story.v1",
       "checkmateQuest.preferences.v1",
-      "checkmateQuest.boardSizing.v1",
       "checkmateQuest.playAiTimeControl.v1",
       "checkmateQuest.profile.v1",
       "checkmateQuest.authPreferences.v1",
@@ -327,7 +326,48 @@
 
       function squareAtPoint(board, selector, event) {
         if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return null;
-        return squareFromTarget(board, selector, document.elementFromPoint(event.clientX, event.clientY));
+        const pointX = event.clientX;
+        const pointY = event.clientY;
+        // Pointer capture can make the board itself the event target after a
+        // drag starts, but when the browser retains the live square target it
+        // is the most reliable answer. Only trust it while the pointer is
+        // still inside that square so a stale target cannot swallow a drop.
+        const targetSquare = squareFromTarget(board, selector, event.target);
+        if (targetSquare) {
+          const targetRect = targetSquare.getBoundingClientRect();
+          if (pointX >= targetRect.left && pointX < targetRect.right
+            && pointY >= targetRect.top && pointY < targetRect.bottom) return targetSquare;
+        }
+        // The native fullscreen top layer can change which element is returned
+        // by elementFromPoint without changing the board that owns the
+        // gesture. Prefer the live hit-test, then fall back to the currently
+        // rendered square rects so normal and fullscreen use the same mapping.
+        const hit = typeof document.elementsFromPoint === "function"
+          ? document.elementsFromPoint(pointX, pointY)
+            .map((element) => squareFromTarget(board, selector, element))
+            .find(Boolean)
+          : squareFromTarget(board, selector, document.elementFromPoint(pointX, pointY));
+        if (hit) return hit;
+
+        const squares = [...board.querySelectorAll(selector)];
+        const rectHit = squares.find((square) => {
+          const rect = square.getBoundingClientRect();
+          return pointX >= rect.left && pointX < rect.right
+            && pointY >= rect.top && pointY < rect.bottom;
+        });
+        if (rectHit) return rectHit;
+
+        // A final grid fallback covers a transient fullscreen frame where a
+        // square rect has not painted yet. The renderer controls DOM order, so
+        // this remains orientation-safe and never invents a route-specific
+        // coordinate system.
+        const boardRect = board.getBoundingClientRect();
+        if (!boardRect.width || !boardRect.height
+          || pointX < boardRect.left || pointX >= boardRect.right
+          || pointY < boardRect.top || pointY >= boardRect.bottom) return null;
+        const col = Math.min(7, Math.max(0, Math.floor(((pointX - boardRect.left) / boardRect.width) * 8)));
+        const row = Math.min(7, Math.max(0, Math.floor(((pointY - boardRect.top) / boardRect.height) * 8)));
+        return squares[row * 8 + col] || null;
       }
 
       function attach(board, options = {}) {
@@ -354,6 +394,8 @@
           ghostWidth: 0,
           ghostHeight: 0,
           pointerMode: "",
+          lastX: 0,
+          lastY: 0,
           analysisDragged: false,
           gestureCommitted: false,
           cleanupInProgress: false,
@@ -413,15 +455,35 @@
           state.ghostWidth = 0;
           state.ghostHeight = 0;
         };
+        const syncGhostSize = () => {
+          if (!state.ghost || !state.from) return;
+          const sourceSquare = board.querySelector(`${selector}[data-square="${state.from}"]`);
+          const sourcePiece = sourceSquare?.querySelector(".piece-svg, .piece-symbol, img");
+          if (!(sourcePiece instanceof HTMLElement)) return;
+          const rect = sourcePiece.getBoundingClientRect();
+          if (!rect.width || !rect.height) return;
+          if (Math.abs(rect.width - state.ghostWidth) < 0.1 && Math.abs(rect.height - state.ghostHeight) < 0.1) return;
+          state.ghostWidth = rect.width;
+          state.ghostHeight = rect.height;
+          state.ghost.style.width = `${rect.width}px`;
+          state.ghost.style.height = `${rect.height}px`;
+        };
         const positionGhost = () => {
           state.ghostFrame = 0;
           if (!state.ghost) return;
           const x = state.ghostX - state.ghostWidth / 2;
           const y = state.ghostY - state.ghostHeight / 2;
-          state.ghost.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+          // The ghost is fixed to the viewport.  Keep its coordinates in the
+          // same coordinate space as PointerEvent.clientX/clientY instead of
+          // relying on a transform, which can be remapped by a fullscreen or
+          // transformed containing block in some browsers.
+          state.ghost.style.transform = "none";
+          state.ghost.style.left = `${x}px`;
+          state.ghost.style.top = `${y}px`;
         };
         const moveGhost = (event) => {
           if (!state.ghost || !Number.isFinite(event?.clientX) || !Number.isFinite(event?.clientY)) return;
+          syncGhostSize();
           state.ghostX = event.clientX;
           state.ghostY = event.clientY;
           if (!state.ghostFrame) state.ghostFrame = window.requestAnimationFrame(positionGhost);
@@ -443,6 +505,10 @@
           ghost.style.top = "0";
           ghost.style.width = `${rect.width}px`;
           ghost.style.height = `${rect.height}px`;
+          ghost.style.minWidth = "0";
+          ghost.style.minHeight = "0";
+          ghost.style.maxWidth = "none";
+          ghost.style.maxHeight = "none";
           ghost.style.pointerEvents = "none";
           ghost.style.zIndex = "2147483000";
           ghost.style.willChange = "transform, opacity";
@@ -450,7 +516,17 @@
           state.ghost = ghost;
           state.ghostWidth = rect.width;
           state.ghostHeight = rect.height;
-          document.body.appendChild(ghost);
+          // A fullscreen board is rendered in its own top-layer/focus
+          // workspace. A ghost left under document.body can still receive
+          // pointer updates and commit the move, but it is painted behind
+          // that workspace, making the held piece appear to vanish. Keep the
+          // one shared ghost renderer in the currently visible board host;
+          // normal boards continue to use body as their viewport layer.
+          const fullscreenHost = board.closest(":fullscreen")
+            || (document.body.classList.contains("interactive-board-fullscreen-active")
+              ? board.closest(".interactive-board-sizing-stage")
+              : null);
+          (fullscreenHost || document.body).appendChild(ghost);
           moveGhost(event);
         };
         const emitHover = (square, event) => {
@@ -474,6 +550,8 @@
           state.from = "";
           state.startX = 0;
           state.startY = 0;
+          state.lastX = 0;
+          state.lastY = 0;
           state.pointerMode = "";
           state.analysisDragged = false;
           if (event) callbacks.onPointerEnd?.(event, state);
@@ -538,6 +616,8 @@
           state.from = squareName(square);
           state.startX = event.clientX;
           state.startY = event.clientY;
+          state.lastX = event.clientX;
+          state.lastY = event.clientY;
           window.clearTimeout(state.suppressTimer);
           state.suppressTimer = 0;
           state.suppressClick = false;
@@ -553,9 +633,10 @@
           clearLongPressVisual();
           emitHover(square, event);
           try { board.setPointerCapture(event.pointerId); } catch {}
-          // A touch gesture belongs to the board once it starts. Preventing
-          // the browser's scroll gesture here keeps board input deterministic.
-          if (event.pointerType === "touch" || state.pointerMode !== "piece") event.preventDefault();
+          // The shared pointer pipeline owns board selection and drops. Stop
+          // native button/HTML dragging for every piece gesture, not only
+          // touch, so mouse drags cannot race the browser's default behavior.
+          if (state.pointerMode === "piece" || event.pointerType === "touch") event.preventDefault();
           if (event.pointerType === "touch") {
             state.longPressTimer = window.setTimeout(() => {
               state.longPressTimer = 0;
@@ -572,6 +653,8 @@
           const square = squareAtPoint(board, selector, event) || squareFromTarget(board, selector, event.target);
           emitHover(square, event);
           if (state.pointerId !== event.pointerId || state.phase === boardInteractionPhases.IDLE) return;
+          state.lastX = event.clientX;
+          state.lastY = event.clientY;
           const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
           if (state.pointerMode === "analysis-arrow") {
             if (distance >= DRAG_THRESHOLD) {
@@ -591,16 +674,23 @@
             setPhase(boardInteractionPhases.DRAGGING, event);
             board.classList.add("is-dragging");
             clearAnalysisArrows("piece-drag-start", board);
-            try { callbacks.onDragStart?.(state.from, event, state); } catch (error) { reportCallbackError(error, event); }
+            // Create the visual feedback before route-specific callbacks run.
+            // A callback may update selection state or rerender a square; the
+            // pointer gesture must still get a stable ghost immediately.
             createGhost(state.from, event);
+            try { callbacks.onDragStart?.(state.from, event, state); } catch (error) { reportCallbackError(error, event); }
             window.clearTimeout(state.dragSafetyTimer);
             state.dragSafetyTimer = window.setTimeout(() => {
               if (state.pointerId !== event.pointerId || state.phase !== boardInteractionPhases.DRAGGING) return;
               cleanupInteraction({ ...event, type: "drag-timeout" }, { notifyCancel: true, suppressClick: true });
             }, 12000);
           }
-          if (state.phase === boardInteractionPhases.DRAGGING && event.pointerType === "touch") event.preventDefault();
-          if (state.phase === boardInteractionPhases.DRAGGING) moveGhost(event);
+          if (state.phase === boardInteractionPhases.DRAGGING) {
+            // Prevent text selection, native dragstart, and touch scrolling
+            // while the shared board drag is active.
+            event.preventDefault();
+            moveGhost(event);
+          }
           callbacks.onPointerMove?.(squareName(square), event, state);
         };
         const onPointerUp = (event) => {
@@ -634,6 +724,7 @@
             return;
           }
           const wasDragging = state.phase === boardInteractionPhases.DRAGGING;
+          if (wasDragging) event.preventDefault();
           state.suppressClick = true;
           try {
             if (!wasDragging && !state.longPressTriggered) clearAnalysisArrows("piece-select", board);
@@ -701,7 +792,10 @@
           // Native HTML5 drag creates a second input pipeline. Pointer events
           // are the canonical path for mouse and touch, so suppress the
           // browser ghost while retaining keyboard activation of square buttons.
-          if (squareFromTarget(board, selector, event.target)) event.preventDefault();
+          if (squareFromTarget(board, selector, event.target)) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
         };
         const onContextMenu = (event) => {
           const square = squareFromTarget(board, selector, event.target);
@@ -773,7 +867,9 @@
         board.addEventListener("pointerover", onPointerOver, { passive: true });
         board.addEventListener("pointerout", onPointerOut, { passive: true });
         board.addEventListener("click", onClick);
-        board.addEventListener("dragstart", onDragStart);
+        // Capture the native dragstart before it can create a browser drag
+        // image. The shared pointer engine must be the only drag pipeline.
+        board.addEventListener("dragstart", onDragStart, true);
         board.addEventListener("contextmenu", onContextMenu);
         board.addEventListener("keydown", onKeyDown);
         window.addEventListener("pointerup", onWindowPointerEnd);
@@ -821,7 +917,7 @@
             board.removeEventListener("pointerover", onPointerOver);
             board.removeEventListener("pointerout", onPointerOut);
             board.removeEventListener("click", onClick);
-            board.removeEventListener("dragstart", onDragStart);
+            board.removeEventListener("dragstart", onDragStart, true);
             board.removeEventListener("contextmenu", onContextMenu);
             board.removeEventListener("keydown", onKeyDown);
             window.removeEventListener("pointerup", onWindowPointerEnd);
@@ -833,6 +929,18 @@
             if (!previousTouchAction && callbacks.touchAction !== false) board.style.touchAction = "";
             registrations.delete(board);
             activeRegistrations.delete(registration);
+          },
+          refresh() {
+            if (state.ghost) {
+              syncGhostSize();
+              moveGhost({ clientX: state.lastX, clientY: state.lastY });
+            }
+            if (state.pointerId !== null && Number.isFinite(state.lastX) && Number.isFinite(state.lastY)) {
+              emitHover(squareAtPoint(board, selector, {
+                clientX: state.lastX,
+                clientY: state.lastY
+              }), { type: "board-geometry-refresh" });
+            }
           }
         };
         registrations.set(board, registration);
@@ -846,6 +954,8 @@
         detach(board) { registrations.get(board)?.detach(); },
         cancel(board, event = null) { registrations.get(board)?.cancel(event); },
         cancelAll(event = null) { activeRegistrations.forEach((registration) => registration.cancel(event)); },
+        refresh(board) { registrations.get(board)?.refresh(); },
+        refreshAll() { activeRegistrations.forEach((registration) => registration.refresh?.()); },
         getState(board) { return registrations.get(board)?.state || null; }
       });
     })();
@@ -861,25 +971,65 @@
      * from growing separate sizing implementations.
      */
     const interactiveBoardSizeStorageKey = "checkmateQuest.boardSizing.v1";
+    const interactiveBoardDiscoveryStorageKey = "checkmateQuest.boardSizingDiscovery.v1";
     const sharedInteractiveBoardWorkspace = (() => {
-      const defaultSize = 720;
       const minSize = 280;
       const maxSize = 1200;
+      const reasonableMaxSize = 960;
+      const legacyFallbackSize = 720;
       const states = new WeakMap();
       const stages = new Set();
       let resizeFrame = 0;
       let syncFrame = 0;
+      let activeResizeStage = null;
+      const sharedResizeObserver = typeof ResizeObserver === "function"
+        ? new ResizeObserver(() => {
+          if (hasLiveResize()) {
+            return;
+          }
+          scheduleSync();
+        })
+        : null;
+      let observedLayoutTargets = new Set();
+
+      function hasLiveResize() {
+        return [...stages].some((stage) => states.get(stage)?.isResizing);
+      }
+
+      function boardDiscoverySeen() {
+        try {
+          return localStorage.getItem(interactiveBoardDiscoveryStorageKey) === "seen";
+        } catch {
+          return false;
+        }
+      }
+
+      function markBoardDiscoverySeen() {
+        try { localStorage.setItem(interactiveBoardDiscoveryStorageKey, "seen"); } catch {}
+      }
+
+      function layoutScopeForStage(stage) {
+        return stage?.closest?.([
+          ".play-shell",
+          ".game-review-command-center",
+          ".real-puzzle-shell",
+          ".puzzle-shell",
+          ".tutorial-shell",
+          ".adventure-play",
+          ".opening-explorer-layout"
+        ].join(",")) || null;
+      }
 
       function readSavedSize() {
         try {
           const saved = JSON.parse(localStorage.getItem(interactiveBoardSizeStorageKey) || "null");
           const requested = Number(saved?.requested);
           return {
-            requested: Number.isFinite(requested) ? Math.max(minSize, Math.min(maxSize, requested)) : defaultSize,
+            requested: Number.isFinite(requested) ? Math.max(minSize, Math.min(maxSize, requested)) : null,
             manual: Boolean(saved?.manual && Number.isFinite(requested))
           };
         } catch {
-          return { requested: defaultSize, manual: false };
+          return { requested: null, manual: false };
         }
       }
 
@@ -894,61 +1044,316 @@
         } catch {}
       }
 
-      function clampRequested(value) {
-        return Math.max(minSize, Math.min(maxSize, Math.round(Number(value) || defaultSize)));
+      function removeDiscovery(stage, state) {
+        if (state?.discoveryTimer) {
+          window.clearTimeout(state.discoveryTimer);
+          state.discoveryTimer = 0;
+        }
+        stage.querySelector("[data-board-discovery]")?.remove();
+      }
+
+      function syncDiscovery(stage, state) {
+        const activeGame = Boolean(stage.closest("#play.is-active-game:not(.is-review-mode)"));
+        if (!activeGame || boardDiscoverySeen() || state.manual || state.discoveryExpired) {
+          if (state.manual) markBoardDiscoverySeen();
+          removeDiscovery(stage, state);
+          return;
+        }
+        if (stage.querySelector("[data-board-discovery]")) return;
+        const cue = document.createElement("div");
+        cue.className = "interactive-board-discovery";
+        cue.dataset.boardDiscovery = "true";
+        cue.setAttribute("aria-live", "polite");
+        cue.innerHTML = `
+          <strong>↘ Drag to resize</strong>
+          <span>Use the lower-right corner to adjust your board.</span>
+          <small>Fullscreen — focus on your game</small>
+        `;
+        stage.append(cue);
+        state.discoveryTimer = window.setTimeout(() => {
+          state.discoveryExpired = true;
+          removeDiscovery(stage, state);
+        }, 12000);
+      }
+
+      function markResizeDiscovered(stage, state) {
+        if (!state || !Boolean(stage.closest("#play.is-active-game:not(.is-review-mode)"))) return;
+        markBoardDiscoverySeen();
+        removeDiscovery(stage, state);
+      }
+
+      function clampRequested(value, fallback = minSize) {
+        const numeric = Number(value);
+        const safeValue = Number.isFinite(numeric) ? numeric : fallback;
+        return Math.max(minSize, Math.min(maxSize, Math.round(safeValue)));
       }
 
       function boardForStage(stage) {
         return stage?.querySelector("[data-interactive-board]") || null;
       }
 
-      function availableSize(stage, board, fullscreen = false) {
-        const viewportWidth = Math.max(240, window.innerWidth || document.documentElement.clientWidth || 240);
-        const viewportHeight = Math.max(320, window.innerHeight || document.documentElement.clientHeight || 320);
+      function viewportSize() {
+        const visualViewport = window.visualViewport;
+        const width = Number(visualViewport?.width) || Number(window.innerWidth) || Number(document.documentElement.clientWidth) || 240;
+        const height = Number(visualViewport?.height) || Number(window.innerHeight) || Number(document.documentElement.clientHeight) || 320;
+        return {
+          width: Math.max(240, width),
+          height: Math.max(320, height)
+        };
+      }
+
+      function responsiveDefaultSize() {
+        const { width: viewportWidth, height: viewportHeight } = viewportSize();
+        const horizontalFit = viewportWidth - 32;
+        const verticalFit = viewportHeight - 170;
+        // One shared viewport baseline is used by every board. Individual
+        // mounted layouts may render smaller when their local track is
+        // narrower, but they never invent a different default preference.
+        return clampRequested(Math.min(reasonableMaxSize, horizontalFit, verticalFit), minSize);
+      }
+
+      function availableSize(stage, board, fullscreen = false, reservePlayerCards = false) {
+        const { width: viewportWidth, height: viewportHeight } = viewportSize();
+        const viewportSafeMinimum = Math.min(minSize, Math.max(180, viewportWidth - 24));
         if (fullscreen) {
-          return Math.max(minSize, Math.floor(Math.min(viewportWidth - 32, viewportHeight - 112)));
+          const host = fullscreenHostForStage(stage);
+          const hostRect = host?.getBoundingClientRect?.();
+          const hostStyle = host ? getComputedStyle(host) : null;
+          // Native fullscreen can expose a layout viewport that differs from
+          // the visual viewport (notably while browser chrome/orientation is
+          // settling). Measure the fullscreen host itself so the square is
+          // fitted to the actual border-box that contains the game.
+          const hostWidth = Number(host?.clientWidth) || Number(hostRect?.width) || viewportWidth;
+          const hostHeight = Number(host?.clientHeight) || Number(hostRect?.height) || viewportHeight;
+          const reviewHost = host?.matches?.(".game-review-command-center") || false;
+          const reviewAnalysis = reviewHost
+            ? host.querySelector(":scope > .game-review-analysis-slot")
+            : null;
+          const reviewAnalysisWidth = Number(reviewAnalysis?.clientWidth)
+            || Number(reviewAnalysis?.getBoundingClientRect?.().width)
+            || 0;
+          const paddingInline = (Number.parseFloat(hostStyle?.paddingInlineStart) || 0)
+            + (Number.parseFloat(hostStyle?.paddingInlineEnd) || 0);
+          const paddingBlock = (Number.parseFloat(hostStyle?.paddingBlockStart) || 0)
+            + (Number.parseFloat(hostStyle?.paddingBlockEnd) || 0);
+          const rowGap = Number.parseFloat(hostStyle?.rowGap || hostStyle?.gap || "") || 0;
+          const cards = [...(host?.querySelectorAll?.(":scope > .ai-player-card, :scope > .match-player-card") || [])];
+          const measuredCardsHeight = cards.reduce((total, card) => total + (card.getBoundingClientRect?.().height || 0), 0);
+          const cardsHeight = measuredCardsHeight || (reservePlayerCards ? cards.length * 68 : 0);
+          const bottomBar = host?.querySelector?.(":scope > .play-bottom-actionbar");
+          const reviewReplay = reviewHost
+            ? host.querySelector(":scope > .game-review-replay-slot")
+            : null;
+          const controlsHeight = Math.max(
+            bottomBar?.getBoundingClientRect?.().height || 0,
+            reviewReplay?.getBoundingClientRect?.().height || 0
+          );
+          const stageRect = stage.getBoundingClientRect?.();
+          const boardRect = board.getBoundingClientRect?.();
+          const playUtility = !reviewHost
+            ? stage.querySelector(":scope > .play-lobby-board-actions")
+            : null;
+          const playUtilityRect = playUtility?.getBoundingClientRect?.();
+          // The shared stage keeps a framed wrapper around the square board.
+          // Fullscreen fitting must reserve that frame, otherwise the rows
+          // can exceed the viewport even when the square itself fits exactly.
+          const measuredFrame = reviewHost
+            ? Number(stageRect?.height) - Number(boardRect?.height)
+            : Number(stageRect?.width) - Number(boardRect?.width);
+          // In fullscreen the stage itself expands to the viewport. Its width
+          // minus the board is therefore not the board's presentation frame;
+          // using that value makes a previously clamped board collapse to 1px.
+          // Keep the measured frame when it is plausible, otherwise use the
+          // stable shared frame allowance.
+          const boardFrameReserve = Number.isFinite(measuredFrame) && measuredFrame > 0
+            ? Math.min(measuredFrame, 96)
+            : 20;
+          // Active Play keeps the fullscreen action as a small edge overlay on
+          // wider fullscreen viewports, so it does not consume a permanent
+          // board-width column. Narrow desktop/tablet layouts retain the
+          // measured rail only when the overlay would intrude on the square.
+          // The host's own padding is already accounted for.
+          const measuredPlayRail = !reviewHost && playUtilityRect && stageRect
+            && playUtilityRect.width > 0
+            && playUtilityRect.left >= stageRect.right
+            ? playUtilityRect.width + Math.max(0, playUtilityRect.left - stageRect.right)
+            : 0;
+          const mobileStageActionsReserve = viewportWidth < 900 ? 42 : 0;
+          const fullscreenRows = reservePlayerCards
+            ? 1 + cards.length + (controlsHeight > 0 ? 1 : 0)
+            : 1;
+          const gridGapReserve = rowGap * Math.max(0, fullscreenRows - 1);
+          const widthBudget = reviewAnalysisWidth || hostWidth;
+          const widthFitWithoutUtility = widthBudget - paddingInline - boardFrameReserve;
+          const heightFitWithoutUtility = hostHeight - paddingBlock
+            - cardsHeight - controlsHeight - gridGapReserve - boardFrameReserve - mobileStageActionsReserve;
+          // The wider edge overlay needs only the amount that prevents it
+          // touching a width-limited board. Height-limited compositions do
+          // not reserve any horizontal space at all.
+          const edgeOverlayReserve = !reviewHost
+            && viewportWidth >= 901
+            && viewportWidth < 981
+            && widthFitWithoutUtility <= heightFitWithoutUtility
+            ? Math.max(0, Math.ceil((playUtilityRect?.width || 34) / 2) - 1)
+            : 0;
+          const utilityRailReserve = reviewHost
+            ? (viewportWidth >= 900 ? 84 : 0)
+            : (viewportWidth >= 981 ? 0 : (viewportWidth >= 901
+              ? edgeOverlayReserve
+              : (measuredPlayRail || (viewportWidth >= 701 ? 42 : 0))));
+          if (!reviewHost) {
+            host.style.setProperty("--interactive-board-utility-reserve", `${utilityRailReserve}px`);
+            host.style.setProperty("--interactive-board-utility-shift", `${-utilityRailReserve / 2}px`);
+          }
+          // The fullscreen utility rail is taken out of the board's width only
+          // on layouts that can actually place it beside the board. On compact
+          // screens the rail stays inside the stage edge instead of causing
+          // horizontal overflow.
+          // Review fullscreen owns the command center, whose right column is
+          // intentionally reserved for evaluation context. Fit the square to
+          // the actual analysis track instead of the whole command-center
+          // border box, otherwise the board can intrude into that context.
+          const widthFit = widthBudget - paddingInline - utilityRailReserve - boardFrameReserve;
+          const verticalReserve = reviewHost
+            ? paddingBlock + controlsHeight + boardFrameReserve + mobileStageActionsReserve + 8
+            : paddingBlock + cardsHeight + controlsHeight + gridGapReserve + boardFrameReserve + mobileStageActionsReserve;
+          // The measured fit is authoritative in focus mode. Do not raise it
+          // back to the shared minimum: on a short viewport that would make
+          // the board overflow the very player cards and controls we just
+          // reserved space for.
+          return Math.max(1, Math.floor(Math.min(maxSize, widthFit, hostHeight - verticalReserve)));
         }
         const parentRect = stage.parentElement?.getBoundingClientRect?.();
         const stageRect = stage.getBoundingClientRect?.();
+        const layoutScope = layoutScopeForStage(stage);
+        const layoutScopeRect = layoutScope?.getBoundingClientRect?.();
         // A board surface can live in one track of a multi-column workspace.
         // The stage itself may already be constrained by --interactive-board-size;
         // using that self-constrained width here creates a feedback loop where a
         // default 720px request can permanently collapse to the minimum size.
-        // Its immediate layout parent is the authoritative mounted track.
+        // Its immediate layout parent is normally the authoritative mounted
+        // track. Some responsive board stacks, however, size that parent from
+        // --interactive-board-workspace-size, which is written below by this
+        // controller. If that parent has collapsed below the usable minimum,
+        // use the stable route layout scope instead of feeding the collapse
+        // back into the board size.
         const parentWidth = Number(parentRect?.width) || 0;
         const stageWidth = Number(stageRect?.width) || 0;
         // Adventures and Openings place the shared stage inside a narrower
         // board column within a wide two-column workspace. Their stage track,
-        // rather than the outer workspace, is the real safe width. Play,
-        // Puzzle, Tutorial, and Review continue to use their mounted parent
+        // rather than the outer workspace, is the real safe width until a
+        // manual resize expands that workspace into a single board-first
+        // track. Play, Puzzle, Tutorial, and Review use their mounted parent
         // track so the controller does not read its own size back as a
         // circular constraint.
-        const surface = String(stage.dataset.boardSurface || "");
-        const constrainedTrack = surface === "adventure" || surface === "openings";
-        const width = Math.max(0, (constrainedTrack ? stageWidth : parentWidth) || stageWidth || viewportWidth - 24);
+        const parent = stage.parentElement;
+        const parentStyle = parent ? getComputedStyle(parent) : null;
+        const gridColumns = parentStyle?.display === "grid"
+          ? parentStyle.gridTemplateColumns.split(/\s+/).filter(Boolean)
+          : [];
+        const stageColumn = Math.max(1, Number.parseInt(getComputedStyle(stage).gridColumnStart, 10) || 1);
+        const gridTrackWidth = Number.parseFloat(gridColumns[stageColumn - 1] || "");
+        // Use the mounted grid track, not the board's self-sized wrapper. This
+        // lets a small manual board grow again without expanding or reflowing
+        // the surrounding rails and panels.
+        const scopeWidth = Number(layoutScopeRect?.width) || 0;
+        const isWidePlayShell = viewportWidth >= 1181
+          && layoutScope?.classList?.contains("play-shell")
+          && Boolean(stage.closest("#play:not(.is-review-mode)"));
+        // Wide Play uses a board-sized max-content center track so the side
+        // rails sit beside the playable workspace instead of leaving a dark
+        // gutter around a vertically-fitted board. Read the shell's full
+        // center budget from its outer tracks rather than reading that
+        // max-content track back as the board's own fit; otherwise the parent
+        // track and --interactive-board-workspace-size would recursively
+        // shrink one another on every sync pass.
+        const playColumns = isWidePlayShell
+          ? getComputedStyle(layoutScope).gridTemplateColumns.split(/\s+/).filter(Boolean)
+          : [];
+        const playLeadingTrack = Number.parseFloat(playColumns[0] || "");
+        const playTrailingTrack = Number.parseFloat(playColumns[playColumns.length - 1] || "");
+        const playColumnGap = Number.parseFloat(getComputedStyle(layoutScope).columnGap || "") || 0;
+        const widePlayTrack = isWidePlayShell
+          && scopeWidth > 0
+          && Number.isFinite(playLeadingTrack)
+          && Number.isFinite(playTrailingTrack)
+          ? scopeWidth - playLeadingTrack - playTrailingTrack - (playColumnGap * 2)
+          : 0;
+        const candidateTrack = widePlayTrack > 0 ? widePlayTrack : (gridTrackWidth || parentWidth);
+        const parentIsCollapsed = candidateTrack > 0 && candidateTrack < Math.max(120, viewportSafeMinimum * 0.5);
+        const width = Math.max(0,
+          parentIsCollapsed
+            ? (scopeWidth || stageWidth || viewportWidth - 24)
+            : (candidateTrack || scopeWidth || stageWidth || viewportWidth - 24));
         // The page can scroll below the board. Reserve the persistent site
         // chrome and the compact player/setup rail, rather than using the
         // board's current document offset (which would make a scrolled or
         // tall workspace shrink unexpectedly).
-        const vertical = viewportHeight - 170;
+        const vertical = viewportHeight - (reservePlayerCards ? 264 : 170);
         const widthLimit = width - (stage.classList.contains("tutorial-board-wrap") ? 52 : 20);
-        return Math.max(minSize, Math.floor(Math.min(widthLimit, vertical > minSize ? vertical : widthLimit)));
+        const safeWidthMinimum = Math.min(viewportSafeMinimum, Math.max(1, widthLimit));
+        return Math.max(safeWidthMinimum, Math.floor(Math.min(widthLimit, vertical > safeWidthMinimum ? vertical : widthLimit)));
+      }
+
+      function fullscreenHostForStage(stage) {
+        return stage.closest("#play:not(.is-review-mode) .match-board-column")
+          || stage.closest("#gameReview.is-review-page .game-review-command-center")
+          || stage;
       }
 
       function updateStage(stage, requestedOverride) {
-        const state = states.get(stage) || { requested: defaultSize, manual: false, fullscreen: false, beforeFullscreen: defaultSize };
-        const saved = readSavedSize();
-        if (!state.manual && saved.manual) {
-          state.requested = saved.requested;
-          state.manual = true;
-        }
-        if (!state.manual && Number.isFinite(Number(requestedOverride)) && Number(requestedOverride) > 0) {
-          state.requested = clampRequested(requestedOverride);
-        }
         const board = boardForStage(stage);
         if (!board) return;
-        const physical = Math.max(minSize, Math.min(state.requested, availableSize(stage, board, state.fullscreen)));
+        const saved = readSavedSize();
+        const initialRequested = saved.manual && Number.isFinite(saved.requested)
+          ? saved.requested
+          : responsiveDefaultSize();
+        const state = states.get(stage) || {
+          requested: initialRequested,
+          manual: saved.manual,
+          fullscreen: false,
+          beforeFullscreen: initialRequested,
+          beforeFullscreenManual: saved.manual,
+          fullscreenRequested: null,
+          fullscreenManual: false,
+          isResizing: false,
+          discoveryExpired: false,
+          discoveryTimer: 0
+        };
+        // Every mounted board shares one persisted manual size. Reconcile any
+        // stage that was initialized by a route preference before the shared
+        // storage value became visible, but never interrupt a live pointer
+        // drag whose pending value has not been committed yet.
+        if (saved.manual && !state.isResizing && !state.pendingRequested && (!state.manual || state.requested !== saved.requested)) {
+          state.requested = saved.requested;
+          state.manual = true;
+          if (!state.fullscreen) {
+            state.beforeFullscreen = saved.requested;
+            state.beforeFullscreenManual = true;
+          }
+        }
+        if (!state.manual && Number.isFinite(Number(requestedOverride)) && Number(requestedOverride) > 0) {
+          // Existing board preferences remain supported, but they are only a
+          // preference ceiling. The first global size must still be the best
+          // fit for the mounted surface, not a Play-sized value that can
+          // overflow a Puzzle, Review, or mobile workspace.
+          state.requested = clampRequested(requestedOverride);
+        }
+        const fullscreenHost = state.fullscreen ? fullscreenHostForStage(stage) : null;
+        const reservePlayerCards = Boolean(fullscreenHost?.matches?.(".match-board-column"));
+        const fit = availableSize(stage, board, state.fullscreen, reservePlayerCards);
+        if (state.fullscreen && !state.fullscreenManual) state.fullscreenRequested = fit;
+        if (state.fullscreen && state.fullscreenRequested != null) {
+          state.fullscreenRequested = Math.max(1, Math.min(state.fullscreenRequested, fit));
+        }
+        const effectiveRequested = state.fullscreen
+          ? (state.fullscreenRequested || fit)
+          : state.requested;
+        // The requested preference keeps the shared minimum, but a very small
+        // viewport may need a smaller physical board to avoid page overflow.
+        const physical = Math.max(1, Math.min(effectiveRequested, fit));
         stage.dataset.boardRequestedSize = String(state.requested);
+        stage.dataset.boardFullscreenSize = state.fullscreen ? String(Math.round(physical)) : "";
         stage.dataset.boardRenderedSize = String(physical);
         stage.dataset.boardManualSize = String(state.manual);
         stage.style.setProperty("--interactive-board-requested-size", `${state.requested}px`);
@@ -964,6 +1369,9 @@
       }
 
       function scheduleSync() {
+        if (hasLiveResize()) {
+          return;
+        }
         if (syncFrame) return;
         syncFrame = window.requestAnimationFrame(() => {
           syncFrame = 0;
@@ -974,21 +1382,46 @@
       function scheduleResize(stage, requested) {
         const state = states.get(stage);
         if (!state) return;
-        state.pendingRequested = clampRequested(requested);
+        state.pendingRequested = Math.max(1, Math.min(state.dragFit || maxSize, Number(requested) || state.requested));
+        activeResizeStage = stage;
         if (resizeFrame) return;
         resizeFrame = window.requestAnimationFrame(() => {
           resizeFrame = 0;
-          stages.forEach((item) => {
-            const itemState = states.get(item);
-            if (itemState?.pendingRequested) {
-              itemState.requested = itemState.pendingRequested;
-              itemState.manual = true;
-              delete itemState.pendingRequested;
-              updateStage(item);
-              syncControls(item);
-            }
-          });
+          const item = activeResizeStage;
+          const itemState = item ? states.get(item) : null;
+          if (!item || !itemState?.isResizing || itemState.pendingRequested == null) return;
+          const next = itemState.pendingRequested;
+          delete itemState.pendingRequested;
+          if (itemState.fullscreen) {
+            itemState.fullscreenRequested = clampRequested(next);
+            itemState.fullscreenManual = true;
+          } else {
+            itemState.requested = clampRequested(next);
+            itemState.manual = true;
+          }
+          applyLiveStageSize(item, itemState);
         });
+      }
+
+      function applyLiveStageSize(stage, state) {
+        const board = boardForStage(stage);
+        if (!board || !state) return;
+        const next = state.pendingRequested ?? (state.fullscreen ? state.fullscreenRequested : state.requested);
+        const physical = Math.max(1, Math.min(next, state.dragFit || next));
+        stage.style.setProperty("--interactive-board-requested-size", `${state.requested}px`);
+        stage.style.setProperty("--interactive-board-size", `${physical}px`);
+        stage.dataset.boardRequestedSize = String(state.requested);
+        stage.dataset.boardFullscreenSize = state.fullscreen ? String(Math.round(physical)) : "";
+        stage.dataset.boardRenderedSize = String(physical);
+        stage.dataset.boardManualSize = String(state.manual);
+        board.dataset.boardRequestedSize = String(state.requested);
+        board.dataset.boardRenderedSize = String(physical);
+        const workspace = stage.parentElement;
+        workspace?.style.setProperty("--interactive-board-workspace-size", `${physical}px`);
+        stage.querySelector("[data-board-resize-handle]")?.setAttribute(
+          "aria-valuenow",
+          String(Math.round(state.fullscreen ? physical : state.requested))
+        );
       }
 
       function setOrientation(stage) {
@@ -1034,133 +1467,272 @@
         const board = boardForStage(stage);
         const state = states.get(stage);
         if (!board || !state) return;
-        const prefs = readLearnerPrefs();
-        const theme = stage.querySelector('[data-board-control="theme"]');
-        const pieces = stage.querySelector('[data-board-control="pieces"]');
-        syncSelect(theme, "board", prefs.board);
-        syncSelect(pieces, "pieceSkin", prefs.pieceSkin);
         stage.querySelector('[data-board-action="flip"]')?.setAttribute("aria-pressed", String(board.dataset.boardOrientation === "flipped"));
-        const fullscreen = stage.querySelector('[data-board-action="fullscreen"]');
-        if (fullscreen) fullscreen.textContent = state.fullscreen ? "Exit Fullscreen" : "Fullscreen";
+        stage.querySelectorAll("[data-board-fullscreen-action]").forEach((fullscreen) => {
+          const label = fullscreen.querySelector("[data-board-fullscreen-label]");
+          const nextLabel = state.fullscreen ? "Exit focus" : "Fullscreen";
+          if (label) label.textContent = nextLabel;
+          fullscreen.setAttribute("aria-label", state.fullscreen ? "Exit focus mode" : "Fullscreen — focus on your game");
+          fullscreen.dataset.boardFullscreenActive = String(state.fullscreen);
+          fullscreen.title = state.fullscreen
+            ? "Exit focus mode"
+            : "Fullscreen — focus on your game";
+        });
         const handle = stage.querySelector("[data-board-resize-handle]");
-        if (handle) handle.setAttribute("aria-valuenow", String(state.requested));
+        if (handle) {
+          const effectiveSize = state.fullscreen
+            ? (state.fullscreenRequested || Number(stage.dataset.boardRenderedSize || 0) || state.requested)
+            : state.requested;
+          handle.setAttribute("aria-valuenow", String(Math.round(effectiveSize)));
+          handle.setAttribute("aria-label", "Resize board by dragging the lower-right corner");
+          handle.setAttribute("aria-valuetext", state.fullscreen
+            ? "Board size in focus mode. Drag the lower-right corner to resize."
+            : "Board size. Drag the lower-right corner to resize.");
+          handle.title = "Drag the lower-right corner to resize";
+        }
       }
 
       function ensureControls(stage) {
-        if (stage.querySelector("[data-board-stage-tools]")) return;
+        // The board has one direct manipulation surface. Older builds created
+        // a full controls strip here; remove it if a mounted DOM survived a
+        // route/style refresh so it cannot reappear on another board page.
+        stage.querySelector("[data-board-stage-tools]")?.remove();
         const surface = String(stage.dataset.boardSurface || "board");
-        const tools = document.createElement("div");
-        tools.className = "interactive-board-stage-tools";
-        tools.dataset.boardStageTools = "true";
-        tools.setAttribute("aria-label", "Board controls");
-        const flip = document.createElement("button");
-        flip.type = "button";
-        flip.className = "button secondary";
-        flip.dataset.boardAction = "flip";
-        flip.textContent = "Flip Board";
-        const themeLabel = document.createElement("label");
-        themeLabel.className = "interactive-board-control-field";
-        themeLabel.append(document.createTextNode("Board Theme"));
-        const theme = document.createElement("select");
-        theme.dataset.boardControl = "theme";
-        theme.setAttribute("aria-label", "Board Theme");
-        themeLabel.append(theme);
-        const piecesLabel = document.createElement("label");
-        piecesLabel.className = "interactive-board-control-field";
-        piecesLabel.append(document.createTextNode("Piece Set"));
-        const pieces = document.createElement("select");
-        pieces.dataset.boardControl = "pieces";
-        pieces.setAttribute("aria-label", "Piece Set");
-        piecesLabel.append(pieces);
-        const fullscreen = document.createElement("button");
-        fullscreen.type = "button";
-        fullscreen.className = "button secondary interactive-board-fullscreen-button";
-        fullscreen.dataset.boardAction = "fullscreen";
-        fullscreen.textContent = "Fullscreen";
-        const handle = document.createElement("button");
-        handle.type = "button";
-        handle.className = "interactive-board-resize-handle";
-        handle.dataset.boardResizeHandle = surface === "coach" ? "play" : surface;
-        handle.setAttribute("aria-label", "Resize board");
+        let handle = stage.querySelector("[data-board-resize-handle]");
+        if (!handle || handle.tagName === "BUTTON") {
+          handle?.remove();
+          handle = document.createElement("div");
+          handle.className = "interactive-board-resize-handle";
+          handle.dataset.boardResizeHandle = surface === "coach" ? "play" : surface;
+          stage.append(handle);
+        }
+        delete handle.dataset.boardFullscreenAction;
+        handle.dataset.boardFullscreenEdge = surface === "coach" ? "play" : surface;
+        handle.setAttribute("role", "separator");
+        handle.removeAttribute("aria-orientation");
+        handle.setAttribute("aria-label", "Resize board by dragging the lower-right corner");
         handle.setAttribute("aria-valuemin", String(minSize));
         handle.setAttribute("aria-valuemax", String(maxSize));
-        handle.setAttribute("aria-valuenow", String(defaultSize));
-        handle.setAttribute("aria-valuetext", "Board size");
-        tools.append(flip, themeLabel, piecesLabel, fullscreen);
-        const existingOpeningControls = stage.querySelector(".opening-explorer-controls");
-        if (existingOpeningControls) stage.insertBefore(tools, existingOpeningControls);
-        else stage.append(tools);
-        stage.append(handle);
+        handle.setAttribute("aria-valuenow", handle.getAttribute("aria-valuenow") || String(legacyFallbackSize));
+        handle.setAttribute("aria-valuetext", "Board size. Drag the lower-right corner to resize.");
+
+        let actions = stage.querySelector(":scope > [data-board-stage-actions]");
+        if (!actions) {
+          actions = document.createElement("div");
+          actions.className = "interactive-board-actions";
+          actions.dataset.boardStageActions = "true";
+          stage.append(actions);
+        }
+        let fullscreen = actions.querySelector("[data-board-fullscreen-action]");
+        if (!fullscreen || fullscreen.tagName !== "BUTTON") {
+          fullscreen?.remove();
+          fullscreen = document.createElement("button");
+          fullscreen.type = "button";
+          fullscreen.className = "interactive-board-fullscreen-button";
+          fullscreen.dataset.boardFullscreenAction = surface === "coach" ? "play" : surface;
+          fullscreen.innerHTML = '<span aria-hidden="true">⛶</span><span data-board-fullscreen-label>Fullscreen</span>';
+          actions.append(fullscreen);
+        }
+        fullscreen.title = "Fullscreen — focus on your game";
+        fullscreen.setAttribute("aria-label", "Fullscreen — focus on your game");
+        let settings = actions.querySelector("[data-board-settings-action]");
+        if (!settings) {
+          settings = document.createElement("button");
+          settings.type = "button";
+          settings.className = "interactive-board-settings-button";
+          settings.dataset.boardSettingsAction = surface === "coach" ? "play" : surface;
+          settings.innerHTML = '<span aria-hidden="true">⚙</span>';
+          actions.append(settings);
+        }
+        settings.title = "Board controls";
+        settings.setAttribute("aria-label", "Board controls");
+      }
+
+      function bindControlEvents(stage, state) {
+        const elements = {
+          flip: stage.querySelector('[data-board-action="flip"]'),
+          handle: stage.querySelector('[data-board-resize-handle]'),
+          fullscreen: stage.querySelector('[data-board-fullscreen-action]'),
+          settings: stage.querySelector('[data-board-settings-action]'),
+          theme: stage.querySelector('[data-board-control="theme"]'),
+          pieces: stage.querySelector('[data-board-control="pieces"]')
+        };
+        const previous = state.controlBindings;
+        const sameElements = previous
+          && Object.keys(elements).every((key) => previous.elements[key] === elements[key]);
+        if (sameElements) return;
+        previous?.cleanup?.();
+
+        const onFlip = () => setOrientation(stage);
+        const onResize = (event) => beginResize(stage, event);
+        const onResizeDoubleClick = () => toggleFullscreen(stage);
+        const onFullscreen = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          toggleFullscreen(stage);
+        };
+        const onSettings = () => {
+          const editor = document.getElementById("openBoardEditor");
+          if (editor && !states.get(stage)?.fullscreen) {
+            editor.click();
+            return;
+          }
+          document.getElementById("prefBoard")?.focus({ preventScroll: true });
+        };
+        const onTheme = (event) => applySettingsPrefsPatch({ board: event.currentTarget.value }, "board theme");
+        const onPieces = (event) => applySettingsPrefsPatch({ pieceSkin: event.currentTarget.value }, "piece set");
+
+        elements.flip?.addEventListener("click", onFlip);
+        elements.handle?.addEventListener("pointerdown", onResize, { passive: false });
+        elements.handle?.addEventListener("dblclick", onResizeDoubleClick);
+        elements.fullscreen?.addEventListener("click", onFullscreen);
+        elements.settings?.addEventListener("click", onSettings);
+        elements.theme?.addEventListener("change", onTheme);
+        elements.pieces?.addEventListener("change", onPieces);
+        state.controlBindings = {
+          elements,
+          cleanup() {
+            elements.flip?.removeEventListener("click", onFlip);
+            elements.handle?.removeEventListener("pointerdown", onResize);
+            elements.handle?.removeEventListener("dblclick", onResizeDoubleClick);
+            elements.fullscreen?.removeEventListener("click", onFullscreen);
+            elements.settings?.removeEventListener("click", onSettings);
+            elements.theme?.removeEventListener("change", onTheme);
+            elements.pieces?.removeEventListener("change", onPieces);
+          }
+        };
       }
 
       function toggleFullscreen(stage) {
         const state = states.get(stage);
         if (!state) return;
-        if (document.fullscreenElement === stage) {
+        const fullscreenHost = fullscreenHostForStage(stage);
+        if (document.fullscreenElement === fullscreenHost) {
           void document.exitFullscreen?.();
           return;
         }
         state.beforeFullscreen = state.requested;
-        const request = stage.requestFullscreen?.({ navigationUI: "hide" });
+        state.beforeFullscreenManual = state.manual;
+        state.fullscreenRequested = null;
+        state.fullscreenManual = false;
+        const request = fullscreenHost.requestFullscreen?.({ navigationUI: "hide" });
         if (request?.catch) request.catch(() => {});
       }
 
       function beginResize(stage, event) {
         const state = states.get(stage);
-        if (!state || state.fullscreen) return;
+        if (!state || event.isPrimary === false || (typeof event.button === "number" && event.button !== 0)) return;
         event.preventDefault();
+        event.stopPropagation();
         const pointerId = event.pointerId;
         const startX = event.clientX;
-        const startY = event.clientY;
-        const startSize = state.requested;
+        const startRenderedSize = Number(stage.dataset.boardRenderedSize || state.requested);
+        const startSize = Number.isFinite(startRenderedSize) && startRenderedSize > 0
+          ? startRenderedSize
+          : state.requested;
+        const board = boardForStage(stage);
+        const fullscreenHost = state.fullscreen ? fullscreenHostForStage(stage) : null;
+        const reservePlayerCards = Boolean(fullscreenHost?.matches?.(".match-board-column"));
+        state.dragFit = availableSize(stage, board, state.fullscreen, reservePlayerCards);
+        state.dragStartSize = startSize;
+        const handle = event.currentTarget;
+        state.isResizing = true;
+        stage.classList.add("is-board-resizing");
         const move = (moveEvent) => {
           if (moveEvent.pointerId !== pointerId) return;
-          const delta = Math.max(moveEvent.clientX - startX, moveEvent.clientY - startY);
-          scheduleResize(stage, startSize + delta);
+          moveEvent.preventDefault();
+          const deltaX = moveEvent.clientX - startX;
+          const deltaY = moveEvent.clientY - event.clientY;
+          // The lower-right gesture accepts horizontal or diagonal movement
+          // while the board renderer remains strictly square.
+          scheduleResize(stage, startSize + Math.round((deltaX + deltaY) / 2));
         };
         const end = (endEvent) => {
-          if (endEvent.pointerId !== pointerId) return;
-          stage.removeEventListener("pointermove", move);
-          stage.removeEventListener("pointerup", end);
-          stage.removeEventListener("pointercancel", end);
-          const next = states.get(stage)?.pendingRequested || states.get(stage)?.requested || startSize;
-          saveSize(next);
+          if (endEvent?.pointerId != null && endEvent.pointerId !== pointerId) return;
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", end);
+          window.removeEventListener("pointercancel", end);
+          window.removeEventListener("blur", cancel);
+          try { handle.releasePointerCapture?.(pointerId); } catch {}
+          const liveState = states.get(stage);
+          const next = clampRequested(liveState?.pendingRequested
+            ?? (liveState?.fullscreen ? liveState.fullscreenRequested : liveState?.requested)
+            ?? startSize);
+          if (liveState) {
+            if (liveState.fullscreen) {
+              liveState.fullscreenRequested = next;
+              liveState.fullscreenManual = true;
+            } else {
+              liveState.requested = next;
+              liveState.manual = true;
+            }
+            liveState.isResizing = false;
+            applyLiveStageSize(stage, liveState);
+            delete liveState.dragFit;
+            delete liveState.dragStartSize;
+            delete liveState.pendingRequested;
+          }
+          stage.classList.remove("is-board-resizing");
+          if (!liveState?.fullscreen) saveSize(next);
+          syncControls(stage);
+          if (Math.abs(next - startSize) >= 2) markResizeDiscovered(stage, liveState);
+          activeResizeStage = null;
+          scheduleSync();
         };
-        stage.addEventListener("pointermove", move, { passive: false });
-        stage.addEventListener("pointerup", end, { once: true, passive: true });
-        stage.addEventListener("pointercancel", end, { once: true, passive: true });
+        const cancel = () => end();
+        window.addEventListener("pointermove", move, { passive: false });
+        window.addEventListener("pointerup", end, { passive: false });
+        window.addEventListener("pointercancel", end, { passive: false });
+        window.addEventListener("blur", cancel, { once: true });
         try { event.currentTarget.setPointerCapture?.(pointerId); } catch {}
       }
 
       function bindStage(stage) {
-        if (stages.has(stage)) return;
+        const firstBinding = !stages.has(stage);
         stages.add(stage);
         ensureControls(stage);
-        const saved = readSavedSize();
-        states.set(stage, { requested: saved.requested, manual: saved.manual, fullscreen: false, beforeFullscreen: saved.requested });
-        stage.querySelector('[data-board-action="flip"]')?.addEventListener("click", () => setOrientation(stage));
-        stage.querySelector('[data-board-action="fullscreen"]')?.addEventListener("click", () => toggleFullscreen(stage));
-        stage.querySelector('[data-board-resize-handle]')?.addEventListener("pointerdown", (event) => beginResize(stage, event), { passive: false });
-        stage.querySelector('[data-board-resize-handle]')?.addEventListener("keydown", (event) => {
-          const state = states.get(stage);
-          if (!state) return;
-          if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-          event.preventDefault();
-          const amount = event.key === "Home" ? minSize : event.key === "End" ? maxSize : state.requested + (event.key === "ArrowUp" || event.key === "ArrowRight" ? 24 : -24);
-          state.requested = clampRequested(amount);
-          state.manual = true;
-          updateStage(stage);
-          saveSize(state.requested);
-        });
-        stage.querySelector('[data-board-control="theme"]')?.addEventListener("change", (event) => applySettingsPrefsPatch({ board: event.currentTarget.value }, "board theme"));
-        stage.querySelector('[data-board-control="pieces"]')?.addEventListener("change", (event) => applySettingsPrefsPatch({ pieceSkin: event.currentTarget.value }, "piece set"));
-        if (typeof ResizeObserver === "function" && stage.parentElement) {
-          const observer = new ResizeObserver(() => scheduleSync());
-          observer.observe(stage.parentElement);
-          stage._interactiveBoardResizeObserver = observer;
+        let state = states.get(stage);
+        if (!state) {
+          const saved = readSavedSize();
+          const requested = saved.manual && Number.isFinite(saved.requested)
+            ? saved.requested
+            : responsiveDefaultSize();
+          state = {
+            requested,
+            manual: saved.manual,
+            fullscreen: false,
+            beforeFullscreen: requested,
+            beforeFullscreenManual: saved.manual,
+            fullscreenRequested: null,
+            fullscreenManual: false,
+            isResizing: false,
+            discoveryExpired: false,
+            discoveryTimer: 0,
+            controlBindings: null
+          };
+          states.set(stage, state);
         }
-        updateStage(stage);
+        bindControlEvents(stage, state);
+        if (firstBinding) updateStage(stage);
         syncControls(stage);
+      }
+
+      function observeLayoutTargets() {
+        if (!sharedResizeObserver) return;
+        const targets = new Set();
+        stages.forEach((stage) => {
+          if (stage.parentElement) targets.add(stage.parentElement);
+          const scope = layoutScopeForStage(stage);
+          if (scope) targets.add(scope);
+        });
+
+        const unchanged = targets.size === observedLayoutTargets.size
+          && [...targets].every((target) => observedLayoutTargets.has(target));
+        if (unchanged) return;
+
+        sharedResizeObserver.disconnect();
+        observedLayoutTargets = targets;
+        targets.forEach((target) => sharedResizeObserver.observe(target));
       }
 
       function sync() {
@@ -1168,9 +1740,12 @@
           const board = boardForStage(stage);
           if (!board) return;
           bindStage(stage);
+          if (states.get(stage)?.isResizing) return;
           updateStage(stage);
           syncControls(stage);
+          syncDiscovery(stage, states.get(stage));
         });
+        observeLayoutTargets();
       }
 
       document.addEventListener("fullscreenchange", () => {
@@ -1178,27 +1753,68 @@
         stages.forEach((stage) => {
           const state = states.get(stage);
           if (!state) return;
-          const active = document.fullscreenElement === stage;
+          const fullscreenHost = fullscreenHostForStage(stage);
+          const active = document.fullscreenElement === fullscreenHost;
+          const playFullscreen = active && fullscreenHost?.matches?.(".match-board-column");
+          const reviewFullscreen = active && fullscreenHost?.matches?.(".game-review-command-center");
           activeBoardStage = activeBoardStage || active;
           state.fullscreen = active;
-          if (!active) state.requested = state.beforeFullscreen || state.requested;
-          updateStage(stage);
-          syncControls(stage);
+          if (active) {
+            state.fullscreenRequested = null;
+            state.fullscreenManual = false;
+          } else {
+            state.requested = state.beforeFullscreen || state.requested;
+            state.manual = Boolean(state.beforeFullscreenManual);
+            state.fullscreenRequested = null;
+            state.fullscreenManual = false;
+          }
+          // Play's browser fullscreen viewport can settle after the native
+          // fullscreen event. Leave its normal size intact for that short
+          // transition, then measure once against the settled host below.
+          if (!playFullscreen || reviewFullscreen) {
+            updateStage(stage);
+            syncControls(stage);
+          } else {
+            syncControls(stage);
+          }
         });
         document.body.classList.toggle("interactive-board-fullscreen-active", activeBoardStage);
+        // Fullscreen changes the rendered board's coordinate space without
+        // changing its shared interaction registration. Refresh the current
+        // board geometry immediately and again after the native top-layer
+        // layout settles so drag ghosts, hover squares, and drop mapping do
+        // not retain normal-mode measurements.
+        boardInteractionEngine.refreshAll();
+        if (activeBoardStage) {
+          window.setTimeout(() => {
+            stages.forEach((stage) => {
+              const state = states.get(stage);
+              const host = fullscreenHostForStage(stage);
+              if (!state?.fullscreen || state.fullscreenManual || state.isResizing
+                || !host?.matches?.(".match-board-column, .game-review-command-center")) return;
+              state.fullscreenRequested = null;
+              updateStage(stage);
+              syncControls(stage);
+            });
+            boardInteractionEngine.refreshAll();
+            scheduleSync();
+          }, 250);
+        }
         scheduleSync();
       });
       window.addEventListener("resize", scheduleSync, { passive: true });
       window.addEventListener("orientationchange", scheduleSync, { passive: true });
+      window.visualViewport?.addEventListener("resize", scheduleSync, { passive: true });
+      window.visualViewport?.addEventListener("scroll", scheduleSync, { passive: true });
 
       return Object.freeze({
         sync,
         scheduleSync,
         getState(stage) { return states.get(stage) || null; },
-        applyPreferenceSize(value) {
+        applyPreferenceSize(value, { defaultPreference = false } = {}) {
           stages.forEach((stage) => {
             const state = states.get(stage);
-            if (!state?.manual) updateStage(stage, value);
+            if (!state?.manual) updateStage(stage, defaultPreference ? responsiveDefaultSize() : value);
           });
         }
       });
@@ -4336,9 +4952,9 @@
         `My favorite opening is ${opening}. Show me your best tiny plan.`
       ],
       inGame: [
-        "Nice idea. What is attacked now?",
-        "Good try. Check if every piece is safe.",
-        "I am thinking about checks, captures, and threats."
+        "What is your opponent attacking?",
+        "Check that every piece is safe.",
+        "Look for checks, captures, and threats."
       ],
       postWin: [
         "You beat me. Great progress!",
@@ -5164,7 +5780,10 @@
         if (featuredStudyState.index === featuredStudyPositions.length - 1) featuredStudyState.index = 0;
         featuredStudyState.playing = true;
         renderFeaturedStudy();
-        featuredStudyState.timer = window.setTimeout(() => advanceFeaturedStudy(1), 160);
+        // Keep the opening step on the same calm cadence as the rest of the
+        // study. The old 160ms kickoff made the first move feel like a
+        // loading glitch instead of an intentional teaching moment.
+        featuredStudyState.timer = window.setTimeout(() => advanceFeaturedStudy(1), 1750);
       });
       void loadChessRules().then((Chess) => {
         featuredStudyState.verified = verifyFeaturedStudyData(Chess);
@@ -5814,6 +6433,16 @@
             return;
           }
           handleTutorialSquare(square);
+        },
+        onDrop(from, to) {
+          if (!from || !to) return false;
+          // Keep tutorial moves on the same shared pointer pipeline as Play
+          // and Puzzle.  The guided lesson already owns move validation and
+          // promotion state; feed the physical drop through that handler
+          // instead of falling back to click-only selection.
+          selectedTutorialSquare = from;
+          handleTutorialSquare(to);
+          return true;
         },
         onLongPress(square) {
           toggleAnalysisHighlight(board, { id: `tutorial-user-highlight:${square}`, square, kind: "coach", color: "blue" });
@@ -13027,7 +13656,12 @@
     function primeHomeRankings() {
       hydrateSharedLeaderboardSnapshot();
       renderHomeTopPlayers();
-      ensureSharedLeaderboardSync();
+      // The cached/local ranking is enough for the first Home paint. Start
+      // the remote refresh after the shell has had a chance to render and
+      // accept input.
+      scheduleBackgroundTask(() => {
+        ensureSharedLeaderboardSync();
+      }, 900, "home-leaderboard-sync");
     }
 
     function renderLeaderboardOverview({ puzzleEntries = [], aiEntries = [], tournamentEntries = [] } = {}) {
@@ -13272,6 +13906,7 @@
           return badge;
         }));
       });
+      renderProfileProgressInsights(profile);
       renderProfileRatingHistory();
       renderProfileShowcase(profile);
       renderProfileAvatarChoices(profile);
@@ -13834,6 +14469,89 @@
       else { delete link.dataset.siteTab; delete link.dataset.sitePanel; }
       link.setAttribute("aria-label", "Next unlock: " + milestone.label + ". " + milestone.detail);
     }
+
+    function renderProfileProgressInsights(profile = getDragonProfileSnapshot()) {
+      const learnerPrefs = readLearnerProfile();
+      const minutes = [5, 10, 15].includes(Number(learnerPrefs.sessionMinutes)) ? Number(learnerPrefs.sessionMinutes) : 10;
+      const focus = getSingleCoachFocus();
+      const coachVoice = getPremiumSessionVoice(focus, ["", focus.href, `Practice ${focus.skill}`], minutes);
+      const dnaSummary = document.getElementById("profileDnaSummary");
+      const dnaSkills = document.getElementById("profileDnaSkills");
+      const dnaAction = document.getElementById("profileDnaAction");
+      if (dnaSummary) dnaSummary.textContent = coachVoice.dna;
+      if (dnaSkills) {
+        dnaSkills.replaceChildren(...getWeeklySkillScores().map(([label, score, key]) => {
+          const row = document.createElement("div");
+          row.className = `home-dna-skill${key === focus.weaknessKey ? " is-focus" : ""}`;
+          const meter = document.createElement("span"); meter.className = "home-dna-meter";
+          const fill = document.createElement("i"); fill.style.width = `${clampNumber(Number(score) || 0, 0, 100)}%`; meter.appendChild(fill);
+          row.append(createBookText("span", "", label), meter, createBookText("b", "", `${Math.round(score)}%`));
+          return row;
+        }));
+      }
+      if (dnaAction) setPremiumHomeAction(dnaAction, ["", focus.href, `Practice ${focus.skill}`, focus.href === "#puzzles" ? "puzzle-plan" : "", getFocusPracticePlan(focus)]);
+
+      const weeklyTarget = 120;
+      const weeklyMomentum = getWeeklyHomeRecap();
+      const weeklyEarned = Math.min(weeklyTarget, Math.max(0, Number(weeklyMomentum.xp) || 0));
+      const weeklyRemaining = Math.max(0, weeklyTarget - weeklyEarned);
+      const momentumCopy = document.getElementById("profileMomentumCopy");
+      const momentumProgress = document.getElementById("profileMomentumProgress");
+      const momentumStatus = document.getElementById("profileMomentumStatus");
+      const momentumMeter = document.getElementById("profileMomentumMeter");
+      const momentumMeterFill = document.getElementById("profileMomentumMeterFill");
+      const momentumDays = document.getElementById("profileMomentumDays");
+      const momentumAction = document.getElementById("profileMomentumAction");
+      if (momentumCopy) momentumCopy.textContent = getPremiumMomentumCopy(coachVoice.tone, weeklyEarned, weeklyTarget, weeklyRemaining, minutes, focus);
+      if (momentumProgress) momentumProgress.textContent = weeklyMomentum.xp >= weeklyTarget ? weeklyMomentum.xp + " XP this week" : weeklyEarned + " / " + weeklyTarget + " XP";
+      if (momentumStatus) {
+        const daily = getDailyGoalsProgress();
+        const ritualLeft = daily.goals.length - daily.doneCount;
+        momentumStatus.textContent = weeklyMomentum.games
+          ? weeklyMomentum.games + " " + (weeklyMomentum.games === 1 ? "game" : "games") + (weeklyMomentum.wins ? " - " + weeklyMomentum.wins + " " + (weeklyMomentum.wins === 1 ? "win" : "wins") : "") + " this week"
+          : daily.complete
+            ? "Today's ritual is complete."
+            : ritualLeft + " " + (ritualLeft === 1 ? "ritual step" : "ritual steps") + " left today.";
+      }
+      const weeklyPercent = Math.round((weeklyEarned / weeklyTarget) * 100);
+      if (momentumMeter) {
+        momentumMeter.setAttribute("aria-valuenow", String(weeklyEarned));
+        momentumMeter.setAttribute("aria-valuetext", weeklyEarned + " of " + weeklyTarget + " XP this week");
+      }
+      if (momentumMeterFill) momentumMeterFill.style.width = weeklyPercent + "%";
+      if (momentumDays) {
+        const days = getWeeklyMomentumDays();
+        const dayMaximum = Math.max(10, ...days.map((day) => day.xp));
+        momentumDays.replaceChildren(...days.map((day) => {
+          const item = document.createElement("span");
+          item.className = "home-momentum-day" + (day.xp ? " is-active" : "") + (day.isToday ? " is-today" : "");
+          item.setAttribute("role", "listitem");
+          item.setAttribute("aria-label", day.fullLabel + ": " + day.xp + " XP");
+          item.title = day.fullLabel + ": " + day.xp + " XP";
+          if (day.isToday) item.setAttribute("aria-current", "date");
+          const bar = document.createElement("i");
+          bar.setAttribute("aria-hidden", "true");
+          bar.style.setProperty("--home-momentum-height", Math.max(4, Math.round(4 + (day.xp / dayMaximum) * 34)) + "px");
+          const label = createBookText("small", "", day.label);
+          label.setAttribute("aria-hidden", "true");
+          item.append(bar, label);
+          return item;
+        }));
+      }
+      const nextMilestone = getNextAchievementMilestone();
+      const milestoneLink = document.getElementById("profileMomentumMilestone");
+      const milestoneTitle = document.getElementById("profileMomentumMilestoneTitle");
+      const milestoneCopy = document.getElementById("profileMomentumMilestoneCopy");
+      if (milestoneTitle) milestoneTitle.textContent = nextMilestone.label;
+      if (milestoneCopy) milestoneCopy.textContent = nextMilestone.detail;
+      setPremiumHomeMilestone(milestoneLink, nextMilestone);
+      if (momentumAction) {
+        setPremiumHomeAction(momentumAction, weeklyMomentum.xp >= weeklyTarget
+          ? ["", "#puzzles", "Keep the rhythm", "puzzle-plan", "adaptive"]
+          : ["", focus.href, "Add " + minutes + "-min focus", focus.href === "#puzzles" ? "puzzle-plan" : "", getFocusPracticePlan(focus)]);
+      }
+    }
+
     function renderPremiumHomeExperience({ focus, focusPuzzlePlan, nextStep, latestReadyReview }) {
       const profile = isApplicationAuthenticated() ? readLearnerProfile() : {};
       const minutes = [5, 10, 15].includes(Number(profile.sessionMinutes)) ? Number(profile.sessionMinutes) : 10;
@@ -13889,80 +14607,6 @@
         rewardClaim.textContent = "Claim +50";
       }
 
-      const dnaSummary = document.getElementById("homeDnaSummary");
-      const dnaSkills = document.getElementById("homeDnaSkills");
-      const dnaAction = document.getElementById("homeDnaAction");
-      if (dnaSummary) dnaSummary.textContent = coachVoice.dna;
-      if (dnaSkills) {
-        dnaSkills.replaceChildren(...getWeeklySkillScores().map(([label, score, key]) => {
-          const row = document.createElement("div");
-          row.className = `home-dna-skill${key === focus.weaknessKey ? " is-focus" : ""}`;
-          const meter = document.createElement("span"); meter.className = "home-dna-meter";
-          const fill = document.createElement("i"); fill.style.width = `${clampNumber(Number(score) || 0, 0, 100)}%`; meter.appendChild(fill);
-          row.append(createBookText("span", "", label), meter, createBookText("b", "", `${Math.round(score)}%`));
-          return row;
-        }));
-      }
-      if (dnaAction) setPremiumHomeAction(dnaAction, ["", focus.href, `Practice ${focus.skill}`, focus.href === "#puzzles" ? "puzzle-plan" : "", focusPuzzlePlan]);
-      const weeklyTarget = 120;
-      const weeklyMomentum = getWeeklyHomeRecap();
-      const weeklyEarned = Math.min(weeklyTarget, Math.max(0, Number(weeklyMomentum.xp) || 0));
-      const weeklyRemaining = Math.max(0, weeklyTarget - weeklyEarned);
-      const momentumCopy = document.getElementById("homeMomentumCopy");
-      const momentumProgress = document.getElementById("homeMomentumProgress");
-      const momentumStatus = document.getElementById("homeMomentumStatus");
-      const momentumMeter = document.getElementById("homeMomentumMeter");
-      const momentumMeterFill = document.getElementById("homeMomentumMeterFill");
-      const momentumDays = document.getElementById("homeMomentumDays");
-      const momentumAction = document.getElementById("homeMomentumAction");
-      if (momentumCopy) momentumCopy.textContent = getPremiumMomentumCopy(coachVoice.tone, weeklyEarned, weeklyTarget, weeklyRemaining, minutes, focus);
-
-      if (momentumProgress) momentumProgress.textContent = weeklyMomentum.xp >= weeklyTarget ? weeklyMomentum.xp + " XP this week" : weeklyEarned + " / " + weeklyTarget + " XP";
-      if (momentumStatus) {
-        const ritualLeft = daily.goals.length - daily.doneCount;
-        momentumStatus.textContent = weeklyMomentum.games
-          ? weeklyMomentum.games + " " + (weeklyMomentum.games === 1 ? "game" : "games") + (weeklyMomentum.wins ? " - " + weeklyMomentum.wins + " " + (weeklyMomentum.wins === 1 ? "win" : "wins") : "") + " this week"
-          : daily.complete
-            ? "Today's ritual is complete."
-            : ritualLeft + " " + (ritualLeft === 1 ? "ritual step" : "ritual steps") + " left today.";
-      }
-      const weeklyPercent = Math.round((weeklyEarned / weeklyTarget) * 100);
-      if (momentumMeter) {
-        momentumMeter.setAttribute("aria-valuenow", String(weeklyEarned));
-        momentumMeter.setAttribute("aria-valuetext", weeklyEarned + " of " + weeklyTarget + " XP this week");
-      }
-      if (momentumMeterFill) momentumMeterFill.style.width = weeklyPercent + "%";
-      if (momentumDays) {
-        const days = getWeeklyMomentumDays();
-        const dayMaximum = Math.max(10, ...days.map((day) => day.xp));
-        momentumDays.replaceChildren(...days.map((day) => {
-          const item = document.createElement("span");
-          item.className = "home-momentum-day" + (day.xp ? " is-active" : "") + (day.isToday ? " is-today" : "");
-          item.setAttribute("role", "listitem");
-          item.setAttribute("aria-label", day.fullLabel + ": " + day.xp + " XP");
-          item.title = day.fullLabel + ": " + day.xp + " XP";
-          if (day.isToday) item.setAttribute("aria-current", "date");
-          const bar = document.createElement("i");
-          bar.setAttribute("aria-hidden", "true");
-          bar.style.setProperty("--home-momentum-height", Math.max(4, Math.round(4 + (day.xp / dayMaximum) * 34)) + "px");
-          const label = createBookText("small", "", day.label);
-          label.setAttribute("aria-hidden", "true");
-          item.append(bar, label);
-          return item;
-        }));
-      }
-      const nextMilestone = getNextAchievementMilestone();
-      const milestoneLink = document.getElementById("homeMomentumMilestone");
-      const milestoneTitle = document.getElementById("homeMomentumMilestoneTitle");
-      const milestoneCopy = document.getElementById("homeMomentumMilestoneCopy");
-      if (milestoneTitle) milestoneTitle.textContent = nextMilestone.label;
-      if (milestoneCopy) milestoneCopy.textContent = nextMilestone.detail;
-      setPremiumHomeMilestone(milestoneLink, nextMilestone);
-      if (momentumAction) {
-        setPremiumHomeAction(momentumAction, weeklyMomentum.xp >= weeklyTarget
-          ? ["", "#puzzles", "Keep the rhythm", "puzzle-plan", "adaptive"]
-          : ["", focus.href, "Add " + minutes + "-min focus", focus.href === "#puzzles" ? "puzzle-plan" : "", focusPuzzlePlan]);
-      }
       if (!window.__nschessHomeOpenedSignal) {
         window.__nschessHomeOpenedSignal = true;
         trackProductSignal("home_opened", { focus: focus.skill, minutes });
@@ -14698,6 +15342,13 @@
       setHomeStat("homeLearningTime", formatLearningTime(learningMinutes), "Estimated from completed lessons, puzzles, attempts, and games.");
       setHomeStat("homeSkillsUnlocked", formatProfileNumber(unlockedSkills.length), unlockedSkills.length ? unlockedSkills.join(", ") : "First unlock: solve one puzzle.");
       setHomeStat("homeXp", `${formatProfileNumber(profileSnapshot?.xp ?? safePuzzleXp)} XP`, `${lessonCount} lessons done`);
+      const homePuzzleAccuracy = document.getElementById("homePuzzleAccuracy");
+      if (homePuzzleAccuracy) {
+        homePuzzleAccuracy.textContent = authenticated && puzzleAttempts ? `${getPuzzleAccuracy(0)}%` : "—";
+        homePuzzleAccuracy.title = authenticated && puzzleAttempts
+          ? "Based on recorded puzzle attempts."
+          : "Solve a puzzle to establish accuracy.";
+      }
       const mainRating = document.getElementById("homeMainRating");
       const mainRatingMeta = document.getElementById("homeMainRatingMeta");
       if (mainRating) mainRating.textContent = String(getLearnerGameRating());
@@ -15166,6 +15817,7 @@
     }
 
     function resetPuzzleGame() {
+      clearPromotionPicker();
       selectedPuzzleSquare = "";
       puzzleLegalMoves = [];
       puzzleLastMove = null;
@@ -15553,14 +16205,15 @@
 
     function handlePuzzleSquare(square) {
       if (!puzzleGame || (!puzzleStarted && !puzzleAnalyzeMode) || (activeAnswered && !puzzleAnalyzeMode)) return;
+      if (promotionPickerState) return;
       const piece = puzzleGame.get(square);
 
       if (selectedPuzzleSquare && square !== selectedPuzzleSquare) {
         const legalMoves = puzzleGame.moves({ square: selectedPuzzleSquare, verbose: true }).filter((move) => move.to === square);
         if (legalMoves.length) {
-          const promotion = choosePromotion(legalMoves);
-          const move = puzzleGame.move({ from: selectedPuzzleSquare, to: square, ...(promotion ? { promotion } : {}) });
-          if (move) {
+          const commit = (promotion = "") => {
+            const move = puzzleGame.move({ from: selectedPuzzleSquare, to: square, ...(promotion ? { promotion } : {}) });
+            if (!move) return;
             if (puzzleAnalyzeMode) {
               puzzleLastMove = move;
               selectedPuzzleSquare = "";
@@ -15570,6 +16223,11 @@
             } else {
               finishPuzzleMove(move);
             }
+          };
+          if (legalMoves.some((move) => move.promotion)) {
+            choosePromotion(legalMoves, document.getElementById("puzzleBoard"), square, commit, () => renderPuzzleBoard());
+          } else {
+            commit();
           }
           return;
         }
@@ -16055,6 +16713,8 @@
     let coachWhyText = "Select or make a move, then ask why.";
     let coachGameRecorded = false;
     let coachGameSessionId = 0;
+    let activePlayScrollAnchorToken = 0;
+    let activePlayScrollRestoration = null;
     let coachEndSoundPlayed = false;
     let coachReviewMoments = [];
     let coachCurrentHanging = 0;
@@ -16568,10 +17228,12 @@
       coachPremove = null;
       coachDrawAgreed = false;
       coachBotPaused = false;
+      document.getElementById("play")?.style.removeProperty("--play-strip-size");
       setupCoachAvatarAssets();
       restartCoachGame();
       updateAiPlayerHeader();
       updateCoachPanel();
+      anchorActivePlayWorkspace();
       window.requestAnimationFrame(() => {
         if (document.getElementById("play")?.classList.contains("is-active-panel")) void initializeCoachEngine();
       });
@@ -16626,7 +17288,7 @@
       }
       const bot = getBeginnerBot(level);
       if (bot) return { name: bot.name, title: bot.personality, rarity: bot.elo >= 1000 ? "Rare" : "Common", avatar: bot.avatar, flag: "PH" };
-      if (level === "strong") return { name: "KingNorbert", title: "Coach Bot", rarity: "Legendary", avatar: "KN", flag: "PH" };
+      if (level === "strong") return { name: "KingNorbert", title: "Coach Bot", rarity: "Legendary", avatar: "KN", avatarImage: getKingNorbertAvatarImage(), flag: "PH" };
       const config = getCoachConfig(level);
       const elo = Number(config.elo) || 1000;
       if (elo >= 2500) return { name: "Astra Citadel", title: "Celestial Champion", rarity: "Divine", avatar: "♛", flag: "IS" };
@@ -16765,6 +17427,13 @@
       });
       return true;
     }
+    let kingNorbertAvatarImage = "";
+    function getKingNorbertAvatarImage() {
+      if (kingNorbertAvatarImage) return kingNorbertAvatarImage;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1d153c"/><stop offset=".58" stop-color="#3f2c75"/><stop offset="1" stop-color="#102f45"/></linearGradient><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff3b0"/><stop offset=".42" stop-color="#e0ae4b"/><stop offset="1" stop-color="#8e5a20"/></linearGradient><radialGradient id="glow"><stop stop-color="#f7d57a" stop-opacity=".42"/><stop offset="1" stop-color="#f7d57a" stop-opacity="0"/></radialGradient></defs><rect width="96" height="96" rx="26" fill="url(#bg)"/><circle cx="73" cy="22" r="28" fill="url(#glow)"/><path d="M19 84c2-17 12-27 28-31 16 4 26 14 30 31" fill="#0a1429" stroke="#6e5aa4" stroke-width="2"/><path d="M31 68c3-13 7-24 9-33-3-7 1-15 8-19l6 7 8-8 5 11c4 5 4 12 0 17 1 9 5 16 8 25z" fill="url(#gold)" stroke="#fff1b5" stroke-opacity=".6" stroke-width="1.5"/><path d="M40 35c6-5 14-6 22-1l-2 14H43z" fill="#281c4e" opacity=".9"/><path d="M43 39h16" stroke="#fff2b5" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"/><path d="M38 25l5-11 7 8 7-11 6 11 8-5-2 14H37z" fill="#f7d77e" stroke="#fff4c2" stroke-width="1.5"/><path d="M46 20l4-4 4 5 5-6 4 6" fill="none" stroke="#8e5a20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="28" cy="24" r="2" fill="#77ecff"/><circle cx="18" cy="42" r="1.5" fill="#b889ff"/><circle cx="78" cy="51" r="1.6" fill="#77ecff"/></svg>`;
+      kingNorbertAvatarImage = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      return kingNorbertAvatarImage;
+    }
     const aiBotAvatarImageCache = new Map();
     function getAiBotAvatarImage(bot, index) {
       const key = `${bot.id}:${index}`;
@@ -16790,9 +17459,23 @@
     }
 
     function setupAiBotRoster() {
+      setupCoachAvatarAssets();
       const roster = document.getElementById("aiBotRoster"); const search = document.getElementById("aiBotSearch"); const filter = document.getElementById("aiBotFilter"); if (!roster || !search || !filter || roster.dataset.ready) return; roster.dataset.ready = "true"; const categories = ["Beginner", "Intermediate", "Advanced", "Master"];
       const render = () => { const query = search.value.trim().toLowerCase(); const matches = beginnerBots.filter((bot) => { const words = [bot.name, bot.elo, bot.personality, bot.opening, bot.bio, bot.style, bot.category].join(" ").toLowerCase(); return (filter.value === "All" || bot.category === filter.value) && (!query || words.includes(query)); }); if (!matches.length) { roster.replaceChildren(createBookText("p", "ai-bot-empty", "No bots match those filters.")); return; } const groups = categories.map((category) => { const bots = matches.filter((bot) => bot.category === category); if (!bots.length) return null; const section = document.createElement("section"); section.className = "ai-bot-category"; const head = document.createElement("div"); head.className = "ai-bot-category-head"; head.append(createBookText("h3", "", category), createBookText("span", "", String(bots.length) + " bots")); const grid = document.createElement("div"); grid.className = "ai-bot-grid"; bots.forEach((bot) => { const card = document.createElement("article"); card.className = "ai-bot-card"; const avatar = document.createElement("img"); avatar.className = "ai-bot-avatar"; avatar.src = getAiBotAvatarImage(bot, beginnerBots.indexOf(bot)); avatar.alt = ""; avatar.loading = "lazy"; avatar.decoding = "async"; avatar.style.setProperty("--ai-bot-hue", String((beginnerBots.indexOf(bot) * 47 + 194) % 360)); const copy = document.createElement("div"); copy.className = "ai-bot-card-copy"; const meta = document.createElement("div"); meta.className = "ai-bot-card-meta"; const elo = createBookText("span", "", String(bot.elo) + " Elo"); const difficulty = createBookText("span", "ai-bot-difficulty", bot.category); difficulty.dataset.difficulty = bot.category.toLowerCase(); const personality = createBookText("span", "", bot.personality); meta.append(elo, difficulty, personality); const nameLine = createBookText("span", "ai-bot-card-name-line", ""); const botName = createBookText("strong", "", bot.name); nameLine.append(botName); const botIdentity = getPlayerIdentityModel({ name: bot.name, title: bot.personality, avatar: bot.avatar, isPlayer: false }, { isPlayer: false, variant: "compact" }); renderSharedIdentityLine(nameLine, botIdentity, { nameSelector: "strong", variant: "compact" }); copy.append(nameLine, meta, createBookText("p", "", bot.bio), createBookText("span", "ai-bot-card-style", "Style: " + bot.style)); const play = createBookText("button", "button", "Play"); play.type = "button"; play.dataset.aiBotPlay = bot.id; play.setAttribute("aria-label", "Play " + bot.name + ", " + bot.elo + " Elo"); card.append(avatar, copy, play); grid.append(card); }); section.append(head, grid); return section; }).filter(Boolean); roster.replaceChildren(...groups); };
-      search.addEventListener("input", render); filter.addEventListener("change", render); roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => openAiGameReady(button.dataset.aiBotPlay, { trigger: button })); }); render();
+      search.addEventListener("input", render); filter.addEventListener("change", render); roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => openAiGameReady(button.dataset.aiBotPlay, { trigger: button })); });
+      const featuredPlay = document.getElementById("aiFeaturedCoachPlay");
+      featuredPlay?.addEventListener("click", () => {
+        const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play");
+        link?.click();
+        void initializeDeferredFeature("play").then(() => {
+          setCoachDifficulty("strong");
+          startSoloCoachGame();
+          coachMessage = "KingNorbert is ready. Find the threat, make a plan, then calculate.";
+          renderCoachBoard();
+          document.getElementById("play")?.scrollIntoView({ block: "start", behavior: "smooth" });
+        });
+      });
+      render();
     }
     function selectBeginnerBot(botId) { const bot = getBeginnerBot(botId); if (!bot || !isBeginnerBotUnlocked(bot.id)) return; prepareAiLobby(bot.id); }
     function chooseBeginnerBotMove(moves, bot = getBeginnerBot()) {
@@ -16896,6 +17579,13 @@
           label: container.getAttribute("aria-label") || "Coach avatar"
         });
       });
+      document.querySelectorAll(".featured-coach-avatar").forEach((container) => {
+        renderCoachAvatar(container, {
+          imageUrl: getKingNorbertAvatarImage(),
+          fallback: container.dataset.coachFallback || "KN",
+          label: container.getAttribute("aria-label") || "KingNorbert coach avatar"
+        });
+      });
     }
 
     function updateAiPlayerHeader() {
@@ -16926,6 +17616,8 @@
       }
       document.getElementById("aiPlayerTitle").textContent = ai.title;
       document.getElementById("aiPlayerRating").textContent = ai.isPlaceholder ? "—" : `${displayRating} Elo`;
+      const aiSide = card.querySelector("[data-ai-frame-side]");
+      if (aiSide) aiSide.textContent = getCoachColorName(botColor);
       const selectedBot = getBeginnerBot();
       const botGames = selectedBot
         ? Math.max(0, Number(beginnerBotState.wins[selectedBot.id]) || 0) + Math.max(0, Number(beginnerBotState.losses[selectedBot.id]) || 0)
@@ -17272,7 +17964,54 @@
       syncAiGameReadySelect("aiGameReadyPieceSet", "prefPieces");
     }
 
+    function releaseActivePlayScrollAnchor() {
+      activePlayScrollAnchorToken += 1;
+      const play = document.getElementById("play");
+      if (play) delete play.dataset.activeGameScrollAnchor;
+      if (activePlayScrollRestoration == null) return;
+      try {
+        window.history.scrollRestoration = activePlayScrollRestoration;
+      } catch {}
+      activePlayScrollRestoration = null;
+    }
+
+    function anchorActivePlayWorkspace() {
+      const play = document.getElementById("play");
+      const workspace = play?.querySelector(".match-board-column");
+      if (!play?.classList.contains("is-active-game") || !workspace) return;
+
+      const token = ++activePlayScrollAnchorToken;
+      play.dataset.activeGameScrollAnchor = "pending";
+      if (activePlayScrollRestoration == null) {
+        try {
+          activePlayScrollRestoration = window.history.scrollRestoration || "auto";
+          window.history.scrollRestoration = "manual";
+        } catch {}
+      }
+
+      const apply = (final = false) => {
+        if (token !== activePlayScrollAnchorToken || !play.isConnected || !play.classList.contains("is-active-game")) return;
+        const rect = workspace.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const header = document.querySelector(".site-header");
+        const headerHeight = Number(header?.getBoundingClientRect?.().height) || 0;
+        const topOffset = Math.max(12, Math.min(headerHeight + 12, (window.innerHeight || 0) * .28));
+        const top = Math.max(0, Math.round(window.scrollY + rect.top - topOffset));
+        window.scrollTo({ top, left: 0, behavior: "auto" });
+        if (final) play.dataset.activeGameScrollAnchor = "ready";
+      };
+
+      // Apply once for the transition and once after the active-game grid and
+      // board sizing pass have painted. This beats browser/SPA restoration
+      // without taking ownership of normal user scrolling afterward.
+      apply();
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => apply(true));
+      });
+    }
+
     function resetAiGameForSetup() {
+      releaseActivePlayScrollAnchor();
       coachSessionActive = false;
       cancelStockfishSearch("Game Ready setup");
       coachMoveToken += 1;
@@ -17291,6 +18030,7 @@
       const dialog = document.getElementById("aiGameReady");
       if (!dialog || dialog.hidden) return;
       dialog.hidden = true;
+      document.body.classList.remove("ai-game-ready-open");
       document.getElementById("aiGameReadyMoreSettings")?.removeAttribute("open");
       if (restoreFocus) aiGameReadyReturnFocus?.focus?.({ preventScroll: true });
       aiGameReadyReturnFocus = null;
@@ -17303,6 +18043,7 @@
       if (dialog) {
         aiGameReadyReturnFocus = trigger || document.activeElement;
         dialog.hidden = false;
+        document.body.classList.add("ai-game-ready-open");
         renderAiGameReady();
         window.requestAnimationFrame(() => document.getElementById("aiGameReadyStart")?.focus({ preventScroll: true }));
       }
@@ -18757,10 +19498,155 @@
       return fallback;
     }
 
-    function choosePromotion(legalMoves) {
-      if (!legalMoves.some((move) => move.promotion)) return undefined;
-      const choice = String(window.prompt("Promote pawn to queen, rook, bishop, or knight? Type q, r, b, or n.", "q") || "q").toLowerCase();
-      return ["q", "r", "b", "n"].includes(choice) ? choice : "q";
+    let promotionPickerState = null;
+    const promotionChoices = Object.freeze([
+      { type: "q", label: "Queen" },
+      { type: "r", label: "Rook" },
+      { type: "b", label: "Bishop" },
+      { type: "n", label: "Knight" }
+    ]);
+
+    function clearPromotionPicker({ cancel = true } = {}) {
+      const state = promotionPickerState;
+      if (!state) return false;
+      promotionPickerState = null;
+      state.picker?.remove();
+      window.removeEventListener("resize", state.reposition);
+      window.removeEventListener("orientationchange", state.reposition);
+      window.removeEventListener("scroll", state.reposition, true);
+      window.visualViewport?.removeEventListener("resize", state.reposition);
+      window.visualViewport?.removeEventListener("scroll", state.reposition);
+      document.removeEventListener("keydown", state.onDocumentKeyDown, true);
+      if (cancel) {
+        try { state.onCancel?.(); } catch {}
+      }
+      return true;
+    }
+
+    function positionPromotionPicker(state) {
+      if (!state?.picker?.isConnected || !state.square?.isConnected) return;
+      const picker = state.picker;
+      const squareRect = state.square.getBoundingClientRect();
+      const pickerRect = picker.getBoundingClientRect();
+      const margin = 8;
+      const viewportWidth = Math.max(240, window.innerWidth || document.documentElement.clientWidth || 240);
+      const viewportHeight = Math.max(320, window.innerHeight || document.documentElement.clientHeight || 320);
+      const candidates = [
+        { placement: "right", left: squareRect.right + margin, top: squareRect.top + (squareRect.height - pickerRect.height) / 2 },
+        { placement: "left", left: squareRect.left - pickerRect.width - margin, top: squareRect.top + (squareRect.height - pickerRect.height) / 2 },
+        { placement: "below", left: squareRect.left + (squareRect.width - pickerRect.width) / 2, top: squareRect.bottom + margin },
+        { placement: "above", left: squareRect.left + (squareRect.width - pickerRect.width) / 2, top: squareRect.top - pickerRect.height - margin }
+      ];
+      const fits = ({ left, top }) => left >= margin
+        && top >= margin
+        && left + pickerRect.width <= viewportWidth - margin
+        && top + pickerRect.height <= viewportHeight - margin;
+      const chosen = candidates.find(fits) || candidates[0];
+      const left = Math.max(margin, Math.min(viewportWidth - pickerRect.width - margin, chosen.left));
+      const top = Math.max(margin, Math.min(viewportHeight - pickerRect.height - margin, chosen.top));
+      picker.dataset.placement = chosen.placement;
+      picker.style.left = `${Math.round(left)}px`;
+      picker.style.top = `${Math.round(top)}px`;
+    }
+
+    function showPromotionPicker(board, destination, legalMoves, { onChoose, onCancel } = {}) {
+      if (!(board instanceof HTMLElement) || !destination || !Array.isArray(legalMoves)) return false;
+      const promotionMoves = legalMoves.filter((move) => ["q", "r", "b", "n"].includes(move?.promotion));
+      if (!promotionMoves.length) return false;
+      clearPromotionPicker();
+      const color = promotionMoves[0].color || (board.querySelector(`[data-square="${destination}"]`)?.classList.contains("black-piece") ? "b" : "w");
+      const square = board.querySelector(`[data-square="${destination}"]`);
+      if (!(square instanceof HTMLElement)) return false;
+
+      const picker = document.createElement("div");
+      picker.className = "promotion-picker";
+      picker.dataset.color = color;
+      picker.dataset.destination = destination;
+      picker.setAttribute("role", "dialog");
+      picker.setAttribute("aria-label", `Choose a promotion piece for ${destination}`);
+      picker.setAttribute("aria-modal", "false");
+      const title = document.createElement("div");
+      title.className = "promotion-picker-title";
+      title.textContent = "Promote to";
+      picker.append(title);
+
+      const available = new Set(promotionMoves.map((move) => move.promotion));
+      promotionChoices.forEach(({ type, label }) => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "promotion-picker-option";
+        option.dataset.promotion = type;
+        option.setAttribute("aria-label", `${label}, promote pawn on ${destination}`);
+        option.title = label;
+        option.disabled = !available.has(type);
+        renderPieceOnSquare(option, { color, type }, activePieceSvgSet, false);
+        option.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (option.disabled || promotionPickerState?.picker !== picker) return;
+          const choice = type;
+          clearPromotionPicker({ cancel: false });
+          try { onChoose?.(choice); } catch {}
+        });
+        picker.append(option);
+      });
+
+      // A board can live in any fullscreen workspace (Play, Review, Puzzle,
+      // lessons, or a future board host). Keep the picker inside the active
+      // native fullscreen element so it remains visible and interactive in
+      // the same top layer as the board.
+      const fullscreenHost = board.closest(":fullscreen");
+      (fullscreenHost || document.body).append(picker);
+      const state = {
+        board,
+        destination,
+        square,
+        picker,
+        onCancel,
+        reposition: () => window.requestAnimationFrame(() => positionPromotionPicker(state)),
+        onDocumentKeyDown: (event) => {
+          if (event.key !== "Escape" || promotionPickerState?.picker !== picker) return;
+          event.preventDefault();
+          event.stopPropagation();
+          clearPromotionPicker();
+        }
+      };
+      promotionPickerState = state;
+      picker.style.visibility = "hidden";
+      window.addEventListener("resize", state.reposition, { passive: true });
+      window.addEventListener("orientationchange", state.reposition, { passive: true });
+      window.addEventListener("scroll", state.reposition, { passive: true, capture: true });
+      window.visualViewport?.addEventListener("resize", state.reposition, { passive: true });
+      window.visualViewport?.addEventListener("scroll", state.reposition, { passive: true });
+      document.addEventListener("keydown", state.onDocumentKeyDown, true);
+      positionPromotionPicker(state);
+      picker.style.visibility = "visible";
+      picker.querySelector(".promotion-picker-option:not(:disabled)")?.focus({ preventScroll: true });
+      return true;
+    }
+
+    function choosePromotion(legalMoves, board, destination, onChoose, onCancel) {
+      if (!legalMoves.some((move) => move.promotion)) return false;
+      return showPromotionPicker(board, destination, legalMoves, { onChoose, onCancel });
+    }
+
+    // This opt-in browser probe exercises the shipped picker without adding a
+    // production control or changing any game state.  It is enabled only by
+    // the focused promotion regression's query flag.
+    if (new URLSearchParams(window.location.search).has("e2ePromotion")) {
+      window.__nschessPromotionTest = {
+        lastChoice: "",
+        open({ color = "w", destination = "a8" } = {}) {
+          const board = document.getElementById("coachBoard") || document.getElementById("puzzleBoard");
+          const legalMoves = promotionChoices.map(({ type }) => ({ from: "a7", to: destination, color, promotion: type }));
+          this.lastChoice = "";
+          return showPromotionPicker(board, destination, legalMoves, {
+            onChoose: (choice) => { this.lastChoice = choice; },
+            onCancel: () => { this.lastChoice = "cancelled"; }
+          });
+        },
+        close() { return clearPromotionPicker(); }
+      };
     }
 
     function explainLearnerMove(move, bestMove, betterGap) {
@@ -18785,14 +19671,14 @@
       }
       if (move.captured) {
         coachWhyText = `${move.san} worked because it captured material with tempo.`;
-        return `The coach played ${move.san} and captured a piece. Great try: now look for checks, captures, and threats.`;
+        return `Coach played ${move.san} and won material. Find your best reply.`;
       }
       if (move.san.includes("+")) {
         coachWhyText = `${move.san} is important because checks must be answered immediately.`;
-        return `The coach played ${move.san}. Your king is in check, so answer that first.`;
+        return `Coach played ${move.san}. Answer the check first.`;
       }
       coachWhyText = `${move.san} improves the coach's position without risking too much.`;
-      return `The coach played ${move.san}. Look for a safe developing move or a forcing move.`;
+      return `Coach played ${move.san}. Develop safely or find a forcing move.`;
     }
 
     function getOpeningCompassData(history = coachGame.history({ verbose: true })) {
@@ -18916,7 +19802,13 @@
       const list = document.getElementById("guidedReviewList");
       if (!panel || !list) return;
       panel.hidden = !show;
-      if (!show) return;
+      if (!show) {
+        // A new game must not inherit the previous game's rendered moments.
+        // Keep the panel hidden, but also clear its DOM so a delayed review
+        // update cannot make stale guidance visible on the next game.
+        list.replaceChildren();
+        return;
+      }
       const moments = coachReviewMoments.length ? coachReviewMoments : [{
         move: Math.max(1, Math.ceil((coachGame?.history({ verbose: true }).length || 1) / 2)),
         headline: "No big mistake saved.",
@@ -20188,6 +21080,7 @@
     }
 
     function showReviewPly(index) {
+      clearPromotionPicker();
       if (!activeMatchReview || !CoachChess) return;
       clearAnalysisArrows("review-position", document.getElementById("coachBoard"));
       stopReviewBestLineReplay();
@@ -20665,12 +21558,22 @@
       }
     }
 
-    function makeReviewSelfAnalysisMove(from, to) {
+    function makeReviewSelfAnalysisMove(from, to, promotionOverride = "") {
       const state = reviewSelfAnalysisState;
       if (!state || !coachGame) return false;
       const legalMoves = coachGame.moves({ square: from, verbose: true }).filter((move) => move.to === to);
       if (!legalMoves.length) return false;
-      const promotion = choosePromotion(legalMoves);
+      if (legalMoves.some((move) => move.promotion) && !promotionOverride) {
+        choosePromotion(legalMoves, document.getElementById("coachBoard"), to,
+          (choice) => makeReviewSelfAnalysisMove(from, to, choice),
+          () => {
+            coachSelected = from;
+            coachLegalMoves = legalMoves;
+            renderCoachBoard();
+          });
+        return true;
+      }
+      const promotion = promotionOverride || undefined;
       let made = null;
       try { made = coachGame.move({ from, to, ...(promotion ? { promotion } : {}) }); } catch {}
       if (!made) return false;
@@ -20689,7 +21592,7 @@
     }
 
     function handleReviewSelfAnalysisSquare(square) {
-      if (!reviewSelfAnalysisState || !coachGame) return;
+      if (promotionPickerState || !reviewSelfAnalysisState || !coachGame) return;
       const piece = coachGame.get(square);
       if (coachSelected && square !== coachSelected && coachLegalMoves.some((move) => move.to === square)) {
         makeReviewSelfAnalysisMove(coachSelected, square);
@@ -20794,13 +21697,23 @@
       showReviewPly(index);
     }
 
-    function makeReviewRetryMove(from, to) {
+    function makeReviewRetryMove(from, to, promotionOverride = "") {
       const retry = reviewRetryState;
       const target = activeMatchReview?.moves?.[retry?.index];
       if (!retry || !target || retry.attempted || !coachGame) return false;
       const legalMoves = coachGame.moves({ square: from, verbose: true }).filter((move) => move.to === to);
       if (!legalMoves.length) return false;
-      const promotion = choosePromotion(legalMoves);
+      if (legalMoves.some((move) => move.promotion) && !promotionOverride) {
+        choosePromotion(legalMoves, document.getElementById("coachBoard"), to,
+          (choice) => makeReviewRetryMove(from, to, choice),
+          () => {
+            coachSelected = from;
+            coachLegalMoves = legalMoves;
+            renderCoachBoard();
+          });
+        return true;
+      }
+      const promotion = promotionOverride || undefined;
       let made = null;
       try { made = coachGame.move({ from, to, ...(promotion ? { promotion } : {}) }); } catch {}
       if (!made) return false;
@@ -20819,7 +21732,7 @@
     }
 
     function handleReviewRetrySquare(square) {
-      if (!reviewRetryState || !coachGame || reviewRetryState.attempted) return;
+      if (promotionPickerState || !reviewRetryState || !coachGame || reviewRetryState.attempted) return;
       const piece = coachGame.get(square);
       if (coachSelected && square !== coachSelected && coachLegalMoves.some((move) => move.to === square)) {
         makeReviewRetryMove(coachSelected, square);
@@ -21335,9 +22248,12 @@
     function renderCoachPracticeLinks(show) {
       const row = document.getElementById("coachPracticeLinks");
       if (!row) return;
+      // Clear before deciding visibility. The previous implementation only
+      // hid the row, leaving completed-game recommendations in the DOM until
+      // the next completed game rendered over them.
+      row.replaceChildren();
       row.hidden = !show;
       if (!show) return;
-      row.replaceChildren();
       const mistake = getCurrentMistakePractice(readDailyTrainingState());
       const focus = getSingleCoachFocus();
       const rec = getSmartGameRecommendation();
@@ -21549,7 +22465,13 @@
       const resignGame = document.getElementById("resignGame");
       const returnLobby = document.getElementById("returnLobby");
       const startGame = document.getElementById("restartGame");
+      const remoteMatch = Boolean(friendChallengeState?.active && friendChallengeState?.remote);
+      const setOptionalVisibility = (id, visible) => {
+        const element = document.getElementById(id);
+        if (element) element.hidden = !visible;
+      };
       if (startGame) {
+        startGame.hidden = remoteMatch;
         startGame.disabled = !coachDifficulty;
         startGame.innerHTML = `<span aria-hidden="true">${coachSessionActive ? "↻" : "▶"}</span> ${coachSessionActive ? "Restart Game" : "Start Game"}`;
       }
@@ -21560,7 +22482,7 @@
       if (acceptDraw) acceptDraw.hidden = !drawIncoming;
       if (declineDraw) declineDraw.hidden = !drawIncoming;
       if (abortGame) {
-        abortGame.hidden = !friendChallengeState?.active;
+        abortGame.hidden = !remoteMatch;
         abortGame.disabled = !isBeforeMoveTwo() || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
       }
       if (resignGame) {
@@ -21568,6 +22490,10 @@
         resignGame.disabled = (!coachSessionActive && !friendChallengeState?.active) || coachDrawAgreed || isMate || isDrawn || Boolean(matchClockExpiredColor);
       }
       if (returnLobby) returnLobby.hidden = !friendChallengeState?.remote && !friendChallengeState?.active;
+      ["openBoardEditor", "undoGame", "toggleBot", "whyGame", "replayMistake", "showThreats", "importPgn"]
+        .forEach((id) => setOptionalVisibility(id, !remoteMatch));
+      setOptionalVisibility("playActiveSettings", true);
+      setOptionalVisibility("flipGame", true);
       updateEnginePanel();
       updateBotToggle();
       renderInGamePlayerCard();
@@ -22733,6 +23659,17 @@
       const board = document.getElementById("coachBoard");
       if (!board || !coachGame) return;
       sharedInteractiveBoardWorkspace.scheduleSync();
+      // Lock normal-mode strip width to the board's initial rendered size;
+      // fullscreen remaps the strips to the focused workspace in CSS.
+      window.requestAnimationFrame(() => {
+        const play = document.getElementById("play");
+        const stage = board.closest("[data-interactive-board-stage]");
+        if (!play?.classList.contains("is-active-game") || play.style.getPropertyValue("--play-strip-size")) return;
+        const rendered = Number(stage?.dataset.boardRenderedSize || 0);
+        const measured = Number(board.getBoundingClientRect?.().width || 0);
+        const size = rendered > 0 ? rendered : measured;
+        if (size > 0) play.style.setProperty("--play-strip-size", `${Math.round(size)}px`);
+      });
       bindCoachBoardEvents(board);
       const boardFen = coachGame.fen();
       const boardHistoryLength = coachGame.history().length;
@@ -22842,7 +23779,7 @@
       syncCoachBoardOutcome();
     }
 
-    function makeCoachMove(from, to) {
+    function makeCoachMove(from, to, promotionOverride = "") {
       if (reviewSelfAnalysisState) return makeReviewSelfAnalysisMove(from, to);
       if (reviewRetryState) return makeReviewRetryMove(from, to);
       if (!coachGame || (!coachSessionActive && !friendChallengeState?.active) || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return false;
@@ -22854,7 +23791,19 @@
         return false;
       }
 
-      const promotion = choosePromotion(legalMoves);
+      const promotionMoves = legalMoves.filter((move) => move.promotion);
+      if (promotionMoves.length && !promotionOverride) {
+        const board = document.getElementById("coachBoard");
+        choosePromotion(legalMoves, board, to,
+          (choice) => makeCoachMove(from, to, choice),
+          () => {
+            coachSelected = from;
+            coachLegalMoves = legalMoves;
+            scheduleCoachBoardRender();
+          });
+        return true;
+      }
+      const promotion = promotionOverride || undefined;
       const beforeFen = coachGame.fen();
       const scoredMoves = getWarmCoachLearnerMoveScores(beforeFen);
       const hasScoredMoves = scoredMoves.length > 0;
@@ -22933,6 +23882,7 @@
     }
 
     function handleCoachSquare(square) {
+      if (promotionPickerState) return;
       if (reviewSelfAnalysisState) return handleReviewSelfAnalysisSquare(square);
       if (reviewRetryState) return handleReviewRetrySquare(square);
       if (!coachGame || coachThinking || coachDrawAgreed || matchClockExpiredColor || isCoachGameOver()) return;
@@ -23042,11 +23992,43 @@
       });
     }
 
+    function clearPositionDependentCoachContext() {
+      const practice = document.getElementById("coachPracticeLinks");
+      if (practice) {
+        practice.replaceChildren();
+        practice.hidden = true;
+      }
+      const guided = document.getElementById("guidedReview");
+      const guidedList = document.getElementById("guidedReviewList");
+      if (guided) guided.hidden = true;
+      guidedList?.replaceChildren();
+
+      const history = document.getElementById("moveHistory");
+      if (history) {
+        delete history.dataset.historyKey;
+        history.replaceChildren();
+        history.textContent = "No moves yet.";
+      }
+      ["whiteCaptured", "blackCaptured"].forEach((id) => {
+        const captured = document.getElementById(id);
+        if (!captured) return;
+        delete captured.dataset.historyKey;
+        captured.textContent = "None";
+      });
+
+      const compass = document.getElementById("openingCompass");
+      const compassList = document.getElementById("openingCompassList");
+      if (compass) delete compass.dataset.renderKey;
+      compassList?.replaceChildren();
+    }
+
     function restartCoachGame() {
+      clearPromotionPicker();
       if (!CoachChess) return;
       const gameShouldRun = coachSessionActive || Boolean(friendChallengeState?.active) || Boolean(reviewSelfAnalysisState) || Boolean(reviewRetryState);
       clearAnalysisArrows("game-restart", document.getElementById("coachBoard"));
       coachMoveToken += 1;
+      cancelActiveReviewAnalysis("Starting a new game");
       window.clearInterval(reviewReplayTimer);
       reviewSelfAnalysisState = null;
       reviewReplayTimer = 0;
@@ -23084,6 +24066,8 @@
       coachReviewMoments = [];
       coachCurrentHanging = 0;
       coachFlipped = coachPlayerColor === "b";
+      matchStartedAt = Date.now();
+      matchEndedElapsedMs = null;
       coachMessage = gameShouldRun
         ? coachPlayerColor === "b"
           ? "Fresh game. You are Black. Coach starts as White."
@@ -23092,6 +24076,7 @@
       refreshRandomLastMoveHighlight();
       resetMatchPlayerTimer(getSoloMatchClockControl(), gameShouldRun ? null : { running: false });
       document.getElementById("gamePgn").textContent = "PGN appears here after export.";
+      clearPositionDependentCoachContext();
       renderGuidedGameReview(false);
       if (gameShouldRun) playAudioCue("game-start");
       renderCoachSidePicker();
@@ -26945,6 +27930,7 @@
     }
 
     function resetRealPuzzleGame() {
+      clearPromotionPicker();
       const puzzle = realPuzzleBank[realPuzzleIndex];
       realPuzzleTransitionId += 1;
       cancelPendingRealPuzzleReply();
@@ -27505,6 +28491,25 @@
             || legalMoves.find((move) => move.promotion === "q")
             || legalMoves[0];
           if (selectedMove) {
+            const from = realPuzzleSelected;
+            if (legalMoves.some((move) => move.promotion)) {
+              const board = document.getElementById("realPuzzleBoard");
+              choosePromotion(
+                legalMoves,
+                board,
+                square,
+                (promotion) => {
+                  const promotedMove = legalMoves.find((move) => move.promotion === promotion);
+                  if (promotedMove) void finishRealPuzzleMove(promotedMove);
+                },
+                () => {
+                  realPuzzleSelected = from;
+                  realPuzzleLegalMoves = legalMoves;
+                  renderRealPuzzleBoard();
+                }
+              );
+              return true;
+            }
             void finishRealPuzzleMove(selectedMove);
             return true;
           }
@@ -28245,7 +29250,7 @@
     // loaded only when a route is entered, while the feature implementations
     // stay in this shared runtime so existing behavior and state remain
     // unchanged. Dynamic imports are cached by the browser automatically.
-    const routeModuleVersion = "review-v201-featured-study-signature-audio";
+    const routeModuleVersion = "review-v226-startup-performance";
     const routeModuleNames = Object.freeze({
       home: "home",
       play: "play",
@@ -28284,7 +29289,15 @@
       if (!name) return Promise.resolve(null);
       const existing = routeModulePromises.get(name);
       if (existing) return existing;
-      const href = `assets/routes/${encodeURIComponent(name)}.js?v=${routeModuleVersion}`;
+      // Dynamic imports require a relative/absolute URL. Without the leading
+      // `./`, browsers interpret `assets/...` as a bare package specifier and
+      // every lazy route fails before its module is even requested. Resolve
+      // against the document so this also works when the site is hosted under
+      // a repository sub-path (for example GitHub Pages).
+      const href = new URL(
+        `./assets/routes/${encodeURIComponent(name)}.js?v=${encodeURIComponent(routeModuleVersion)}`,
+        document.baseURI
+      ).href;
       const task = import(href).catch((error) => {
         console.warn(`[Nschess] Route module ${name} failed to load.`, error);
         return { routeError: true, routeName: name, features: [], styles: [] };
@@ -28534,8 +29547,10 @@
       });
 
       function showHome(shouldScroll = false) {
+        releaseActivePlayScrollAnchor();
         boardInteractionEngine.cancelAll({ type: "routechange" });
         cancelCoachPremove();
+        clearPromotionPicker({ cancel: false });
         routeModuleActivationGeneration += 1;
         stopStorePreview({ silent: true });
         clearAllAnalysisOverlays();
@@ -28576,8 +29591,10 @@
           showHome(shouldScroll);
           return;
         }
+        if (config.panel !== "play") releaseActivePlayScrollAnchor();
         boardInteractionEngine.cancelAll({ type: "routechange" });
         cancelCoachPremove();
+        clearPromotionPicker({ cancel: false });
         firstVisitSetupClose?.({ restoreFocus: false });
         routeModuleActivationGeneration += 1;
 
@@ -29053,7 +30070,7 @@
 
       if (avatar) avatar.textContent = adventureProfile.avatar;
       if (displayName) displayName.textContent = name ? `${name}'s Player Pass` : "Guest Explorer";
-      if (displayMeta) displayMeta.textContent = name ? `${adventureProfile.level} - ${profile.goal}` : "Create your Player Pass to personalize the journey.";
+      if (displayMeta) displayMeta.textContent = name ? `${adventureProfile.level} · ${profile.goal}` : "Local pass · saved on this device.";
       if (status) status.textContent = name ? `Coach remembers you as ${name}. Your next tiny win is waiting.` : "Saved only in this browser.";
       if (nameField && document.activeElement !== nameField) nameField.value = name;
       if (levelField) levelField.value = profile.level;
@@ -30733,7 +31750,33 @@
         resetApplicationAccountState(previousAccountId, { status: "loading", render: true });
       }
       const workspaceChanged = switchAccountWorkspace(account);
-      if (workspaceChanged) hydrateAccountWorkspaceRuntimeState();
+      if (workspaceChanged) {
+        hydrateAccountWorkspaceRuntimeState();
+      }
+      // Hash routing can run before the authenticated workspace has been
+      // restored on a refresh. Re-open a saved Review once its account-scoped
+      // match history is available instead of leaving the route active with
+      // an empty hidden workspace. If a narrow startup race left the runtime
+      // empty, restore only this verified account's snapshot and hydrate it
+      // again; never fall back to another account's active keys.
+      if (isGameReviewRoute()
+        && !document.getElementById("gameReview")?.classList.contains("is-review-page")) {
+        let savedReview = matchReviews.find((review) => review?.moves?.length && review?.summary);
+        const accountId = normalizeAccountWorkspaceId(account.authUserId || account.publicId);
+        const storedValues = readAccountWorkspaceStore().accounts?.[accountId]?.values;
+        if (!savedReview && storedValues && typeof storedValues === "object") {
+          restoreAccountWorkspace(accountId);
+          hydrateAccountWorkspaceRuntimeState();
+          savedReview = matchReviews.find((review) => review?.moves?.length && review?.summary);
+        }
+        if (savedReview) {
+          void initializeDeferredFeature("play").then(() => {
+            if (isGameReviewRoute() && !document.getElementById("gameReview")?.classList.contains("is-review-page")) {
+              openSavedMatchReview(savedReview);
+            }
+          });
+        }
+      }
       applicationAuthState = "authenticated";
       applicationAuthAccount = account;
       setStoreAuthState("authenticated", account.authUserId || account.publicId || "");
@@ -31522,7 +32565,9 @@
       const playSection = document.getElementById("play");
       playSection?.style.setProperty("--user-board-size", `${scaledBoardSize}px`);
       playSection?.style.setProperty("--match-card-width", `${clampNumber(Math.round(scaledBoardSize * 0.58), 320, 540)}px`);
-      sharedInteractiveBoardWorkspace.applyPreferenceSize(scaledBoardSize);
+      const isDefaultBoardPreference = prefs.boardSize === "large"
+        && clampNumber(Number(prefs.boardScale) || 100, 82, 122) === 100;
+      sharedInteractiveBoardWorkspace.applyPreferenceSize(scaledBoardSize, { defaultPreference: isDefaultBoardPreference });
     }
 
     function applyLearnerPrefs(prefs) {
@@ -34699,7 +35744,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v200-global-board-recovery";
+    const optionalRouteStylesheetVersion = "review-v230-active-play-clocks";
     const optionalRouteStylesheetPaths = Object.freeze({ "play-lobby": "assets/play-lobby.css" });
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
@@ -34733,10 +35778,15 @@
       // not look like the legacy shell simply because deviceMemory reports 4.
       const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2;
       const lowCpu = typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 2;
+      const mobileViewport = window.matchMedia("(max-width: 760px)").matches;
+      const mobileConstrained = mobileViewport && (
+        (typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 4)
+        || (typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4)
+      );
       const applyPerformanceMode = () => {
         const saveData = Boolean(connection?.saveData);
         const slowNetwork = /(^|-)2g$/.test(connection?.effectiveType || "");
-        const enabled = lowMemory || lowCpu || saveData || slowNetwork || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const enabled = lowMemory || lowCpu || mobileConstrained || saveData || slowNetwork || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         document.body.classList.toggle("perf-lite", enabled);
         if (enabled) void loadOptionalRouteStylesheet("perf-lite");
         document.documentElement.style.setProperty("--perf-mode", enabled ? "lite" : "full");
@@ -36256,7 +37306,7 @@
       socialActivityState = [];
     }
 
-    function setupSiteNotifications() {
+    function setupSiteNotifications({ deferRemote = false } = {}) {
       const dialog = document.getElementById("siteNotificationsDialog");
       const open = document.getElementById("siteNotificationsOpen");
       const close = document.getElementById("siteNotificationsClose");
@@ -36371,10 +37421,14 @@
         if (!options.skipServer) void refreshSocialActivity();
       };
       render();
-      void refreshSocialNotifications();
-      void refreshSocialActivity();
-      void ensureSocialNotificationRealtime();
-      void ensureSocialActivityRealtime();
+      const startRemoteNotifications = () => {
+        void refreshSocialNotifications();
+        void refreshSocialActivity();
+        void ensureSocialNotificationRealtime();
+        void ensureSocialActivityRealtime();
+      };
+      if (deferRemote) scheduleBackgroundTask(startRemoteNotifications, 1200, "startup-social-notifications");
+      else startRemoteNotifications();
     }
 
     function setupSafetyReport() {
@@ -36470,7 +37524,7 @@
       window.NschessOnlineMatchmaking = {
         async findMatch(options = {}) {
           const provider = getFriendProvider();
-          if (!provider?.joinMatchmakingQueue || !provider?.getMatchmakingStatus) {
+          if (!provider?.joinMatchmakingQueue || !provider?.getMatchmakingStatus || !provider?.leaveMatchmakingQueue) {
             throw new Error("Online matchmaking is unavailable.");
           }
           if (!provider.getCachedAccount?.()?.publicId) {
@@ -36478,63 +37532,94 @@
           }
           const signal = options.signal;
           let ticketId = null;
-           const leaveQueue = () => {
-             if (ticketId) void provider.leaveMatchmakingQueue?.(ticketId).catch(() => {});
-           };
-           if (signal?.aborted) return null;
-           let heartbeatTimer = 0;
-           let fallbackTimer = 0;
-           let settled = false;
-           let realtimeHandler = null;
-           const cleanup = () => {
-             window.clearInterval(heartbeatTimer);
-             window.clearTimeout(fallbackTimer);
-             heartbeatTimer = 0;
-             fallbackTimer = 0;
-             if (realtimeHandler) window.removeEventListener("nschess:matchmaking", realtimeHandler);
-             realtimeHandler = null;
-           };
-           const resolveFromServer = async () => {
-             if (settled || !ticketId) return;
-             const status = normalizeMatchmakingTicket(await (provider.resolveMatchmakingTimeout
-               ? provider.resolveMatchmakingTimeout(ticketId)
-               : provider.getMatchmakingStatus(ticketId)));
-             if (status.status === "matched" && status.challengeCode) {
-               settled = true;
-               cleanup();
-               leaveQueue();
-               return { challengeCode: status.challengeCode, ticketId };
-             }
-             if (status.status === "ai_fallback" || status.queueState === "ai_fallback") {
-               settled = true;
-               cleanup();
-               leaveQueue();
-               return { fallback: true, ticketId };
-             }
-             const fallbackAt = status.fallbackAt ? Date.parse(status.fallbackAt) : 0;
-             if (fallbackAt > Date.now()) {
-               window.clearTimeout(fallbackTimer);
-               fallbackTimer = window.setTimeout(() => { void resolveFromServer().then((match) => match && finish(match)); }, Math.max(250, fallbackAt - Date.now() + 50));
-             }
-             return null;
-           };
-           let finish;
-           const finishPromise = new Promise((resolve) => { finish = resolve; });
-           try {
-              const joined = normalizeMatchmakingTicket(await provider.joinMatchmakingQueue(options));
-              ticketId = joined.ticketId;
-              if (signal?.aborted) {
-                cleanup();
-                leaveQueue();
-                return null;
-              }
-              if (!ticketId) throw new Error("Matchmaking did not return a queue ticket.");
-              if (joined.status === "matched" && joined.challengeCode) {
-               cleanup();
-               leaveQueue();
-               return { challengeCode: joined.challengeCode, ticketId };
-             }
-             const onRealtime = (event) => {
+          let leavePromise = null;
+          const leaveQueue = () => {
+            if (!ticketId) return Promise.resolve(null);
+            if (!leavePromise) {
+              const ticketToLeave = ticketId;
+              leavePromise = Promise.resolve(provider.leaveMatchmakingQueue(ticketToLeave));
+            }
+            return leavePromise;
+          };
+          if (signal?.aborted) return null;
+          let heartbeatTimer = 0;
+          let fallbackTimer = 0;
+          let settled = false;
+          let realtimeHandler = null;
+          let abortHandler = null;
+          let finishResolve;
+          let finishReject;
+          const cleanup = () => {
+            window.clearInterval(heartbeatTimer);
+            window.clearTimeout(fallbackTimer);
+            heartbeatTimer = 0;
+            fallbackTimer = 0;
+            if (realtimeHandler) window.removeEventListener("nschess:matchmaking", realtimeHandler);
+            if (abortHandler) signal?.removeEventListener("abort", abortHandler);
+            realtimeHandler = null;
+            abortHandler = null;
+          };
+          const finishPromise = new Promise((resolve, reject) => {
+            finishResolve = resolve;
+            finishReject = reject;
+          });
+          const finish = (match) => finishResolve(match);
+          const abortSearch = async () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            if (!ticketId) return;
+            try {
+              await leaveQueue();
+              finish(null);
+            } catch (error) {
+              finishReject(error);
+            }
+          };
+          abortHandler = () => { void abortSearch(); };
+          signal?.addEventListener("abort", abortHandler, { once: true });
+          const resolveFromServer = async () => {
+            if (settled || !ticketId) return;
+            const status = normalizeMatchmakingTicket(await (provider.resolveMatchmakingTimeout
+              ? provider.resolveMatchmakingTimeout(ticketId)
+              : provider.getMatchmakingStatus(ticketId)));
+            if (settled || signal?.aborted) return null;
+            if (status.status === "matched" && status.challengeCode) {
+              settled = true;
+              cleanup();
+              await leaveQueue();
+              return { challengeCode: status.challengeCode, ticketId };
+            }
+            if (status.status === "ai_fallback" || status.queueState === "ai_fallback") {
+              settled = true;
+              cleanup();
+              await leaveQueue();
+              return { fallback: true, ticketId };
+            }
+            const fallbackAt = status.fallbackAt ? Date.parse(status.fallbackAt) : 0;
+            if (fallbackAt > Date.now()) {
+              window.clearTimeout(fallbackTimer);
+              fallbackTimer = window.setTimeout(() => {
+                void resolveFromServer().then((match) => match && finish(match)).catch((error) => finishReject(error));
+              }, Math.max(250, fallbackAt - Date.now() + 50));
+            }
+            return null;
+          };
+          try {
+            const joined = normalizeMatchmakingTicket(await provider.joinMatchmakingQueue(options));
+            ticketId = joined.ticketId;
+            if (signal?.aborted) {
+              cleanup();
+              await leaveQueue();
+              return null;
+            }
+            if (!ticketId) throw new Error("Matchmaking did not return a queue ticket.");
+            if (joined.status === "matched" && joined.challengeCode) {
+              cleanup();
+              await leaveQueue();
+              return { challengeCode: joined.challengeCode, ticketId };
+            }
+            const onRealtime = (event) => {
                const row = event?.detail?.payload?.new || event?.detail?.payload?.old || {};
                if (!ticketId || String(row.id || "") !== String(ticketId)) return;
                const status = normalizeMatchmakingTicket({
@@ -36544,31 +37629,35 @@
                 if (status.status === "matched" && status.challengeCode) {
                   settled = true;
                   cleanup();
-                  leaveQueue();
-                  finish({ challengeCode: status.challengeCode, ticketId });
-               } else if (status.status === "ai_fallback") {
-                 settled = true;
-                 cleanup();
-                 leaveQueue();
-                 finish({ fallback: true, ticketId });
-               }
-             };
-             realtimeHandler = onRealtime;
+                  void leaveQueue().then(() => finish({ challengeCode: status.challengeCode, ticketId })).catch((error) => finishReject(error));
+                } else if (status.status === "ai_fallback") {
+                  settled = true;
+                  cleanup();
+                  void leaveQueue().then(() => finish({ fallback: true, ticketId })).catch((error) => finishReject(error));
+                }
+              };
+              realtimeHandler = onRealtime;
              window.addEventListener("nschess:matchmaking", realtimeHandler);
              heartbeatTimer = window.setInterval(() => { void provider.heartbeatMatchmakingQueue?.(ticketId).catch(() => {}); }, 18000);
              const fallbackAt = joined.fallbackAt ? Date.parse(joined.fallbackAt) : 0;
              const fallbackDelay = fallbackAt > Date.now() ? fallbackAt - Date.now() + 50 : Math.max(1000, (joined.fallbackSeconds || (options.gameType === "rated" ? 25 : 12)) * 1000);
              fallbackTimer = window.setTimeout(() => { void resolveFromServer().then((match) => match && finish(match)); }, fallbackDelay);
-             signal?.addEventListener("abort", () => { if (!settled) { settled = true; cleanup(); leaveQueue(); finish(null); } }, { once: true });
-             return await finishPromise;
-           } catch (error) {
-             cleanup();
-             if (signal?.aborted || error?.name === "AbortError") return null;
-             leaveQueue();
-             throw error;
-           } finally {
-             if (signal?.aborted && !settled) { cleanup(); leaveQueue(); }
-           }
+              return await finishPromise;
+            } catch (error) {
+              cleanup();
+              if (signal?.aborted || error?.name === "AbortError") {
+                await leaveQueue();
+                return null;
+              }
+              await leaveQueue();
+              throw error;
+            } finally {
+              if (signal?.aborted && !settled) {
+                settled = true;
+                cleanup();
+                await leaveQueue();
+              }
+            }
         },
         async startMatch(match) {
           const provider = getFriendProvider();
@@ -36634,7 +37723,7 @@
 
       const storageKey = "nschess.quickMatchSettings.v1";
       const defaults = { timeControl: "5+0", gameType: "casual", color: "random" };
-      const state = { token: 0, controller: null, fallbackTimer: 0, ticker: 0, returnFocus: null, options: { ...defaults } };
+      const state = { token: 0, controller: null, searchPromise: null, onlineSearchPromise: null, fallbackTimer: 0, ticker: 0, returnFocus: null, options: { ...defaults } };
       const readSavedOptions = () => {
         try {
           const saved = JSON.parse(window.localStorage.getItem(storageKey) || "null");
@@ -36687,8 +37776,13 @@
         state.controller = null;
       };
       const cancelForAccountTransition = () => {
+        const pendingSearch = state.searchPromise;
+        const pendingOnlineSearch = state.onlineSearchPromise;
+        state.searchPromise = null;
+        state.onlineSearchPromise = null;
         state.token += 1;
         clearSearch();
+        void Promise.allSettled([pendingSearch, pendingOnlineSearch].filter(Boolean));
         setup.hidden = true;
         overlay.hidden = true;
         document.body.classList.remove("quick-match-searching");
@@ -36703,9 +37797,16 @@
           state.returnFocus = null;
         }
       };
-      const closeSearch = ({ restoreFocus = true } = {}) => {
+      const closeSearch = async ({ restoreFocus = true } = {}) => {
+        const pendingSearch = state.searchPromise;
+        const pendingOnlineSearch = state.onlineSearchPromise;
+        state.searchPromise = null;
+        state.onlineSearchPromise = null;
         state.token += 1;
         clearSearch();
+        await Promise.allSettled([pendingSearch, pendingOnlineSearch].filter(Boolean));
+        if (/(^|[?&])mode=quick/.test(window.location.hash)) window.history?.replaceState?.(null, "", "#play");
+        setup.hidden = true;
         overlay.hidden = true;
         document.body.classList.remove("quick-match-searching");
         void syncFriendPresence(!document.hidden);
@@ -36726,7 +37827,7 @@
       };
       const waitForOnlineMatch = (signal) => {
         const adapter = window.NschessOnlineMatchmaking;
-        if (typeof adapter?.findMatch !== "function") return new Promise(() => {});
+        if (typeof adapter?.findMatch !== "function") return Promise.resolve(null);
         return Promise.resolve(adapter.findMatch({ ...getQueueOptions(), signal }))
           .then((match) => ({ match: match || null }));
       };
@@ -36750,7 +37851,7 @@
         await new Promise((resolve) => window.setTimeout(resolve, 420));
         if (token !== state.token) return;
         if (/(^|[?&])mode=quick/.test(window.location.hash)) window.history?.replaceState?.(null, "", "#play");
-        closeSearch({ restoreFocus: false });
+        await closeSearch({ restoreFocus: false });
         await initializeDeferredFeature("play");
         if (token !== state.token - 1) return;
         syncAiSettings(options);
@@ -36781,7 +37882,11 @@
         const fallback = new Promise((resolve) => {
           state.fallbackTimer = window.setTimeout(() => resolve(null), searchTimeoutMs);
         });
-        void Promise.race([waitForOnlineMatch(state.controller.signal), fallback]).then(async (result) => {
+      const onlineSearchPromise = waitForOnlineMatch(state.controller.signal);
+      state.onlineSearchPromise = onlineSearchPromise;
+      const searchPromise = Promise.race([onlineSearchPromise, fallback]);
+      state.searchPromise = searchPromise;
+      void searchPromise.then(async (result) => {
           if (token !== state.token) return;
           window.clearInterval(state.ticker);
           state.ticker = 0;
@@ -36793,7 +37898,7 @@
             status.textContent = "Opponent found. Starting your online game…";
             try {
               if (await startOnlineMatch(result.match)) {
-                closeSearch({ restoreFocus: false });
+                await closeSearch({ restoreFocus: false });
                 return;
               }
               status.textContent = "The matched game could not be started. Cancel and try again.";
@@ -36813,6 +37918,9 @@
           state.ticker = 0;
           status.textContent = error?.message || "Online matchmaking is temporarily unavailable. Cancel and try again.";
           cancel?.focus({ preventScroll: true });
+        }).finally(() => {
+          if (state.searchPromise === searchPromise) state.searchPromise = null;
+          if (state.onlineSearchPromise === onlineSearchPromise) state.onlineSearchPromise = null;
         });
       };
 
@@ -36826,9 +37934,20 @@
         setup.hidden = false;
         timeControl.focus({ preventScroll: true });
       };
+      const openSetupFromHash = () => {
+        if (!/(^|[?&])mode=quick/.test(window.location.hash) || !setup.hidden || !overlay.hidden) return;
+        window.requestAnimationFrame(() => {
+          if (/(^|[?&])mode=quick/.test(window.location.hash) && setup.hidden && overlay.hidden) openSetup(null);
+        });
+      };
+      window.addEventListener("hashchange", openSetupFromHash);
 
       setupForm.addEventListener("submit", (event) => {
         event.preventDefault();
+        // closeSetup() hides the form before the first search is dispatched.
+        // A stale/replayed submit event must not reopen the queue or create a
+        // second server ticket during cancellation/reinitialization.
+        if (setup.hidden) return;
         setupForm.querySelector(".quick-match-auth-notice")?.remove();
         if (!canUseOnlineQuickMatch()) {
           showAuthRequired();
@@ -36846,11 +37965,11 @@
       });
       setupCancel?.addEventListener("click", () => closeSetup());
       setupStop?.addEventListener("click", () => closeSetup());
-      cancel?.addEventListener("click", () => closeSearch());
-      stop?.addEventListener("click", () => closeSearch());
-      change?.addEventListener("click", () => {
+      cancel?.addEventListener("click", () => { void closeSearch(); });
+      stop?.addEventListener("click", () => { void closeSearch(); });
+      change?.addEventListener("click", async () => {
         const trigger = state.returnFocus;
-        closeSearch({ restoreFocus: false });
+        await closeSearch({ restoreFocus: false });
         openSetup(trigger);
       });
       setup.addEventListener("click", (event) => { if (event.target === setup) closeSetup(); });
@@ -36859,7 +37978,7 @@
         const activeDialog = !overlay.hidden ? overlay : !setup.hidden ? setup : null;
         if (activeDialog && trapDialogFocus(event, activeDialog)) return;
         if (event.key !== "Escape") return;
-        if (!overlay.hidden) closeSearch();
+        if (!overlay.hidden) void closeSearch();
         else if (!setup.hidden) closeSetup();
       });
       document.addEventListener("click", (event) => {
@@ -36872,7 +37991,7 @@
         }
         window.requestAnimationFrame(() => openSetup(trigger));
       }, true);
-      if (/(^|[?&])mode=quick/.test(window.location.hash)) window.requestAnimationFrame(() => openSetup(null));
+      openSetupFromHash();
     }
 
     applyStartupTheme();
@@ -36888,13 +38007,17 @@
       if (oauthReturnParams.has("error")) location.hash = "#login";
     }
     primeHomeRankings();
-    void setupSupabaseAuthUi();
+    // Home can paint useful guest content without waiting for Supabase. The
+    // Login/Profile route still initializes auth immediately when entered.
+    scheduleBackgroundTask(() => {
+      void setupSupabaseAuthUi();
+    }, 450, "startup-auth-hydration");
     // The study is homepage content. Mount it eagerly so a delayed optional
     // route manifest or an offline route-module fetch cannot leave the board
     // empty while the rest of the home dashboard is already visible.
     setupFeaturedGameStudy();
     setupSiteSearch();
-    setupSiteNotifications();
+    setupSiteNotifications({ deferRemote: true });
     window.requestAnimationFrame(() => {
       setupVisualEntrances();
       setupPerformanceOptimizations();

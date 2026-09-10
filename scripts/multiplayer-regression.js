@@ -13,6 +13,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const hardeningMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260819_release_candidate_security_hardening.sql"), "utf8");
+const matchmakingMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260814_intelligent_quick_match.sql"), "utf8");
 
 const boardMove = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 
@@ -311,11 +312,54 @@ async function run() {
   assert.match(e2eSource, /function resetLiveE2eAccountBFixture\(\)/);
   assert.match(e2eSource, /provision-e2e-account\.cjs.*fixture-only/);
   assert.match(e2eSource, /secondary-live-fixture/);
+  assert.match(e2eSource, /async function runLiveMatchmakingE2E\(/);
+  assert.match(e2eSource, /function expectedNameStyleForE2eAccount\(label, accountRole = ""\)/);
+  assert.match(e2eSource, /"matchmaking-secondary"[\s\S]{0,180}accountRole: "secondary"/);
+  assert.match(e2eSource, /E2E_SECOND_EXPECTED_NAME_STYLE/);
+  assert.match(e2eSource, /function requireLiveE2EAdminCredential\(\)/);
+  assert.match(e2eSource, /Live matchmaking E2E is blocked before browser\/database work/);
+  assert.match(e2eSource, /real Quick Match queue paired two accounts into one server-authoritative game/);
+  assert.match(e2eSource, /Quick Match refresh recovery restored the active game/);
+  assert.match(e2eSource, /Quick Match Game Over opened the existing Review workspace/);
+  assert.match(e2eSource, /matchmakingOnly/);
+  assert.doesNotMatch(e2eSource, /skip\("browser: two-account live/);
+  assert.match(fs.readFileSync(path.join(root, "package.json"), "utf8"), /test:matchmaking-live/);
+  const packageSource = fs.readFileSync(path.join(root, "package.json"), "utf8");
+  const environmentGate = fs.readFileSync(path.join(root, "scripts", "test-environment.cjs"), "utf8");
+  const environmentDocs = fs.readFileSync(path.join(root, "docs", "TEST-ENVIRONMENT.md"), "utf8");
+  const verifyWorkflow = fs.readFileSync(path.join(root, ".github", "workflows", "verify.yml"), "utf8");
+  assert.match(packageSource, /"test:environment"\s*:/);
+  assert.match(packageSource, /"test:matchmaking-live"\s*:\s*"npm run test:environment &&/);
+  assert.match(environmentGate, /BLOCKED\/ENVIRONMENT/);
+  assert.match(environmentGate, /E2E_REALTIME_ENABLED/);
+  assert.match(environmentGate, /generatedPrimary/);
+  assert.match(environmentGate, /runProvisioning/);
+  assert.match(environmentDocs, /npm run test:environment/);
+  assert.match(environmentDocs, /production fixtures are forbidden|production.*forbidden/i);
+  assert.match(verifyWorkflow, /NSCHESS_SUPABASE_SECRET_KEY/);
+  assert.match(verifyWorkflow, /npm run test:environment/);
+  assert.match(verifyWorkflow, /npm run test:matchmaking-live/);
+  const provisioningDocs = fs.readFileSync(path.join(root, "docs", "e2e-account-provisioning.md"), "utf8");
+  assert.match(provisioningDocs, /npm\.cmd run test:matchmaking-live/);
+  assert.match(provisioningDocs, /SUPABASE_SECRET_KEY/);
   assert.match(e2eSource, /accountBFixture\.profile\.xp === 840/);
   assert.match(e2eSource, /accountBFixture\.profile\.coins === 1_000_000_000/);
   const fixtureSource = fs.readFileSync(path.join(root, "scripts", "provision-e2e-account.cjs"), "utf8");
+  assert.match(fixtureSource, /const environmentCheck = process\.argv\.includes\("--environment-check"\)/);
+  assert.match(fixtureSource, /refusing to continue because fixture isolation is not proven/);
   assert.match(fixtureSource, /const fixtureOnly = process\.argv\.includes\("--fixture-only"\)/);
   assert.match(fixtureSource, /fixture-only reset did not return the canonical Account B profile baseline/);
+  assert.match(fixtureSource, /const E2E_PRIMARY_MATCHMAKING_RATING = 1450/);
+  assert.match(fixtureSource, /const E2E_SECONDARY_MATCHMAKING_RATING = 1520/);
+  assert.match(fixtureSource, /fixture-only reset did not set the canonical Account A matchmaking rating/);
+  assert.match(fixtureSource, /accountARating: E2E_PRIMARY_MATCHMAKING_RATING/);
+  assert.match(e2eSource, /both disposable matchmaking fixtures use distinct compatible authoritative ratings/);
+  assert.match(e2eSource, /accountAFixture\.rating === 1450 && accountBFixture\.rating === 1520/);
+  assert.match(e2eSource, /pageA\.locator\("#quickMatchSetupForm button\[type=submit\]"\)\.click\(\),[\s\S]{0,220}pageB\.locator\("#quickMatchSetupForm button\[type=submit\]"\)\.click\(\)/);
+  assert.match(e2eSource, /second Quick Match attempt created two distinct real queue tickets/);
+  assert.match(e2eSource, /request\.method\(\) !== "POST"/);
+  assert.match(e2eSource, /rpcCalls\.a\.length === 2 && rpcCalls\.b\.length === 1/);
+  assert.match(matchmakingMigration, /abs\(candidate\.rating - self_row\.rating\) <= rating_band/);
 
   // Friend Challenge route setup can run before Supabase session hydration.
   // The invite must queue, replay after authentication, and remain idempotent

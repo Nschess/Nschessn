@@ -985,10 +985,13 @@
     }
 
     .piece-svg {
-      width: 88%;
-      height: 88%;
-      max-width: 5.05rem;
-      max-height: 5.05rem;
+      /* Nschessn Focus-fit: let the artwork follow the square at every
+         board size. The old 5.05rem ceiling made pieces stop growing on
+         large boards, leaving the position visually underweighted. */
+      width: 94%;
+      height: 94%;
+      max-width: none;
+      max-height: none;
       display: block;
       margin: auto;
       pointer-events: none;
@@ -5756,6 +5759,78 @@
       transition: transform 180ms ease, box-shadow 180ms ease;
     }
 
+    /* Promotion is a board decision, not a browser dialog.  The picker is
+       mounted in the fullscreen top layer when needed (otherwise on body)
+       so the board's clipped paint surface cannot cut it off at an edge. */
+    .promotion-picker {
+      position: fixed;
+      z-index: 2147483001;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+      width: min(148px, calc(100vw - 16px));
+      padding: 7px;
+      box-sizing: border-box;
+      border: 1px solid color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 54%, var(--cq-border, rgba(148, 163, 184, .22)));
+      border-radius: 14px;
+      background:
+        linear-gradient(145deg, color-mix(in srgb, var(--cq-surface-elevated, #17243b) 96%, #020617), color-mix(in srgb, var(--cq-surface-panel, #101a2d) 94%, #020617));
+      box-shadow: 0 18px 40px rgba(2, 8, 18, .42), 0 0 0 1px rgba(255, 255, 255, .06), 0 0 24px color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 20%, transparent);
+      backdrop-filter: blur(16px);
+      isolation: isolate;
+      touch-action: manipulation;
+    }
+
+    .promotion-picker-title {
+      grid-column: 1 / -1;
+      padding: 2px 4px 3px;
+      color: var(--cq-text-muted, #aab7ce);
+      font-size: .58rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      line-height: 1.2;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .promotion-picker-option {
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      min-height: 48px;
+      aspect-ratio: 1;
+      padding: 3px;
+      border: 1px solid color-mix(in srgb, var(--cq-border, rgba(148, 163, 184, .22)) 90%, transparent);
+      border-radius: 10px;
+      color: var(--cq-text-primary, #f5f7ff);
+      background: color-mix(in srgb, var(--cq-surface-input, #0b1325) 88%, transparent);
+      cursor: pointer;
+      font: inherit;
+      transition: border-color 120ms ease, background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    .promotion-picker-option:hover,
+    .promotion-picker-option:focus-visible {
+      border-color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 78%, white 10%);
+      background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 28%, var(--cq-surface-input, #0b1325));
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 26%, transparent), 0 8px 18px rgba(2, 8, 18, .24);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .promotion-picker-option:active { transform: translateY(0); }
+    .promotion-picker-option:disabled { cursor: default; opacity: .42; }
+    .promotion-picker-option > :is(.piece-svg, .piece-symbol) { width: 88%; height: 88%; }
+    .promotion-picker[data-placement="left"] { transform: translateX(0); }
+    .promotion-picker[data-placement="right"] { transform: translateX(0); }
+    .promotion-picker[data-placement="above"] { transform: translateY(0); }
+    .promotion-picker[data-placement="below"] { transform: translateY(0); }
+
+    @media (max-width: 420px) {
+      .promotion-picker { width: min(132px, calc(100vw - 12px)); gap: 4px; padding: 6px; }
+      .promotion-picker-option { min-height: 44px; border-radius: 8px; }
+    }
+
     .puzzle-board-wrap:hover,
     .puzzle-board-wrap:focus-within {
       transform: translateY(-2px);
@@ -8328,6 +8403,7 @@
       padding: 0;
       cursor: pointer;
       touch-action: manipulation;
+      -webkit-user-drag: none;
       transition: background-color var(--move-speed) ease, box-shadow var(--move-speed) ease;
     }
 
@@ -28280,6 +28356,7 @@
         "stats"
         "ratings"
         "progress"
+        "insights"
         "collection"
         "activity"
         "achievements";
@@ -28295,6 +28372,12 @@
     #login .login-player-profile .profile-stat-section { grid-area: stats; }
     #login .login-player-profile .profile-performance { grid-area: ratings; }
     #login .login-player-profile .profile-progress-section { grid-area: progress; }
+    #login .login-player-profile .profile-progress-insights { grid-area: auto; grid-column: 1 / -1; display: grid; gap: 10px; min-width: 0; }
+    #login .login-player-profile .profile-progress-insights > :is(.home-dna-card, .home-momentum-card) { margin: 0; padding: 14px; border-radius: 15px; box-shadow: none; }
+    #login .login-player-profile .profile-progress-insights .home-dna-card { grid-template-columns: 1fr; gap: 12px; }
+    #login .login-player-profile .profile-progress-insights .home-momentum-card { grid-template-columns: 1fr; gap: 11px; }
+    #login .login-player-profile .profile-progress-insights .home-dna-card .button,
+    #login .login-player-profile .profile-progress-insights .home-momentum-card .button { justify-self: start; min-width: 0; }
     #login .login-player-profile .profile-collection { grid-area: collection; }
     #login .login-player-profile .profile-activity { grid-area: activity; }
     #login .login-player-profile .profile-achievement-section { grid-area: achievements; }
@@ -28710,9 +28793,91 @@
       #store .store-tier-signal::after { animation: none; }
     }
 
-    body.low-performance #store .store-tier-signal::after { animation: none; }
+body.low-performance #store .store-tier-signal::after { animation: none; }
 
-    @media (prefers-reduced-motion: reduce) {
+/* Account entry refresh: three clear jobs, with the local pass and secure
+   account visually separate while keeping both flows available in one route. */
+#login .login-shell {
+  grid-template-columns: minmax(300px, 1.04fr) minmax(300px, .94fr) minmax(310px, .96fr);
+  gap: clamp(14px, 1.1vw, 18px);
+}
+#login .login-card { min-height: 0; padding: clamp(20px, 2vw, 30px); gap: 13px; }
+#login .login-card h3 { max-width: 11ch; }
+#login .login-card > p:not(.eyebrow) { max-width: 34ch; font-size: .82rem; line-height: 1.5; }
+#login .login-perks { gap: 7px; }
+#login .login-perks span { min-height: 82px; padding: 10px 9px; }
+#login .login-perks small { margin-top: 5px; font-size: .64rem; line-height: 1.34; }
+#login .login-quest-list { gap: 5px; }
+#login .login-quest-list li { min-height: 34px; padding: 6px 8px; font-size: .66rem; }
+#login .login-quest-list b { width: 22px; height: 22px; }
+#login .login-progress-preview { gap: 6px; padding: 10px; }
+#login .login-progress-preview p { font-size: .64rem; }
+#login .login-card-actions { gap: 7px; }
+#login .login-card-actions .button { min-height: 40px; font-size: .69rem; }
+
+#login .login-pass-hero {
+  min-height: 94px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 0 100%, color-mix(in srgb, var(--cq-accent-tertiary) 18%, transparent), transparent 44%),
+    linear-gradient(145deg, color-mix(in srgb, var(--cq-surface-elevated) 94%, #020617), var(--cq-surface));
+}
+#login .login-pass-title p { max-width: 24ch; }
+#login .login-pass-grid > .login-pass-panel { padding: 12px; }
+#login .login-player-profile { max-height: 372px; }
+#login .login-player-profile .profile-detail-summary { min-height: 38px; }
+#login .login-form { gap: 9px; padding: 11px; }
+#login .login-form label { font-size: .69rem; }
+#login .login-form :is(input, select) { min-height: 44px; font-size: .74rem; }
+#login .login-actions .button { min-height: 44px; font-size: .69rem; }
+
+#login .login-pass-grid > .login-pass-panel:last-child {
+  border-color: color-mix(in srgb, var(--cq-accent-primary) 32%, var(--cq-border));
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--cq-accent-primary) 15%, transparent), transparent 36%),
+    var(--cq-card-surface);
+}
+#login .login-pass-grid > .login-pass-panel:last-child > h4 { color: var(--cq-accent-tertiary); }
+#login .auth-panel { gap: 10px; }
+#login .auth-panel h3 { max-width: 16ch; }
+#login .auth-panel > div > p:last-child { max-width: 34ch; font-size: .7rem; }
+#login .auth-field small { display: none; }
+#login .auth-field { gap: 4px; }
+#login .auth-form { gap: 8px; }
+#login .auth-form > .button:not(.secondary),
+#login .auth-oauth-button { min-height: 40px; }
+#login .auth-security-note {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--cq-border);
+  border-radius: 12px;
+  color: var(--cq-text-subtle);
+  background: var(--cq-surface-input);
+  font-size: .63rem;
+  line-height: 1.35;
+}
+#login .auth-note { font-size: .63rem; }
+
+@media (max-width: 1250px) and (min-width: 761px) {
+  #login .login-shell { grid-template-columns: minmax(280px, .9fr) minmax(0, 1.1fr); }
+  #login .login-card { grid-column: 1; grid-row: 1 / span 2; }
+  #login .login-pass-hero { grid-column: 2; grid-row: 1; }
+  #login .login-pass-grid > .login-pass-panel:first-child { grid-column: 2; grid-row: 2; }
+  #login .login-pass-grid > .login-pass-panel:last-child { grid-column: 1 / -1; grid-row: 3; }
+}
+
+@media (max-width: 760px) {
+  #login .login-shell { grid-template-columns: 1fr; }
+  #login .login-card { min-height: 0; }
+  #login .login-card h3 { max-width: 12ch; }
+  #login .login-pass-hero,
+  #login .login-pass-grid > .login-pass-panel:first-child,
+  #login .login-pass-grid > .login-pass-panel:last-child { grid-column: auto; grid-row: auto; }
+  #login .login-player-profile { max-height: none; }
+  #login .auth-panel h3 { max-width: 20ch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
       #login :is(.login-card, .login-pass-hero, .login-pass-grid > .login-pass-panel) { transition: none; }
       #login :is(.login-card, .login-pass-hero, .login-pass-grid > .login-pass-panel):hover { transform: none; }
     }
@@ -38667,8 +38832,8 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
 }
 
 /* Shared interactive-board workspace. The chess renderers remain route-owned;
-   this layer owns only the common physical board size, controls, resize edge,
-   and native fullscreen host. */
+   this layer owns only the common physical board size, the direct corner
+   gesture, and native fullscreen geometry. */
 .interactive-board-sizing-stage {
   --interactive-board-requested-size: 720px;
   --interactive-board-size: 720px;
@@ -38708,9 +38873,9 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
 }
 
 .interactive-board-stage-tools {
+  display: none !important;
   position: relative;
   z-index: 5;
-  display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
@@ -38760,25 +38925,38 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
 
 .interactive-board-resize-handle {
   position: absolute;
-  right: 7px;
-  bottom: 7px;
+  top: 24px;
+  right: -6px;
+  bottom: 24px;
   z-index: 7;
-  inline-size: 28px;
-  block-size: 28px;
+  inline-size: 14px;
+  block-size: auto;
   padding: 0;
   border: 0;
-  border-radius: 7px;
-  background: linear-gradient(135deg, transparent 0 34%, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 78%, white) 35% 42%, transparent 43% 55%, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 78%, white) 56% 63%, transparent 64%);
-  cursor: nwse-resize;
+  border-radius: 999px;
+  background: transparent;
+  cursor: ew-resize;
   touch-action: none;
-  opacity: .8;
+  opacity: 0;
+  transition: opacity 140ms ease;
 }
 
-.interactive-board-resize-handle:hover,
+.interactive-board-resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 14px 5px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 80%, white), transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 44%, transparent);
+}
+
+.interactive-board-sizing-stage:hover > .interactive-board-resize-handle,
 .interactive-board-resize-handle:focus-visible {
-  outline: 2px solid var(--cq-accent-secondary, #7650ed);
-  outline-offset: 2px;
-  opacity: 1;
+  opacity: .72;
+}
+
+.interactive-board-resize-handle[data-board-fullscreen-active="true"] {
+  cursor: zoom-out;
 }
 
 #play .play-extra-actions-menu #flipGame { display: none !important; }
@@ -38836,6 +39014,12 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   .interactive-board-resize-handle {
     transition: none !important;
   }
+}
+
+/* Home discovery belongs to the Home route; keep it out of every site panel
+   so route pages retain their own layout and responsive gutters. */
+body.site-tab-mode #top > .home-discovery-section {
+  display: none !important;
 }
 
 /* Featured Game Study: a board-first surface for the verified Opera Game. */
@@ -39003,7 +39187,7 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
 .featured-study-square.is-last { box-shadow: inset 0 0 0 999px rgba(92, 255, 224, .2); }
 .featured-study-square.is-last::after { position: absolute; inset: 8%; border: 1px solid rgba(194, 255, 245, .62); border-radius: 5px; content: ""; pointer-events: none; }
 .featured-study-square .piece-svg,
-.featured-study-square .piece-symbol { position: relative; z-index: 1; width: 88%; height: 88%; object-fit: contain; }
+.featured-study-square .piece-symbol { position: relative; z-index: 1; width: 94%; height: 94%; object-fit: contain; }
 
 .featured-study-board-footer {
   padding: 14px 5px 2px;
@@ -39175,3 +39359,3580 @@ body.is-board-route { padding-bottom: 0; }
 /* Keep the Home command deck focused: the session card and hero action are
    the continuation paths; the duplicate fourth quick card is not. */
 :is(body:not(.theme-light), body.theme-light) #top .hero-dashboard > #homeContinueAction { display: none; }
+
+/* Design pass: quiet premium hierarchy.
+   Presentation-only cascade edge for shared surfaces. Keep board variables,
+   route layout, and interaction bindings outside this layer. */
+:root {
+  --cq-design-border: rgba(174, 194, 226, 0.18);
+  --cq-design-border-strong: rgba(116, 216, 255, 0.42);
+  --cq-design-surface: linear-gradient(145deg, rgba(22, 35, 58, 0.94), rgba(8, 16, 30, 0.92));
+  --cq-design-surface-soft: rgba(13, 25, 44, 0.72);
+  --cq-design-shadow: 0 18px 40px rgba(2, 8, 18, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --cq-design-shadow-hover: 0 24px 48px rgba(2, 8, 18, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --cq-design-radius: 18px;
+}
+
+body.theme-light {
+  --cq-design-border: rgba(58, 75, 124, 0.18);
+  --cq-design-border-strong: rgba(94, 78, 212, 0.42);
+  --cq-design-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(237, 242, 252, 0.94));
+  --cq-design-surface-soft: rgba(246, 249, 255, 0.82);
+  --cq-design-shadow: 0 16px 34px rgba(51, 68, 117, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --cq-design-shadow-hover: 0 22px 44px rgba(51, 68, 117, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* The header reads as one navigation system instead of three unrelated pill
+   groups, while the account chip remains a clear identity anchor. */
+:is(body:not(.theme-light), body.theme-light) .site-header {
+  border-bottom-color: var(--cq-design-border);
+  background: color-mix(in srgb, var(--cq-surface-glass-strong) 88%, transparent);
+  box-shadow: 0 10px 26px rgba(2, 8, 18, 0.16);
+}
+
+:is(body:not(.theme-light), body.theme-light) .site-header .nav {
+  gap: clamp(10px, 1.6vw, 22px);
+  padding-block: 7px;
+}
+
+:is(body:not(.theme-light), body.theme-light) .site-header .brand {
+  gap: 11px;
+  letter-spacing: -0.025em;
+}
+
+:is(body:not(.theme-light), body.theme-light) .site-header .brand-mark {
+  border-color: var(--cq-design-border-strong);
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(2, 8, 18, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+:is(body:not(.theme-light), body.theme-light) .site-header .nav-links {
+  gap: 3px;
+  padding: 4px;
+  border-radius: 13px;
+  background: var(--cq-design-surface-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+:is(body:not(.theme-light), body.theme-light) .site-header .nav-links :is(a, .nav-group-label) {
+  min-height: 35px;
+  border-color: transparent;
+  border-radius: 9px;
+  font-size: 0.72rem;
+  letter-spacing: 0.055em;
+}
+
+:is(body:not(.theme-light), body.theme-light) .site-header .nav-links :is(a.is-active-tab, a[aria-current="page"], .nav-group.is-active-group > .nav-group-label) {
+  border-color: var(--cq-design-border-strong);
+  box-shadow: 0 6px 16px rgba(92, 70, 200, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+:is(body:not(.theme-light), body.theme-light) .site-header .player-flex-chip {
+  min-width: min(222px, 23vw);
+  border-radius: 14px;
+  box-shadow: var(--cq-design-shadow);
+}
+
+/* Route headings get a stronger reading order: label, title, supporting copy. */
+:is(body:not(.theme-light), body.theme-light) main .section-head {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--cq-design-border);
+  background: var(--cq-design-surface);
+  box-shadow: var(--cq-design-shadow);
+}
+
+:is(body:not(.theme-light), body.theme-light) main .section-head::after {
+  content: "";
+  position: absolute;
+  right: 9%;
+  bottom: 0;
+  left: 9%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cq-design-border-strong), transparent);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+:is(body:not(.theme-light), body.theme-light) main .section-head :is(h2, h3) {
+  max-width: 18ch;
+  color: var(--cq-text-primary);
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+:is(body:not(.theme-light), body.theme-light) main .section-head .section-kicker {
+  margin-bottom: 10px;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+/* Shared content cards: less visual noise, more depth on interaction. */
+:is(body:not(.theme-light), body.theme-light) :where(
+  .lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+  .notation-card, .book-card, .video-card, .video-path-card, .store-card,
+  .store-showcase-card, .leaderboard-card, .academy-card, .friend-card,
+  .friend-result-card, .home-feature-card, .home-summary-card, .home-lower-card,
+  .home-quick-card, .home-sidebar-tile, .match-player-card, .next-step-card,
+  .real-puzzle-card, .settings-card, .story-mode-card, .tournament-card
+) {
+  border-color: var(--cq-design-border);
+  border-radius: var(--cq-design-radius);
+  background: var(--cq-design-surface);
+  box-shadow: var(--cq-design-shadow);
+}
+
+:is(body:not(.theme-light), body.theme-light) :where(
+  .lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+  .notation-card, .book-card, .video-card, .video-path-card, .store-card,
+  .store-showcase-card, .leaderboard-card, .academy-card, .friend-card,
+  .friend-result-card, .home-feature-card, .home-summary-card, .home-lower-card,
+  .home-quick-card, .home-sidebar-tile, .match-player-card, .next-step-card,
+  .real-puzzle-card, .settings-card, .story-mode-card, .tournament-card
+) :is(h3, h4, strong) {
+  letter-spacing: -0.018em;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(body:not(.theme-light), body.theme-light) :where(
+    .lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+    .notation-card, .book-card, .video-card, .video-path-card, .store-card,
+    .store-showcase-card, .leaderboard-card, .academy-card, .friend-card,
+    .friend-result-card, .home-feature-card, .home-summary-card, .home-lower-card,
+    .home-quick-card, .home-sidebar-tile, .match-player-card, .next-step-card,
+    .real-puzzle-card, .settings-card, .story-mode-card, .tournament-card
+  ):hover {
+    border-color: var(--cq-design-border-strong);
+    box-shadow: var(--cq-design-shadow-hover);
+  }
+}
+
+/* Home: make the board the focal object and reduce the dashboard's card soup. */
+:is(body:not(.theme-light), body.theme-light) #top .hero-command-center {
+  border-bottom: 1px solid var(--cq-design-border);
+  background:
+    radial-gradient(circle at 52% 43%, rgba(34, 197, 94, 0.16), transparent 25rem),
+    radial-gradient(circle at 8% 12%, rgba(250, 204, 21, 0.08), transparent 18rem),
+    linear-gradient(135deg, #07111f 0%, #0d1b2e 52%, #07101c 100%);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top .hero-command-center .hero-copy h1 {
+  max-width: 9ch;
+  letter-spacing: -0.075em;
+}
+
+:is(body:not(.theme-light), body.theme-light) #top .hero-command-center .hero-description {
+  max-width: 32ch;
+  color: color-mix(in srgb, var(--cq-text-primary) 68%, var(--cq-text-muted));
+}
+
+:is(body:not(.theme-light), body.theme-light) #top .hero-command-center .hero-dashboard {
+  gap: 10px;
+  padding: 10px;
+  border-color: var(--cq-design-border);
+  border-radius: var(--cq-design-radius);
+  background: color-mix(in srgb, var(--cq-design-surface) 72%, transparent);
+  box-shadow: var(--cq-design-shadow);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top .hero-command-center :is(.hero-quick-card, .hero-progress-card) {
+  border-color: var(--cq-design-border);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top .hero-command-center .hero-quick-card--play {
+  border-color: rgba(134, 239, 172, 0.52);
+}
+
+:is(body:not(.theme-light), body.theme-light) #top .home-feature-strip {
+  border-bottom: 1px solid var(--cq-design-border);
+  background: linear-gradient(180deg, rgba(8, 17, 31, 0.08), rgba(8, 17, 31, 0.54));
+}
+
+:is(body:not(.theme-light), body.theme-light) #top > .home-feature-strip .home-feature-card {
+  min-height: 66px;
+  border-color: var(--cq-design-border);
+  border-radius: 14px;
+  background: var(--cq-design-surface);
+  box-shadow: var(--cq-design-shadow);
+}
+
+/* Featured Study: give the lesson its own editorial frame without changing
+   the board, notation, or controls. */
+:is(body:not(.theme-light), body.theme-light) .featured-study {
+  border-top: 1px solid var(--cq-design-border);
+  background:
+    radial-gradient(circle at 12% 10%, rgba(92, 255, 224, 0.07), transparent 24rem),
+    linear-gradient(180deg, rgba(4, 12, 22, 0.34), rgba(4, 12, 22, 0.7));
+}
+
+:is(body:not(.theme-light), body.theme-light) .featured-study-stage,
+:is(body:not(.theme-light), body.theme-light) .featured-study-card {
+  border-color: var(--cq-design-border);
+  border-radius: var(--cq-design-radius);
+  box-shadow: var(--cq-design-shadow);
+}
+
+:is(body:not(.theme-light), body.theme-light) .featured-study-card h3 {
+  max-width: 13ch;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+/* Mobile: preserve touch targets while restoring breathing room and a clear
+   single-column reading rhythm. */
+@media (max-width: 760px) {
+  :is(body:not(.theme-light), body.theme-light) .site-header .nav {
+    gap: 8px;
+    padding-block: 5px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) .site-header .player-flex-chip {
+    min-width: 0;
+    max-width: min(47vw, 220px);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) main .section-head {
+    gap: 14px;
+    margin-bottom: 18px;
+    padding: 16px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) main .section-head :is(h2, h3) {
+    max-width: 14ch;
+    font-size: clamp(1.75rem, 8vw, 2.5rem);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #top .hero-command-center .hero-dashboard {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #top > .home-feature-strip .home-feature-card {
+    min-height: 62px;
+    padding: 10px;
+    border-radius: 13px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) :where(
+    .lesson-card, .adventure-card, .mission-card, .rule-item, .opening-card,
+    .notation-card, .book-card, .video-card, .video-path-card, .store-card,
+    .store-showcase-card, .leaderboard-card, .academy-card, .friend-card,
+    .friend-result-card, .home-feature-card, .home-summary-card, .home-lower-card,
+    .home-quick-card, .home-sidebar-tile, .match-player-card, .next-step-card,
+    .real-puzzle-card, .settings-card, .story-mode-card, .tournament-card,
+    .featured-study-stage, .featured-study-card
+  ) {
+    border-radius: 15px;
+  }
+}
+
+@media (max-width: 420px) {
+  :is(body:not(.theme-light), body.theme-light) .site-header .player-flex-chip {
+    max-width: 43vw;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #top .hero-command-center .hero-copy h1 {
+    max-width: 8.5ch;
+    font-size: clamp(2.8rem, 14vw, 4.2rem);
+  }
+}
+
+/* Visual QA: make recoverable route failures read as a calm system notice
+   instead of an unexplained red line floating above the page. */
+:is(body:not(.theme-light), body.theme-light) .route-status {
+  border: 1px solid color-mix(in srgb, var(--cq-danger, #fb7185) 28%, var(--cq-border));
+  border-radius: 14px;
+  background-color: var(--cq-design-surface-soft);
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--cq-danger, #fb7185) 9%, transparent), transparent 62%);
+  box-shadow: 0 12px 28px rgba(2, 8, 18, 0.14), var(--cq-inset-highlight);
+}
+
+:is(body:not(.theme-light), body.theme-light) .route-status::before {
+  content: "";
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cq-danger, #fb7185);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cq-danger, #fb7185) 12%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) .route-status-message {
+  color: color-mix(in srgb, var(--cq-text-primary) 78%, var(--cq-danger, #fb7185));
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+:is(body:not(.theme-light), body.theme-light) .route-status .button {
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+}
+
+/* Review has a deliberate empty/loading shell until a saved game is opened;
+   keep that state compact so it does not look like a broken blank page. */
+:is(body:not(.theme-light), body.theme-light) #gameReview:not(.is-review-page) {
+  min-height: 0;
+  padding-block: 28px 42px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview:not(.is-review-page) .route-status {
+  margin-block: 0;
+}
+
+@media (max-width: 760px) {
+  /* Three compact settings groups scan better than a six-row tower on touch
+     screens; the tighter breakpoint below protects very narrow phones. */
+  :is(body:not(.theme-light), body.theme-light) #settings .settings-sidebar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #settings .settings-tab {
+    min-height: 42px;
+    padding-inline: 6px;
+    font-size: 0.72rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* Books keep two useful summary metrics together before the final legal
+     source metric spans the row. */
+  :is(body:not(.theme-light), body.theme-light) #books .book-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #books .book-stat {
+    min-height: 76px;
+    padding: 12px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #books .book-stat:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  :is(body:not(.theme-light), body.theme-light) .route-status {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) .route-status .button {
+    margin-left: 16px;
+  }
+}
+
+/* Home lower command-center pass: compact continuation, progress, focus, and discovery. */
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-panel {
+  gap: 11px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-panel .home-card-heading {
+  align-items: center;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-summary {
+  color: #91a8c7;
+  font-size: .63rem;
+  letter-spacing: .04em;
+  text-align: right;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-stats .home-command-stat {
+  min-width: 0;
+  padding: 9px 8px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-stats .home-command-stat strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-stats .home-command-stat em {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: #8197b4;
+  font-size: .54rem;
+  font-style: normal;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-goal-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-goal-line a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 4px 8px;
+  border: 1px solid rgba(117, 160, 210, .18);
+  border-radius: 7px;
+  color: #a7bbd6;
+  font-size: .58rem;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-goal-line a:hover,
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-goal-line a:focus-visible {
+  border-color: rgba(112, 224, 239, .48);
+  color: #e8fbff;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-legacy {
+  display: none !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-section {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(106, 151, 204, .23);
+  border-radius: 17px;
+  background: linear-gradient(135deg, rgba(16, 36, 64, .78), rgba(8, 20, 39, .88));
+  box-shadow: 0 16px 34px rgba(2, 10, 22, .16);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-section-heading h2,
+body:not(.site-tab-mode) #top > .home-discovery-section .home-section-heading h2 {
+  margin: 4px 0 0;
+  color: #f1f6ff;
+  font-size: 1rem;
+  letter-spacing: -.02em;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-section-heading > a,
+body:not(.site-tab-mode) #top > .home-discovery-section .home-section-heading > span,
+body:not(.site-tab-mode) #top > .home-discovery-section .home-section-heading > a {
+  color: #8edfe4;
+  font-size: .63rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-strip {
+  display: grid;
+  grid-template-columns: minmax(230px, .64fr) minmax(0, 1.36fr);
+  gap: 9px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-strip .home-continue-card {
+  min-height: 62px;
+  margin: 0;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-history {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(190px, 1fr);
+  gap: 8px;
+  min-width: 0;
+  overflow: auto hidden;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-history .home-lower-game-row,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-empty {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 62px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(117, 160, 210, .19);
+  border-radius: 11px;
+  background: rgba(9, 23, 43, .58);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-empty > span:first-child,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-history .home-lower-game-row > span:first-child {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(82, 126, 173, .18);
+  color: #b5d5ef;
+  font-size: .63rem;
+  font-weight: 800;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-empty strong,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-empty small,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-history .home-lower-game-row strong,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-history .home-lower-game-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-empty strong,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-history .home-lower-game-row strong {
+  color: #edf5ff;
+  font-size: .68rem;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-empty small,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-history .home-lower-game-row small {
+  margin-top: 3px;
+  color: #8298b6;
+  font-size: .58rem;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-empty a,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-history .home-lower-game-row a {
+  color: #8edfe4;
+  font-size: .6rem;
+  font-weight: 800;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session {
+  margin-top: 14px;
+  padding: 14px 18px;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section {
+  margin-top: 0;
+  padding: 20px 0 30px;
+  border-top: 1px solid rgba(106, 151, 204, .18);
+  background: linear-gradient(180deg, rgba(5, 17, 33, .78), rgba(3, 12, 25, .96));
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-shell {
+  width: min(100% - 32px, 1180px);
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-section-heading {
+  margin-bottom: 10px;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav a {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 10px 11px;
+  border: 1px solid rgba(106, 151, 204, .23);
+  border-radius: 12px;
+  background: rgba(12, 29, 52, .68);
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav a:hover,
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav a:focus-visible {
+  border-color: rgba(112, 224, 239, .5);
+  background: rgba(20, 43, 72, .82);
+  transform: translateY(-1px);
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav a > span {
+  grid-row: 1 / -1;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(99, 222, 222, .24);
+  border-radius: 8px;
+  color: #9be8ef;
+  font-size: .8rem;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav strong {
+  overflow: hidden;
+  color: #edf5ff;
+  font-size: .68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav small {
+  overflow: hidden;
+  color: #8298b6;
+  font-size: .56rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav b {
+  grid-row: 1 / -1;
+  color: #8edfe4;
+  font-size: .8rem;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-status {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-line {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(106, 151, 204, .18);
+  border-radius: 12px;
+  background: rgba(9, 23, 43, .58);
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-line-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(112, 224, 239, .1);
+  color: #8edfe4;
+  font-size: .58rem;
+  font-weight: 800;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-line-head strong {
+  overflow: hidden;
+  color: #e7f1ff;
+  font-size: .67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-line-head a {
+  margin-left: auto;
+  color: #8edfe4;
+  font-size: .58rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content {
+  min-height: 0 !important;
+  margin: 8px 0 0;
+  color: #8da3c0;
+  font-size: .62rem;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content .home-lower-empty {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8da3c0;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content .home-lower-tournament {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+  padding: 3px 0 0;
+  border: 0;
+  background: transparent;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content.home-lower-rankings {
+  display: flex !important;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow: auto hidden;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content.home-lower-rankings li {
+  flex: 0 0 145px;
+  min-width: 0;
+  padding: 4px 0 0;
+  color: #a8bbd6;
+  font-size: .6rem;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session {
+  row-gap: 8px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-ritual-item {
+  min-height: 42px;
+  padding: 5px 7px;
+}
+
+@media (max-width: 760px) {
+  body:not(.site-tab-mode) #top > .home-command-deck .home-progress-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-continue-strip,
+  body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-status {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-nav a:last-child {
+    grid-column: 1 / -1;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-ritual {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-ritual-item {
+    min-width: 0;
+    min-height: 42px;
+    padding: 5px;
+  }
+}
+
+@media (max-width: 430px) {
+  body:not(.site-tab-mode) #top > .home-command-deck .home-continue-section {
+    padding: 14px;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-section-heading {
+    align-items: start;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-section-heading > a,
+  body:not(.site-tab-mode) #top > .home-discovery-section .home-section-heading > span {
+    display: none;
+  }
+
+  body:not(.site-tab-mode) #top > .home-discovery-section .home-discovery-shell {
+    width: min(100% - 22px, 640px);
+  }
+}
+
+/* Home command center: one useful surface for identity, action, focus, and progress. */
+body:not(.site-tab-mode) #top > .home-command-deck {
+  min-height: 0 !important;
+  padding: clamp(28px, 4vw, 54px) 0 clamp(28px, 4vw, 48px) !important;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 12%, rgba(116, 92, 255, .17), transparent 28rem),
+    radial-gradient(circle at 8% 26%, rgba(45, 218, 213, .09), transparent 24rem),
+    linear-gradient(145deg, #071323 0%, #0b1930 56%, #08121f 100%) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck::before {
+  background: linear-gradient(90deg, rgba(7, 19, 35, .97), rgba(7, 19, 35, .6) 54%, rgba(7, 19, 35, .9));
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-ambient {
+  opacity: .18;
+  pointer-events: none;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-shell {
+  position: relative;
+  z-index: 1;
+  width: min(calc(100% - var(--ns-page-gutter) * 2), var(--ns-workspace-max));
+  margin-inline: auto;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 24px;
+  padding: clamp(20px, 2.5vw, 34px);
+  border: 1px solid rgba(105, 155, 211, .2);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(15, 36, 63, .9), rgba(7, 19, 36, .78));
+  box-shadow: 0 24px 56px rgba(1, 7, 18, .24), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-intro { min-width: 0; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #6bdfe5;
+  font-size: .67rem;
+  font-weight: 900;
+  letter-spacing: .15em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-kicker .hero-welcome-dot {
+  width: 7px;
+  height: 7px;
+  margin: 0;
+  border-radius: 50%;
+  background: #65e6d8;
+  box-shadow: 0 0 12px rgba(101, 230, 216, .7);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-welcome-note {
+  max-width: 66ch;
+  margin: 9px 0 0;
+  color: #a8b9d1;
+  font-size: .84rem;
+  line-height: 1.45;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck #hero-title {
+  max-width: 26ch;
+  margin: 13px 0 0;
+  color: #f5f8ff;
+  font-size: clamp(2.15rem, 3.6vw, 3.6rem);
+  line-height: .96;
+  letter-spacing: -.055em;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-description {
+  max-width: 58ch;
+  margin: 14px 0 0;
+  color: #bfcee1;
+  font-size: clamp(.88rem, 1.1vw, 1rem);
+  line-height: 1.55;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-player {
+  display: grid;
+  grid-template-columns: auto minmax(105px, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-width: 230px;
+  padding: 12px 14px;
+  border: 1px solid rgba(110, 215, 219, .3);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgba(21, 69, 76, .28), rgba(8, 22, 40, .76));
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-avatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(151, 135, 255, .7);
+  border-radius: 12px;
+  background: linear-gradient(145deg, #667eff, #8257e9);
+  color: #fff;
+  font-weight: 950;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-player strong,
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-player small,
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-player b small {
+  display: block;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-player strong {
+  overflow: hidden;
+  color: #f4f8ff;
+  font-size: .86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-player small {
+  margin-top: 3px;
+  color: #9fb2ca;
+  font-size: .65rem;
+  font-weight: 750;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-player b {
+  color: #f2c96c;
+  font-size: .92rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-player b small {
+  color: #a9b8cf;
+  font-size: .56rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 70px;
+  padding: 11px 13px;
+  border: 1px solid rgba(111, 158, 212, .22);
+  border-radius: 15px;
+  background: rgba(12, 29, 51, .84);
+  color: #dbeafe;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action:hover,
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action:focus-visible,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card:hover,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card:focus-visible {
+  border-color: rgba(105, 223, 229, .64);
+  background: rgba(18, 47, 76, .92);
+  box-shadow: 0 12px 28px rgba(1, 7, 18, .22);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action.is-primary {
+  border-color: rgba(136, 123, 255, .72);
+  background: linear-gradient(135deg, rgba(98, 111, 255, .96), rgba(126, 79, 224, .92));
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(88, 75, 228, .25), inset 0 1px 0 rgba(255, 255, 255, .2);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-action-glyph {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(103, 224, 229, .28);
+  border-radius: 10px;
+  background: rgba(76, 208, 219, .1);
+  color: #80e7eb;
+  font-size: 1rem;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action.is-primary .home-action-glyph {
+  border-color: rgba(255, 255, 255, .25);
+  background: rgba(255, 255, 255, .13);
+  color: #fff;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action strong,
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action small,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card strong,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action strong,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card strong { color: inherit; font-size: .84rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action small,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card small { margin-top: 4px; color: #aabbd2; font-size: .64rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action.is-primary small { color: rgba(255, 255, 255, .8); }
+body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action > b,
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card > b { color: #8de6e4; font-size: 1rem; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.16fr) minmax(320px, .84fr);
+  align-items: start;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-next-move,
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-panel {
+  min-width: 0;
+  padding: clamp(18px, 2.1vw, 26px);
+  border: 1px solid rgba(105, 155, 211, .2);
+  border-radius: 19px;
+  background: linear-gradient(145deg, rgba(16, 38, 66, .9), rgba(8, 22, 40, .86));
+  box-shadow: 0 18px 40px rgba(1, 7, 18, .2), inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-next-move {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  border-color: rgba(119, 111, 255, .38);
+  background:
+    radial-gradient(circle at 94% 0%, rgba(121, 103, 255, .2), transparent 16rem),
+    linear-gradient(145deg, rgba(24, 39, 83, .94), rgba(8, 22, 40, .88));
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-card-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-card-heading h2 {
+  margin: 4px 0 0;
+  color: #f4f7ff;
+  font-size: clamp(1.2rem, 1.7vw, 1.55rem);
+  letter-spacing: -.025em;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-next-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(131, 120, 255, .52);
+  border-radius: 12px;
+  background: rgba(116, 92, 255, .16);
+  color: #c9c1ff;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-next-reason {
+  max-width: 52ch;
+  margin: 0;
+  color: #d3def0;
+  font-size: clamp(1rem, 1.45vw, 1.18rem);
+  font-weight: 760;
+  line-height: 1.45;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-next-action {
+  width: fit-content;
+  min-height: 42px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #697dff, #8959e9);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(91, 83, 235, .22);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-insight {
+  margin: 0;
+  color: #91a7c2;
+  font-size: .74rem;
+  line-height: 1.45;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-next-recommendations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(133, 164, 213, .13);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-next-recommendations:empty { display: none; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-next-recommendations .button { min-height: 31px; padding: 0 10px; border-radius: 8px; font-size: .66rem; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-panel { display: grid; align-content: start; gap: 14px; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-goal-links {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-goal-links a {
+  color: #92dfe6;
+  font-size: .63rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-stats,
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-stat,
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-metrics span {
+  min-width: 0;
+  padding: 10px 8px;
+  border: 1px solid rgba(133, 164, 213, .14);
+  border-radius: 11px;
+  background: rgba(5, 16, 31, .46);
+  text-align: center;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-stat strong,
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-metrics strong {
+  display: block;
+  overflow: hidden;
+  color: #f4f8ff;
+  font-size: .88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-stat small,
+body:not(.site-tab-mode) #top > .home-command-deck .home-progress-metrics small {
+  display: block;
+  margin-top: 4px;
+  color: #8ea3bd;
+  font-size: .59rem;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-stat.is-highlight strong { color: #f3cf72; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card {
+  min-height: 58px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: rgba(14, 35, 57, .75);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card .home-action-glyph { width: 30px; height: 30px; border-radius: 9px; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-milestone-row {
+  display: grid;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-milestone-row:has(#homeUnlocks:empty) { display: none; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-milestone-row > .home-command-kicker { font-size: .58rem; color: #8499b5; }
+body:not(.site-tab-mode) #top > .home-command-deck #homeUnlocks { display: flex; min-width: 0; overflow: auto hidden; gap: 7px; padding-bottom: 2px; scrollbar-width: thin; }
+body:not(.site-tab-mode) #top > .home-command-deck #homeUnlocks .roadmap-step { flex: 0 0 145px; min-height: 50px; padding: 7px 8px; border-radius: 9px; }
+body:not(.site-tab-mode) #top > .home-command-deck #homeUnlocks .roadmap-step strong { font-size: .67rem; }
+body:not(.site-tab-mode) #top > .home-command-deck #homeUnlocks .roadmap-step small { font-size: .55rem; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 12px 18px;
+  width: auto !important;
+  margin-top: 14px !important;
+  padding: 16px 18px !important;
+  border: 1px solid rgba(105, 155, 211, .2) !important;
+  border-radius: 17px !important;
+  background: rgba(10, 27, 48, .82) !important;
+  box-shadow: 0 14px 32px rgba(1, 7, 18, .17) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-copy { min-width: 0; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-copy strong { display: block; margin-top: 3px; color: #f2f6ff; font-size: .96rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-copy p { margin: 4px 0 0; color: #a5b8d0; font-size: .72rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-meta { display: block; margin-top: 5px; color: #7088a7; font-size: .6rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session > .button { align-self: center; min-height: 38px; border-radius: 10px; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-ritual { grid-column: 1 / -1; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-mission-dock,
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session > details:last-child { grid-column: 1 / -1; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session > details:last-child { margin-top: -3px; }
+body:not(.site-tab-mode) #top > .home-command-deck .hero-logic-cache { display: none !important; }
+
+@media (max-width: 900px) {
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-header { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-player { width: min(100%, 300px); }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 620px) {
+  body:not(.site-tab-mode) #top > .home-command-deck { padding-top: 22px !important; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-shell { width: min(calc(100% - 22px), 640px); }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-header { padding: 18px; border-radius: 17px; }
+  body:not(.site-tab-mode) #top > .home-command-deck #hero-title { font-size: clamp(2.15rem, 11vw, 3.4rem); }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-primary-actions { grid-template-columns: minmax(0, 1fr); }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action { min-height: 58px; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-grid { gap: 10px; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-next-move,
+  body:not(.site-tab-mode) #top > .home-command-deck .home-progress-panel { padding: 16px; border-radius: 16px; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session { grid-template-columns: minmax(0, 1fr) !important; padding: 14px !important; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session > .button { width: 100%; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-ritual { grid-template-columns: 1fr; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-goal-links { text-align: left; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-card-heading { gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:not(.site-tab-mode) #top > .home-command-deck .home-primary-action,
+  body:not(.site-tab-mode) #top > .home-command-deck .home-continue-card { transition: none; }
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip,
+body:not(.site-tab-mode) #top > .home-lower-dashboard {
+  display: block !important;
+}
+
+body:not(.site-tab-mode) #top > .home-lower-dashboard {
+  order: 0;
+  padding-top: 18px;
+}
+
+@media (max-width: 620px) {
+  body:not(.site-tab-mode) #top > .home-lower-dashboard { padding-top: 10px; }
+}
+
+@media (max-width: 420px) {
+  :is(body:not(.theme-light), body.theme-light) #settings .settings-sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #books .book-stats {
+    grid-template-columns: 1fr;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #books .book-stat:last-child {
+    grid-column: auto;
+  }
+}
+
+/* Home editorial hero: promote the existing verified Featured Game Study to
+   the first Home composition without changing its data, controls, or any
+   shared board surface used by Play, Review, Puzzles, or Books. */
+body:not(.site-tab-mode) #top {
+  display: flex;
+  flex-direction: column;
+}
+
+body:not(.site-tab-mode) #top > .home-hero {
+  order: -2;
+  padding-block: clamp(90px, 7vw, 118px) clamp(38px, 5vw, 74px);
+  border-top: 0;
+  border-bottom-color: rgba(92, 255, 224, 0.22);
+  background:
+    radial-gradient(circle at 18% 14%, rgba(92, 255, 224, 0.1), transparent 27rem),
+    radial-gradient(circle at 88% 72%, rgba(174, 135, 255, 0.11), transparent 31rem),
+    linear-gradient(145deg, #07131f 0%, #0a1b2b 52%, #06111d 100%);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-shell {
+  width: min(calc(100% - clamp(28px, 6vw, 96px)), 1480px);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-heading h2 {
+  max-width: 18ch;
+  font-size: clamp(1.65rem, 3.35vw, 3.55rem);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-source {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 12px;
+  flex-basis: auto;
+  width: min(100%, 420px);
+  padding: 12px 14px;
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-layout {
+  grid-template-columns: minmax(0, 1.52fr) minmax(360px, 0.82fr);
+  gap: clamp(18px, 3vw, 44px);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-stage,
+body:not(.site-tab-mode) #top > .home-hero .featured-study-card {
+  border-color: rgba(126, 182, 214, 0.3);
+  background: linear-gradient(145deg, rgba(15, 36, 53, 0.95), rgba(4, 15, 26, 0.96));
+  box-shadow: 0 28px 76px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-stage {
+  padding: clamp(14px, 2vw, 24px);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-board-frame {
+  padding: clamp(10px, 1.6vw, 20px);
+  background: radial-gradient(circle at 50% 42%, rgba(92, 255, 224, 0.14), transparent 54%), rgba(2, 11, 20, 0.86);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-board {
+  width: min(100%, 720px, calc(100svh - 240px));
+  border-width: clamp(6px, 0.65vw, 10px);
+  border-color: #245365;
+  box-shadow: 0 0 0 1px rgba(174, 236, 255, 0.24), 0 24px 52px rgba(0, 0, 0, 0.38);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-card {
+  min-height: 100%;
+  padding: clamp(20px, 2.8vw, 34px);
+}
+
+body:not(.site-tab-mode) #top > .home-hero .featured-study-card h3 {
+  max-width: 11ch;
+  margin-top: clamp(24px, 3vw, 34px);
+  font-size: clamp(1.9rem, 3.1vw, 3.15rem);
+}
+
+/* Keep the existing personalized dashboard available as the next Home
+   section, but visually subordinate to the editorial study hero. */
+body:not(.site-tab-mode) #top > .hero-command-center {
+  order: -1;
+  min-height: auto;
+  padding-block: clamp(30px, 4vw, 56px);
+}
+
+@media (max-width: 980px) {
+  body:not(.site-tab-mode) #top > .home-hero .featured-study-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  body:not(.site-tab-mode) #top > .home-hero .featured-study-source {
+    width: min(100%, 520px);
+  }
+
+  body:not(.site-tab-mode) #top > .home-hero .featured-study-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:not(.site-tab-mode) #top > .home-hero .featured-study-board {
+    width: min(100%, 720px);
+  }
+}
+
+@media (max-width: 620px) {
+  body:not(.site-tab-mode) #top > .home-hero {
+    padding-block: 90px 42px;
+  }
+
+  body:not(.site-tab-mode) #top > .home-hero .featured-study-heading h2 {
+    font-size: clamp(1.75rem, 9vw, 2.7rem);
+  }
+
+  body:not(.site-tab-mode) #top > .home-hero .featured-study-card h3 {
+    max-width: 13ch;
+    font-size: clamp(1.75rem, 9vw, 2.5rem);
+  }
+}
+
+@media (max-width: 760px) {
+  /* Keep the Home study board fully visible above the fixed mobile dock. */
+  body:not(.site-tab-mode) #top > .home-hero .featured-study-board {
+    width: min(100%, 520px, calc(100svh - 278px));
+  }
+}
+
+/* Nschess home refresh: an original, board-first welcome surface inspired by
+   the requested product direction. All selectors stay inside Home so route
+   panels and shared chess boards keep their existing visual language. */
+body:not(.site-tab-mode) #top {
+  display: flex;
+  flex-direction: column;
+  background: #07111f;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck {
+  order: -4;
+  min-height: auto;
+  padding: clamp(24px, 4vw, 52px) 0 clamp(18px, 2.4vw, 32px);
+  overflow: hidden;
+  border-bottom: 1px solid rgba(129, 156, 208, 0.22);
+  background:
+    radial-gradient(circle at 76% 42%, rgba(117, 92, 255, 0.2), transparent 26rem),
+    radial-gradient(circle at 11% 10%, rgba(45, 218, 213, 0.12), transparent 20rem),
+    linear-gradient(135deg, #071323 0%, #0b1930 56%, #08121f 100%);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck::before {
+  background:
+    linear-gradient(90deg, rgba(7, 19, 35, 0.96), rgba(7, 19, 35, 0.38) 42%, rgba(7, 19, 35, 0.08) 72%, rgba(7, 19, 35, 0.9)),
+    radial-gradient(circle at 74% 45%, rgba(119, 92, 255, 0.12), transparent 42%);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck::after {
+  opacity: 0.2;
+  background-size: 38px 38px;
+  -webkit-mask-image: radial-gradient(ellipse at 58% 44%, #000 16%, transparent 74%);
+  mask-image: radial-gradient(ellipse at 58% 44%, #000 16%, transparent 74%);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-inner {
+  width: min(calc(100% - clamp(28px, 6vw, 96px)), 1440px);
+  padding: 0;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-layout {
+  display: grid;
+  grid-template-columns: minmax(270px, 0.82fr) minmax(440px, 1.18fr);
+  grid-template-areas:
+    "copy stage"
+    "session session"
+    "dashboard dashboard";
+  gap: clamp(18px, 2.2vw, 30px);
+  align-items: center;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy {
+  grid-area: copy;
+  max-width: 520px;
+  padding: clamp(10px, 1vw, 18px) 0;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-welcome-badge {
+  color: #b9f8ed;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-welcome-dot {
+  background: #36e4d0;
+  box-shadow: 0 0 0 4px rgba(54, 228, 208, 0.12), 0 0 18px rgba(54, 228, 208, 0.7);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-welcome-note {
+  margin: 10px 0 19px;
+  color: #93a9c7;
+  font-size: 0.86rem;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 {
+  max-width: 9.5ch;
+  margin: 0;
+  color: #f7f9ff;
+  font-size: clamp(3rem, 5.8vw, 6.2rem);
+  line-height: 0.91;
+  letter-spacing: -0.065em;
+  text-wrap: balance;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 span {
+  display: block !important;
+  color: transparent;
+  background: linear-gradient(105deg, #63d9ff 8%, #8b7cff 55%, #cb75ff 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 34px rgba(128, 116, 255, 0.18);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-description {
+  max-width: 37ch;
+  margin: 22px 0 0;
+  color: #b2c0d6;
+  font-size: clamp(0.92rem, 1.15vw, 1.04rem);
+  line-height: 1.65;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-actions {
+  gap: 10px;
+  margin-top: 26px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-actions .button {
+  min-height: 46px;
+  padding-inline: 18px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-actions .button:not(.secondary) {
+  color: #f8fbff;
+  background: linear-gradient(135deg, #6577ff 0%, #9a63ed 100%);
+  box-shadow: 0 12px 28px rgba(109, 99, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-actions .button.secondary {
+  border-color: rgba(135, 159, 204, 0.26);
+  background: rgba(22, 36, 62, 0.86);
+  color: #e8efff;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-stat-row {
+  gap: 8px;
+  margin-top: 28px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-stat {
+  padding: 11px 8px;
+  border: 1px solid rgba(135, 159, 204, 0.16);
+  border-radius: 12px;
+  background: rgba(8, 18, 36, 0.56);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-stat strong { color: #f5f8ff; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-stat small { color: #8298b8; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-stat.is-highlight strong { color: #ffcf73; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-stage {
+  grid-area: stage;
+  min-height: clamp(380px, 40vw, 570px);
+  padding: clamp(12px, 2vw, 30px);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-stage-halo {
+  inset: 4% -8%;
+  background:
+    radial-gradient(ellipse at 52% 50%, rgba(128, 112, 255, 0.28), rgba(50, 215, 206, 0.07) 44%, transparent 74%),
+    radial-gradient(circle at 73% 28%, rgba(255, 206, 109, 0.12), transparent 25%);
+  filter: blur(18px);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-board.hero-board--center {
+  width: min(100%, 600px);
+  transform: rotate(-1.5deg) perspective(1200px) rotateX(3deg);
+  border: 8px solid #162442;
+  border-radius: 21px;
+  background: linear-gradient(145deg, #30446d, #0c1425 72%);
+  box-shadow: 0 34px 70px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(117, 157, 255, 0.22), 0 0 60px rgba(114, 101, 255, 0.2);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-square {
+  font-size: clamp(1.35rem, 3.7vw, 4rem);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-player-card {
+  width: min(54%, 230px);
+  padding: 9px 11px;
+  border-color: rgba(152, 170, 218, 0.22);
+  border-radius: 13px;
+  background: rgba(13, 24, 47, 0.84);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-player-card--you {
+  border-color: rgba(113, 223, 214, 0.44);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-player-avatar--you {
+  background: linear-gradient(135deg, #5fcbff, #756af5);
+  color: #f9fbff;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-player-card b { color: #ffcf73; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session {
+  grid-area: session;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) auto minmax(260px, 0.85fr);
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  padding: 15px 18px;
+  border: 1px solid rgba(126, 157, 211, 0.2);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(91, 221, 212, 0.1), transparent 26%),
+    linear-gradient(135deg, rgba(18, 34, 60, 0.9), rgba(9, 21, 40, 0.82));
+  box-shadow: 0 18px 36px rgba(2, 7, 19, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-copy { min-width: 0; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-kicker,
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-copy p,
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-meta { color: #8fa5c5; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-copy strong { color: #f2f6ff; font-size: 1rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-copy p { margin: 4px 0 0; font-size: 0.74rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-meta { display: block; margin-top: 5px; font-size: 0.62rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-card > .button { min-width: 112px; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-ritual { min-width: 0; }
+body:not(.site-tab-mode) #top > .home-command-deck .home-mission-dock,
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-reward,
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-card > details { display: none; }
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard {
+  grid-area: dashboard;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-today-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 0 1px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-today-heading span {
+  color: #61ddd4;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-today-heading h2 {
+  margin: 0 0 0 auto;
+  color: #eaf1ff;
+  font-family: inherit;
+  font-size: 0.9rem;
+  letter-spacing: -0.02em;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-today-heading p { display: none; }
+
+body:not(.site-tab-mode) #top > .home-command-deck :is(.hero-quick-card, .hero-progress-card) {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid rgba(130, 157, 206, 0.2);
+  border-radius: 15px;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.045), transparent 48%),
+    linear-gradient(145deg, rgba(19, 35, 61, 0.9), rgba(9, 20, 38, 0.86));
+  box-shadow: 0 14px 30px rgba(2, 7, 19, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-quick-card:hover,
+body:not(.site-tab-mode) #top > .home-command-deck .hero-quick-card:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(112, 230, 218, 0.62);
+  background: linear-gradient(145deg, rgba(30, 61, 78, 0.9), rgba(10, 23, 44, 0.9));
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-quick-card--play {
+  border-color: rgba(119, 116, 255, 0.52);
+  background: linear-gradient(145deg, rgba(56, 46, 112, 0.68), rgba(10, 22, 42, 0.9));
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-quick-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgba(82, 214, 210, 0.14);
+  color: #bdfaf0;
+  font-size: 0.54rem;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-quick-card--play .hero-quick-icon {
+  background: linear-gradient(145deg, #776aff, #b05ef1);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(119, 106, 255, 0.14), 0 8px 20px rgba(119, 106, 255, 0.22);
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-quick-card strong { color: #f1f5ff; font-size: 0.84rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .hero-quick-card small { color: #94a8c6; font-size: 0.68rem; }
+body:not(.site-tab-mode) #top > .home-command-deck .hero-quick-card b { color: #7bdeff; }
+body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card { grid-column: span 2; }
+body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card > div:first-child strong { color: #f1f5ff; }
+body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card > div:first-child :is(span, a) { color: #8da3c3; }
+body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-metrics .home-stat { background: rgba(7, 18, 36, 0.56); }
+
+body:not(.site-tab-mode) #top > .home-hero {
+  order: -3;
+  padding-block: clamp(34px, 5vw, 72px);
+  border-top: 0;
+  background: linear-gradient(180deg, #07111f 0%, #081827 100%);
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip {
+  order: -2;
+  display: block;
+  margin: 0;
+  padding: 18px 0 28px;
+  border-bottom: 1px solid rgba(129, 156, 208, 0.16);
+  background: linear-gradient(180deg, #07111f, #081725);
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-grid {
+  width: min(100% - clamp(28px, 6vw, 96px), 1440px);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-card {
+  min-height: 68px;
+  border-color: rgba(129, 156, 208, 0.18);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(18, 35, 60, 0.86), rgba(8, 19, 37, 0.92));
+  box-shadow: 0 12px 28px rgba(2, 8, 19, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body:not(.site-tab-mode) #top > .home-command-secondary,
+body:not(.site-tab-mode) #top > .home-lower-dashboard {
+  order: -1;
+}
+
+@media (max-width: 1180px) {
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-layout {
+    grid-template-columns: minmax(260px, 0.82fr) minmax(370px, 1.18fr);
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-today-heading { grid-column: 1 / -1; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card { grid-column: span 2; }
+  body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  body:not(.site-tab-mode) #top > .home-command-deck { padding-block: 20px 22px; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-inner { width: min(100% - 22px, 640px); }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "copy" "stage" "session" "dashboard";
+    gap: 16px;
+  }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-copy { max-width: 560px; padding: 8px 5px 0; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 { font-size: clamp(3rem, 12vw, 5.2rem); }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stage { min-height: min(92vw, 560px); }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session { grid-template-columns: minmax(0, 1fr) auto; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-session-ritual { grid-column: 1 / -1; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card { grid-column: span 2; }
+  body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-grid { width: min(100% - 22px, 640px); }
+}
+
+@media (max-width: 520px) {
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-actions .button { width: 100%; padding-inline: 10px; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stage { min-height: min(102vw, 470px); padding: 4px; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-player-card { width: min(75%, 220px); }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session { grid-template-columns: 1fr; }
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session > .button { width: 100%; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard { grid-template-columns: 1fr; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card { grid-column: auto; }
+  body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body:not(.site-tab-mode) #top > .home-hero { padding-block: 34px 46px; }
+}
+
+/* Specificity bridge for the older compact Home deck rules above. */
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-layout {
+  grid-template-areas: "copy stage" "session session" "dashboard dashboard" !important;
+  grid-template-columns: minmax(270px, 0.82fr) minmax(440px, 1.18fr) !important;
+  min-height: 0 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-copy {
+  display: block !important;
+  grid-area: copy !important;
+  grid-template-areas: none !important;
+  grid-template-columns: none !important;
+  max-width: 520px !important;
+  min-width: 0 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-stage {
+  grid-area: stage !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .home-command-session {
+  grid-area: session !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-dashboard {
+  grid-area: dashboard !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-ambient,
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-stage-halo,
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-player-card--opponent {
+  display: block !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-player-card--opponent { display: grid !important; }
+
+@media (max-width: 1180px) {
+  body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-layout {
+    grid-template-areas: "copy stage" "session session" "dashboard dashboard" !important;
+    grid-template-columns: minmax(260px, 0.82fr) minmax(370px, 1.18fr) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-layout {
+    grid-template-areas: "copy" "stage" "session" "dashboard" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Re-enable the home-only secondary actions that an older compact pass hid. */
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-progress-card,
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck #homeContinueAction {
+  display: grid !important;
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip.home-feature-strip {
+  display: block !important;
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-grid > :nth-child(n) {
+  display: grid !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-dashboard {
+  align-content: start !important;
+  align-items: start !important;
+  grid-auto-rows: min-content !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-progress-card,
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck #homeContinueAction {
+  height: auto !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-progress-card {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0 !important;
+  height: 126px !important;
+  max-height: 126px !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck #homeContinueAction {
+  align-self: start !important;
+  height: 74px !important;
+  max-height: 74px !important;
+}
+
+/* Home recovery: keep the landing page on one predictable layout contract. */
+body:not(.site-tab-mode) #top {
+  display: block !important;
+  min-height: 0 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck {
+  display: block !important;
+  min-height: 0 !important;
+  padding: clamp(78px, 8vw, 118px) 0 42px !important;
+  overflow: hidden;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-inner {
+  width: min(calc(100% - 40px), 1320px) !important;
+  margin-inline: auto !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr) !important;
+  grid-template-areas:
+    "copy stage"
+    "session session"
+    "dashboard dashboard" !important;
+  align-items: center !important;
+  gap: clamp(24px, 4vw, 64px) clamp(28px, 5vw, 86px) !important;
+  min-height: 0 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy {
+  display: block !important;
+  grid-area: copy !important;
+  width: auto !important;
+  max-width: 560px !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 {
+  max-width: 10ch !important;
+  margin: 18px 0 22px !important;
+  font-size: clamp(3.35rem, 6.2vw, 6.8rem) !important;
+  line-height: 0.9 !important;
+  letter-spacing: -0.07em !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  text-wrap: balance;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 span {
+  display: block !important;
+  white-space: normal !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-description {
+  max-width: 38rem !important;
+  font-size: clamp(0.96rem, 1.25vw, 1.12rem) !important;
+  line-height: 1.65 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-stage {
+  display: grid !important;
+  grid-area: stage !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: clamp(380px, 39vw, 610px) !important;
+  padding: clamp(18px, 2vw, 30px) !important;
+  overflow: visible !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-board {
+  width: min(100%, 600px) !important;
+  aspect-ratio: 1 !important;
+  margin-inline: auto !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-player-card--opponent {
+  display: grid !important;
+  top: auto !important;
+  right: clamp(4px, 1vw, 18px) !important;
+  bottom: clamp(8px, 2vw, 28px) !important;
+  width: min(76%, 280px) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session {
+  grid-area: session !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard {
+  grid-area: dashboard !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+/* The previous study treatment is retired globally; Home uses the live board preview above. */
+#featuredGameStudy,
+.featured-study {
+  display: none !important;
+}
+
+@media (max-width: 860px) {
+  body:not(.site-tab-mode) #top > .home-command-deck {
+    padding-top: 72px !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas:
+      "copy"
+      "stage"
+      "session"
+      "dashboard" !important;
+    gap: 26px !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-copy {
+    max-width: 620px !important;
+    margin-inline: auto !important;
+    text-align: center;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 {
+    max-width: 12ch !important;
+    margin-inline: auto !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-description,
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-actions,
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stat-row,
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-rank {
+    margin-inline: auto;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stage {
+    width: min(100%, 650px) !important;
+    min-height: min(92vw, 650px) !important;
+    margin-inline: auto !important;
+  }
+}
+
+@media (max-width: 560px) {
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-inner {
+    width: min(calc(100% - 24px), 640px) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 {
+    max-width: 11ch !important;
+    font-size: clamp(3rem, 15vw, 5.25rem) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stage {
+    min-height: min(104vw, 500px) !important;
+    padding: 10px !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-player-card--opponent {
+    top: auto !important;
+    width: min(82%, 240px) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-actions .button {
+    width: 100%;
+  }
+}
+
+/* Header hierarchy: one clear primary action, quieter destinations, one tidy More menu. */
+@media (min-width: 911px) {
+  .site-header {
+    border-bottom-color: rgba(133, 164, 213, 0.14);
+    background: rgba(7, 16, 31, 0.86);
+    box-shadow: 0 14px 38px rgba(1, 6, 18, 0.24), inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+  }
+
+  .site-header .nav {
+    width: min(100% - clamp(24px, 4vw, 72px), 1540px);
+    gap: clamp(12px, 1.6vw, 26px);
+    min-height: 68px;
+  }
+
+  .site-header .nav-links {
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 4px;
+    border-color: rgba(133, 164, 213, 0.16);
+    border-radius: 15px;
+    background: rgba(11, 24, 44, 0.62);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  }
+
+  .site-header .nav-links > a,
+  .site-header .nav-group-label {
+    min-height: 38px;
+    padding-inline: clamp(10px, 1.1vw, 15px);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: #aebed8;
+    font-size: clamp(0.7rem, 0.78vw, 0.78rem);
+    font-weight: 800;
+    letter-spacing: 0.015em;
+  }
+
+  .site-header .nav-links > a:hover,
+  .site-header .nav-links > a:focus-visible,
+  .site-header .nav-group-label:hover,
+  .site-header .nav-group-label:focus-visible {
+    border-color: rgba(102, 222, 235, 0.24);
+    background: rgba(72, 126, 170, 0.14);
+    color: #f4f8ff;
+  }
+
+  .site-header .nav-links > .nav-primary-link {
+    border-color: rgba(133, 121, 255, 0.6);
+    background: linear-gradient(135deg, #5e7bff, #7d5bf1);
+    box-shadow: 0 8px 20px rgba(91, 83, 235, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    color: #ffffff;
+  }
+
+  .site-header .nav-links > .nav-primary-link .nav-icon { color: #ffffff; }
+  .site-header .nav-links > .nav-primary-link:hover,
+  .site-header .nav-links > .nav-primary-link:focus-visible {
+    border-color: rgba(190, 185, 255, 0.86);
+    background: linear-gradient(135deg, #6e8bff, #9264ff);
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+
+  .site-header .nav-icon {
+    width: 1.05em;
+    color: #62d9ec;
+    font-size: 0.9rem;
+  }
+
+  .site-header .nav-group-label::after { display: none; }
+  .site-header .nav-group-label .nav-icon { color: #b49aff; }
+
+  .site-header .nav-menu {
+    top: calc(100% + 11px);
+    min-width: 252px;
+    gap: 4px;
+    padding: 10px;
+    border-color: rgba(133, 164, 213, 0.24);
+    border-radius: 15px;
+    background: rgba(10, 22, 41, 0.98);
+    box-shadow: 0 24px 56px rgba(1, 6, 18, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    backdrop-filter: blur(20px) saturate(1.2);
+  }
+
+  .site-header .nav-menu-heading {
+    padding: 5px 10px 3px;
+    color: #6bdfe5;
+    font-size: 0.6rem;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .site-header .nav-menu-divider {
+    height: 1px;
+    margin: 5px 4px;
+    background: rgba(133, 164, 213, 0.16);
+  }
+
+  .site-header .nav-menu a {
+    min-height: 36px;
+    gap: 9px;
+    padding-inline: 10px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: #b7c6de;
+    font-size: 0.75rem;
+  }
+
+  .site-header .nav-menu a:hover,
+  .site-header .nav-menu a:focus-visible {
+    border-color: rgba(102, 222, 235, 0.24);
+    background: rgba(72, 126, 170, 0.14);
+    color: #f6f9ff;
+    outline: none;
+  }
+
+  .site-header .nav-menu-icon {
+    width: 1.05rem;
+    color: #62d9ec;
+    font-size: 0.86rem;
+  }
+
+  .site-header .nav-menu .friends-nav-badge { margin-left: auto; }
+
+  .site-header .nav-utilities { gap: 6px; }
+  .site-header .nav-coin-chip,
+  .site-header .nav-icon-button {
+    min-height: 38px;
+    border-color: rgba(133, 164, 213, 0.18);
+    border-radius: 11px;
+    background: rgba(11, 24, 44, 0.66);
+  }
+
+  .site-header .nav-utilities .player-flex-chip {
+    min-width: 154px;
+    max-width: 176px;
+    border-color: rgba(194, 164, 82, 0.46);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(73, 74, 39, 0.36), rgba(11, 24, 44, 0.8));
+  }
+}
+
+/* Home finish: keep the board legible and give the primary message more air. */
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy {
+  border-color: rgba(123, 164, 216, 0.2) !important;
+  border-left: 2px solid rgba(100, 224, 222, 0.62) !important;
+  background:
+    linear-gradient(135deg, rgba(14, 31, 53, 0.84), rgba(7, 18, 34, 0.72)) !important;
+  box-shadow: 0 22px 48px rgba(1, 7, 18, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-stat-row .home-stat {
+  border-color: rgba(123, 164, 216, 0.16) !important;
+  background: rgba(5, 16, 31, 0.42) !important;
+  box-shadow: none !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-rank {
+  border-color: rgba(99, 224, 222, 0.34) !important;
+  background: linear-gradient(135deg, rgba(21, 67, 73, 0.24), rgba(8, 22, 40, 0.7)) !important;
+  box-shadow: none !important;
+}
+
+/* The coach identity was decorative and obscured the lower board ranks. */
+body:not(.site-tab-mode) #top > .home-command-deck.home-command-deck .hero-player-card--opponent {
+  display: none !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-stage {
+  border-color: rgba(112, 183, 223, 0.28) !important;
+  box-shadow: 0 24px 54px rgba(1, 7, 18, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.055) !important;
+}
+
+/* Mobile performance floor: retain the palette while removing expensive live blur/fixed-paint work. */
+@media (max-width: 760px) {
+  html { scroll-behavior: auto; }
+
+  body,
+  body::before {
+    background-attachment: scroll !important;
+  }
+
+  body,
+  body::before,
+  body[data-background-key] {
+    animation: none !important;
+    filter: none !important;
+  }
+
+  .site-header,
+  .site-header .nav,
+  .site-header .nav-links,
+  .mobile-bottom-nav,
+  body:not(.site-tab-mode) #top > .home-command-deck :where(.hero-copy, .hero-stage, .home-command-session, .hero-quick-card, .hero-progress-card, .home-command-rank) {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stage::after,
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stage-halo {
+    filter: none !important;
+    opacity: 0.58;
+  }
+}
+
+/* The governor applies this same compositor-safe surface treatment before a constrained route paints. */
+body.perf-lite .site-header,
+body.perf-lite .site-header .nav,
+body.perf-lite .site-header .nav-links,
+body.perf-lite .mobile-bottom-nav,
+body.perf-lite :where(.hero-copy, .hero-stage, .home-command-session, .hero-quick-card, .hero-progress-card, .home-command-rank, .home-feature-card, .home-command-secondary, .home-lower-dashboard) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+body.perf-lite :where(.hero-stage::after, .hero-stage-halo) {
+  filter: none !important;
+  opacity: 0.58;
+}
+
+body.perf-lite :where(.quick-match-overlay, .first-tour-backdrop) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+body.perf-lite :where(.quick-match-overlay, .first-tour-backdrop, .first-tour-card, .first-tour-highlight) {
+  animation: none !important;
+  transition: none !important;
+}
+
+body.perf-lite .hero-command-center .hero-board.hero-board--center {
+  transform: none !important;
+  box-shadow: 0 18px 30px rgba(2, 6, 23, 0.26) !important;
+}
+
+body.perf-lite main > :is(.section-dark, .section-warm),
+body.perf-lite.site-tab-mode main > .site-panel.is-active-panel,
+body.perf-lite #play:not(.is-review-mode) :is(.play-shell, .play-mode-nav, .player-frame, .game-options-panel, .coach-panel, .play-bottom-actionbar) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+body.perf-lite.site-tab-mode main > .site-panel.is-active-panel,
+body.perf-lite #play:not(.is-review-mode) .play-shell > :is(.play-left-sidebar, .match-board-column, .play-right-sidebar, .play-bottom-actionbar) {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Game Ready is rendered at document level so it can be opened from the bot
+   roster without changing the Play workspace. The markup and JS own content
+   and behavior; this layer owns modal placement and responsive containment. */
+body.ai-game-ready-open { overflow: hidden; }
+.ai-game-ready-overlay {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(14px, 3vw, 42px);
+  background: rgba(2, 8, 18, 0.76);
+  backdrop-filter: blur(12px) saturate(1.08);
+}
+.ai-game-ready-overlay[hidden] { display: none !important; }
+.ai-game-ready-dialog {
+  position: relative;
+  width: min(100%, 700px);
+  max-height: min(900px, calc(100svh - 28px));
+  overflow: auto;
+  padding: clamp(22px, 4vw, 42px);
+  border: 1px solid var(--cq-design-border-strong, rgba(116, 216, 255, 0.42));
+  border-radius: 24px;
+  color: var(--cq-text-primary, #f5f7ff);
+  background:
+    radial-gradient(circle at 92% 5%, rgba(116, 216, 255, 0.12), transparent 14rem),
+    radial-gradient(circle at 8% 92%, rgba(127, 92, 255, 0.14), transparent 16rem),
+    linear-gradient(145deg, rgba(20, 35, 59, 0.98), rgba(5, 13, 26, 0.99));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.ai-game-ready-close {
+  position: absolute;
+  top: 13px;
+  right: 15px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--cq-design-border, rgba(174, 194, 226, 0.18));
+  border-radius: 10px;
+  color: var(--cq-text-muted, #a9b8cd);
+  background: rgba(255, 255, 255, 0.045);
+  font: 700 1.35rem/1 inherit;
+  cursor: pointer;
+}
+.ai-game-ready-close:hover,
+.ai-game-ready-close:focus-visible { border-color: var(--cq-design-border-strong, rgba(116, 216, 255, 0.42)); color: var(--cq-text-primary, #f5f7ff); outline: none; }
+.ai-game-ready-symbol {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  margin-bottom: 18px;
+  border: 1px solid rgba(116, 216, 255, 0.44);
+  border-radius: 15px;
+  color: #c5f5ff;
+  background: linear-gradient(145deg, rgba(61, 148, 180, 0.42), rgba(107, 71, 208, 0.34));
+  box-shadow: 0 10px 24px rgba(44, 116, 160, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  font-size: 1.55rem;
+}
+.ai-game-ready-dialog .section-kicker { margin: 0 0 9px; color: var(--cq-accent-tertiary, #65e7f7); font-size: .66rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+.ai-game-ready-dialog h2 { max-width: 14ch; margin: 0; color: var(--cq-text-primary, #f5f7ff); font-size: clamp(2rem, 5vw, 3.45rem); line-height: .98; letter-spacing: -.055em; text-wrap: balance; }
+.ai-game-ready-description { max-width: 46ch; margin: 13px 0 20px; color: var(--cq-text-muted, #a9b8cd); font-size: .92rem; line-height: 1.55; }
+.ai-game-ready-opponent { display: flex; align-items: center; gap: 11px; margin: 0 0 18px; padding: 11px 13px; border: 1px solid var(--cq-design-border, rgba(174, 194, 226, .18)); border-radius: 14px; background: rgba(255, 255, 255, .035); }
+.ai-game-ready-avatar { display: grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border: 1px solid rgba(116, 216, 255, .34); border-radius: 12px; color: #d8fbff; background: linear-gradient(145deg, #2c7189, #372b70); font-size: 1.3rem; }
+.ai-game-ready-opponent strong, .ai-game-ready-opponent small { display: block; }
+.ai-game-ready-opponent strong { color: var(--cq-text-primary, #f5f7ff); font-size: .88rem; }
+.ai-game-ready-opponent small { margin-top: 3px; color: var(--cq-text-muted, #a9b8cd); font-size: .7rem; }
+.ai-game-ready-saved { margin: -5px 0 16px; color: #b8e5c7; font-size: .7rem; }
+.ai-game-ready-saved button { margin-left: 4px; padding: 0; border: 0; color: var(--cq-accent-tertiary, #65e7f7); background: transparent; font: inherit; text-decoration: underline; cursor: pointer; }
+.ai-game-ready-paces, .ai-game-ready-advanced-time, .ai-game-ready-color { min-width: 0; margin: 0; padding: 0; border: 0; }
+.ai-game-ready-paces legend, .ai-game-ready-advanced-time legend, .ai-game-ready-color legend { margin-bottom: 8px; color: var(--cq-text-muted, #a9b8cd); font-size: .68rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.ai-game-ready-paces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ai-game-ready-pace, .ai-game-ready-advanced-grid button, .ai-game-ready-color button { min-width: 0; border: 1px solid var(--cq-design-border, rgba(174, 194, 226, .18)); border-radius: 12px; color: var(--cq-text-primary, #f5f7ff); background: rgba(8, 18, 34, .72); font: inherit; cursor: pointer; }
+.ai-game-ready-pace { display: grid; min-height: 72px; align-content: center; gap: 5px; padding: 10px; text-align: left; }
+.ai-game-ready-pace strong, .ai-game-ready-advanced-grid strong { font-size: .82rem; }
+.ai-game-ready-pace small, .ai-game-ready-advanced-grid small { color: var(--cq-text-muted, #a9b8cd); font-size: .64rem; line-height: 1.3; }
+.ai-game-ready-pace:hover, .ai-game-ready-pace:focus-visible, .ai-game-ready-advanced-grid button:hover, .ai-game-ready-advanced-grid button:focus-visible, .ai-game-ready-color button:hover, .ai-game-ready-color button:focus-visible, .ai-game-ready-pace[aria-pressed="true"], .ai-game-ready-advanced-grid button[aria-pressed="true"], .ai-game-ready-color button[aria-pressed="true"] { border-color: var(--cq-design-border-strong, rgba(116, 216, 255, .42)); background: linear-gradient(145deg, rgba(57, 112, 145, .42), rgba(85, 58, 161, .34)); outline: none; }
+.ai-game-ready-selection { margin: 10px 0 0; color: var(--cq-accent-tertiary, #65e7f7); font-size: .72rem; font-weight: 750; }
+.ai-game-ready-actions { margin-top: 18px; }
+.ai-game-ready-actions .button { width: 100%; justify-content: center; min-height: 47px; }
+.ai-game-ready-more { margin-top: 17px; border-top: 1px solid var(--cq-design-border, rgba(174, 194, 226, .18)); }
+.ai-game-ready-more > summary { padding: 13px 0 4px; color: var(--cq-text-muted, #a9b8cd); font-size: .72rem; font-weight: 800; cursor: pointer; }
+.ai-game-ready-more-body { display: grid; gap: 17px; padding-top: 11px; }
+.ai-game-ready-advanced-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.ai-game-ready-advanced-grid button { display: grid; gap: 3px; padding: 9px 8px; text-align: left; }
+.ai-game-ready-custom-time { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
+.ai-game-ready-custom-time[hidden] { display: none !important; }
+.ai-game-ready-custom-time label, .ai-game-ready-options label { display: grid; gap: 5px; color: var(--cq-text-muted, #a9b8cd); font-size: .66rem; font-weight: 750; }
+.ai-game-ready-custom-time input, .ai-game-ready-options select { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--cq-design-border, rgba(174, 194, 226, .18)); border-radius: 9px; color: var(--cq-text-primary, #f5f7ff); background: rgba(8, 18, 34, .82); font: inherit; }
+.ai-game-ready-custom-time p { grid-column: 1 / -1; margin: 0; color: #fda4af; font-size: .66rem; }
+.ai-game-ready-color > div { display: flex; gap: 7px; }
+.ai-game-ready-color button { min-height: 36px; padding: 7px 13px; font-size: .7rem; }
+.ai-game-ready-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 560px) {
+  .ai-game-ready-overlay { align-items: end; padding: 10px; }
+  .ai-game-ready-dialog { max-height: calc(100svh - 20px); padding: 24px 17px 18px; border-radius: 20px; }
+  .ai-game-ready-dialog h2 { font-size: clamp(1.9rem, 10vw, 2.7rem); }
+  .ai-game-ready-paces { grid-template-columns: 1fr; }
+  .ai-game-ready-pace { min-height: 58px; }
+  .ai-game-ready-advanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-game-ready-options { grid-template-columns: 1fr; }
+}
+
+/* KingNorbert is a first-class coach: give the profile one clear home in AI options. */
+.ai-featured-coach {
+  position: relative;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  grid-template-areas: "avatar copy action";
+  gap: 18px;
+  align-items: center;
+  margin: 18px 0 20px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, #e6bd63 58%, var(--cq-border, #26364d));
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(239, 191, 92, .2), transparent 30%),
+    linear-gradient(135deg, rgba(26, 28, 62, .96), rgba(8, 24, 35, .96));
+  box-shadow: 0 18px 38px rgba(0, 0, 0, .2), inset 0 1px 0 rgba(255, 255, 255, .08);
+  overflow: hidden;
+}
+.ai-featured-coach::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(112deg, transparent 35%, rgba(255, 244, 202, .11) 50%, transparent 64%);
+}
+.ai-featured-coach-avatar {
+  grid-area: avatar;
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  box-shadow: 0 12px 28px rgba(26, 17, 67, .42), inset 0 0 0 1px rgba(255, 239, 172, .28);
+}
+.ai-featured-coach-avatar::before { animation-duration: 5s; }
+.ai-featured-coach-copy { grid-area: copy; min-width: 0; }
+.ai-featured-coach-kicker {
+  margin: 0 0 5px;
+  color: #f8d66f;
+  font-size: .66rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.ai-featured-coach-copy h3 {
+  margin: 0;
+  color: var(--cq-text-primary, #f5f7ff);
+  font-size: clamp(1.2rem, 2.5vw, 1.55rem);
+  letter-spacing: -.035em;
+}
+.ai-featured-coach-copy h3 span { color: #f8d66f; font-size: .8em; }
+.ai-featured-coach-copy > p:not(.ai-featured-coach-kicker) {
+  max-width: 50ch;
+  margin: 7px 0 10px;
+  color: var(--cq-text-muted, #a9b8cd);
+  font-size: .82rem;
+  line-height: 1.45;
+}
+.ai-featured-coach-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--cq-text-secondary, #d3deef); font-size: .68rem; font-weight: 800; }
+.ai-featured-coach-meta > :not(.player-country-flag) { padding: 4px 8px; border: 1px solid rgba(137, 222, 235, .18); border-radius: 999px; background: rgba(91, 192, 213, .1); }
+.ai-featured-coach-meta strong { color: #ffe7a7; border-color: rgba(238, 192, 91, .28); background: rgba(238, 192, 91, .11); }
+.ai-featured-coach-meta .player-country-flag { font-size: 1rem; line-height: 1; }
+.ai-featured-coach > .button { grid-area: action; min-width: 154px; white-space: nowrap; }
+.ai-featured-coach + .ai-bot-browser { margin-top: 0; }
+
+#play .featured-coach-card {
+  grid-template-columns: 54px minmax(0, 1fr);
+  grid-template-areas: "avatar copy" "action action";
+  gap: 10px;
+  align-items: start;
+  padding: 11px;
+}
+#play .featured-coach-card .featured-coach-avatar { grid-area: avatar; width: 54px; height: 54px; border-radius: 15px; }
+#play .featured-coach-copy { grid-area: copy; min-width: 0; }
+#play .featured-coach-copy > span { display: block; margin-bottom: 3px; color: #f8d66f; font-size: .61rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+#play .featured-coach-copy h4 { margin: 0 0 5px; font-size: .9rem; line-height: 1.15; }
+#play .featured-coach-meta { gap: 5px; font-size: .62rem; line-height: 1.2; }
+#play .featured-coach-copy p { display: none; }
+#play .featured-coach-card > .button { grid-area: action; width: 100%; min-height: 36px; margin: 0; }
+#play .simple-coach { min-width: 0; padding: 11px; font-size: .75rem; line-height: 1.48; overflow-wrap: normal; word-break: normal; }
+
+@media (max-width: 700px) {
+  .ai-featured-coach { grid-template-columns: 64px minmax(0, 1fr); grid-template-areas: "avatar copy" "action action"; gap: 12px; padding: 14px; border-radius: 18px; }
+  .ai-featured-coach-avatar { width: 64px; height: 64px; border-radius: 16px; }
+  .ai-featured-coach > .button { width: 100%; min-height: 42px; }
+}
+@media (max-width: 390px) {
+  .ai-featured-coach { margin-inline: -2px; }
+  .ai-featured-coach-copy > p:not(.ai-featured-coach-kicker) { font-size: .76rem; }
+}
+
+/*
+ * Nschessn workspace revamp
+ *
+ * This is the final shared presentation layer. It intentionally owns rhythm,
+ * surfaces, and responsive composition only; chess boards, game state, and
+ * route-owned interactions stay in their existing modules.
+ */
+:root {
+  --ns-workspace-max: 1460px;
+  --ns-page-gutter: clamp(14px, 3vw, 48px);
+  --ns-surface: linear-gradient(145deg, rgba(17, 31, 54, .96), rgba(7, 16, 31, .94));
+  --ns-surface-soft: rgba(10, 22, 41, .78);
+  --ns-surface-raised: linear-gradient(145deg, rgba(26, 42, 70, .96), rgba(9, 20, 38, .96));
+  --ns-border: rgba(129, 160, 211, .2);
+  --ns-border-strong: rgba(100, 224, 222, .52);
+  --ns-shadow: 0 20px 48px rgba(1, 7, 18, .25), inset 0 1px 0 rgba(255, 255, 255, .055);
+  --ns-shadow-lift: 0 26px 58px rgba(1, 7, 18, .34), inset 0 1px 0 rgba(255, 255, 255, .075);
+  --ns-radius: 20px;
+}
+
+body.theme-light {
+  --ns-surface: linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(237, 243, 253, .96));
+  --ns-surface-soft: rgba(247, 250, 255, .9);
+  --ns-surface-raised: linear-gradient(145deg, #fff, #edf2fb);
+  --ns-border: rgba(58, 75, 124, .18);
+  --ns-border-strong: rgba(78, 98, 208, .48);
+  --ns-shadow: 0 18px 42px rgba(51, 68, 117, .13), inset 0 1px 0 rgba(255, 255, 255, .84);
+  --ns-shadow-lift: 0 24px 52px rgba(51, 68, 117, .18), inset 0 1px 0 rgba(255, 255, 255, .94);
+}
+
+:is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) {
+  padding-block: clamp(44px, 5.4vw, 82px);
+}
+
+:is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) > .wrap {
+  width: min(calc(100% - (var(--ns-page-gutter) * 2)), var(--ns-workspace-max));
+}
+
+:is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(220px, .85fr);
+  align-items: end;
+  gap: 18px 38px;
+  min-height: 92px;
+  margin-bottom: clamp(22px, 3vw, 34px);
+  padding: 20px clamp(18px, 2.4vw, 30px) 22px;
+  border: 1px solid var(--ns-border);
+  border-radius: var(--ns-radius);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(116, 216, 255, .12), transparent 20rem),
+    var(--ns-surface);
+  box-shadow: var(--ns-shadow);
+}
+
+:is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head::after {
+  right: 9%;
+  left: 9%;
+  background: linear-gradient(90deg, transparent, var(--ns-border-strong), transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head .section-intro {
+  max-width: 36ch;
+  margin: 0 0 2px auto;
+  color: var(--cq-text-muted);
+  font-size: .82rem;
+  line-height: 1.55;
+  text-align: right;
+}
+
+:is(body:not(.theme-light), body.theme-light) :where(
+  .cq-panel, .real-puzzles-panel, .ai-bot-browser, .settings-shell,
+  .store-shell, .friends-hub-nav, .friends-hub-main, .friends-hub-profile,
+  .login-card, .login-pass-hero, .login-player-profile, .admin-shell,
+  .lesson-card, .adventure-card, .mission-card, .opening-card, .video-card,
+  .book-card, .leaderboard-card, .friend-card, .tournament-card
+) {
+  border-color: var(--ns-border);
+  border-radius: var(--ns-radius);
+  box-shadow: var(--ns-shadow);
+}
+
+:is(body:not(.theme-light), body.theme-light) :where(
+  .button, .mission-button, .tab-button, input, select, textarea
+) {
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+:is(body:not(.theme-light), body.theme-light) :where(
+  .button, .mission-button, .tab-button
+):focus-visible,
+:is(body:not(.theme-light), body.theme-light) :where(input, select, textarea):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ns-border-strong) 78%, white);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(body:not(.theme-light), body.theme-light) :where(
+    .cq-panel, .real-puzzles-panel, .ai-bot-browser, .settings-shell,
+    .store-shell, .friends-hub-nav, .friends-hub-main, .friends-hub-profile,
+    .login-card, .login-pass-hero, .login-player-profile, .admin-shell,
+    .lesson-card, .adventure-card, .mission-card, .opening-card, .video-card,
+    .book-card, .leaderboard-card, .friend-card, .tournament-card
+  ):hover {
+    border-color: color-mix(in srgb, var(--ns-border-strong) 72%, var(--ns-border));
+    box-shadow: var(--ns-shadow-lift);
+  }
+}
+
+/* Home is a calm board-first landing, not a stack of equally loud cards. */
+body:not(.site-tab-mode) #top > .home-command-deck {
+  padding-block: clamp(36px, 5vw, 68px) clamp(24px, 3vw, 38px) !important;
+  background:
+    radial-gradient(circle at 76% 38%, rgba(116, 92, 255, .17), transparent 28rem),
+    radial-gradient(circle at 11% 8%, rgba(45, 218, 213, .1), transparent 22rem),
+    linear-gradient(135deg, #071323 0%, #0b1930 56%, #08121f 100%) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-inner {
+  width: min(calc(100% - var(--ns-page-gutter) * 2), var(--ns-workspace-max)) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-layout {
+  grid-template-columns: minmax(280px, .88fr) minmax(420px, 1.12fr) !important;
+  gap: clamp(20px, 3vw, 42px) clamp(24px, 4vw, 64px) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy {
+  max-width: 540px !important;
+  padding: 0 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 {
+  max-width: 9.5ch !important;
+  font-size: clamp(3.25rem, 6vw, 6rem) !important;
+  line-height: .9 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-description {
+  max-width: 38ch !important;
+  margin-top: 20px !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-stage {
+  min-height: clamp(350px, 38vw, 590px) !important;
+  padding: clamp(14px, 2vw, 24px) !important;
+  border-color: rgba(126, 182, 214, .28) !important;
+  border-radius: 24px;
+  box-shadow: 0 28px 68px rgba(1, 7, 18, .3), inset 0 1px 0 rgba(255, 255, 255, .06) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-board.hero-board--center {
+  width: min(100%, 560px) !important;
+  border-radius: 18px !important;
+  transform: rotate(-.7deg) perspective(1200px) rotateX(2deg) !important;
+  box-shadow: 0 28px 62px rgba(0, 0, 0, .44), 0 0 0 1px rgba(117, 157, 255, .24), 0 0 44px rgba(114, 101, 255, .15) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-stage:hover .hero-board {
+  transform: rotate(-.7deg) perspective(1200px) rotateX(2deg) translateY(-4px) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-command-session {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  min-height: 0 !important;
+  padding: 13px 16px !important;
+  border-color: rgba(126, 157, 211, .22) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 34px rgba(2, 7, 19, .22), inset 0 1px 0 rgba(255, 255, 255, .05) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-ritual {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .home-session-ritual-item {
+  padding: 7px;
+  border-radius: 10px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 9px !important;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard .hero-quick-card {
+  min-height: 76px;
+  padding: 12px;
+  border-radius: 15px;
+}
+
+body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card {
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 12px !important;
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip {
+  padding-block: 16px 24px !important;
+  background: linear-gradient(180deg, #07111f, #081725) !important;
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-grid {
+  width: min(calc(100% - var(--ns-page-gutter) * 2), var(--ns-workspace-max)) !important;
+  gap: 9px;
+}
+
+body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-card {
+  min-height: 64px;
+  border-radius: 14px;
+}
+
+/* Play keeps its three-zone workspace stable while the board changes size. */
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+  width: min(calc(100% - var(--ns-page-gutter) * 2), 1500px) !important;
+  max-width: 1500px !important;
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(250px, 300px) !important;
+  gap: clamp(10px, 1.45vw, 18px) !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+  align-content: start;
+  min-width: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .match-board-column {
+  min-width: 0;
+  align-content: start;
+  padding: clamp(8px, 1.1vw, 14px);
+  border: 1px solid var(--ns-border);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(11, 26, 47, .74), rgba(6, 15, 29, .68));
+  box-shadow: var(--ns-shadow);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-board-wrap {
+  border-radius: 18px;
+  box-shadow: 0 22px 46px rgba(1, 6, 17, .3), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+
+:is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) :is(.match-player-card, .ai-player-card) {
+  box-sizing: border-box;
+  border-color: var(--ns-border);
+  border-radius: 14px;
+}
+
+/* Puzzle and review share the same board-first workbench rhythm. */
+:is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzles-panel {
+  padding: clamp(16px, 2.4vw, 28px);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(255, 211, 107, .1), transparent 20rem),
+    var(--ns-surface);
+}
+
+:is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzles-head {
+  align-items: end;
+  gap: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--ns-border);
+}
+
+:is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-shell {
+  align-items: start;
+  gap: clamp(18px, 3vw, 34px);
+}
+
+:is(body:not(.theme-light), body.theme-light) #puzzles .real-board-stack {
+  min-width: 0;
+  align-content: start;
+  gap: 10px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #puzzles :is(.real-puzzle-info, .real-puzzle-control, .real-puzzle-stats) {
+  border-color: var(--ns-border);
+  border-radius: 16px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-page-frame {
+  width: min(calc(100% - var(--ns-page-gutter) * 2), var(--ns-workspace-max));
+  margin-inline: auto;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-shell {
+  gap: 16px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page :is(.game-review-header-slot, .game-review-overview-slot, .game-review-analysis-slot, .game-review-current-column, .game-review-dock) {
+  min-width: 0;
+  border-color: var(--ns-border);
+  border-radius: var(--ns-radius);
+  box-shadow: var(--ns-shadow);
+}
+
+/* AI roster and profile pages get the same reading width and density. */
+:is(body:not(.theme-light), body.theme-light) #bots .ai-featured-coach,
+:is(body:not(.theme-light), body.theme-light) #bots .ai-bot-browser {
+  width: min(100%, 1180px);
+  margin-inline: auto;
+}
+
+:is(body:not(.theme-light), body.theme-light) #bots .ai-bot-browser {
+  margin-top: 16px;
+  padding: clamp(14px, 2vw, 22px);
+  background: var(--ns-surface-soft);
+}
+
+:is(body:not(.theme-light), body.theme-light) #bots .ai-bot-controls {
+  grid-template-columns: minmax(0, 1.35fr) minmax(180px, .65fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+:is(body:not(.theme-light), body.theme-light) #login .login-shell {
+  align-items: start;
+  gap: clamp(14px, 2vw, 24px);
+}
+
+:is(body:not(.theme-light), body.theme-light) #login :is(.login-card, .login-pass-hero, .login-player-profile) {
+  overflow: hidden;
+}
+
+@media (max-width: 1180px) {
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center center" "left right" "social social" !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-layout {
+    grid-template-columns: minmax(260px, .85fr) minmax(360px, 1.15fr) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 860px) {
+  :is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 10px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head .section-intro {
+    max-width: 52ch;
+    margin: 0;
+    text-align: left;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #play:not(.is-review-mode) .play-shell {
+    /* On touch layouts the mode/time choices lead; the board then gets the
+       full-width focus without making the user scroll past a hidden rail. */
+    grid-template-areas: "left" "center" "right" "social" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas: "copy" "stage" "session" "dashboard" !important;
+    gap: 22px !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-copy {
+    max-width: 620px !important;
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1,
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-description {
+    margin-inline: auto;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stage {
+    width: min(100%, 640px) !important;
+    min-height: min(92vw, 640px) !important;
+    margin-inline: auto;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #puzzles .real-board-stack {
+    /* Keep this containing block independent from the shared board-size
+       variable. The controller writes that variable from measured geometry;
+       sizing this parent from it creates a responsive feedback loop. */
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #bots .ai-bot-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  :is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head {
+    min-height: 0;
+    padding: 17px;
+    border-radius: 16px;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-inner {
+    width: min(calc(100% - 22px), 640px) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-copy h1 {
+    max-width: 11ch !important;
+    font-size: clamp(3rem, 15vw, 5.1rem) !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-stage {
+    min-height: min(104vw, 500px) !important;
+    padding: 8px !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session {
+    grid-template-columns: 1fr !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session > .button {
+    width: 100%;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-session-ritual {
+    grid-template-columns: 1fr;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-dashboard {
+    grid-template-columns: 1fr !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-progress-card {
+    grid-column: auto;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzles-panel {
+    padding: 12px;
+    border-radius: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(body:not(.theme-light), body.theme-light) :where(.button, .mission-button, .tab-button, input, select, textarea) {
+    transition: none !important;
+  }
+}
+
+/* Final shared interaction layer: the resize target belongs to the rendered
+   board frame, not to a route-specific toolbar. The corner hit zone is wide
+   enough for mouse, touch, and pen without covering the board surface. */
+.interactive-board-sizing-stage {
+  overflow: visible !important;
+  contain: layout style !important;
+}
+
+.interactive-board-resize-handle {
+  top: auto !important;
+  right: -46px !important;
+  bottom: -8px !important;
+  inline-size: 58px !important;
+  block-size: 58px !important;
+  z-index: 80 !important;
+  pointer-events: auto !important;
+  cursor: nwse-resize !important;
+  opacity: .24 !important;
+}
+
+.interactive-board-resize-handle::before {
+  inset: 17px 4px 4px 17px !important;
+  background: linear-gradient(135deg, transparent 0 42%, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 94%, white) 44% 49%, transparent 51% 60%, color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 88%, white) 62% 67%, transparent 69%) !important;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 54%, transparent) !important;
+}
+
+.interactive-board-resize-handle::after {
+  content: "↘";
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 82%, white);
+  font-size: 1.2rem;
+  font-weight: 900;
+  line-height: 1;
+  opacity: .72;
+  animation: interactiveBoardResizePulse 1.8s ease-in-out infinite;
+}
+
+.interactive-board-sizing-stage:hover > .interactive-board-resize-handle,
+.interactive-board-sizing-stage.is-board-resizing > .interactive-board-resize-handle,
+.interactive-board-resize-handle:hover,
+.interactive-board-resize-handle:focus-visible {
+  opacity: 1 !important;
+}
+
+.interactive-board-sizing-stage.is-board-resizing {
+  user-select: none;
+}
+
+.interactive-board-sizing-stage.is-board-resizing,
+.interactive-board-sizing-stage.is-board-resizing > [data-interactive-board],
+.interactive-board-sizing-stage.is-board-resizing .puzzle-board,
+.interactive-board-sizing-stage.is-board-resizing .play-board {
+  transition: none !important;
+}
+
+.interactive-board-sizing-stage.is-board-resizing .interactive-board-resize-handle::after {
+  animation-duration: .7s;
+}
+
+.interactive-board-actions {
+  position: absolute;
+  inset: 50% auto auto calc(100% + 8px);
+  z-index: 81;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  inline-size: 34px;
+  min-block-size: 0;
+  margin: 0;
+  padding: 0;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.interactive-board-fullscreen-button {
+  display: inline-flex;
+  align-items: center;
+  inline-size: 34px;
+  block-size: 34px;
+  min-block-size: 34px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 66%, white 4%);
+  border-radius: 10px;
+  color: var(--cq-text-primary, #f5f7ff);
+  background: color-mix(in srgb, var(--cq-surface-panel, #101a2d) 84%, transparent);
+  box-shadow: 0 8px 18px rgba(3, 8, 18, .2), inset 0 1px rgba(255,255,255,.09);
+  font: inherit;
+  font-size: .94rem;
+  font-weight: 850;
+  letter-spacing: .04em;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(12px);
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.interactive-board-fullscreen-button [data-board-fullscreen-label] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.interactive-board-settings-button {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 30px;
+  block-size: 30px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--cq-border, rgba(148,163,184,.22)) 82%, transparent);
+  border-radius: 9px;
+  color: var(--cq-text-muted, #aab7ce);
+  background: color-mix(in srgb, var(--cq-surface-panel, #101a2d) 78%, transparent);
+  box-shadow: 0 6px 14px rgba(3, 8, 18, .18);
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
+  transition: opacity 140ms ease, border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.interactive-board-settings-button:hover,
+.interactive-board-settings-button:focus-visible {
+  border-color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 72%, white 8%);
+  color: var(--cq-text-primary, #f5f7ff);
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 26%, var(--cq-surface-panel, #101a2d));
+  outline: none;
+}
+
+.interactive-board-fullscreen-button:hover,
+.interactive-board-fullscreen-button:focus-visible {
+  border-color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 82%, white 8%);
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 30%, var(--cq-surface-panel, #101a2d));
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.interactive-board-fullscreen-button[data-board-fullscreen-active="true"] {
+  color: #fff8ed;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 76%, #2c176c), color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 28%, #101a2d));
+}
+
+/* Keep the controls discoverable without making them part of the board's
+   visual weight. Hover/focus raises the whole reserved rail together. */
+.interactive-board-actions {
+  opacity: .2;
+  transition: opacity 160ms ease;
+}
+
+.interactive-board-sizing-stage:hover > .interactive-board-actions,
+.interactive-board-actions:hover,
+.interactive-board-actions:focus-within,
+.interactive-board-sizing-stage.is-board-resizing > .interactive-board-actions {
+  opacity: 1;
+}
+
+.interactive-board-discovery {
+  position: absolute;
+  inset: auto 70px 8px auto;
+  z-index: 79;
+  display: grid;
+  gap: 3px;
+  max-inline-size: min(248px, calc(100% - 84px));
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 62%, transparent);
+  border-radius: 12px;
+  color: var(--cq-text-primary, #f5f7ff);
+  background: color-mix(in srgb, var(--cq-surface-panel, #101a2d) 92%, transparent);
+  box-shadow: 0 14px 28px rgba(3, 8, 18, .26), 0 0 22px color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 18%, transparent);
+  pointer-events: none;
+  animation: interactiveBoardDiscoveryIn 360ms ease both;
+}
+
+.interactive-board-discovery::after {
+  content: "";
+  position: absolute;
+  right: -7px;
+  bottom: 10px;
+  inline-size: 12px;
+  block-size: 12px;
+  border-block-start: 1px solid color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 62%, transparent);
+  border-inline-end: 1px solid color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 62%, transparent);
+  background: inherit;
+  transform: rotate(135deg);
+}
+
+.interactive-board-discovery strong {
+  font-size: .74rem;
+  letter-spacing: .03em;
+}
+
+.interactive-board-discovery span,
+.interactive-board-discovery small {
+  color: var(--cq-text-muted, #aab7ce);
+  font-size: .64rem;
+  line-height: 1.45;
+}
+
+.interactive-board-discovery small {
+  color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 76%, white 20%);
+}
+
+@keyframes interactiveBoardResizePulse {
+  0%, 100% { opacity: .34; transform: scale(.84); }
+  50% { opacity: .92; transform: scale(1); }
+}
+
+@keyframes interactiveBoardDiscoveryIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 699px) {
+  .interactive-board-sizing-stage {
+    padding-block-end: 44px !important;
+  }
+
+  .interactive-board-actions {
+    inset: auto 0 -44px auto;
+    flex-direction: row;
+    inline-size: auto;
+    transform: none;
+  }
+
+  .interactive-board-resize-handle {
+    right: -30px !important;
+    bottom: -8px !important;
+    inline-size: 52px !important;
+    block-size: 52px !important;
+    opacity: .38 !important;
+  }
+
+  .interactive-board-resize-handle::before { inset: 15px 3px 3px 15px !important; }
+  .interactive-board-fullscreen-button { min-block-size: 34px; }
+  .interactive-board-discovery { inset-inline-end: 64px; inset-block-end: 8px; max-inline-size: min(220px, calc(100% - 88px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive-board-resize-handle::after,
+  .interactive-board-discovery { animation: none !important; }
+}
+
+/* Controlled chess workspace. The center column owns the board track; the
+   side rails never become part of the board's sizing equation. */
+html body #play:not(.is-review-mode) .play-shell {
+  min-width: 0 !important;
+  overflow-x: clip !important;
+}
+
+html body #play:not(.is-review-mode) .match-board-column {
+  inline-size: 100% !important;
+  max-inline-size: 100% !important;
+  min-inline-size: 0 !important;
+  overflow: visible !important;
+}
+
+/* Focus mode is a dedicated four-row chess workspace, including lobby state.
+   Native fullscreen removes the global header automatically because only this
+   match column enters the top layer. */
+html body #play:not(.is-review-mode) .match-board-column:fullscreen {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  /* Keep the board track content-sized. An auto middle track stretches to
+     consume spare viewport height even though the board itself has a fixed
+     square size, which leaves a false empty strip below the board. */
+  grid-template-rows: max-content max-content max-content max-content !important;
+  grid-template-areas: "opponent" "board" "player" "controls" !important;
+  align-content: center !important;
+  justify-items: center !important;
+  inline-size: 100dvw !important;
+  block-size: 100dvh !important;
+  max-inline-size: none !important;
+  max-block-size: 100dvh !important;
+  min-block-size: 100dvh !important;
+  box-sizing: border-box !important;
+  gap: 10px !important;
+  padding: clamp(8px, 1.25dvh, 16px) clamp(8px, 1.5dvw, 24px) !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background:
+    radial-gradient(circle at 50% 8%, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 14%, transparent), transparent 34rem),
+    var(--cq-surface-page, #071222) !important;
+}
+
+html body #play:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card,
+html body #play:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card {
+  inline-size: min(100%, var(--interactive-board-workspace-size, 720px)) !important;
+  max-inline-size: var(--interactive-board-workspace-size, 720px) !important;
+  min-inline-size: 0 !important;
+}
+
+html body #play:not(.is-review-mode) .match-board-column:fullscreen > .ai-player-card { grid-area: opponent !important; }
+html body #play:not(.is-review-mode) .match-board-column:fullscreen > .play-board-wrap { grid-area: board !important; }
+html body #play:not(.is-review-mode) .match-board-column:fullscreen > .match-player-card { grid-area: player !important; }
+html body #play:not(.is-review-mode) .match-board-column:fullscreen > .play-bottom-actionbar {
+  grid-area: controls !important;
+  inline-size: min(100%, var(--interactive-board-workspace-size, 720px)) !important;
+  max-inline-size: var(--interactive-board-workspace-size, 720px) !important;
+}
+
+html body #play:not(.is-review-mode) .match-board-column:fullscreen > :not(.ai-player-card):not(.match-player-card):not(.play-board-wrap):not(.play-bottom-actionbar) {
+  display: none !important;
+}
+
+html body #play:not(.is-review-mode) .match-board-column:fullscreen .interactive-board-sizing-stage {
+  align-self: center !important;
+  max-inline-size: 100% !important;
+}
+
+/* Keep the first-use resize cue out of the chess surface. On wide Play
+   workspaces it lives in the existing utility gutter; on narrower layouts it
+   gets a reserved strip below the stage so it cannot cover a square or card. */
+html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .interactive-board-sizing-stage > .interactive-board-discovery {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+@media (min-width: 1181px) {
+  html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .interactive-board-sizing-stage > .interactive-board-discovery {
+    inset-block-end: 8px !important;
+    inset-inline-start: calc(100% + 48px) !important;
+    inset-inline-end: auto !important;
+    inline-size: min(176px, 12vw) !important;
+    max-inline-size: min(176px, 12vw) !important;
+    padding: 8px 10px !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .interactive-board-sizing-stage > .interactive-board-discovery {
+    inset-block-start: calc(100% + 10px) !important;
+    inset-block-end: auto !important;
+    inset-inline-end: 8px !important;
+    max-inline-size: min(180px, calc(100% - 16px)) !important;
+    padding: 6px 8px !important;
+    font-size: .6rem !important;
+  }
+
+  html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .interactive-board-sizing-stage > .interactive-board-discovery span,
+  html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .interactive-board-sizing-stage > .interactive-board-discovery small {
+    display: none !important;
+  }
+}
+
+/* Review board contract: keep the evaluation rail and board in explicit
+   tracks. The board is mounted beside the rail at runtime; assigning it a
+   named grid area without a parent template creates implicit tracks and can
+   collapse a perfectly sized board into a narrow column. */
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-items: start;
+  justify-items: stretch;
+  gap: 0 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot > .review-eval-rail {
+  grid-column: 1;
+  grid-row: 1;
+  width: 26px;
+  min-width: 26px;
+  min-height: 0;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot > .play-board-wrap {
+  grid-area: auto !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  justify-self: center;
+  align-self: start;
+  width: min(100%, min(760px, calc(100svh - 190px))) !important;
+  max-width: min(760px, calc(100svh - 190px)) !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot {
+  width: min(100%, 760px);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-compare-row {
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary) 22%, var(--review-line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cq-surface-raised) 82%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "previous play next"
+    "auto flip critical";
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--cq-border) 76%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--cq-surface-quiet) 74%, transparent);
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPrev { grid-area: previous; }
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewPlay { grid-area: play; }
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewNext { grid-area: next; }
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewAuto { grid-area: auto; }
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewFlip { grid-area: flip; }
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewMistake { grid-area: critical; }
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-controls #reviewPlay {
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--cq-accent-primary) 18%, transparent);
+}
+
+@media (max-width: 840px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot > .play-board-wrap {
+    width: min(100%, calc(100vw - 42px)) !important;
+    max-width: calc(100vw - 42px) !important;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewReplaySlot {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot {
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 0 5px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot > .review-eval-rail {
+    width: 20px;
+    min-width: 20px;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot > .play-board-wrap {
+    width: min(100%, calc(100vw - 34px)) !important;
+    max-width: calc(100vw - 34px) !important;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .review-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "previous next"
+      "play play"
+      "auto flip"
+      "critical critical";
+  }
+}
+
+/* Shared Review focus workspace. The global board controller promotes the
+   Review command center to the fullscreen host, so the board, evaluation
+   context, and replay controls stay in one measured workspace. This is the
+   Review counterpart to the existing Play host contract; it does not alter
+   Play's fullscreen geometry. */
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, min(30vw, 380px));
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "analysis current"
+    "replay replay";
+  align-items: stretch;
+  box-sizing: border-box;
+  inline-size: 100dvw !important;
+  block-size: 100dvh !important;
+  max-inline-size: none !important;
+  max-block-size: none !important;
+  min-inline-size: 0;
+  min-block-size: 0;
+  margin: 0 !important;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)) !important;
+  gap: 12px;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background:
+    radial-gradient(720px 420px at 24% 0%, color-mix(in srgb, var(--cq-accent-secondary) 10%, transparent), transparent 72%),
+    var(--cq-bg-primary, #07101d) !important;
+  box-shadow: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen > .game-review-analysis-slot {
+  grid-area: analysis;
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr);
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen #reviewBoardSlot {
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 0 !important;
+  place-items: center;
+  overflow: visible;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen #reviewBoardSlot > .play-board-wrap {
+  /* The review eval rail is prepended inside this wrapper at runtime. Keep
+     its rail + gap in the measured stage width so the square board does not
+     overflow the fullscreen analysis track on tablet widths. */
+  width: min(100%, calc(var(--interactive-board-size, 720px) + 36px)) !important;
+  max-width: calc(var(--interactive-board-size, 720px) + 36px) !important;
+  margin: 0 auto;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen > .game-review-current-column {
+  grid-area: current;
+  min-inline-size: 0;
+  min-block-size: 0;
+  max-block-size: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen > .game-review-replay-slot {
+  grid-area: replay;
+  inline-size: 100%;
+  max-block-size: 152px;
+  min-inline-size: 0;
+  margin: 0;
+  overflow: auto;
+}
+
+/* Review keeps the existing shared action but moves it to the measured stage
+   edge in focus mode, away from the board's piece interaction surface. */
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen .play-lobby-board-actions {
+  display: contents !important;
+}
+
+:is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen .play-lobby-board-actions > [data-board-fullscreen-action] {
+  position: absolute !important;
+  inset: 50% auto auto calc(100% + 8px) !important;
+  z-index: 120 !important;
+  inline-size: 34px !important;
+  min-inline-size: 34px !important;
+  block-size: 34px !important;
+  min-block-size: 34px !important;
+  padding: 0 !important;
+  transform: translateY(-50%);
+}
+
+body:has(.game-review-command-center:fullscreen),
+html:has(.game-review-command-center:fullscreen) {
+  block-size: 100dvh !important;
+  min-block-size: 100dvh !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 840px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 30dvh) auto;
+    grid-template-areas:
+      "analysis"
+      "current"
+      "replay";
+    gap: 8px;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen > .game-review-current-column {
+    max-block-size: 30dvh;
+  }
+
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen .play-lobby-board-actions > [data-board-fullscreen-action] {
+    inset: auto 4px -42px auto !important;
+    transform: none;
+  }
+}
+
+@media (max-width: 520px) {
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen {
+    grid-template-rows: minmax(0, 1fr) minmax(0, 26dvh) auto;
+  }
+}
+
+/* Final Home-only overrides: these selectors intentionally come after the
+   legacy dashboard rules so the compact IA owns its responsive tracks. */
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content.home-lower-rankings {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  overflow: auto hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content.home-lower-rankings li {
+  flex: 0 0 240px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 32px !important;
+  padding: 4px 0 0 !important;
+}
+
+body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content.home-lower-rankings > li.home-lower-empty {
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 1.35;
+}
+
+@media (max-width: 760px) {
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-ritual {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  body:not(.site-tab-mode) #top > .home-command-deck .home-command-session .home-session-ritual-item {
+    min-width: 0 !important;
+    min-height: 42px !important;
+    padding: 5px !important;
+  }
+}

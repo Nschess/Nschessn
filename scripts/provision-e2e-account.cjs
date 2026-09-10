@@ -9,13 +9,21 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { discoverSupabaseConfig, parseEnvFile } = require("./e2e-config.cjs");
+const { parseEnvFile } = require("./e2e-config.cjs");
 
 const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
 const E2E_WALLET_BALANCE = 1_000_000_000;
+// The intelligent Quick Match RPC starts with a narrow candidate band. Keep
+// the two disposable live accounts on deterministic, distinct ratings whose
+// difference is inside that initial band so the E2E exercises real pairing
+// rather than an accidental incompatible fixture contract.
+const E2E_PRIMARY_MATCHMAKING_RATING = 1450;
+const E2E_SECONDARY_MATCHMAKING_RATING = 1520;
 const walletOnly = process.argv.includes("--wallet-only");
 const fixtureOnly = process.argv.includes("--fixture-only");
+const environmentCheck = process.argv.includes("--environment-check");
+const safeTargetEnvironments = new Set(["local", "development", "test", "staging"]);
 
 function fail(message) {
   throw new Error(`E2E Account B provisioning blocked: ${message}`);
@@ -30,6 +38,9 @@ function readE2eValues() {
 }
 
 function writeEnvValue(file, key, value) {
+  // CI receives both disposable accounts through secret-backed environment
+  // variables. Never materialize those credentials in a workspace file.
+  if (process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true" || process.env.E2E_NO_ENV_FILE_WRITE === "1") return;
   const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
   const line = `${key}=${value}`;
   const pattern = new RegExp(`^${key.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}=.*$`, "m");
@@ -115,6 +126,16 @@ async function readCatalogItem(baseUrl, serviceKey, itemId) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 
+async function probeRequiredIntegrationTables(baseUrl, serviceKey) {
+  for (const [table, feature] of [["profiles", "Auth profiles"], ["store_catalog", "Store authority"], ["matchmaking_queue", "Quick Match matchmaking"], ["game_challenges", "Realtime game challenges"]]) {
+    try {
+      await requestJson(`${baseUrl}/rest/v1/${table}?select=*&limit=0`, serviceKey, { serverCredential: true });
+    } catch (error) {
+      fail(`${feature} migration surface is unavailable at public.${table}: ${error.message || error}`);
+    }
+  }
+}
+
 async function readProfile(baseUrl, serviceKey, userId) {
   const query = `id=eq.${encodeURIComponent(userId)}&select=id,public_id,username,avatar,country_flag,rating,coins,xp,wins,losses,draws,title&limit=1`;
   const rows = await requestJson(`${baseUrl}/rest/v1/profiles?${query}`, serviceKey, { serverCredential: true });
@@ -129,7 +150,7 @@ async function updateProfile(baseUrl, serviceKey, userId, profile) {
     headers: { Prefer: "return=representation" },
     body: JSON.stringify(profile)
   });
-  if (!Array.isArray(rows) || rows.length !== 1) fail("the exact Account B profile was not updated");
+  if (!Array.isArray(rows) || rows.length !== 1) fail("the exact disposable E2E profile was not updated");
   return rows[0];
 }
 
@@ -202,16 +223,23 @@ async function resolveExactUser(users, email, label, { requireGenerated = true, 
 }
 
 async function main() {
-  if (!fs.existsSync(envFile)) fail(`the local ${path.basename(envFile)} file is missing; refusing to create a partial E2E configuration`);
+  const ci = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+  if (!fs.existsSync(envFile) && !ci) fail(`the local ${path.basename(envFile)} file is missing; refusing to create a partial E2E configuration`);
   const values = readE2eValues();
-  const config = discoverSupabaseConfig();
-  const baseUrl = (envValue("E2E_SUPABASE_URL", values) || config.url).replace(/\/$/, "");
-  const anonKey = envValue("E2E_SUPABASE_ANON_KEY", values) || config.anonKey;
+  const target = envValue("E2E_ENVIRONMENT", values).toLowerCase();
+  const explicitBaseUrl = envValue("E2E_SUPABASE_URL", values);
+  const explicitAnonKey = envValue("E2E_SUPABASE_ANON_KEY", values);
+  if (!safeTargetEnvironments.has(target)) fail("E2E_ENVIRONMENT must be local, development, test, or staging; production fixture targets are forbidden");
+  if (!explicitBaseUrl) fail("E2E_SUPABASE_URL must be explicitly configured for the dedicated non-production project; production URL discovery is forbidden");
+  if (!explicitAnonKey) fail("E2E_SUPABASE_ANON_KEY must be explicitly configured for the dedicated non-production project");
+  const baseUrl = explicitBaseUrl.replace(/\/$/, "");
+  const anonKey = explicitAnonKey;
   const adminCredential = resolveAdminCredential();
   const serviceKey = adminCredential?.key || "";
-  if (!/^https:\/\/[^/]+\.supabase\.co$/i.test(baseUrl)) fail("a production Supabase HTTPS URL is required");
+  if (!/^https:\/\/[^/]+\.supabase\.co$/i.test(baseUrl)) fail("a dedicated non-production Supabase HTTPS URL is required");
   if (!anonKey) fail("the public Supabase anon/publishable key is not discoverable");
   if (!serviceKey) fail("SUPABASE_SECRET_KEY (preferred) or SUPABASE_SERVICE_ROLE_KEY (legacy fallback) must be supplied only in the current shell; neither is read from or written to .env.e2e");
+  await probeRequiredIntegrationTables(baseUrl, serviceKey);
 
   const configuredEmail = envValue("E2E_SECOND_EMAIL", values).toLowerCase();
   const configuredPassword = String(process.env.E2E_SECOND_PASSWORD || values.E2E_SECOND_PASSWORD || "");
@@ -241,13 +269,20 @@ async function main() {
     const secondaryEmail = configuredEmail;
     if (!secondaryEmail || !configuredPassword) fail("fixture-only reset requires the already-provisioned generated Account B credentials");
     const secondaryUser = await resolveExactUser(users, secondaryEmail, "secondary E2E", { role: "account_b" });
+    const primaryFixtureProfile = await updateProfile(baseUrl, serviceKey, primaryUser.id, {
+      rating: E2E_PRIMARY_MATCHMAKING_RATING,
+      updated_at: new Date().toISOString()
+    });
+    if (Number(primaryFixtureProfile?.rating) !== E2E_PRIMARY_MATCHMAKING_RATING) {
+      fail("fixture-only reset did not set the canonical Account A matchmaking rating");
+    }
     const fixtureProfile = await updateProfile(baseUrl, serviceKey, secondaryUser.id, {
       username,
       display_name: username,
       avatar: "♞",
       country_flag: "JP",
       title: "E2E B Marshal",
-      rating: 1520,
+      rating: E2E_SECONDARY_MATCHMAKING_RATING,
       coins: E2E_WALLET_BALANCE,
       xp: 840,
       wins: 7,
@@ -255,7 +290,9 @@ async function main() {
       draws: 1,
       updated_at: new Date().toISOString()
     });
-    if (Number(fixtureProfile?.coins) !== E2E_WALLET_BALANCE || Number(fixtureProfile?.xp) !== 840) {
+    if (Number(fixtureProfile?.coins) !== E2E_WALLET_BALANCE
+      || Number(fixtureProfile?.xp) !== 840
+      || Number(fixtureProfile?.rating) !== E2E_SECONDARY_MATCHMAKING_RATING) {
       fail("fixture-only reset did not return the canonical Account B profile baseline");
     }
     await equipDistinctiveNameStyle(baseUrl, serviceKey, secondaryUser.id, nameStyleItem);
@@ -265,8 +302,14 @@ async function main() {
     console.log(JSON.stringify({
       result: "Dedicated E2E Account B fixture reset and verified",
       accountBAuthUserId: mask(secondaryUser.id),
-      profileBaseline: { xp: 840, coins: E2E_WALLET_BALANCE, rating: 1520, title: "E2E B Marshal" },
-      accountScope: "only the generated E2E secondary account"
+      profileBaseline: {
+        accountARating: E2E_PRIMARY_MATCHMAKING_RATING,
+        accountBRating: E2E_SECONDARY_MATCHMAKING_RATING,
+        xp: 840,
+        coins: E2E_WALLET_BALANCE,
+        title: "E2E B Marshal"
+      },
+      accountScope: "only the generated E2E primary and secondary accounts"
     }, null, 2));
     return;
   }
@@ -331,6 +374,7 @@ async function main() {
   }
   const userId = String(user?.id || matches[0]?.id || "");
   if (!/^[0-9a-f-]{36}$/i.test(userId)) fail("Supabase Admin Auth did not return a valid Account B user ID");
+  if (userId === String(primaryUser.id || "")) fail("the generated Account B resolved to the generated primary account; refusing to continue because fixture isolation is not proven");
 
   const confirmedPayload = await readAdminUser(baseUrl, serviceKey, userId);
   const confirmedUser = confirmedPayload?.user || confirmedPayload;
@@ -349,7 +393,7 @@ async function main() {
     avatar: "♞",
     country_flag: "JP",
     title: "E2E B Marshal",
-    rating: 1520,
+    rating: E2E_SECONDARY_MATCHMAKING_RATING,
     coins: E2E_WALLET_BALANCE,
     xp: 840,
     wins: 7,
@@ -357,9 +401,19 @@ async function main() {
     draws: 1,
     updated_at: new Date().toISOString()
   });
+  if (Number(updatedProfile?.rating) !== E2E_SECONDARY_MATCHMAKING_RATING) {
+    fail("Account B profile baseline did not persist the canonical matchmaking rating");
+  }
   await equipDistinctiveNameStyle(baseUrl, serviceKey, userId, nameStyleItem);
   const session = await passwordLogin(baseUrl, anonKey, email, password);
   const store = await verifyStoreState(baseUrl, anonKey, session.access_token, nameStyleItem);
+  const primaryFixtureProfile = await updateProfile(baseUrl, serviceKey, primaryUser.id, {
+    rating: E2E_PRIMARY_MATCHMAKING_RATING,
+    updated_at: new Date().toISOString()
+  });
+  if (Number(primaryFixtureProfile?.rating) !== E2E_PRIMARY_MATCHMAKING_RATING) {
+    fail("primary E2E fixture did not receive the canonical matchmaking rating");
+  }
   const primaryBalance = await resetWallet(baseUrl, serviceKey, primaryUser.id, "primary E2E");
   const primarySession = await passwordLogin(baseUrl, anonKey, primaryEmail, primaryPassword);
   const primaryStore = await verifyStoreState(baseUrl, anonKey, primarySession.access_token, "");
@@ -371,7 +425,7 @@ async function main() {
   writeEnvValue(envFile, "E2E_SECOND_PASSWORD", password);
   writeEnvValue(envFile, "E2E_SECOND_EXPECTED_NAME_STYLE", nameStyleValue);
   console.log(JSON.stringify({
-    result: `Account B ${action} through Supabase Auth Admin API`,
+    result: `${environmentCheck ? "Environment check created/reset" : "Account B"} through Supabase Auth Admin API`,
     accountB: {
       email,
       password: "stored only in ignored .env.e2e; not printed",
@@ -384,6 +438,10 @@ async function main() {
       nameStyle: nameStyleItem,
       accountBCoins: Number(updatedProfile.coins),
       accountACoins: primaryBalance,
+      matchmakingRatings: {
+        primary: E2E_PRIMARY_MATCHMAKING_RATING,
+        secondary: E2E_SECONDARY_MATCHMAKING_RATING
+      },
       authenticatedStoreCoins: store.coins
     },
     localCredentialFile: path.relative(root, envFile)
