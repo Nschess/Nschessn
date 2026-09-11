@@ -2735,6 +2735,296 @@ html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-bo
   }
 }
 
+/* Phase-one human entry: pre-game Play begins with an opponent decision,
+   while the released board workspace stays reserved for actual games. */
+#play .human-play-entry {
+  display: none;
+}
+
+body:not(.friend-challenge-mode):not(.tournament-mode) #play#play:not(.is-active-game):not(.is-review-mode) {
+  min-height: 0 !important;
+  padding-block: 14px 32px !important;
+}
+
+body:not(.friend-challenge-mode):not(.tournament-mode) #play#play:not(.is-active-game):not(.is-review-mode) .play-shell {
+  display: none !important;
+}
+
+body:not(.friend-challenge-mode):not(.tournament-mode) #play#play:not(.is-active-game):not(.is-review-mode) .human-play-entry {
+  display: grid;
+  width: min(calc(100% - 32px), 1040px);
+  margin: 18px auto 0;
+  gap: 18px;
+  padding: clamp(20px, 3vw, 34px);
+  border: 1px solid color-mix(in srgb, var(--cq-border, rgba(148, 163, 184, .18)) 86%, transparent);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 18%, transparent), transparent 34%),
+    linear-gradient(140deg, color-mix(in srgb, var(--cq-surface-glass, #0b1527) 82%, #111d35), color-mix(in srgb, var(--cq-surface-input, #101c31) 72%, #080f20));
+  box-shadow: 0 18px 42px rgba(2, 7, 18, .18), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+#play .human-play-entry-head {
+  max-width: 610px;
+}
+
+#play .human-play-entry-head .section-kicker {
+  margin-bottom: 6px;
+}
+
+#play .human-play-entry-head h3 {
+  margin: 0;
+  color: var(--cq-text-primary, #f5f7ff);
+  font-size: clamp(1.3rem, 2.2vw, 1.75rem);
+  letter-spacing: -.035em;
+}
+
+#play .human-play-entry-head p:not(.section-kicker),
+#play .human-play-entry-foot {
+  margin: 7px 0 0;
+  color: var(--cq-text-secondary, #c4cee2);
+  line-height: 1.55;
+}
+
+#play .human-play-entry-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#play .human-play-entry-option {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-height: 108px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--cq-border, rgba(148, 163, 184, .18)) 86%, transparent);
+  border-radius: 14px;
+  color: var(--cq-text-primary, #f5f7ff);
+  text-decoration: none;
+  background: color-mix(in srgb, var(--cq-surface-input, #101c31) 50%, transparent);
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+#play .human-play-entry-option:is(:hover, :focus-visible) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 66%, var(--cq-border, rgba(148, 163, 184, .18)));
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 11%, var(--cq-surface-input, #101c31));
+}
+
+#play .human-play-entry-option.is-primary {
+  border-color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 40%, var(--cq-accent-secondary, #7650ed));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 58%, #182647), color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 13%, #111b31));
+  box-shadow: 0 10px 24px rgba(55, 40, 139, .2), inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+
+#play .human-play-entry-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--cq-accent-primary, #e7b65d);
+  background: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 14%, transparent);
+  font-size: 1.05rem;
+}
+
+#play .human-play-entry-option span:not(.human-play-entry-icon) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+#play .human-play-entry-option strong {
+  font-size: .88rem;
+  letter-spacing: -.012em;
+}
+
+#play .human-play-entry-option small {
+  color: var(--cq-text-secondary, #c4cee2);
+  font-size: .72rem;
+  line-height: 1.35;
+}
+
+#play .human-play-entry-option b {
+  color: var(--cq-accent-primary, #e7b65d);
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+#play .human-play-entry-foot {
+  margin-top: -4px;
+  font-size: .78rem;
+}
+
+#play .human-play-entry-foot a {
+  color: var(--cq-accent-primary, #e7b65d);
+  font-weight: 800;
+}
+
+/* Special routes are focused workspaces, not a lobby above an inactive AI
+   board. The :not(.is-active-game) guard preserves a live friend board. */
+body.friend-challenge-mode #play#play:not(.is-active-game) .play-shell,
+body.tournament-mode #play#play:not(.is-active-game) .play-shell {
+  display: none !important;
+}
+
+body.friend-challenge-mode #play#play:not(.is-active-game) .friend-lobby {
+  width: min(calc(100% - 32px), 980px);
+  margin: 18px auto 32px;
+  gap: 14px;
+  padding: clamp(14px, 2.2vw, 24px);
+}
+
+body.friend-challenge-mode #play .friend-lobby-head {
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--cq-border, rgba(148, 163, 184, .18)) 72%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+
+body.friend-challenge-mode #play .friend-code-card {
+  min-width: 148px;
+  padding: 9px 11px;
+  border-radius: 12px;
+}
+
+body.friend-challenge-mode #play .friend-code-card[hidden] {
+  display: none !important;
+}
+
+body.friend-challenge-mode #play .friend-mode-tabs {
+  margin-top: -2px;
+}
+
+body.friend-challenge-mode #play .friend-lobby-panel {
+  display: grid;
+  gap: 12px;
+}
+
+body.friend-challenge-mode #play .friend-online-panel {
+  display: grid;
+  gap: 10px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cq-border, rgba(148, 163, 184, .18)) 72%, transparent);
+}
+
+body.friend-challenge-mode #play .friend-online-panel > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+body.friend-challenge-mode #play .friend-online-panel span,
+body.friend-challenge-mode #play .friend-match-settings summary small {
+  color: var(--cq-text-secondary, #c4cee2);
+  font-size: .76rem;
+  line-height: 1.4;
+}
+
+body.friend-challenge-mode #play .friend-search-panel {
+  padding: 14px;
+  border-radius: 14px;
+}
+
+body.friend-challenge-mode #play .friend-match-settings {
+  border: 1px solid color-mix(in srgb, var(--cq-border, rgba(148, 163, 184, .18)) 76%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cq-surface-input, #101c31) 38%, transparent);
+}
+
+body.friend-challenge-mode #play .friend-match-settings > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+body.friend-challenge-mode #play .friend-match-settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.friend-challenge-mode #play .friend-match-settings[open] > summary {
+  border-bottom: 1px solid color-mix(in srgb, var(--cq-border, rgba(148, 163, 184, .18)) 72%, transparent);
+}
+
+body.friend-challenge-mode #play .friend-match-settings-body {
+  padding: 14px;
+}
+
+body.friend-challenge-mode #play .friend-match-settings .friend-lobby-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body.friend-challenge-mode #play .friend-match-settings .friend-clock-control {
+  grid-column: 1 / -1;
+}
+
+body.friend-challenge-mode #play .friend-share-card {
+  padding: 14px;
+  border-radius: 14px;
+}
+
+body.friend-challenge-mode #play .friend-share-row {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body.friend-challenge-mode #play .friend-lobby-foot {
+  padding: 2px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+@media (max-width: 760px) {
+  body:not(.friend-challenge-mode):not(.tournament-mode) #play#play:not(.is-active-game):not(.is-review-mode) .human-play-entry,
+  body.friend-challenge-mode #play#play:not(.is-active-game) .friend-lobby {
+    width: min(calc(100% - 20px), 720px);
+  }
+
+  #play .human-play-entry-options {
+    grid-template-columns: 1fr;
+  }
+
+  #play .human-play-entry-option {
+    min-height: 72px;
+  }
+}
+
+@media (max-width: 560px) {
+  body:not(.friend-challenge-mode):not(.tournament-mode) #play#play:not(.is-active-game):not(.is-review-mode) .human-play-entry {
+    padding: 18px;
+  }
+
+  body.friend-challenge-mode #play#play:not(.is-active-game) .friend-lobby {
+    padding: 12px;
+  }
+
+  body.friend-challenge-mode #play .friend-match-settings > summary {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding-block: 10px;
+  }
+
+  body.friend-challenge-mode #play .friend-match-settings .friend-lobby-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Final action hierarchy. A completed game deserves two clear next moves;
    a live restart and board utilities should never compete with the position. */
 html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls #restartGame {

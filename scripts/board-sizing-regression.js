@@ -244,6 +244,7 @@ async function waitForRouteStylesheet(page, name) {
 async function setBoardScale(page, value) {
   await openRoute(page, "#settings");
   await page.locator('[data-settings-tab="gameplay"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-settings-page="gameplay"]')?.classList.contains("is-active"), null, { timeout: 5000 });
   const slider = page.locator('input[data-pref-setting="boardScale"]');
   await slider.waitFor({ state: "visible" });
   await slider.evaluate((input, nextValue) => {
@@ -267,6 +268,7 @@ async function startPlayGame(page) {
   await bot.click();
   const ready = page.locator("#aiGameReady");
   await ready.waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.getElementById("aiGameReady")?.dataset.ready === "true", null, { timeout: 15000 });
   await page.locator("#aiGameReadyStart").click();
   await waitForBoard(page, "#coachBoard");
   await page.waitForTimeout(250);

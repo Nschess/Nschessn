@@ -194,7 +194,7 @@ const requiredRegressionContracts = [
   ["active coach tone", /data-profile-setting="coachTone"[\s\S]*?function getCoachTone\([\s\S]*?function getPremiumSessionVoice\([\s\S]*?function getPremiumMomentumCopy\(/],
   ["premium home reduced motion", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-session-ritual-item[\s\S]*?\.home-momentum-milestone[\s\S]*?\.home-momentum-meter span/],
   ["cacheable application asset split", /href="assets\/app\.css(?:\?v=[^"]+)?"[\s\S]*?src="assets\/app\.js(?:\?v=[^"]+)?"/],
-  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v\d+-[^"]+";[\s\S]*?"\.\/assets\/app\.css\?v=review-v\d+-[^"]+"[\s\S]*?"\.\/assets\/app\.js\?v=review-v\d+-[^"]+"[\s\S]*?isReviewShellAsset/],
+  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v\d+-[^"]+";[\s\S]*?"\.\/assets\/app\.css\?v=review-v\d+-[^"]+"[\s\S]*?"\.\/assets\/app\.js\?v=(?:review-v\d+-[^"]+|play-human-entry-v\d+)"[\s\S]*?isReviewShellAsset/],
   ["friend challenge create and join tabs", /id="friendCreateTab"[\s\S]*?aria-controls="friendCreatePanel"[\s\S]*?id="friendJoinTab"[\s\S]*?aria-controls="friendJoinPanel"/],
   ["friend challenge valid default clock", /function normalizeFriendChallengeClock\(value\)[\s\S]*?"5\+0"[\s\S]*?function getFriendInviteLink\([\s\S]*?clock: source\.clock/],
   ["friend challenge quick time controls", /id="friendClockPresets"[\s\S]*?data-friend-clock="3\+2"[\s\S]*?data-friend-clock="5\+0"[\s\S]*?data-friend-clock="10\+0"/],

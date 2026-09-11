@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const app = read("assets/app.js");
 const css = read("assets/app.css");
 const playCss = read("assets/play-lobby.css");
+const serviceWorker = read("service-worker.js");
 const html = read("index.html");
 
 assert.match(app, /function showRouteFeatureFailure\(panel, featureName\)/, "Deferred route failures must have a visible recovery boundary.");
@@ -17,9 +18,19 @@ assert.match(app, /Route module \$\{name\} failed to load\.[\s\S]*?routeError: t
 assert.match(app, /if \(module\?\.routeError\) showRouteFeatureFailure\(panelElement, `route:\$\{module\.routeName \|\| panel\}`\)/, "Route-module failures must render their retry boundary on the active panel.");
 assert.match(app, /if \(ok === false\) showRouteFeatureFailure\(panelElement, name\)/, "Deferred initializer failures must surface on the active route.");
 assert.match(app, /function syncOptionalRouteStylesheets\(styles = \[\]\)/, "Route CSS must have an active-route reconciliation path.");
+assert.match(app, /const optionalRouteStylesheetVersion = "play-human-entry-v234";/, "The human Play entry must request its current route stylesheet rather than a released-board cache key.");
+assert.match(app, /const currentHref = new URL\(current\.href, document\.baseURI\)\.href;[\s\S]*?if \(currentHref === requestedHref\)[\s\S]*?current\.remove\(\);/, "An already-injected released Play stylesheet must be replaced when the current entry stylesheet changes.");
+assert.match(html, /assets\/app\.js\?v=play-human-entry-v234/, "The shipped shell must request the current human Play entry controller.");
+assert.match(serviceWorker, /nschess-shell-v184-human-play-entry[\s\S]*?assets\/app\.js\?v=play-human-entry-v234/, "The offline shell must refresh with the human Play entry controller.");
 assert.match(app, /link\.remove\(\);\s*optionalRouteStylesheetPromises\.delete\(key\);/, "Inactive route CSS must be removed with its cached loader promise.");
 assert.match(app, /firstVisitSetupClose\?\.\(\{ restoreFocus: false \}\)/, "Home onboarding must close before changing routes.");
 assert.match(app, /document\.body\.classList\.toggle\("is-board-route", \["play", "puzzles", "gameReview"\]\.includes\(config\.panel\)\)/, "Board-centric routes must own compact navigation state.");
+assert.match(html, /id="humanPlayEntry"[\s\S]*?Quick Match[\s\S]*?Play a Friend[\s\S]*?Challenge a Player/, "Inactive Play must lead with the three human-play decisions.");
+assert.doesNotMatch(html, /Open Challenges/, "Open Challenges must not be presented until a browsable backend lobby exists.");
+assert.match(html, /id="friendCodeCard" hidden/, "Friend challenge must not show an idle invite code before a private invite exists.");
+assert.match(html, /id="friendList"[\s\S]*?id="friendSearchInput"[\s\S]*?id="friendMatchSettings"[\s\S]*?id="friendInviteLink"/, "Friend challenge must prioritize friends, then search, compact match details, and private sharing.");
+assert.match(playCss, /body\.friend-challenge-mode #play#play:not\(\.is-active-game\) \.play-shell,[\s\S]*?body\.tournament-mode #play#play:not\(\.is-active-game\) \.play-shell[\s\S]*?display: none !important;/, "Friend and Tournament routes must isolate their inactive workspace from the AI Play shell.");
+assert.match(playCss, /body:not\(\.friend-challenge-mode\):not\(\.tournament-mode\) #play#play:not\(\.is-active-game\):not\(\.is-review-mode\) \.play-shell[\s\S]*?display: none !important;/, "Inactive default Play must show the human entry instead of the AI workspace, even before deferred Play initialization completes.");
 assert.match(app, /function openResignConfirmation\(\)/, "Resign must require an explicit confirmation step.");
 assert.match(app, /document\.getElementById\("resignConfirmButton"\)\?\.addEventListener/, "The resign confirmation action must be wired to a visible dialog.");
 assert.match(html, /id="resignConfirmDialog"[\s\S]*?id="resignConfirmCancel"[\s\S]*?id="resignConfirmButton"/, "Resign confirmation dialog markup must include cancel and confirm actions.");

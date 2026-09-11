@@ -2889,10 +2889,36 @@
         <div class="section-head cq-section-header">
           <div>
             <p class="section-kicker">Play</p>
-            <h2 id="play-title">Play the coach</h2>
+            <h2 id="play-title">Play chess online</h2>
           </div>
-          <p class="section-intro">Start a friendly game. Full chess rules are built in.</p>
+          <p class="section-intro">Choose a human opponent, then get straight to the board.</p>
         </div>
+
+        <section class="human-play-entry" id="humanPlayEntry" aria-labelledby="humanPlayEntryTitle">
+          <div class="human-play-entry-head">
+            <p class="section-kicker">Human play</p>
+            <h3 id="humanPlayEntryTitle">Find your next opponent.</h3>
+            <p>Start a quick game, play someone you know, or look up a specific player.</p>
+          </div>
+          <div class="human-play-entry-options" aria-label="Human play options">
+            <a class="human-play-entry-option is-primary" href="#play?mode=quick" data-site-tab="play" data-site-panel="play" data-play-mode="quick">
+              <span class="human-play-entry-icon" aria-hidden="true">&#9889;</span>
+              <span><strong>Quick Match</strong><small>Play a random opponent</small></span>
+              <b aria-hidden="true">&#8250;</b>
+            </a>
+            <a class="human-play-entry-option" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">
+              <span class="human-play-entry-icon" aria-hidden="true">&#128101;</span>
+              <span><strong>Play a Friend</strong><small>Challenge someone you know</small></span>
+              <b aria-hidden="true">&#8250;</b>
+            </a>
+            <a class="human-play-entry-option" href="#friends" data-site-tab="friends" data-site-panel="friends" data-site-focus="friendsHub">
+              <span class="human-play-entry-icon" aria-hidden="true">&#128269;</span>
+              <span><strong>Challenge a Player</strong><small>Search registered players</small></span>
+              <b aria-hidden="true">&#8250;</b>
+            </a>
+          </div>
+          <p class="human-play-entry-foot">Looking for practice instead? <a href="#bots" data-site-tab="bots" data-site-panel="bots">Play against AI bots</a>.</p>
+        </section>
 
         <div class="friend-lobby" id="friendChallenge" aria-labelledby="friendChallengeTitle">
           <div class="friend-lobby-head">
@@ -2901,7 +2927,7 @@
               <h3 id="friendChallengeTitle">Play a friend</h3>
               <p>Create or join a private game.</p>
             </div>
-            <div class="friend-code-card">
+            <div class="friend-code-card" id="friendCodeCard" hidden>
               <small>Invite code</small>
               <strong id="friendChallengeCode">READY</strong>
               <button class="button secondary" type="button" id="friendNewCode">New code</button>
@@ -2925,41 +2951,48 @@
           </div>
 
           <section class="friend-lobby-panel" id="friendCreatePanel" role="tabpanel" aria-labelledby="friendCreateTab">
-            <div class="friend-lobby-grid">
-              <label>Invite visibility
-                <select id="friendInviteType"><option value="private">Private link</option><option value="public">Public lobby</option></select>
-              </label>
-              <label>Game style
-                <select id="friendGameType"><option value="casual">Casual</option><option value="rated">Rated</option></select>
-              </label>
-              <label>Play as
-                <select id="friendColor"><option value="random">Random color</option><option value="w">White</option><option value="b">Black</option></select>
-              </label>
-              <fieldset class="friend-clock-control">
-                <legend>Time control</legend>
-                <div class="friend-clock-presets" id="friendClockPresets" aria-label="Quick time controls">
-                  <button type="button" data-friend-clock="3+2" aria-pressed="false">3+2 <small>Blitz</small></button>
-                  <button type="button" data-friend-clock="5+0" aria-pressed="true">5+0 <small>Blitz</small></button>
-                  <button type="button" data-friend-clock="10+0" aria-pressed="false">10+0 <small>Rapid</small></button>
-                  <button type="button" data-friend-clock="15+10" aria-pressed="false">15+10 <small>Rapid</small></button>
-                  <button type="button" data-friend-clock="none" aria-pressed="false">No clock</button>
-                </div>
-                <select id="friendClock" aria-label="Time control"><option value="none">No clock</option><option value="3+2">3+2 Blitz</option><option value="5+0" selected>5+0 Blitz</option><option value="10+0">10+0 Rapid</option><option value="15+10">15+10 Rapid</option></select>
-              </fieldset>
-            </div>
+            <section class="friend-online-panel" aria-labelledby="friendOnlineTitle">
+              <div><strong id="friendOnlineTitle">Friends ready to play</strong><span>Challenge someone from your network first.</span></div>
+              <div class="friend-list" id="friendList" aria-label="Your friends"></div>
+            </section>
 
             <div class="friend-search-panel" aria-label="Find and challenge friends">
-              <div><strong>Challenge someone</strong><span>Find a player and send an invite.</span></div>
+              <div><strong>Challenge a player</strong><span>Search a registered username when they are not already in your friends list.</span></div>
               <div class="friend-search-row">
                 <input id="friendSearchInput" type="search" autocomplete="off" placeholder="Search player name..." aria-label="Search players to add as friends" />
                 <button class="button secondary" type="button" id="friendSearchButton">Find players</button>
               </div>
               <div class="friend-search-results" id="friendSearchResults" aria-live="polite"></div>
-              <div class="friend-list" id="friendList" aria-label="Your friends"></div>
             </div>
 
+            <details class="friend-match-settings" id="friendMatchSettings">
+              <summary><span>Match details</span><small>5+0 · Casual · Random color</small></summary>
+              <div class="friend-match-settings-body">
+                <input id="friendInviteType" type="hidden" value="private" />
+                <div class="friend-lobby-grid">
+                  <label>Game style
+                    <select id="friendGameType"><option value="casual">Casual</option><option value="rated">Rated</option></select>
+                  </label>
+                  <label>Play as
+                    <select id="friendColor"><option value="random">Random color</option><option value="w">White</option><option value="b">Black</option></select>
+                  </label>
+                  <fieldset class="friend-clock-control">
+                    <legend>Time control</legend>
+                    <div class="friend-clock-presets" id="friendClockPresets" aria-label="Quick time controls">
+                      <button type="button" data-friend-clock="3+2" aria-pressed="false">3+2 <small>Blitz</small></button>
+                      <button type="button" data-friend-clock="5+0" aria-pressed="true">5+0 <small>Blitz</small></button>
+                      <button type="button" data-friend-clock="10+0" aria-pressed="false">10+0 <small>Rapid</small></button>
+                      <button type="button" data-friend-clock="15+10" aria-pressed="false">15+10 <small>Rapid</small></button>
+                      <button type="button" data-friend-clock="none" aria-pressed="false">No clock</button>
+                    </div>
+                    <select id="friendClock" aria-label="Time control"><option value="none">No clock</option><option value="3+2">3+2 Blitz</option><option value="5+0" selected>5+0 Blitz</option><option value="10+0">10+0 Rapid</option><option value="15+10">15+10 Rapid</option></select>
+                  </fieldset>
+                </div>
+              </div>
+            </details>
+
             <div class="friend-share-card" aria-label="Create and share a private invite">
-              <div class="friend-share-card-copy"><strong>Private invite</strong><span>Create an invite to get a link and code.</span></div>
+              <div class="friend-share-card-copy"><strong>Invite by link</strong><span>Create a private link and code when your friend is not here.</span></div>
               <div class="friend-share-row">
                 <input id="friendInviteLink" readonly aria-label="Friend challenge invite link" placeholder="Create an invite to get a share link" />
                 <button class="button secondary" type="button" id="friendCopyLink" disabled>Copy link</button>
@@ -4630,6 +4663,6 @@
   </aside>
 
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
-  <script defer src="assets/app.js?v=review-v226-startup-performance"></script>
+  <script defer src="assets/app.js?v=play-human-entry-v234"></script>
 </body>
 </html>

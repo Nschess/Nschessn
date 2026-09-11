@@ -47,6 +47,7 @@ async function startActivePlay(page) {
   await page.goto(`${baseUrl}/#bots`, { waitUntil: "domcontentloaded" });
   await page.locator("#aiBotRoster [data-ai-bot-play]").first().click();
   await page.locator("#aiGameReady").waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.getElementById("aiGameReady")?.dataset.ready === "true", null, { timeout: 15000 });
   await page.locator("#aiGameReadyStart").click();
   await page.waitForFunction(() => document.querySelectorAll("#coachBoard [data-square]").length === 64, null, { timeout: 15000 });
   await page.waitForFunction(() => {
@@ -215,12 +216,83 @@ async function main() {
         await context.close();
       }
     }
+    await runInactiveHumanEntryRegression(browser);
     await runActiveContextAndFullscreenRegression(browser);
     console.log(`PASS Play board-priority responsive regression (${results.join(", ")})`);
   } finally {
     await browser.close();
     server.kill();
   }
+}
+
+async function runInactiveHumanEntryRegression(browser) {
+  const results = [];
+  for (const [width, height] of viewports) {
+    const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
+    try {
+      await installOfflineSupabaseFixture(context);
+      const page = await context.newPage();
+
+      await page.goto(`${baseUrl}/#play`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => document.getElementById("humanPlayEntry") && getComputedStyle(document.getElementById("humanPlayEntry")).display !== "none");
+      const humanEntry = await page.evaluate(() => ({
+        entryVisible: getComputedStyle(document.getElementById("humanPlayEntry")).display !== "none",
+        workspaceVisible: getComputedStyle(document.getElementById("playWorkspace")).display !== "none",
+        options: [...document.querySelectorAll("#humanPlayEntry .human-play-entry-option")].map((option) => option.textContent.replace(/\s+/g, " ").trim()),
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1
+      }));
+      assert.equal(humanEntry.entryVisible, true, `${width}x${height}: human Play entry is not visible.`);
+      assert.equal(humanEntry.workspaceVisible, false, `${width}x${height}: inactive Play kept the AI workspace visible.`);
+      assert.equal(humanEntry.options.length, 3, `${width}x${height}: human Play must keep exactly three primary choices.`);
+      assert.match(humanEntry.options[0], /Quick Match\s*Play a random opponent/,
+        `${width}x${height}: Quick Match copy changed unexpectedly.`);
+      assert.match(humanEntry.options[1], /Play a Friend\s*Challenge someone you know/,
+        `${width}x${height}: Play a Friend copy changed unexpectedly.`);
+      assert.match(humanEntry.options[2], /Challenge a Player\s*Search registered players/,
+        `${width}x${height}: Challenge a Player copy changed unexpectedly.`);
+      assert.equal(humanEntry.overflow, false, `${width}x${height}: human Play entry introduced horizontal overflow.`);
+      await page.locator("#humanPlayEntry .human-play-entry-option.is-primary").click();
+      await page.locator("#quickMatchSetup").waitFor({ state: "visible" });
+      await page.locator("#quickMatchSetupCancel").click();
+      await page.locator("#quickMatchSetup").waitFor({ state: "hidden" });
+
+      await page.goto(`${baseUrl}/#play?mode=friend`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => document.body.classList.contains("friend-challenge-mode")
+        && getComputedStyle(document.getElementById("friendChallenge")).display !== "none");
+      const friend = await page.evaluate(() => {
+        const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect?.();
+        return {
+          workspaceVisible: getComputedStyle(document.getElementById("playWorkspace")).display !== "none",
+          friendVisible: getComputedStyle(document.getElementById("friendChallenge")).display !== "none",
+          detailsOpen: document.getElementById("friendMatchSettings")?.open,
+          order: ["#friendList", ".friend-search-panel", "#friendMatchSettings", ".friend-share-card"].map((selector) => rect(selector)?.top ?? -1),
+          overflow: document.documentElement.scrollWidth > window.innerWidth + 1
+        };
+      });
+      assert.equal(friend.friendVisible, true, `${width}x${height}: Friend workspace is not visible.`);
+      assert.equal(friend.workspaceVisible, false, `${width}x${height}: Friend route rendered the inactive AI workspace.`);
+      assert.equal(friend.detailsOpen, false, `${width}x${height}: Friend match details should begin collapsed.`);
+      assert(friend.order.every((top) => top >= 0) && friend.order.every((top, index) => index === 0 || top > friend.order[index - 1]),
+        `${width}x${height}: Friend workspace no longer follows people → search → details → share: ${JSON.stringify(friend)}.`);
+      assert.equal(friend.overflow, false, `${width}x${height}: Friend workspace introduced horizontal overflow.`);
+
+      await page.goto(`${baseUrl}/#play?mode=tournament`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => document.body.classList.contains("tournament-mode")
+        && getComputedStyle(document.getElementById("tournamentLobby")).display !== "none");
+      const tournament = await page.evaluate(() => ({
+        workspaceVisible: getComputedStyle(document.getElementById("playWorkspace")).display !== "none",
+        tournamentVisible: getComputedStyle(document.getElementById("tournamentLobby")).display !== "none",
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1
+      }));
+      assert.equal(tournament.tournamentVisible, true, `${width}x${height}: Tournament workspace is not visible.`);
+      assert.equal(tournament.workspaceVisible, false, `${width}x${height}: Tournament route rendered the inactive AI workspace.`);
+      assert.equal(tournament.overflow, false, `${width}x${height}: Tournament workspace introduced horizontal overflow.`);
+      results.push(`${width}x${height}`);
+    } finally {
+      await context.close();
+    }
+  }
+  console.log(`PASS human Play entry and special-lobby isolation (${results.join(", ")})`);
 }
 
 async function runActiveContextAndFullscreenRegression(browser) {

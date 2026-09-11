@@ -25288,10 +25288,16 @@
         }
       }
       if (list) {
+        const acceptedFriends = directory
+          .filter((friend) => friend.requestStatus === "accepted")
+          .sort((left, right) => {
+            const availability = Number(Boolean(right.online)) - Number(Boolean(left.online));
+            return availability || String(left.name || "").localeCompare(String(right.name || ""));
+          });
         const records = [
           ...directory.filter((friend) => friend.requestDirection === "incoming" && friend.requestStatus === "pending").map((friend) => ({ friend, mode: "incoming" })),
           ...directory.filter((friend) => friend.requestDirection === "outgoing" && friend.requestStatus === "pending").map((friend) => ({ friend, mode: "outgoing" })),
-          ...directory.filter((friend) => friend.requestStatus === "accepted").map((friend) => ({ friend, mode: "friend" }))
+          ...acceptedFriends.map((friend) => ({ friend, mode: "friend" }))
         ];
         if (records.length) {
           patchKeyedChildren(list, records, ({ friend, mode }) => `${mode}:${friend.id}`, ({ friend, mode }) => createFriendCard(friend, mode), ({ friend, mode }) => JSON.stringify([mode, friend.id, friend.name, friend.title, friend.rating, friend.online, friend.requestStatus, friend.requestDirection]));
@@ -25328,11 +25334,13 @@
         if (element && document.activeElement !== element) element.value = value;
       };
       const code = document.getElementById("friendChallengeCode");
+      const codeCard = document.getElementById("friendCodeCard");
       const link = document.getElementById("friendInviteLink");
       const status = document.getElementById("friendChallengeStatus");
       const joinCode = document.getElementById("friendJoinCode");
       const shareReady = Boolean(state.remote && ["pending", "accepted", "active"].includes(state.status));
       const spectator = isFriendSpectatorMode(state);
+      if (codeCard) codeCard.hidden = !shareReady;
       if (code) code.textContent = shareReady ? state.code : "READY";
       if (link) {
         link.value = shareReady ? getFriendInviteLink(state) : "";
@@ -25353,7 +25361,7 @@
           ? `Live friend board: ${state.gameType === "rated" ? "Rated" : "Casual"} • ${state.clock === "none" ? "No clock" : `${state.clock} clock`} • ${state.gameType === "casual" ? "takebacks allowed" : "rated rules"}.`
            : state.status === "declined"
            ? "This challenge was declined. Pick a fresh setup when you are ready."
-           : "Choose time and color, then challenge a player or share this code.";
+           : "Choose a friend, search a player, or create a private invite.";
         if (spectator) status.textContent = `Watching ${state.targetName || state.creatorName || "a live friend game"}. Moves and chat update automatically.`;
       }
       setValue("friendInviteType", state.inviteType);
@@ -35847,7 +35855,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "play-focus-v232-quiet-surfaces";
+    const optionalRouteStylesheetVersion = "play-human-entry-v234";
     const optionalRouteStylesheetPaths = Object.freeze({ "play-lobby": "assets/play-lobby.css" });
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
@@ -35858,7 +35866,12 @@
         const path = optionalRouteStylesheetPaths[key] || `assets/routes/${encodeURIComponent(key)}.css`;
         const href = `${path}?v=${optionalRouteStylesheetVersion}`;
         const current = document.querySelector(`link[data-route-style="${key}"]`);
-        if (current) { resolve(true); return; }
+        if (current) {
+          const currentHref = new URL(current.href, document.baseURI).href;
+          const requestedHref = new URL(href, document.baseURI).href;
+          if (currentHref === requestedHref) { resolve(true); return; }
+          current.remove();
+        }
         const link = document.createElement("link");
         link.rel = "stylesheet";
         link.href = href;
