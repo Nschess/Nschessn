@@ -2901,9 +2901,9 @@
             <p>Start a quick game, play someone you know, or look up a specific player.</p>
           </div>
           <div class="human-play-entry-options" aria-label="Human play options">
-            <a class="human-play-entry-option is-primary" href="#play?mode=quick" data-site-tab="play" data-site-panel="play" data-play-mode="quick">
+            <a class="human-play-entry-option is-primary" href="#play?mode=quick" data-site-tab="play" data-site-panel="play" data-play-mode="quick" aria-label="Play Now: Quick Match">
               <span class="human-play-entry-icon" aria-hidden="true">&#9889;</span>
-              <span><strong>Quick Match</strong><small>Play a random opponent</small></span>
+              <span><strong>Play Now</strong><small><span class="quick-match-entry-label">Quick Match</span><span class="quick-match-entry-settings" id="quickMatchSavedSettings">5+0 • Casual • Random</span></small></span>
               <b aria-hidden="true">&#8250;</b>
             </a>
             <a class="human-play-entry-option" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">
@@ -2952,12 +2952,12 @@
 
           <section class="friend-lobby-panel" id="friendCreatePanel" role="tabpanel" aria-labelledby="friendCreateTab">
             <section class="friend-online-panel" aria-labelledby="friendOnlineTitle">
-              <div><strong id="friendOnlineTitle">Friends ready to play</strong><span>Challenge someone from your network first.</span></div>
+              <div><strong id="friendOnlineTitle"><i class="friend-online-indicator" aria-hidden="true"></i>Online friends</strong><span>Live presence is shown when it is available. Challenge someone from your network first.</span></div>
               <div class="friend-list" id="friendList" aria-label="Your friends"></div>
             </section>
 
             <div class="friend-search-panel" aria-label="Find and challenge friends">
-              <div><strong>Challenge a player</strong><span>Search a registered username when they are not already in your friends list.</span></div>
+              <div><strong><span aria-hidden="true">&#128269;</span> Find a player</strong><span>Search a registered username when they are not already in your friends list.</span></div>
               <div class="friend-search-row">
                 <input id="friendSearchInput" type="search" autocomplete="off" placeholder="Search player name..." aria-label="Search players to add as friends" />
                 <button class="button secondary" type="button" id="friendSearchButton">Find players</button>
@@ -2992,7 +2992,7 @@
             </details>
 
             <div class="friend-share-card" aria-label="Create and share a private invite">
-              <div class="friend-share-card-copy"><strong>Invite by link</strong><span>Create a private link and code when your friend is not here.</span></div>
+              <div class="friend-share-card-copy"><strong><span aria-hidden="true">&#128279;</span> Invite / share</strong><span>Create a private link and code when your friend is not here.</span></div>
               <div class="friend-share-row">
                 <input id="friendInviteLink" readonly aria-label="Friend challenge invite link" placeholder="Create an invite to get a share link" />
                 <button class="button secondary" type="button" id="friendCopyLink" disabled>Copy link</button>
@@ -3859,8 +3859,9 @@
         <button class="quick-match-close" type="button" id="quickMatchSetupCancel" aria-label="Close Quick Match setup">×</button>
         <span class="quick-match-symbol" aria-hidden="true">⚡</span>
         <p class="section-kicker">Quick Match</p>
-        <h2 id="quickMatchSetupTitle">Quick Match Setup</h2>
-        <p class="quick-match-status">Choose your preferred game, then we will find the closest available opponent.</p>
+        <h2 id="quickMatchSetupTitle">Set up your human game</h2>
+        <p class="quick-match-status">Review your saved settings, adjust anything you want, then enter the human matchmaking queue.</p>
+        <div class="quick-match-saved-settings" aria-live="polite"><span>Saved settings</span><strong id="quickMatchSetupSummary">5+0 • Casual • Random</strong></div>
         <div class="quick-match-setup-fields">
           <label>Time Control
             <select id="quickMatchTimeControl" name="timeControl">
@@ -3875,7 +3876,7 @@
           </label>
         </div>
         <label class="quick-match-remember"><input id="quickMatchRemember" type="checkbox" /> Remember these settings on this device</label>
-        <div class="quick-match-setup-actions"><button class="button secondary" type="button" id="quickMatchSetupStop">Cancel</button><button class="button" type="submit">Start Matchmaking</button></div>
+        <div class="quick-match-setup-actions"><button class="button secondary" type="button" id="quickMatchSetupStop">Cancel</button><button class="button" type="submit" id="quickMatchPlayNow">Play Now</button></div>
       </form>
     </div>
 
@@ -3884,11 +3885,18 @@
         <button class="quick-match-close" type="button" id="quickMatchCancel" aria-label="Cancel matchmaking">×</button>
         <span class="quick-match-symbol" aria-hidden="true">⚡</span>
         <p class="section-kicker">Quick Match</p>
-        <h2 id="quickMatchTitle">Finding your opponent</h2>
-        <p class="quick-match-status" id="quickMatchStatus" role="status" aria-live="polite">Searching the online pool…</p>
+        <span class="quick-match-state" id="quickMatchSearchState">Searching</span>
+        <h2 id="quickMatchTitle">Finding a human opponent</h2>
+        <p class="quick-match-status" id="quickMatchStatus" role="status" aria-live="polite">Searching with your selected game settings.</p>
         <div class="quick-match-signal" aria-hidden="true"><span></span><span></span><span></span></div>
-         <div class="quick-match-meta"><span id="quickMatchMetaType">Casual</span><span id="quickMatchMetaTime">5+0</span><span id="quickMatchMetaColor">Random color</span><span id="quickMatchMetaRange">±100 rating</span></div>
-         <div class="quick-match-search-actions"><button class="button secondary" type="button" id="quickMatchChange">Change settings</button><button class="button secondary" type="button" id="quickMatchStop">Cancel search</button></div>
+        <div class="quick-match-meta" aria-label="Current matchmaking settings">
+          <span><small>Time control</small><strong id="quickMatchMetaTime">5+0</strong></span>
+          <span><small>Game type</small><strong id="quickMatchMetaType">Casual</strong></span>
+          <span><small>Color</small><strong id="quickMatchMetaColor">Random</strong></span>
+          <span id="quickMatchRangeItem" hidden><small>Rating range</small><strong id="quickMatchMetaRange"></strong></span>
+        </div>
+        <p class="quick-match-fallback" id="quickMatchFallback" role="status" hidden><strong>AI fallback</strong><span>A human match was not completed; the same settings will start against AI.</span></p>
+        <div class="quick-match-search-actions"><button class="button secondary" type="button" id="quickMatchChange">Change settings</button><button class="button secondary" type="button" id="quickMatchStop">Cancel</button></div>
       </div>
     </div>
 
@@ -4663,6 +4671,6 @@
   </aside>
 
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
-  <script defer src="assets/app.js?v=play-human-entry-v234"></script>
+  <script defer src="assets/app.js?v=play-human-matchmaking-v235"></script>
 </body>
 </html>

@@ -36,6 +36,7 @@ function run() {
   includes(intelligentSql, "heartbeat_at >= now() - interval '45 seconds'", "stale queue exclusion");
   includes(intelligentSql, "create or replace function public.resolve_matchmaking_timeout", "server fallback decision");
   includes(intelligentSql, "create or replace function public.heartbeat_matchmaking_queue", "queue heartbeat");
+  includes(intelligentSql, "'ratingRange', public.quick_match_rating_band", "server-owned rating range payload");
   includes(pairingSecuritySql, "auth.uid() <> p_user_id", "pairing authenticates the queue owner");
   assert.match(pairingSecuritySql, /creator_row := self_row;\s*opponent_user_row := opponent_row;/,
     "pairing uses the authenticated caller as challenge creator");
@@ -71,6 +72,17 @@ function run() {
   includes(intelligentSql, "delete from public.matchmaking_queue where id = p_ticket_id and user_id = current_user_id", "server queue-leave account isolation");
   includes(app, "if (!ticketId) throw new Error(\"Matchmaking did not return a queue ticket.\");", "ticket requirement");
   includes(app, "provider.heartbeatMatchmakingQueue?.(ticketId)", "client queue heartbeat");
+  assert.match(app, /const ratingRange = source\.ratingRange[\s\S]*?hasRatingRange:[\s\S]*?const reportStatus = \(payload\) => \{[\s\S]*?options\.onStatus\?\.\(ticket\)/,
+    "client surfaces the server-owned rating range through an explicit queue-status callback");
+  assert.match(app, /waitForOnlineMatch\(state\.controller\.signal, \(ticket\) => \{[\s\S]*?setMatchMeta\(state\.options, ticket\)/,
+    "search metadata updates from the authenticated queue ticket rather than a fabricated rating band");
+  assert.match(app, /setSearchPresentation\("AI fallback",[\s\S]*?No human match was completed/,
+    "AI handoff remains visibly identified as a fallback");
+  assert.doesNotMatch(
+    app,
+    /Searching for a human opponent\.\.\. \$\{seconds\}s|AI fallback after \$\{/,
+    "search messaging must not present client-invented timing as a queue estimate"
+  );
   includes(app, "normalized.status !== \"active\"", "matched game status validation");
   includes(app, "async startMatch(match)", "same-game transition");
   includes(app, "stopQuickMatchSearch?.();", "account-transition cleanup");

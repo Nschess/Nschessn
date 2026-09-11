@@ -28969,14 +28969,23 @@ body.low-performance #store .store-tier-signal::after { animation: none; }
     .quick-match-dialog .section-kicker { margin: 4px 0 -7px; }
     .quick-match-dialog h2 { margin: 0; font-family: var(--cq-font-display, inherit); font-size: clamp(1.35rem, 4vw, 1.75rem); letter-spacing: var(--cq-tracking-heading, -0.02em); }
     .quick-match-status { min-height: 1.5em; margin: 0; color: var(--cq-text-muted, var(--muted)); font-size: 0.84rem; }
+    .quick-match-state { padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--cq-accent-secondary, #38bdf8) 52%, transparent); border-radius: 999px; color: var(--cq-accent-secondary, #7dd3fc); background: color-mix(in srgb, var(--cq-accent-secondary, #38bdf8) 10%, transparent); font-size: .68rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 
     .quick-match-signal { display: flex; align-items: end; justify-content: center; gap: 6px; min-height: 28px; }
     .quick-match-signal span { width: 7px; height: 11px; border-radius: 999px; background: var(--cq-accent-secondary, var(--blue)); animation: quickMatchPulse 1s ease-in-out infinite; }
     .quick-match-signal span:nth-child(2) { height: 20px; animation-delay: 120ms; }
     .quick-match-signal span:nth-child(3) { height: 28px; animation-delay: 240ms; }
 
-    .quick-match-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
-    .quick-match-meta span { padding: 5px 8px; border: 1px solid var(--cq-border, var(--line)); border-radius: 999px; color: var(--cq-text-secondary, var(--soft)); background: var(--cq-surface-pill, rgba(59, 130, 246, 0.1)); font-size: 0.68rem; font-weight: 750; }
+    .quick-match-meta { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; text-align: left; }
+    .quick-match-meta span { display: grid; gap: 2px; min-width: 0; padding: 8px 9px; border: 1px solid var(--cq-border, var(--line)); border-radius: 11px; color: var(--cq-text-secondary, var(--soft)); background: var(--cq-surface-pill, rgba(59, 130, 246, 0.1)); }
+    .quick-match-meta small { color: var(--cq-text-muted, var(--muted)); font-size: .62rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+    .quick-match-meta strong { overflow: hidden; color: var(--cq-text-primary, var(--text)); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+    .quick-match-saved-settings { display: grid; gap: 3px; padding: 10px 11px; border: 1px solid var(--cq-border, var(--line)); border-radius: 12px; color: var(--cq-text-secondary, var(--soft)); background: color-mix(in srgb, var(--cq-accent-secondary, #38bdf8) 8%, transparent); }
+    .quick-match-saved-settings span { font-size: .65rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .quick-match-saved-settings strong { color: var(--cq-text-primary, var(--text)); font-size: .84rem; }
+    .quick-match-fallback { display: grid; gap: 3px; width: 100%; margin: 0; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 46%, transparent); border-radius: 12px; color: var(--cq-text-secondary, var(--soft)); background: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 9%, transparent); font-size: .76rem; text-align: left; }
+    .quick-match-fallback strong { color: var(--cq-accent-primary, #f4cc7a); }
+    .quick-match-fallback[hidden] { display: none; }
     .quick-match-dialog .button { min-width: 142px; margin-top: 3px; }
     .quick-match-search-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; }
     .quick-match-search-actions .button { min-width: 0; }
@@ -43301,4 +43310,11 @@ body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content.hom
     min-height: 42px !important;
     padding: 5px !important;
   }
+}
+
+/* The human-first entry stylesheet loads by route. Hide the legacy pre-game
+   workspace in the always-present shell stylesheet so a delayed route
+   stylesheet can never flash an AI board before the human choices appear. */
+#play.play-lobby:not(.is-active-game):not(.is-review-mode) .play-shell {
+  display: none !important;
 }

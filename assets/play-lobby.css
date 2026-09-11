@@ -2842,9 +2842,20 @@ body:not(.friend-challenge-mode):not(.tournament-mode) #play#play:not(.is-active
 }
 
 #play .human-play-entry-option small {
+  display: grid;
+  gap: 3px;
   color: var(--cq-text-secondary, #c4cee2);
   font-size: .72rem;
   line-height: 1.35;
+}
+
+#play .quick-match-entry-label {
+  color: var(--cq-text-secondary, #c4cee2);
+}
+
+#play .quick-match-entry-settings {
+  color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 84%, var(--cq-text-primary, #f5f7ff));
+  font-weight: 800;
 }
 
 #play .human-play-entry-option b {
@@ -2914,6 +2925,20 @@ body.friend-challenge-mode #play .friend-online-panel {
 body.friend-challenge-mode #play .friend-online-panel > div:first-child {
   display: grid;
   gap: 3px;
+}
+
+body.friend-challenge-mode #play .friend-online-panel strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+body.friend-challenge-mode #play .friend-online-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #5ed39a;
+  box-shadow: 0 0 0 4px rgba(94, 211, 154, .12);
 }
 
 body.friend-challenge-mode #play .friend-online-panel span,

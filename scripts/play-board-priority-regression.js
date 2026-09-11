@@ -244,8 +244,8 @@ async function runInactiveHumanEntryRegression(browser) {
       assert.equal(humanEntry.entryVisible, true, `${width}x${height}: human Play entry is not visible.`);
       assert.equal(humanEntry.workspaceVisible, false, `${width}x${height}: inactive Play kept the AI workspace visible.`);
       assert.equal(humanEntry.options.length, 3, `${width}x${height}: human Play must keep exactly three primary choices.`);
-      assert.match(humanEntry.options[0], /Quick Match\s*Play a random opponent/,
-        `${width}x${height}: Quick Match copy changed unexpectedly.`);
+      assert.match(humanEntry.options[0], /Play Now\s*Quick Match\s*5\+0 • Casual • Random/,
+        `${width}x${height}: Play Now must make the default Quick Match settings visible.`);
       assert.match(humanEntry.options[1], /Play a Friend\s*Challenge someone you know/,
         `${width}x${height}: Play a Friend copy changed unexpectedly.`);
       assert.match(humanEntry.options[2], /Challenge a Player\s*Search registered players/,
@@ -253,6 +253,22 @@ async function runInactiveHumanEntryRegression(browser) {
       assert.equal(humanEntry.overflow, false, `${width}x${height}: human Play entry introduced horizontal overflow.`);
       await page.locator("#humanPlayEntry .human-play-entry-option.is-primary").click();
       await page.locator("#quickMatchSetup").waitFor({ state: "visible" });
+      const quickMatchSetup = await page.evaluate(() => ({
+        summary: document.getElementById("quickMatchSetupSummary")?.textContent?.trim(),
+        action: document.getElementById("quickMatchPlayNow")?.textContent?.trim(),
+        overflow: document.documentElement.scrollWidth > window.innerWidth + 1
+      }));
+      assert.equal(quickMatchSetup.summary, "5+0 • Casual • Random",
+        `${width}x${height}: Quick Match setup did not explain its saved/default settings.`);
+      assert.equal(quickMatchSetup.action, "Play Now",
+        `${width}x${height}: Quick Match setup lost its direct Play Now action.`);
+      assert.equal(quickMatchSetup.overflow, false,
+        `${width}x${height}: Quick Match setup introduced horizontal overflow.`);
+      await page.locator("#quickMatchTimeControl").selectOption("3+2");
+      await page.locator("#quickMatchGameType").selectOption("rated");
+      await page.locator("#quickMatchColor").selectOption("b");
+      assert.equal(await page.locator("#quickMatchSetupSummary").textContent(), "3+2 • Rated • Black",
+        `${width}x${height}: Quick Match setup did not keep its visible settings summary in sync.`);
       await page.locator("#quickMatchSetupCancel").click();
       await page.locator("#quickMatchSetup").waitFor({ state: "hidden" });
 
@@ -264,6 +280,8 @@ async function runInactiveHumanEntryRegression(browser) {
         return {
           workspaceVisible: getComputedStyle(document.getElementById("playWorkspace")).display !== "none",
           friendVisible: getComputedStyle(document.getElementById("friendChallenge")).display !== "none",
+          onlineLabel: document.getElementById("friendOnlineTitle")?.textContent.replace(/\s+/g, " ").trim(),
+          onlineIndicator: Boolean(document.querySelector(".friend-online-indicator")),
           detailsOpen: document.getElementById("friendMatchSettings")?.open,
           order: ["#friendList", ".friend-search-panel", "#friendMatchSettings", ".friend-share-card"].map((selector) => rect(selector)?.top ?? -1),
           overflow: document.documentElement.scrollWidth > window.innerWidth + 1
@@ -271,6 +289,8 @@ async function runInactiveHumanEntryRegression(browser) {
       });
       assert.equal(friend.friendVisible, true, `${width}x${height}: Friend workspace is not visible.`);
       assert.equal(friend.workspaceVisible, false, `${width}x${height}: Friend route rendered the inactive AI workspace.`);
+      assert.match(friend.onlineLabel, /Online friends/, `${width}x${height}: Friend route does not lead with online friends.`);
+      assert.equal(friend.onlineIndicator, true, `${width}x${height}: Friend route is missing its live-presence affordance.`);
       assert.equal(friend.detailsOpen, false, `${width}x${height}: Friend match details should begin collapsed.`);
       assert(friend.order.every((top) => top >= 0) && friend.order.every((top, index) => index === 0 || top > friend.order[index - 1]),
         `${width}x${height}: Friend workspace no longer follows people → search → details → share: ${JSON.stringify(friend)}.`);

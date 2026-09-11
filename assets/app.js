@@ -25217,14 +25217,15 @@
       const friendName = createBookText("strong", "", friend.name);
       main.append(
         friendName,
-        createBookText("small", "", `${friend.title} • ${friend.rating} Elo • ${friend.online ? "Online" : "Offline"}`)
+        createBookText("small", "", `${friend.title} • ${friend.rating} Elo • ${friendPresenceLabel(friend)}`)
       );
         const friendIdentity = getPlayerIdentityModel({ ...friend, countryCode: friend.country || friend.countryCode, profileId: friend.id, isPlayer: false }, { isPlayer: false, variant: "compact", profileId: friend.id });
         renderSharedIdentityLine(main, friendIdentity, { nameSelector: "strong", variant: "compact", linkProfile: true, profileTarget: main });
       applySharedAvatarElement(avatar, friendIdentity, { variant: "compact" });
       const dot = document.createElement("span");
-      dot.className = `friend-status-dot${friend.online ? "" : " is-offline"}`;
-      dot.title = friend.online ? "Online" : "Offline";
+      dot.className = friendPresenceClass(friend);
+      dot.title = friendPresenceLabel(friend);
+      dot.setAttribute("aria-label", friendPresenceLabel(friend));
       const actions = document.createElement("span");
       actions.className = "friend-card-actions";
       if (mode === "search") {
@@ -25295,9 +25296,9 @@
             return availability || String(left.name || "").localeCompare(String(right.name || ""));
           });
         const records = [
+          ...acceptedFriends.map((friend) => ({ friend, mode: "friend" })),
           ...directory.filter((friend) => friend.requestDirection === "incoming" && friend.requestStatus === "pending").map((friend) => ({ friend, mode: "incoming" })),
-          ...directory.filter((friend) => friend.requestDirection === "outgoing" && friend.requestStatus === "pending").map((friend) => ({ friend, mode: "outgoing" })),
-          ...acceptedFriends.map((friend) => ({ friend, mode: "friend" }))
+          ...directory.filter((friend) => friend.requestDirection === "outgoing" && friend.requestStatus === "pending").map((friend) => ({ friend, mode: "outgoing" }))
         ];
         if (records.length) {
           patchKeyedChildren(list, records, ({ friend, mode }) => `${mode}:${friend.id}`, ({ friend, mode }) => createFriendCard(friend, mode), ({ friend, mode }) => JSON.stringify([mode, friend.id, friend.name, friend.title, friend.rating, friend.online, friend.requestStatus, friend.requestDirection]));
@@ -35855,7 +35856,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "play-human-entry-v234";
+    const optionalRouteStylesheetVersion = "play-human-matchmaking-v235";
     const optionalRouteStylesheetPaths = Object.freeze({ "play-lobby": "assets/play-lobby.css" });
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();
@@ -37627,12 +37628,15 @@
     function setupOnlineMatchmakingAdapter() {
       const normalizeMatchmakingTicket = (payload) => {
         const source = payload && typeof payload === "object" ? payload : {};
+        const ratingRange = source.ratingRange ?? source.rating_range ?? source.ratingBand ?? source.rating_band;
         return {
           status: String(source.status || ""),
           ticketId: source.ticketId || source.ticket_id || null,
           challengeCode: String(source.challengeCode || source.challenge_code || "").toUpperCase(),
           fallbackAt: source.fallbackAt || source.fallback_at || null,
           fallbackSeconds: Number(source.fallbackSeconds || source.fallback_seconds || 0) || 0,
+          ratingRange: Number(ratingRange || 0) || 0,
+          hasRatingRange: ratingRange !== undefined && ratingRange !== null && String(ratingRange).trim() !== "",
           queueState: String(source.queueState || source.queue_state || "")
         };
       };
@@ -37647,6 +37651,11 @@
             throw new Error("Sign in to use Quick Match.");
           }
           const signal = options.signal;
+          const reportStatus = (payload) => {
+            const ticket = normalizeMatchmakingTicket(payload);
+            try { options.onStatus?.(ticket); } catch {}
+            return ticket;
+          };
           let ticketId = null;
           let leavePromise = null;
           const leaveQueue = () => {
@@ -37696,7 +37705,7 @@
           signal?.addEventListener("abort", abortHandler, { once: true });
           const resolveFromServer = async () => {
             if (settled || !ticketId) return;
-            const status = normalizeMatchmakingTicket(await (provider.resolveMatchmakingTimeout
+            const status = reportStatus(await (provider.resolveMatchmakingTimeout
               ? provider.resolveMatchmakingTimeout(ticketId)
               : provider.getMatchmakingStatus(ticketId)));
             if (settled || signal?.aborted) return null;
@@ -37722,7 +37731,7 @@
             return null;
           };
           try {
-            const joined = normalizeMatchmakingTicket(await provider.joinMatchmakingQueue(options));
+            const joined = reportStatus(await provider.joinMatchmakingQueue(options));
             ticketId = joined.ticketId;
             if (signal?.aborted) {
               cleanup();
@@ -37738,7 +37747,7 @@
             const onRealtime = (event) => {
                const row = event?.detail?.payload?.new || event?.detail?.payload?.old || {};
                if (!ticketId || String(row.id || "") !== String(ticketId)) return;
-               const status = normalizeMatchmakingTicket({
+               const status = reportStatus({
                  ...row,
                  status: row.queue_state === "ai_fallback" ? "ai_fallback" : row.matched_code ? "matched" : "waiting"
                 });
@@ -37814,10 +37823,16 @@
       const cancel = document.getElementById("quickMatchCancel");
       const stop = document.getElementById("quickMatchStop");
       const change = document.getElementById("quickMatchChange");
+      const title = document.getElementById("quickMatchTitle");
+      const searchState = document.getElementById("quickMatchSearchState");
+      const fallbackNotice = document.getElementById("quickMatchFallback");
+      const setupSummary = document.getElementById("quickMatchSetupSummary");
+      const savedSettings = document.getElementById("quickMatchSavedSettings");
       const metaType = document.getElementById("quickMatchMetaType");
       const metaTime = document.getElementById("quickMatchMetaTime");
       const metaColor = document.getElementById("quickMatchMetaColor");
       const metaRange = document.getElementById("quickMatchMetaRange");
+      const rangeItem = document.getElementById("quickMatchRangeItem");
       const canUseOnlineQuickMatch = () => {
         const provider = getFriendProvider();
         return Boolean(provider?.joinMatchmakingQueue && provider.getCachedAccount?.()?.publicId);
@@ -37853,6 +37868,7 @@
         timeControl.value = state.options.timeControl;
         gameType.value = state.options.gameType;
         color.value = state.options.color;
+        syncQuickMatchSettingsSummary(state.options);
         try {
           remember.checked = Boolean(window.localStorage.getItem(storageKey));
         } catch {
@@ -37864,11 +37880,28 @@
         gameType: gameType.value,
         color: color.value
       });
-      const setMatchMeta = (options) => {
+      const formatQuickMatchSettings = (options = defaults) => `${options.timeControl} • ${options.gameType === "rated" ? "Rated" : "Casual"} • ${options.color === "random" ? "Random" : options.color === "w" ? "White" : "Black"}`;
+      const syncQuickMatchSettingsSummary = (options = state.options) => {
+        const summary = formatQuickMatchSettings(options);
+        if (setupSummary) setupSummary.textContent = summary;
+        if (savedSettings) savedSettings.textContent = summary;
+      };
+      const setMatchMeta = (options, ticket = null) => {
         if (metaType) metaType.textContent = options.gameType === "rated" ? "Rated" : "Casual";
         if (metaTime) metaTime.textContent = options.timeControl;
-        if (metaColor) metaColor.textContent = options.color === "random" ? "Random color" : options.color === "w" ? "White" : "Black";
-        if (metaRange) metaRange.textContent = "±100 rating";
+        if (metaColor) metaColor.textContent = options.color === "random" ? "Random" : options.color === "w" ? "White" : "Black";
+        if (!ticket) {
+          if (rangeItem) rangeItem.hidden = true;
+          return;
+        }
+        if (!ticket.hasRatingRange) return;
+        const range = Number(ticket.ratingRange || 0);
+        if (rangeItem) rangeItem.hidden = !(Number.isFinite(range) && range > 0);
+        if (metaRange && Number.isFinite(range) && range > 0) metaRange.textContent = `±${range} Elo`;
+      };
+      const setSearchPresentation = (stateLabel, message) => {
+        if (searchState) searchState.textContent = stateLabel;
+        if (status) status.textContent = message;
       };
       const syncAiSettings = (options) => {
         const [minutes, increment] = options.timeControl.split("+");
@@ -37901,6 +37934,7 @@
         void Promise.allSettled([pendingSearch, pendingOnlineSearch].filter(Boolean));
         setup.hidden = true;
         overlay.hidden = true;
+        if (fallbackNotice) fallbackNotice.hidden = true;
         document.body.classList.remove("quick-match-searching");
         state.returnFocus = null;
       };
@@ -37924,6 +37958,7 @@
         if (/(^|[?&])mode=quick/.test(window.location.hash)) window.history?.replaceState?.(null, "", "#play");
         setup.hidden = true;
         overlay.hidden = true;
+        if (fallbackNotice) fallbackNotice.hidden = true;
         document.body.classList.remove("quick-match-searching");
         void syncFriendPresence(!document.hidden);
         if (restoreFocus) state.returnFocus?.focus?.({ preventScroll: true });
@@ -37941,10 +37976,10 @@
           preferredColor: state.options.color
         };
       };
-      const waitForOnlineMatch = (signal) => {
+      const waitForOnlineMatch = (signal, onStatus) => {
         const adapter = window.NschessOnlineMatchmaking;
         if (typeof adapter?.findMatch !== "function") return Promise.resolve(null);
-        return Promise.resolve(adapter.findMatch({ ...getQueueOptions(), signal }))
+        return Promise.resolve(adapter.findMatch({ ...getQueueOptions(), signal, onStatus }))
           .then((match) => ({ match: match || null }));
       };
       const startOnlineMatch = async (match) => {
@@ -37963,8 +37998,10 @@
       };
       const launchAiFallback = async (token) => {
         const options = { ...state.options };
-        status.textContent = "No players available. Starting a game against AI...";
-        await new Promise((resolve) => window.setTimeout(resolve, 420));
+        if (fallbackNotice) fallbackNotice.hidden = false;
+        if (title) title.textContent = "AI fallback ready";
+        setSearchPresentation("AI fallback", `No human match was completed. Starting the same ${formatQuickMatchSettings(options)} settings against AI.`);
+        await new Promise((resolve) => window.setTimeout(resolve, 650));
         if (token !== state.token) return;
         if (/(^|[?&])mode=quick/.test(window.location.hash)) window.history?.replaceState?.(null, "", "#play");
         await closeSearch({ restoreFocus: false });
@@ -37982,23 +38019,22 @@
         ensureFriendRealtime();
         state.token += 1;
         const token = state.token;
-         setMatchMeta(state.options);
-         overlay.hidden = false;
-         document.body.classList.add("quick-match-searching");
-         void syncFriendPresence(true);
-         status.textContent = `Searching for a human opponent... AI fallback after ${state.options.gameType === "rated" ? 25 : 12}s`;
+        if (fallbackNotice) fallbackNotice.hidden = true;
+        if (title) title.textContent = "Finding a human opponent";
+        setMatchMeta(state.options);
+        overlay.hidden = false;
+        document.body.classList.add("quick-match-searching");
+        void syncFriendPresence(true);
+        setSearchPresentation("Searching", "Searching for a human opponent with your selected game settings.");
         cancel?.focus({ preventScroll: true });
         state.controller = new AbortController();
-        const startedAt = Date.now();
-        state.ticker = window.setInterval(() => {
-          const seconds = Math.floor((Date.now() - startedAt) / 1000);
-           status.textContent = `Searching for a human opponent... ${seconds}s · AI fallback after ${state.options.gameType === "rated" ? 25 : 12}s`;
-        }, 1000);
         const searchTimeoutMs = canUseOnlineQuickMatch() ? 90000 : 7000;
         const fallback = new Promise((resolve) => {
           state.fallbackTimer = window.setTimeout(() => resolve(null), searchTimeoutMs);
         });
-      const onlineSearchPromise = waitForOnlineMatch(state.controller.signal);
+      const onlineSearchPromise = waitForOnlineMatch(state.controller.signal, (ticket) => {
+        if (token === state.token) setMatchMeta(state.options, ticket);
+      });
       state.onlineSearchPromise = onlineSearchPromise;
       const searchPromise = Promise.race([onlineSearchPromise, fallback]);
       state.searchPromise = searchPromise;
@@ -38011,18 +38047,19 @@
               void launchAiFallback(token);
               return;
             }
-            status.textContent = "Opponent found. Starting your online game…";
+            if (title) title.textContent = "Human opponent found";
+            setSearchPresentation("Match found", "A human opponent was found. Starting your online game…");
             try {
               if (await startOnlineMatch(result.match)) {
                 await closeSearch({ restoreFocus: false });
                 return;
               }
-              status.textContent = "The matched game could not be started. Cancel and try again.";
+              setSearchPresentation("Match issue", "The matched game could not be started. Cancel and try again.");
             } catch (error) {
               // A server match must not silently turn into a different AI
               // game. Keep the dialog visible so the player can see the
               // failure and explicitly retry or cancel.
-              status.textContent = error?.message || "The matched game could not be started. Cancel and try again.";
+              setSearchPresentation("Match issue", error?.message || "The matched game could not be started. Cancel and try again.");
               cancel?.focus({ preventScroll: true });
             }
             return;
@@ -38032,7 +38069,7 @@
           if (token !== state.token) return;
           window.clearInterval(state.ticker);
           state.ticker = 0;
-          status.textContent = error?.message || "Online matchmaking is temporarily unavailable. Cancel and try again.";
+          setSearchPresentation("Search issue", error?.message || "Online matchmaking is temporarily unavailable. Cancel and try again.");
           cancel?.focus({ preventScroll: true });
         }).finally(() => {
           if (state.searchPromise === searchPromise) state.searchPromise = null;
@@ -38070,6 +38107,7 @@
           return;
         }
         state.options = { ...defaults, ...selectedOptions() };
+        syncQuickMatchSettingsSummary(state.options);
         try {
           if (remember.checked) window.localStorage.setItem(storageKey, JSON.stringify(state.options));
           else window.localStorage.removeItem(storageKey);
@@ -38081,6 +38119,7 @@
       });
       setupCancel?.addEventListener("click", () => closeSetup());
       setupStop?.addEventListener("click", () => closeSetup());
+      [timeControl, gameType, color].forEach((control) => control.addEventListener("change", () => syncQuickMatchSettingsSummary(selectedOptions())));
       cancel?.addEventListener("click", () => { void closeSearch(); });
       stop?.addEventListener("click", () => { void closeSearch(); });
       change?.addEventListener("click", async () => {
@@ -38107,6 +38146,7 @@
         }
         window.requestAnimationFrame(() => openSetup(trigger));
       }, true);
+      applyOptionsToForm();
       openSetupFromHash();
     }
 
