@@ -26043,6 +26043,52 @@
       return `Starts ${new Date(starts).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`;
     }
 
+    const tournamentStartingSoonWindowMs = 24 * 60 * 60 * 1000;
+
+    function getTournamentDiscoveryGroups(events = []) {
+      const now = Date.now();
+      const groups = { live: [], startingSoon: [], upcoming: [] };
+      (Array.isArray(events) ? events : []).forEach((event) => {
+        if (event?.status === "running") {
+          groups.live.push(event);
+          return;
+        }
+        if (event?.status !== "draft") return;
+        const startsAt = Date.parse(event.startsAt || "");
+        if (Number.isFinite(startsAt) && startsAt > now && startsAt - now <= tournamentStartingSoonWindowMs) groups.startingSoon.push(event);
+        else groups.upcoming.push(event);
+      });
+      const byStartThenTitle = (left, right) => {
+        const leftStart = Date.parse(left.startsAt || "");
+        const rightStart = Date.parse(right.startsAt || "");
+        const leftSort = Number.isFinite(leftStart) ? leftStart : Number.MAX_SAFE_INTEGER;
+        const rightSort = Number.isFinite(rightStart) ? rightStart : Number.MAX_SAFE_INTEGER;
+        return leftSort - rightSort || String(left.title || "").localeCompare(String(right.title || ""));
+      };
+      groups.live.sort(byStartThenTitle);
+      groups.startingSoon.sort(byStartThenTitle);
+      groups.upcoming.sort(byStartThenTitle);
+      return groups;
+    }
+
+    function formatTournamentCardStart(event = {}) {
+      const startsAt = Date.parse(event.startsAt || "");
+      if (!Number.isFinite(startsAt)) return "";
+      const label = event.status === "running" ? "Started" : "Starts";
+      return label + " " + new Date(startsAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+    }
+
+    function formatTournamentFormat(event = {}) {
+      return event.format === "swiss"
+        ? "Swiss · round-based"
+        : "Arena · continuous pairings";
+    }
+
+    function canJoinTournament(event = {}) {
+      if (event.joined || Number(event.participantCount) >= Number(event.maxPlayers)) return false;
+      return event.status === "draft" || (event.status === "running" && event.format === "arena");
+    }
+
     function getSelectedTournament() {
       return tournamentRuntime.events.find((event) => event.code === tournamentRuntime.currentCode) || null;
     }
@@ -26231,16 +26277,70 @@
       return section;
     }
 
+    function createTournamentDiscoveryCard(event) {
+      const card = document.createElement("article");
+      card.className = "tournament-card" + (event.code === tournamentRuntime.currentCode ? " is-selected" : "");
+      const top = document.createElement("div");
+      top.className = "tournament-card-top";
+      const title = createBookText("h4", "", event.title);
+      const status = createBookText("span", "tournament-status is-" + event.status + (isTournamentScheduled(event) ? " is-scheduled" : ""), formatTournamentStatus(event.status, event));
+      top.append(title, status);
+
+      const meta = document.createElement("dl");
+      meta.className = "tournament-card-meta";
+      const addMeta = (label, value) => {
+        if (!value) return;
+        const item = document.createElement("div");
+        item.append(createBookText("dt", "", label), createBookText("dd", "", value));
+        meta.append(item);
+      };
+      addMeta("Format", formatTournamentFormat(event));
+      addMeta("Time", event.clock);
+      addMeta("Start", formatTournamentCardStart(event));
+      addMeta("Players", String(event.participantCount) + "/" + String(event.maxPlayers));
+
+      const actions = document.createElement("div");
+      actions.className = "tournament-card-actions";
+      if (canJoinTournament(event)) actions.append(createTournamentButton("Join", "button", () => void joinTournament(event.code)));
+      actions.append(createTournamentButton("View event", "button secondary", () => void openTournament(event.code, { reveal: true })));
+      card.append(top, meta, actions);
+      return card;
+    }
+
+    function createTournamentEmptyState(message, { detail = "", alternatives = [] } = {}) {
+      const state = document.createElement("div");
+      state.className = "tournament-empty-state";
+      state.append(createBookText("p", "tournament-empty", message));
+      if (detail) state.append(createBookText("p", "tournament-empty-note", detail));
+      if (alternatives.length) {
+        const actions = document.createElement("div");
+        actions.className = "tournament-empty-actions";
+        alternatives.forEach(({ label, targetId }) => {
+          actions.append(createTournamentButton(label, "button secondary", () => {
+            document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }));
+        });
+        state.append(actions);
+      }
+      return state;
+    }
+
     function renderTournamentLobby() {
       const list = document.getElementById("tournamentList");
       const detail = document.getElementById("tournamentDetail");
       const sync = document.getElementById("tournamentSyncStatus");
       if (!list || !detail) return;
       const provider = getTournamentProvider();
-      if (sync) sync.textContent = provider ? "Live sync" : "Sign in";
-      if (!provider) {
-        list.replaceChildren(createBookText("p", "tournament-empty", "Sign in to browse, host, and join live tournaments."));
-        detail.replaceChildren(createBookText("p", "tournament-empty", "Tournament pairings use your secure Friend Challenge account."));
+      const canBrowse = Boolean(provider && isApplicationAuthenticated());
+      if (sync) sync.textContent = canBrowse ? "Live sync" : "Sign in";
+      if (!canBrowse) {
+        const groups = ["tournamentLiveList", "tournamentStartingSoonList", "tournamentUpcomingList"]
+          .map((id) => document.getElementById(id))
+          .filter(Boolean);
+        groups.forEach((group, index) => group.replaceChildren(createBookText("p", "tournament-empty", index === 0
+          ? "Sign in to browse, host, and join live tournaments."
+          : "Tournament availability appears after you sign in.")));
+        detail.hidden = true;
         renderHomeTournaments();
         return;
       }
@@ -26263,39 +26363,44 @@
         return;
       }
       tournamentRuntime.renderSignature = renderSignature;
-      if (!events.length) list.replaceChildren(createBookText("p", "tournament-empty", "No events yet. Create the first one."));
-      else {
-        list.replaceChildren(...events.map((event) => {
-          const card = document.createElement("article");
-          card.className = `tournament-card${event.code === tournamentRuntime.currentCode ? " is-selected" : ""}`;
-          const top = document.createElement("div");
-          top.className = "tournament-card-top";
-          const title = document.createElement("div");
-          title.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? "Swiss" : "Arena"} | ${event.clock} | ${event.visibility}`));
-          const status = createBookText("span", `tournament-status is-${event.status}${isTournamentScheduled(event) ? " is-scheduled" : ""}`, formatTournamentStatus(event.status, event));
-          top.append(title, status);
-          const schedule = formatTournamentSchedule(event);
-          const meta = createBookText("div", "tournament-meta", `${event.participantCount}/${event.maxPlayers} players | Host: ${event.creatorName}${schedule ? ` | ${schedule}` : ""}`);
-          const actions = document.createElement("div");
-          actions.className = "tournament-actions";
-          actions.append(createTournamentButton(event.code === tournamentRuntime.currentCode ? "Selected" : "View", "button secondary", () => void openTournament(event.code)));
-          if (!event.joined && ["draft", "running"].includes(event.status)) actions.append(createTournamentButton("Join", "button", () => void joinTournament(event.code)));
-          card.append(top, meta, actions);
-          return card;
-        }));
-      }
+      const discoveryGroups = getTournamentDiscoveryGroups(events);
+      const discovery = [
+        ["live", "tournamentLiveList", "No live tournaments right now.", {
+          detail: "Explore scheduled events while you wait for the next one to begin.",
+          alternatives: [
+            { label: "Starting Soon", targetId: "tournamentStartingSoonList" },
+            { label: "Upcoming", targetId: "tournamentUpcomingList" }
+          ]
+        }],
+        ["startingSoon", "tournamentStartingSoonList", "No tournaments begin in the next 24 hours.", {
+          detail: "Browse later events that are already scheduled.",
+          alternatives: [{ label: "Upcoming", targetId: "tournamentUpcomingList" }]
+        }],
+        ["upcoming", "tournamentUpcomingList", "No public tournaments are scheduled yet.", {
+          detail: "Published Arena and Swiss events will appear here."
+        }]
+      ];
+      discovery.forEach(([key, id, emptyCopy, emptyOptions]) => {
+        const group = document.getElementById(id);
+        if (!group) return;
+        const groupEvents = discoveryGroups[key] || [];
+        group.replaceChildren(...(groupEvents.length
+          ? groupEvents.map((event) => createTournamentDiscoveryCard(event))
+          : [createTournamentEmptyState(emptyCopy, emptyOptions)]));
+      });
       const event = getSelectedTournament();
       if (!event) {
-        detail.replaceChildren(createBookText("p", "tournament-empty", "Choose an event to see its live pairings and standings."));
+        detail.hidden = true;
         renderHomeTournaments();
         return;
       }
+      detail.hidden = false;
       const currentUserId = getFriendCurrentUserId();
       const activePairings = getTournamentActivePairings(event);
       const head = document.createElement("div");
       head.className = "tournament-detail-head";
       const copy = document.createElement("div");
-      copy.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? `Swiss • Round ${Math.max(1, event.currentRound)}/${event.rounds}` : "Arena"} • ${event.clock} • ${event.participantCount}/${event.maxPlayers} players`));
+      copy.append(createBookText("h4", "", event.title), createBookText("p", "", `${event.format === "swiss" ? `Swiss · round-based • Round ${Math.max(1, event.currentRound)}/${event.rounds}` : "Arena · continuous pairings"} • ${event.clock} • ${event.participantCount}/${event.maxPlayers} players`));
       head.append(copy, createBookText("span", `tournament-status is-${event.status}${isTournamentScheduled(event) ? " is-scheduled" : ""}`, formatTournamentStatus(event.status, event)));
 
       const stage = document.createElement("section");
@@ -26327,7 +26432,7 @@
 
       const actionRow = document.createElement("div");
       actionRow.className = "tournament-actions";
-      if (!event.joined && ["draft", "running"].includes(event.status)) actionRow.append(createTournamentButton("Join tournament", "button", () => void joinTournament(event.code)));
+      if (canJoinTournament(event)) actionRow.append(createTournamentButton("Join tournament", "button", () => void joinTournament(event.code)));
       if (event.joined && event.status === "draft") actionRow.append(createTournamentButton("Leave", "button secondary", () => void leaveTournament(event.code)));
       if (event.myPairing?.challengeCode && event.myPairing.status === "active") actionRow.append(createBookText("span", "tournament-auto-start", "Board launches automatically"));
       if (event.isHost) {
@@ -26571,11 +26676,22 @@
         });
     }
 
-    async function openTournament(code) {
+    function revealTournamentDetail() {
+      window.requestAnimationFrame(() => document.getElementById("tournamentDetail")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+
+    async function openTournament(code, { reveal = false } = {}) {
       const provider = getTournamentProvider();
       if (!provider) return;
-      try { setSelectedTournament(await provider.getTournament(code)); }
-      catch (error) { document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Tournament could not be opened.")); }
+      try {
+        setSelectedTournament(await provider.getTournament(code));
+        if (reveal) revealTournamentDetail();
+      } catch (error) {
+        const detail = document.getElementById("tournamentDetail");
+        if (!detail) return;
+        detail.hidden = false;
+        detail.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Tournament could not be opened."));
+      }
     }
 
     async function createTournamentFromForm(event) {
@@ -26598,17 +26714,32 @@
           startsAt
         });
         setSelectedTournament(created);
+        document.getElementById("tournamentCreateDisclosure")?.removeAttribute("open");
         document.getElementById("tournamentName").value = "";
         const startsAtField = document.getElementById("tournamentStartsAt");
         if (startsAtField) startsAtField.value = "";
+        revealTournamentDetail();
       } catch (error) {
-        document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Tournament could not be created."));
+        const detail = document.getElementById("tournamentDetail");
+        if (detail) {
+          detail.hidden = false;
+          detail.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Tournament could not be created."));
+        }
       }
     }
 
     async function joinTournament(code) {
-      try { setSelectedTournament(await getTournamentProvider()?.joinTournament(code)); await refreshTournamentNetwork(true); }
-      catch (error) { document.getElementById("tournamentDetail")?.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Could not join this tournament.")); }
+      try {
+        setSelectedTournament(await getTournamentProvider()?.joinTournament(code));
+        revealTournamentDetail();
+        await refreshTournamentNetwork(true);
+      } catch (error) {
+        const detail = document.getElementById("tournamentDetail");
+        if (detail) {
+          detail.hidden = false;
+          detail.replaceChildren(createBookText("p", "tournament-empty", error?.message || "Could not join this tournament."));
+        }
+      }
     }
 
     async function leaveTournament(code) {
@@ -31915,6 +32046,14 @@
       renderHomeDashboard();
       renderLeaderboards();
       renderAuthUi(account, false);
+      // A direct Tournament link can activate before the session finishes
+      // hydrating. Refresh its real event feed immediately once this account
+      // is known instead of leaving a signed-in player on the guest state
+      // until the background interval happens to run.
+      if (document.body.classList.contains("tournament-mode")) {
+        tournamentRuntime.renderSignature = "";
+        startTournamentNetworkSync();
+      }
       if (location.hash.includes("challenge=")) {
         const hashQuery = location.hash.includes("?") ? location.hash.split("?")[1] : "";
         const inviteCode = String(new URLSearchParams(hashQuery).get("challenge") || "").trim().toUpperCase();
@@ -35856,7 +35995,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "play-human-matchmaking-v235";
+    const optionalRouteStylesheetVersion = "play-tournament-density-v238";
     const optionalRouteStylesheetPaths = Object.freeze({ "play-lobby": "assets/play-lobby.css" });
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();

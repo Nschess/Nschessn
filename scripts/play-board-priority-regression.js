@@ -299,13 +299,30 @@ async function runInactiveHumanEntryRegression(browser) {
       await page.goto(`${baseUrl}/#play?mode=tournament`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => document.body.classList.contains("tournament-mode")
         && getComputedStyle(document.getElementById("tournamentLobby")).display !== "none");
-      const tournament = await page.evaluate(() => ({
-        workspaceVisible: getComputedStyle(document.getElementById("playWorkspace")).display !== "none",
-        tournamentVisible: getComputedStyle(document.getElementById("tournamentLobby")).display !== "none",
-        overflow: document.documentElement.scrollWidth > window.innerWidth + 1
-      }));
+      const tournament = await page.evaluate(() => {
+        const top = (selector) => document.querySelector(selector)?.getBoundingClientRect?.().top ?? -1;
+        return {
+          workspaceVisible: getComputedStyle(document.getElementById("playWorkspace")).display !== "none",
+          tournamentVisible: getComputedStyle(document.getElementById("tournamentLobby")).display !== "none",
+          groups: ["#tournamentLiveList", "#tournamentStartingSoonList", "#tournamentUpcomingList"].map((selector) => ({
+            visible: getComputedStyle(document.querySelector(selector)).display !== "none",
+            top: top(selector)
+          })),
+          detailHidden: document.getElementById("tournamentDetail")?.hidden,
+          createOpen: document.getElementById("tournamentCreateDisclosure")?.open,
+          createTop: top("#tournamentCreateDisclosure"),
+          overflow: document.documentElement.scrollWidth > window.innerWidth + 1
+        };
+      });
       assert.equal(tournament.tournamentVisible, true, `${width}x${height}: Tournament workspace is not visible.`);
       assert.equal(tournament.workspaceVisible, false, `${width}x${height}: Tournament route rendered the inactive AI workspace.`);
+      assert(tournament.groups.every((group) => group.visible && group.top >= 0)
+        && tournament.groups.every((group, index) => index === 0 || group.top > tournament.groups[index - 1].top),
+      `${width}x${height}: Tournament discovery must lead with Live → Starting Soon → Upcoming: ${JSON.stringify(tournament)}.`);
+      assert.equal(tournament.detailHidden, true, `${width}x${height}: Tournament detail must not reserve space before an event is selected.`);
+      assert.equal(tournament.createOpen, false, `${width}x${height}: Create Tournament must remain a secondary collapsed action.`);
+      assert(tournament.createTop > tournament.groups[2].top,
+        `${width}x${height}: Create Tournament must follow event discovery: ${JSON.stringify(tournament)}.`);
       assert.equal(tournament.overflow, false, `${width}x${height}: Tournament workspace introduced horizontal overflow.`);
       results.push(`${width}x${height}`);
     } finally {

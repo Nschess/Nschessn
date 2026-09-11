@@ -3029,50 +3029,75 @@
         <section class="tournament-lobby" id="tournamentLobby" aria-labelledby="tournamentTitle">
           <div class="tournament-head">
             <div>
-              <p class="section-kicker">Live events</p>
+              <p class="section-kicker">Live events first</p>
               <h3 id="tournamentTitle">Chess Tournaments</h3>
-              <p>Join an Arena for continuous pairings or a Swiss event for round-by-round standings.</p>
+              <p>Arena events use continuous pairings; Swiss events progress round by round.</p>
             </div>
             <div class="tournament-actions">
               <span class="tournament-status" id="tournamentSyncStatus">Syncing</span>
               <button class="button secondary" type="button" id="tournamentRefresh">Refresh</button>
             </div>
           </div>
-          <form class="tournament-create-grid" id="tournamentCreateForm">
-            <label>Name
-              <input id="tournamentName" maxlength="60" required placeholder="Friday Rapid Arena" />
-            </label>
-            <label>Format
-              <select id="tournamentFormat"><option value="arena">Arena</option><option value="swiss">Swiss</option></select>
-            </label>
-            <label>Access
-              <select id="tournamentVisibility"><option value="public">Public</option><option value="private">Private</option></select>
-            </label>
-            <label>Clock
-              <select id="tournamentClock"><option value="3+2">3+2 Blitz</option><option value="5+0">5+0 Blitz</option><option value="10+0" selected>10+0 Rapid</option><option value="15+10">15+10 Rapid</option></select>
-            </label>
-            <label>Players
-              <select id="tournamentMaxPlayers"><option>8</option><option selected>16</option><option>32</option><option>64</option></select>
-            </label>
-            <label>Rounds / mins
-              <select id="tournamentLength"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option></select>
-            </label>
-            <label>Start time (optional)
-              <input id="tournamentStartsAt" type="datetime-local" />
-            </label>
-            <div class="tournament-reward-preview" aria-label="Tournament rewards">
-              <span class="section-kicker">Podium rewards</span>
-              <strong>Cosmetic badge + coins + XP</strong>
-              <small>Top three finishers earn event-only recognition.</small>
-            </div>
-            <button class="button" type="submit">Create Event</button>
-          </form>
           <div class="tournament-grid">
-            <div class="tournament-list" id="tournamentList" aria-live="polite"></div>
-            <article class="tournament-detail" id="tournamentDetail" aria-live="polite">
+            <div class="tournament-discovery tournament-list" id="tournamentList" aria-live="polite">
+              <section class="tournament-discovery-group" data-tournament-group="live" aria-labelledby="tournamentLiveTitle">
+                <div class="tournament-discovery-heading">
+                  <div><span class="tournament-discovery-status is-live">Live</span><h4 id="tournamentLiveTitle">Live events</h4></div>
+                  <p>Events currently pairing.</p>
+                </div>
+                <div class="tournament-discovery-list" id="tournamentLiveList"><p class="tournament-empty">Checking live tournaments…</p></div>
+              </section>
+              <section class="tournament-discovery-group" data-tournament-group="starting-soon" aria-labelledby="tournamentStartingSoonTitle">
+                <div class="tournament-discovery-heading">
+                  <div><span class="tournament-discovery-status is-starting">Starting soon</span><h4 id="tournamentStartingSoonTitle">Starting soon</h4></div>
+                  <p>Scheduled next.</p>
+                </div>
+                <div class="tournament-discovery-list" id="tournamentStartingSoonList"><p class="tournament-empty">Loading scheduled events…</p></div>
+              </section>
+              <section class="tournament-discovery-group" data-tournament-group="upcoming" aria-labelledby="tournamentUpcomingTitle">
+                <div class="tournament-discovery-heading">
+                  <div><span class="tournament-discovery-status is-upcoming">Upcoming</span><h4 id="tournamentUpcomingTitle">Upcoming</h4></div>
+                  <p>Registration and later events.</p>
+                </div>
+                <div class="tournament-discovery-list" id="tournamentUpcomingList"><p class="tournament-empty">Loading upcoming events…</p></div>
+              </section>
+            </div>
+            <article class="tournament-detail" id="tournamentDetail" aria-live="polite" hidden>
               <p class="tournament-empty">Choose an event to see its live pairings and standings.</p>
             </article>
           </div>
+          <details class="tournament-create-disclosure" id="tournamentCreateDisclosure">
+            <summary><span><strong>+ Create tournament</strong><small>Host a public or private event.</small></span><b aria-hidden="true">⌄</b></summary>
+            <form class="tournament-create-grid" id="tournamentCreateForm">
+              <label>Name
+                <input id="tournamentName" maxlength="60" required placeholder="Friday Rapid Arena" />
+              </label>
+              <label>Format
+                <select id="tournamentFormat"><option value="arena">Arena — continuous pairings</option><option value="swiss">Swiss — round-based</option></select>
+              </label>
+              <label>Access
+                <select id="tournamentVisibility"><option value="public">Public</option><option value="private">Private</option></select>
+              </label>
+              <label>Clock
+                <select id="tournamentClock"><option value="3+2">3+2 Blitz</option><option value="5+0">5+0 Blitz</option><option value="10+0" selected>10+0 Rapid</option><option value="15+10">15+10 Rapid</option></select>
+              </label>
+              <label>Players
+                <select id="tournamentMaxPlayers"><option>8</option><option selected>16</option><option>32</option><option>64</option></select>
+              </label>
+              <label>Rounds / mins
+                <select id="tournamentLength"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option></select>
+              </label>
+              <label>Start time (optional)
+                <input id="tournamentStartsAt" type="datetime-local" />
+              </label>
+              <div class="tournament-reward-preview" aria-label="Tournament rewards">
+                <span class="section-kicker">Podium rewards</span>
+                <strong>Cosmetic badge + coins + XP</strong>
+                <small>Top three finishers earn event-only recognition.</small>
+              </div>
+              <button class="button" type="submit">Create Event</button>
+            </form>
+          </details>
         </section>
 
         <div class="puzzle-shell play-shell cq-workspace-shell" id="playWorkspace">
@@ -4671,6 +4696,6 @@
   </aside>
 
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
-  <script defer src="assets/app.js?v=play-human-matchmaking-v235"></script>
+  <script defer src="assets/app.js?v=play-tournament-density-v238"></script>
 </body>
 </html>
