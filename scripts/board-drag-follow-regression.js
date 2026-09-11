@@ -84,11 +84,24 @@ async function resizeViewport(page, selector, width, height) {
 }
 
 async function enterFullscreen(page, selector) {
-  const button = page.locator(`${selector} .interactive-board-fullscreen-button:visible`).first();
+  // Play's real fullscreen action is mounted in the board stage's utility
+  // hook, rather than inside #coachBoard. Keep the generic class selector
+  // for other board routes, but never fall back to native-fullscreening the
+  // board itself when the shared controller has supplied this action.
+  const stage = page.locator("[data-interactive-board-stage]").filter({ has: page.locator(selector) }).first();
+  const button = stage.locator("[data-board-fullscreen-action]:visible, .interactive-board-fullscreen-button:visible").first();
   if (await button.count()) {
     await button.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
     await button.click({ force: true });
-    await page.waitForFunction(() => document.body.classList.contains("interactive-board-fullscreen-active"), null, { timeout: 5000 });
+    await page.waitForFunction((target) => {
+      const board = document.querySelector(target);
+      const stage = board?.closest("[data-interactive-board-stage]");
+      const expectedHost = stage?.closest("#play:not(.is-review-mode) .match-board-column")
+        || stage?.closest("#gameReview.is-review-page .game-review-command-center")
+        || stage;
+      return Boolean(expectedHost && document.fullscreenElement === expectedHost
+        && document.body.classList.contains("interactive-board-fullscreen-active"));
+    }, selector, { timeout: 5000 });
   } else {
     await page.evaluate(async (target) => {
       const board = document.querySelector(target);
@@ -140,6 +153,18 @@ async function readGhost(page, selector, point) {
     const ghostRect = rect(ghost);
     const style = ghost ? getComputedStyle(ghost) : null;
     const parentStyle = parent ? getComputedStyle(parent) : null;
+    const displayRules = [];
+    const collectDisplayRules = (rules) => {
+      for (const rule of rules || []) {
+        if (rule.cssRules) collectDisplayRules(rule.cssRules);
+        if (ghost && rule.selectorText && rule.style?.display && ghost.matches(rule.selectorText)) {
+          displayRules.push({ selector: rule.selectorText, display: rule.style.display });
+        }
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      try { collectDisplayRules(sheet.cssRules); } catch {}
+    }
     const ancestors = [];
     for (let ancestor = parent; ancestor && ancestors.length < 8; ancestor = ancestor.parentElement) {
       const ancestorStyle = getComputedStyle(ancestor);
@@ -160,6 +185,11 @@ async function readGhost(page, selector, point) {
       board: rect(board),
       ghost: ghostRect,
       ghostStyle: style ? {
+        display: style.display,
+        width: style.width,
+        height: style.height,
+        visibility: style.visibility,
+        opacity: style.opacity,
         left: ghost.style.left,
         top: ghost.style.top,
         transform: style.transform,
@@ -178,6 +208,7 @@ async function readGhost(page, selector, point) {
         border: parentStyle.border,
         overflow: parentStyle.overflow
       } : null,
+      displayRules,
       ancestors
     };
   }, { target: selector, point });

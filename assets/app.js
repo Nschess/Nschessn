@@ -522,7 +522,16 @@
           // that workspace, making the held piece appear to vanish. Keep the
           // one shared ghost renderer in the currently visible board host;
           // normal boards continue to use body as their viewport layer.
-          const fullscreenHost = board.closest(":fullscreen")
+          // `Element.closest(":fullscreen")` is unreliable in Chromium while
+          // a nested board is being pointer-captured. The native fullscreen
+          // element is authoritative and may be a larger game workspace than
+          // the normal-sized board stage, so use it directly when it owns the
+          // board. Otherwise keep the existing focus-mode stage fallback.
+          const nativeFullscreenHost = document.fullscreenElement instanceof HTMLElement
+            && document.fullscreenElement.contains(board)
+            ? document.fullscreenElement
+            : null;
+          const fullscreenHost = nativeFullscreenHost
             || (document.body.classList.contains("interactive-board-fullscreen-active")
               ? board.closest(".interactive-board-sizing-stage")
               : null);
@@ -17460,9 +17469,101 @@
 
     function setupAiBotRoster() {
       setupCoachAvatarAssets();
-      const roster = document.getElementById("aiBotRoster"); const search = document.getElementById("aiBotSearch"); const filter = document.getElementById("aiBotFilter"); if (!roster || !search || !filter || roster.dataset.ready) return; roster.dataset.ready = "true"; const categories = ["Beginner", "Intermediate", "Advanced", "Master"];
-      const render = () => { const query = search.value.trim().toLowerCase(); const matches = beginnerBots.filter((bot) => { const words = [bot.name, bot.elo, bot.personality, bot.opening, bot.bio, bot.style, bot.category].join(" ").toLowerCase(); return (filter.value === "All" || bot.category === filter.value) && (!query || words.includes(query)); }); if (!matches.length) { roster.replaceChildren(createBookText("p", "ai-bot-empty", "No bots match those filters.")); return; } const groups = categories.map((category) => { const bots = matches.filter((bot) => bot.category === category); if (!bots.length) return null; const section = document.createElement("section"); section.className = "ai-bot-category"; const head = document.createElement("div"); head.className = "ai-bot-category-head"; head.append(createBookText("h3", "", category), createBookText("span", "", String(bots.length) + " bots")); const grid = document.createElement("div"); grid.className = "ai-bot-grid"; bots.forEach((bot) => { const card = document.createElement("article"); card.className = "ai-bot-card"; const avatar = document.createElement("img"); avatar.className = "ai-bot-avatar"; avatar.src = getAiBotAvatarImage(bot, beginnerBots.indexOf(bot)); avatar.alt = ""; avatar.loading = "lazy"; avatar.decoding = "async"; avatar.style.setProperty("--ai-bot-hue", String((beginnerBots.indexOf(bot) * 47 + 194) % 360)); const copy = document.createElement("div"); copy.className = "ai-bot-card-copy"; const meta = document.createElement("div"); meta.className = "ai-bot-card-meta"; const elo = createBookText("span", "", String(bot.elo) + " Elo"); const difficulty = createBookText("span", "ai-bot-difficulty", bot.category); difficulty.dataset.difficulty = bot.category.toLowerCase(); const personality = createBookText("span", "", bot.personality); meta.append(elo, difficulty, personality); const nameLine = createBookText("span", "ai-bot-card-name-line", ""); const botName = createBookText("strong", "", bot.name); nameLine.append(botName); const botIdentity = getPlayerIdentityModel({ name: bot.name, title: bot.personality, avatar: bot.avatar, isPlayer: false }, { isPlayer: false, variant: "compact" }); renderSharedIdentityLine(nameLine, botIdentity, { nameSelector: "strong", variant: "compact" }); copy.append(nameLine, meta, createBookText("p", "", bot.bio), createBookText("span", "ai-bot-card-style", "Style: " + bot.style)); const play = createBookText("button", "button", "Play"); play.type = "button"; play.dataset.aiBotPlay = bot.id; play.setAttribute("aria-label", "Play " + bot.name + ", " + bot.elo + " Elo"); card.append(avatar, copy, play); grid.append(card); }); section.append(head, grid); return section; }).filter(Boolean); roster.replaceChildren(...groups); };
-      search.addEventListener("input", render); filter.addEventListener("change", render); roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => openAiGameReady(button.dataset.aiBotPlay, { trigger: button })); });
+      const roster = document.getElementById("aiBotRoster");
+      const search = document.getElementById("aiBotSearch");
+      const filter = document.getElementById("aiBotFilter");
+      const sort = document.getElementById("aiBotSort");
+      const results = document.getElementById("aiBotResults");
+      const clear = document.getElementById("aiBotClear");
+      const reset = document.getElementById("aiBotReset");
+      if (!roster || !search || !filter || !sort || roster.dataset.ready) return;
+      roster.dataset.ready = "true";
+      const categories = ["Beginner", "Intermediate", "Advanced", "Master"];
+      const render = () => {
+        const query = search.value.trim().toLowerCase();
+        const queryTerms = query.split(/\s+/).filter(Boolean);
+        const matches = beginnerBots.filter((bot) => {
+          const words = [bot.name, bot.elo, bot.personality, bot.opening, bot.bio, bot.style, bot.category].join(" ").toLowerCase();
+          return (filter.value === "All" || bot.category === filter.value) && queryTerms.every((term) => words.includes(term));
+        });
+        const hasCustomView = Boolean(query) || filter.value !== "All" || sort.value !== "rating-asc";
+        if (results) {
+          const levelCopy = filter.value === "All" ? "" : ` · ${filter.value}`;
+          results.textContent = `${matches.length} of ${beginnerBots.length} opponents${levelCopy}`;
+        }
+        if (clear) clear.hidden = !query;
+        if (reset) reset.hidden = !hasCustomView;
+        if (!matches.length) {
+          roster.replaceChildren(createBookText("p", "ai-bot-empty", "No opponents match this search. Try a name, opening, or a different level."));
+          return;
+        }
+        const groups = categories.map((category) => {
+          const bots = matches.filter((bot) => bot.category === category).sort((a, b) => {
+            if (sort.value === "rating-desc") return b.elo - a.elo;
+            if (sort.value === "name") return a.name.localeCompare(b.name);
+            return a.elo - b.elo;
+          });
+          if (!bots.length) return null;
+          const section = document.createElement("section");
+          section.className = "ai-bot-category";
+          const head = document.createElement("div");
+          head.className = "ai-bot-category-head";
+          head.append(createBookText("h3", "", category), createBookText("span", "", `${bots.length} bots`));
+          const grid = document.createElement("div");
+          grid.className = "ai-bot-grid";
+          bots.forEach((bot) => {
+            const index = beginnerBots.indexOf(bot);
+            const card = document.createElement("article");
+            card.className = "ai-bot-card";
+            const avatar = document.createElement("img");
+            avatar.className = "ai-bot-avatar";
+            avatar.src = getAiBotAvatarImage(bot, index);
+            avatar.alt = "";
+            avatar.loading = "lazy";
+            avatar.decoding = "async";
+            avatar.style.setProperty("--ai-bot-hue", String((index * 47 + 194) % 360));
+
+            const copy = document.createElement("div");
+            copy.className = "ai-bot-card-copy";
+            const meta = document.createElement("div");
+            meta.className = "ai-bot-card-meta";
+            const elo = createBookText("span", "ai-bot-rating", `${bot.elo} Elo`);
+            const identity = createBookText("span", "ai-bot-identity", `${bot.personality} · ${bot.opening}`);
+            meta.append(elo, identity);
+            const nameLine = createBookText("span", "ai-bot-card-name-line", "");
+            const botName = createBookText("strong", "", bot.name);
+            nameLine.append(botName);
+            copy.append(nameLine, meta, createBookText("p", "", bot.bio));
+
+            const details = document.createElement("details");
+            details.className = "ai-bot-card-details";
+            details.append(createBookText("summary", "", "Style & opening"));
+            const detailsCopy = document.createElement("div");
+            detailsCopy.className = "ai-bot-card-details-copy";
+            detailsCopy.append(
+              createBookText("span", "", `Style: ${bot.style}`),
+              createBookText("span", "", `Opening: ${bot.opening}`)
+            );
+            details.append(detailsCopy);
+
+            const play = createBookText("button", "button", "Play");
+            play.type = "button";
+            play.dataset.aiBotPlay = bot.id;
+            play.setAttribute("aria-label", `Play ${bot.name}, ${bot.elo} Elo`);
+            card.append(avatar, copy, details, play);
+            grid.append(card);
+          });
+          section.append(head, grid);
+          return section;
+        }).filter(Boolean);
+        roster.replaceChildren(...groups);
+      };
+      search.addEventListener("input", render);
+      filter.addEventListener("change", render);
+      sort.addEventListener("change", render);
+      clear?.addEventListener("click", () => { search.value = ""; search.focus(); render(); });
+      reset?.addEventListener("click", () => { search.value = ""; filter.value = "All"; sort.value = "rating-asc"; search.focus(); render(); });
+      roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => openAiGameReady(button.dataset.aiBotPlay, { trigger: button })); });
       const featuredPlay = document.getElementById("aiFeaturedCoachPlay");
       featuredPlay?.addEventListener("click", () => {
         const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play");
@@ -28664,13 +28765,15 @@
     function setupPlayWorkspaceDrawers() {
       if (setupPlayWorkspaceDrawers.ready) return;
       setupPlayWorkspaceDrawers.ready = true;
-      const compactWorkspace = window.innerWidth <= 1180;
       document.querySelectorAll("#play details[data-play-drawer]").forEach((drawer) => {
         if (!(drawer instanceof HTMLDetailsElement)) return;
-        drawer.open = drawer.dataset.playDrawer === "moves" || !compactWorkspace;
+        // An active game begins with one contextual insight, not an expanded
+        // stack of history, coach, and chat panels. Each remains available
+        // through its own disclosed control once the player asks for it.
+        drawer.open = false;
       });
       const coachLibrary = document.querySelector("#play .coach-library");
-      if (coachLibrary instanceof HTMLDetailsElement) coachLibrary.open = !compactWorkspace;
+      if (coachLibrary instanceof HTMLDetailsElement) coachLibrary.open = false;
     }
 
     function setupPlayAuthPrompt() {
@@ -35744,7 +35847,7 @@
     }
 
     const optionalRouteStylesheetPromises = new Map();
-    const optionalRouteStylesheetVersion = "review-v230-active-play-clocks";
+    const optionalRouteStylesheetVersion = "play-focus-v232-quiet-surfaces";
     const optionalRouteStylesheetPaths = Object.freeze({ "play-lobby": "assets/play-lobby.css" });
     function loadOptionalRouteStylesheet(name) {
       const key = String(name || "").trim().toLowerCase();

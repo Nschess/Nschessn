@@ -15,9 +15,9 @@ const root = path.resolve(__dirname, "..");
 const port = 4196;
 const baseUrl = `http://127.0.0.1:${port}`;
 const viewports = [
-  [1920, 1080, 850],
-  [1440, 900, 680],
-  [1366, 768, 560],
+  [1920, 1080, 825],
+  [1440, 900, 650],
+  [1366, 768, 520],
   [1024, 768, 560],
   [768, 1024, 560],
   [624, 844, 460],
@@ -70,18 +70,36 @@ async function readLayout(page) {
     const stage = board?.closest("[data-interactive-board-stage]");
     const column = board?.closest(".match-board-column");
     const shell = board?.closest(".play-shell");
+    const leftSidebar = shell?.querySelector(".play-left-sidebar");
+    const rightSidebar = shell?.querySelector(".play-right-sidebar");
     const cards = [...(column?.querySelectorAll(":scope > .ai-player-card, :scope > .match-player-card") || [])];
     const square = board?.querySelector("[data-square]");
     const piece = board?.querySelector(".piece-svg, .piece-symbol, img");
     const discovery = document.querySelector("#play.is-active-game .interactive-board-discovery");
     const discoveryRect = rect(discovery);
-    const fullscreenAction = document.querySelector("#play.is-active-game [data-board-fullscreen-action]");
+    const fullscreenAction = [...document.querySelectorAll("#play.is-active-game [data-board-fullscreen-action]")]
+      .find((action) => {
+        const box = action.getBoundingClientRect?.();
+        return Boolean(box && box.width > 0 && box.height > 0);
+      }) || null;
     const fullscreenActionRect = rect(fullscreenAction);
+    const restart = document.getElementById("restartGame");
+    const directRailDrawers = [...document.querySelectorAll("#play.is-active-game .play-right-sidebar > details")];
     const overlap = Boolean(board && discoveryRect
       && discoveryRect.x < rect(board).right
       && discoveryRect.right > rect(board).x
       && discoveryRect.y < rect(board).bottom
       && discoveryRect.bottom > rect(board).y);
+    const discoveryCardOverlap = Boolean(discoveryRect && cards.some((card) => card
+      && discoveryRect.x < card.right
+      && discoveryRect.right > card.x
+      && discoveryRect.y < card.bottom
+      && discoveryRect.bottom > card.y));
+    const discoveryActionOverlap = Boolean(discoveryRect && fullscreenActionRect
+      && discoveryRect.x < fullscreenActionRect.right
+      && discoveryRect.right > fullscreenActionRect.x
+      && discoveryRect.y < fullscreenActionRect.bottom
+      && discoveryRect.bottom > fullscreenActionRect.y);
     const shellStyle = shell ? getComputedStyle(shell) : null;
     return {
       viewport: [window.innerWidth, window.innerHeight],
@@ -89,6 +107,8 @@ async function readLayout(page) {
       stage: rect(stage),
       column: rect(column),
       shell: rect(shell),
+      leftSidebarDisplay: leftSidebar ? getComputedStyle(leftSidebar).display : "",
+      rightSidebar: rect(rightSidebar),
       cards: cards.map(rect),
       piece: rect(piece),
       square: rect(square),
@@ -102,9 +122,13 @@ async function readLayout(page) {
       activeGameScrollAnchor: document.getElementById("play")?.dataset.activeGameScrollAnchor || "",
       discovery: discoveryRect,
       overlap,
+      discoveryCardOverlap,
+      discoveryActionOverlap,
       fullscreenAction: fullscreenActionRect,
       fullscreenActionTitle: fullscreenAction?.getAttribute("title") || "",
-      fullscreenActionLabel: fullscreenAction?.getAttribute("aria-label") || ""
+      fullscreenActionLabel: fullscreenAction?.getAttribute("aria-label") || "",
+      restart: rect(restart),
+      directRailDrawers: directRailDrawers.map((drawer) => ({ id: drawer.id, open: drawer.open }))
     };
   });
 }
@@ -135,10 +159,22 @@ async function main() {
         if (width >= 1181) {
           assert(layout.centerTrackGutter <= 20,
             `${width}x${height}: desktop center track leaves an excessive board gutter: ${JSON.stringify(layout)}.`);
+          assert.equal(layout.leftSidebarDisplay, "none",
+            `${width}x${height}: active Play kept a competing permanent left rail: ${JSON.stringify(layout)}.`);
+          assert(layout.rightSidebar && layout.rightSidebar.width >= 280 && layout.rightSidebar.width <= 326,
+            `${width}x${height}: active Play contextual rail did not keep its compact 280–320px budget: ${JSON.stringify(layout)}.`);
+          assert(layout.restart && layout.rightSidebar && layout.restart.width < layout.rightSidebar.width - 24,
+            `${width}x${height}: Restart Game regained a full-width hero treatment: ${JSON.stringify(layout)}.`);
+          assert(layout.directRailDrawers.every((drawer) => !drawer.open),
+            `${width}x${height}: secondary active-game context opened by default: ${JSON.stringify(layout)}.`);
         }
         assert(layout.cards.length === 2 && layout.cards.every((card) => card && card.width > 0 && card.height > 0),
           `${width}x${height}: both player cards must remain rendered: ${JSON.stringify(layout)}.`);
         assert(layout.cards.every((card) => card.width <= width + 1), `${width}x${height}: player card exceeds viewport width: ${JSON.stringify(layout)}.`);
+        if (width >= 1181) {
+          assert(layout.cards.every((card) => card.y >= -1 && card.bottom <= height + 1),
+            `${width}x${height}: desktop board sizing pushed a player card below the initial workspace viewport: ${JSON.stringify(layout)}.`);
+        }
         assert(layout.piece && layout.square && layout.piece.width > 0 && layout.piece.height > 0,
           `${width}x${height}: board piece rendering disappeared: ${JSON.stringify(layout)}.`);
         assert(layout.piece.width <= layout.square.width + 1 && layout.piece.height <= layout.square.height + 1,
@@ -147,6 +183,10 @@ async function main() {
           `${width}x${height}: active-game board was not initially visible: ${JSON.stringify(layout)}.`);
         assert.equal(layout.overlap, false,
           `${width}x${height}: resize discovery cue overlaps the board interaction surface: ${JSON.stringify(layout)}.`);
+        assert.equal(layout.discoveryCardOverlap, false,
+          `${width}x${height}: resize discovery cue overlaps a player card: ${JSON.stringify(layout)}.`);
+        assert.equal(layout.discoveryActionOverlap, false,
+          `${width}x${height}: resize discovery cue overlaps the fullscreen control: ${JSON.stringify(layout)}.`);
         if (width <= 900) {
           assert(layout.cards.every((card) => card.y >= -1 && card.bottom <= height + 1),
             `${width}x${height}: active-game player cards were left outside the initial viewport: ${JSON.stringify(layout)}.`);

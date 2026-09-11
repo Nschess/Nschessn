@@ -143,7 +143,7 @@ const requiredRegressionContracts = [
   ["collapsible move history", /id="moveHistoryDrawer"[\s\S]*?data-play-drawer="moves"[\s\S]*?id="moveHistory"/],
   ["collapsible coach tools", /id="coachToolsDrawer"[\s\S]*?data-play-drawer="coach"/],
   ["collapsible friend chat", /id="friendGameChatDrawer"[\s\S]*?data-play-drawer="chat"[\s\S]*?id="friendGameChat"/],
-  ["responsive drawer defaults", /function setupPlayWorkspaceDrawers\([\s\S]*?const compactWorkspace = window\.innerWidth <= 1180;[\s\S]*?drawer\.dataset\.playDrawer === "moves" \|\| !compactWorkspace/],
+  ["progressive-disclosure drawer defaults", /function setupPlayWorkspaceDrawers\([\s\S]*?document\.querySelectorAll\("#play details\[data-play-drawer\]"\)[\s\S]*?drawer\.open = false;[\s\S]*?coachLibrary\.open = false;/],
   ["friend chat drawer visibility", /function renderFriendGameChat[\s\S]*?drawer\.hidden = !enabled/],
   ["visible player-strip essentials", /match-player-meta :is\(\[data-match-side\], \[data-match-rating\], \[data-match-coins\], \[data-match-online\]\)[\s\S]*?display: inline-flex/],
   ["captured-piece presentation", /#play \.captured-pieces \{\s*display: flex;/],

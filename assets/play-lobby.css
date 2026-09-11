@@ -835,8 +835,15 @@ html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-revie
   max-width: var(--interactive-board-size, 720px) !important;
 }
 
-html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > :not(.ai-player-card):not(.match-player-card):not(.play-board-wrap):not(.play-bottom-actionbar) {
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > :not(.ai-player-card):not(.match-player-card):not(.play-board-wrap):not(.play-bottom-actionbar):not(.board-drag-ghost) {
   display: none !important;
+}
+
+/* The shared interaction engine mounts its held-piece ghost in the native
+   fullscreen host. It is a fixed overlay, not workspace content, so retain
+   it while hiding nonessential fullscreen children. */
+html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen > .board-drag-ghost {
+  display: block !important;
 }
 
 @media (max-width: 699px) {
@@ -853,6 +860,17 @@ html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-revie
   html body.interactive-board-fullscreen-active #play.is-active-game:not(.is-review-mode) .match-board-column:fullscreen {
     align-content: start;
     padding: 10px !important;
+  }
+}
+
+/* A 701–1180px Play board can legitimately consume nearly the entire line.
+   There is no non-overlapping place for the explanatory card at that size;
+   retain the visible, labelled resize handle and keep the fuller first-use
+   cue for phone and desktop instead of covering a live square or a player. */
+@media (min-width: 701px) and (max-width: 1180px) {
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .interactive-board-sizing-stage > .interactive-board-discovery,
+  html body #play#play.is-active-game:not(.is-review-mode) .interactive-board-sizing-stage > .interactive-board-discovery {
+    display: none !important;
   }
 }
 
@@ -2401,6 +2419,858 @@ html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-boa
   }
 }
 
+/* -------------------------------------------------------------------------
+   Single contextual rail
+   -------------------------------------------------------------------------
+   The lobby now follows the same three-purpose composition as an active
+   game: a compact wayfinding menu, the board, and one state-specific rail.
+   This deliberately reuses the existing Game Ready and Bot profile controls
+   instead of introducing a second setup surface. */
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play.play-lobby {
+    --play-lobby-left: clamp(150px, 11vw, 172px);
+    --play-lobby-right: clamp(232px, 16vw, 276px);
+    --play-lobby-gap: clamp(12px, 1.1vw, 18px);
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-shell {
+    grid-template-columns: var(--play-lobby-left) max-content var(--play-lobby-right) !important;
+    width: min(calc(100% - 32px), 1220px) !important;
+    max-width: 1220px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-left-sidebar,
+  html body.site-tab-mode #play#play.play-lobby .play-right-sidebar {
+    position: sticky;
+    inset-block-start: 88px;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-left-sidebar {
+    gap: 8px;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-nav {
+    padding: 7px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-head {
+    margin: 2px 3px 6px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card {
+    grid-template-columns: 24px minmax(0, 1fr) !important;
+    min-height: 40px !important;
+    margin-bottom: 3px !important;
+    padding: 5px 6px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card > span:nth-child(2) {
+    gap: 0;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card small,
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card > b {
+    display: none !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card strong {
+    font-size: .68rem !important;
+    white-space: nowrap;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-icon {
+    font-size: .9rem;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .coach-library > summary {
+    min-height: 36px;
+    padding-inline: 9px;
+    font-size: .6rem;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-right-sidebar {
+    gap: 8px;
+    max-height: calc(100svh - 108px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-lobby-settings {
+    padding: 12px;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-lobby-panel-heading {
+    padding-bottom: 9px;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-lobby-ready-summary {
+    gap: 4px;
+    padding: 11px 0 9px;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-lobby-start {
+    min-height: 56px;
+    margin-top: 10px;
+    padding: 8px 11px;
+  }
+}
+
+/* On narrow screens, keep the board ahead of both supporting regions. The
+   setup rail stays immediately after it, while navigation remains available
+   below without competing for the first viewport. */
+@media (max-width: 900px) {
+  html body.site-tab-mode #play#play.play-lobby .play-shell {
+    grid-template-areas: "center" "right" "left" !important;
+  }
+}
+
+/* Final quiet-surface pass -------------------------------------------------
+   Keep elevation for the position and the one action that matters now. Every
+   other Play surface becomes a spaced, typographic layer rather than another
+   bordered card. */
+html body #play#play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play.play-lobby .match-board-column {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play.play-lobby .play-mode-nav {
+  padding: 4px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play.play-lobby .play-mode-head {
+  margin: 5px 6px 8px !important;
+}
+
+html body #play#play.play-lobby .play-mode-head strong,
+html body #play#play.play-lobby :is(.play-lobby-ready-kicker, .play-active-controls-heading .section-kicker, .post-game-head small) {
+  color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 78%, var(--cq-text-primary, #f5f7ff)) !important;
+  font-size: .59rem !important;
+  font-weight: 900 !important;
+  letter-spacing: .105em !important;
+}
+
+html body #play#play.play-lobby .play-mode-card {
+  margin-bottom: 5px !important;
+  border-color: transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+}
+
+html body #play#play.play-lobby .play-mode-card:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 8%, transparent) !important;
+}
+
+html body #play#play.play-lobby .play-mode-card:is([data-play-mode="ai"], .is-selected) {
+  border-inline-start-color: var(--cq-accent-primary, #e7b65d) !important;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 13%, transparent), transparent 78%) !important;
+  box-shadow: inset 2px 0 0 var(--cq-accent-primary, #e7b65d) !important;
+}
+
+html body #play#play.play-lobby .coach-library,
+html body #play#play.play-lobby .play-lobby-bot-info {
+  border: 0 !important;
+  border-top: 1px solid color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 74%, transparent) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play.play-lobby .play-lobby-settings {
+  padding: 8px 0 10px 12px !important;
+  border: 0 !important;
+  border-inline-start: 2px solid color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 72%, transparent) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play.play-lobby .play-lobby-panel-heading,
+html body #play#play.play-lobby .play-lobby-ready-summary {
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 58%, transparent) !important;
+}
+
+html body #play#play:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 58%, transparent) !important;
+  background: color-mix(in srgb, var(--cq-surface-glass, #0b1527) 52%, transparent) !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+  gap: 14px !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > .play-active-controls {
+  gap: 12px !important;
+  padding: 15px !important;
+  border: 0 !important;
+  border-inline-start: 2px solid color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 72%, transparent) !important;
+  border-radius: 0 14px 14px 0 !important;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 9%, transparent), transparent 74%) !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-active-controls-heading {
+  padding-bottom: 10px !important;
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 60%, transparent) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-active-controls-heading h3,
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-head strong {
+  font-size: 1rem !important;
+  letter-spacing: -.018em !important;
+  line-height: 1.15 !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details) {
+  border-bottom-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 64%, transparent) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details) > summary {
+  min-height: 46px !important;
+  color: var(--cq-text-secondary, #c4cee2) !important;
+  font-size: .68rem !important;
+  letter-spacing: .025em;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-rail-drawer-content > :is(.featured-coach-card, .simple-coach, .opening-compass) {
+  margin: 0 !important;
+  padding-inline: 0 !important;
+  border: 0 !important;
+  border-top: 1px solid color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 52%, transparent) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-rail-drawer-content > :is(.featured-coach-card, .simple-coach, .opening-compass):first-child {
+  border-top: 0 !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) {
+  padding: 16px !important;
+  border: 0 !important;
+  border-inline-start: 2px solid var(--cq-accent-primary, #e7b65d) !important;
+  border-radius: 0 14px 14px 0 !important;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 10%, transparent), color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 6%, transparent)) !important;
+  box-shadow: none !important;
+}
+
+/* Reassert the completion hierarchy after the legacy surface layers. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls #restartGame {
+  order: 4 !important;
+  min-height: 34px !important;
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 84%, transparent) !important;
+  color: var(--cq-text-muted, #99a7c1) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-areas: "review again" "next new" "history share" "home home" !important;
+  gap: 8px !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions > .button {
+  min-height: 36px;
+  font-size: .68rem;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameReview {
+  grid-area: review !important;
+  order: initial !important;
+  min-height: 44px !important;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 78%, transparent) !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #6749cb, #8066ff) !important;
+  box-shadow: 0 9px 20px rgba(86, 62, 188, .25) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameAgain {
+  grid-area: again !important;
+  order: initial !important;
+  min-height: 44px !important;
+  border-color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 68%, transparent) !important;
+  color: var(--cq-text-primary, #f5f7ff) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 22%, var(--cq-surface-input, #101c31)), color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 12%, var(--cq-surface-input, #101c31))) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 18px rgba(3, 8, 18, .18) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameNextBot { grid-area: next; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameNew { grid-area: new; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameHistory { grid-area: history; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameShare { grid-area: share; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameHome { grid-area: home; }
+
+html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-board-actions, .play-lobby-board-actions) {
+  gap: 5px !important;
+}
+
+html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-board-actions, .play-lobby-board-actions) > :is(.interactive-board-fullscreen-button, .interactive-board-settings-button, [data-board-fullscreen-action]) {
+  inline-size: 32px !important;
+  min-inline-size: 32px !important;
+  block-size: 32px !important;
+  min-block-size: 32px !important;
+  padding: 0 !important;
+  border-radius: 9px !important;
+  box-shadow: 0 6px 14px rgba(3, 8, 18, .16) !important;
+}
+
+@media (max-width: 620px) {
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: "review" "again" "next" "new" "history" "share" "home" !important;
+  }
+}
+
+/* Final action hierarchy. A completed game deserves two clear next moves;
+   a live restart and board utilities should never compete with the position. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls #restartGame {
+  order: 4 !important;
+  min-height: 34px !important;
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 84%, transparent) !important;
+  color: var(--cq-text-muted, #99a7c1) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls #restartGame:not(:disabled):hover,
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls #restartGame:not(:disabled):focus-visible {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 44%, var(--cq-border, rgba(148,163,184,.18))) !important;
+  color: var(--cq-text-primary, #f5f7ff) !important;
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 8%, transparent) !important;
+  outline: none;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-areas:
+    "review again"
+    "next new"
+    "history share"
+    "home home" !important;
+  gap: 8px !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions > .button {
+  min-height: 36px;
+  font-size: .68rem;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameReview {
+  grid-area: review !important;
+  order: initial !important;
+  min-height: 44px !important;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 78%, transparent) !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #6749cb, #8066ff) !important;
+  box-shadow: 0 9px 20px rgba(86, 62, 188, .25) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameAgain {
+  grid-area: again !important;
+  order: initial !important;
+  min-height: 44px !important;
+  border-color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 68%, transparent) !important;
+  color: var(--cq-text-primary, #f5f7ff) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 22%, var(--cq-surface-input, #101c31)), color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 12%, var(--cq-surface-input, #101c31))) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 18px rgba(3, 8, 18, .18) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameNextBot { grid-area: next; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameNew { grid-area: new; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameHistory { grid-area: history; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameShare { grid-area: share; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameHome { grid-area: home; }
+
+/* Existing controls remain exactly where the shared board controller puts
+   them. This only fixes their hit area and visual weight to a compact edge
+   utility, including the pre-game action supplied in the static markup. */
+html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-board-actions, .play-lobby-board-actions) {
+  gap: 5px !important;
+}
+
+html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-board-actions, .play-lobby-board-actions) > :is(.interactive-board-fullscreen-button, .interactive-board-settings-button, [data-board-fullscreen-action]) {
+  inline-size: 32px !important;
+  min-inline-size: 32px !important;
+  block-size: 32px !important;
+  min-block-size: 32px !important;
+  padding: 0 !important;
+  border-radius: 9px !important;
+  box-shadow: 0 6px 14px rgba(3, 8, 18, .16) !important;
+}
+
+@media (max-width: 620px) {
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: "review" "again" "next" "new" "history" "share" "home" !important;
+  }
+}
+
+/* Play visual hierarchy ---------------------------------------------------
+   Keep the existing board controller, drag affordance, fullscreen action,
+   and interaction layers intact. This final route-only pass changes the
+   surrounding presentation so the position reads first and the utility
+   rails recede into the background. */
+#play:not(.is-review-mode) .section-head {
+  min-height: 0 !important;
+  margin: 0 auto !important;
+  padding: 8px 0 12px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#play:not(.is-review-mode) .section-head .section-kicker {
+  color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 76%, white 8%);
+  font-size: .56rem !important;
+  letter-spacing: .14em;
+}
+
+#play:not(.is-review-mode) .section-head h2 {
+  margin-top: 2px !important;
+  color: var(--cq-text-primary, #f5f7ff);
+  font-size: clamp(1rem, 1.4vw, 1.28rem) !important;
+  letter-spacing: -.02em;
+}
+
+#play:not(.is-review-mode) .section-head .section-intro {
+  color: var(--cq-text-subtle, #71809a) !important;
+  font-size: .66rem !important;
+}
+
+#play.play-lobby .play-shell,
+#play.is-active-game:not(.is-review-mode) .play-shell {
+  --play-focus-gap: clamp(10px, .9vw, 16px);
+  width: min(calc(100% - 32px), 1560px) !important;
+  gap: var(--play-focus-gap) !important;
+}
+
+#play.play-lobby .play-left-sidebar,
+#play.is-active-game:not(.is-review-mode) .play-left-sidebar,
+#play.play-lobby .play-right-sidebar,
+#play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+  opacity: .9;
+}
+
+#play.play-lobby .play-mode-nav,
+#play.play-lobby .play-right-sidebar > :is(.play-lobby-settings, .play-lobby-bot-info),
+#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-active-controls, .play-rail-drawer, .captured-row, .trainer-note) {
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 72%, transparent) !important;
+  background: color-mix(in srgb, var(--cq-surface-glass, #0b1527) 78%, transparent) !important;
+  box-shadow: 0 12px 28px rgba(2, 8, 18, .14) !important;
+}
+
+#play.play-lobby .play-mode-card {
+  min-height: 48px !important;
+  padding-block: 6px !important;
+}
+
+#play.play-lobby .play-mode-card strong {
+  font-size: .7rem;
+}
+
+#play.play-lobby .play-mode-card small {
+  opacity: .78;
+}
+
+/* The center stage is a quiet mount for the board, not another dashboard
+   card. Its children keep their existing grid areas and measured size. */
+#play.play-lobby .match-board-column,
+#play.is-active-game:not(.is-review-mode) .match-board-column {
+  padding: clamp(2px, .55vw, 8px) !important;
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 62%, transparent) !important;
+  border-radius: 18px !important;
+  background: linear-gradient(145deg, rgba(11, 26, 47, .4), rgba(6, 15, 29, .26)) !important;
+  box-shadow: 0 18px 42px rgba(1, 6, 17, .16), inset 0 1px 0 rgba(255, 255, 255, .045) !important;
+}
+
+#play.play-lobby .play-board-wrap,
+#play.is-active-game:not(.is-review-mode) .play-board-wrap {
+  border-radius: 16px !important;
+  box-shadow: 0 24px 52px rgba(1, 6, 17, .34), 0 0 0 1px rgba(255, 255, 255, .06) !important;
+}
+
+/* Let the chess set breathe inside each square. The element remains the
+   existing rendered asset, so piece selection, drag targets, animations, and
+   themed sets continue to work exactly as before. */
+#play.play-lobby #coachBoard :is(.piece-svg, .piece-symbol),
+#play.is-active-game:not(.is-review-mode) #coachBoard :is(.piece-svg, .piece-symbol) {
+  width: 87% !important;
+  height: 87% !important;
+  opacity: .92 !important;
+}
+
+#play.play-lobby #coachBoard .piece-svg.black-piece,
+#play.is-active-game:not(.is-review-mode) #coachBoard .piece-svg.black-piece {
+  opacity: .88 !important;
+}
+
+#play.play-lobby #coachBoard .piece-symbol.black-piece,
+#play.is-active-game:not(.is-review-mode) #coachBoard .piece-symbol.black-piece {
+  color: color-mix(in srgb, currentColor 86%, white 14%) !important;
+}
+
+@media (min-width: 1181px) {
+  #play.play-lobby .play-shell {
+    grid-template-columns: clamp(178px, 12vw, 208px) max-content clamp(204px, 13.5vw, 232px) !important;
+    justify-content: center !important;
+  }
+
+  /* Active games already use a measured board budget. Keep their established
+     track widths so this visual pass cannot make the live board smaller. */
+  #play.is-active-game:not(.is-review-mode) .play-shell {
+    grid-template-columns: clamp(204px, 12.5vw, 240px) max-content clamp(224px, 14vw, 260px) !important;
+    justify-content: center !important;
+  }
+}
+
+@media (max-width: 700px) {
+  #play:not(.is-review-mode) .section-head {
+    padding: 4px 12px 8px !important;
+  }
+
+  #play.play-lobby .play-shell,
+  #play.is-active-game:not(.is-review-mode) .play-shell {
+    width: min(calc(100% - 16px), 720px) !important;
+  }
+
+  #play.play-lobby .match-board-column,
+  #play.is-active-game:not(.is-review-mode) .match-board-column {
+    border-radius: 14px !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Final active-workspace polish: the fullscreen action belongs just beyond
+   the contextual rail on desktop, never on top of a disclosure label. On
+   compact screens, keep the discovery cue in the stage's reserved lower
+   strip so it teaches resizing without covering the lower player card. */
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions,
+  html body #play#play.is-active-game:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions {
+    inset-inline-start: calc(100% + 354px) !important;
+    inset-inline-end: auto !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  html body.site-tab-mode #play#play.is-active-game:not(.is-review-mode) .interactive-board-sizing-stage > .interactive-board-discovery,
+  html body #play#play.is-active-game:not(.is-review-mode) .interactive-board-sizing-stage > .interactive-board-discovery {
+    inset-block-start: auto !important;
+    inset-block-end: 8px !important;
+    /* The fullscreen control occupies the lower-right utility edge at these
+       widths. Start the one-time resize hint from the opposite edge so the
+       two affordances never sit on top of each other. */
+    inset-inline-start: 8px !important;
+    inset-inline-end: auto !important;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Targeted Play revamp
+   -------------------------------------------------------------------------
+   This layer changes only Play's normal lobby/active presentation. The
+   shared board controller and native fullscreen host remain the owners of
+   board size, drag-resize, and focus-mode geometry. */
+
+/* Active games have one contextual rail. The mode rail remains available
+   from the Play/Bots routes and the existing More > Lobby action, but it no
+   longer competes with a live board for permanent desktop space. */
+@media (min-width: 1181px) {
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    display: grid !important;
+    grid-template-areas: "center right" !important;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px) !important;
+    gap: clamp(16px, 1.6vw, 24px) !important;
+    /* Keep the board and its one rail as a single centered composition.
+       A max-width based on the whole viewport left a second board-width of
+       empty space between the square and contextual information. */
+    /* Give a fresh user the same viewport-aware center budget as the shared
+       board controller. A previous physical board measurement was fed back
+       into this shell, trapping a 910px requested board inside a 700px track
+       on wide screens. Manual board preferences still win inside this track. */
+    /* Reserve the two compact identity strips in normal flow. This affects
+       only the automatic fresh-user budget; manual resizing is still owned
+       by the shared controller and fullscreen is untouched. */
+    --play-revamp-center-budget: clamp(540px, calc(100svh - 230px), 980px);
+    width: min(calc(100% - 24px), calc(var(--play-revamp-center-budget) + 344px)) !important;
+    max-width: calc(var(--play-revamp-center-budget) + 344px) !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-left-sidebar {
+    display: none !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .match-board-column {
+    grid-area: center !important;
+    justify-self: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+    grid-area: right !important;
+    align-self: start !important;
+    width: 100% !important;
+    max-height: calc(100svh - 104px) !important;
+    overflow: auto !important;
+    scrollbar-width: thin;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 1180px) {
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    display: grid !important;
+    grid-template-areas: "center" "right" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px !important;
+    width: min(calc(100% - 20px), 920px) !important;
+    max-width: 920px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-left-sidebar {
+    display: none !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .match-board-column {
+    grid-area: center !important;
+    justify-self: center !important;
+    width: 100% !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+    grid-area: right !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+@media (max-width: 700px) {
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center" "right" !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+    width: min(calc(100% - 8px), 680px) !important;
+    padding: 4px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-left-sidebar {
+    display: none !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+    grid-area: right !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* The board column keeps its established cards and sizing variables; only
+   the surrounding surface density changes. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .match-board-column {
+  gap: clamp(6px, .7dvh, 10px) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > .play-active-controls {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 13px !important;
+  border: 1px solid color-mix(in srgb, var(--cq-border-strong, rgba(148,163,184,.34)) 72%, transparent) !important;
+  border-radius: 14px !important;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 9%, var(--cq-surface-glass, #0b1527)), var(--cq-surface-glass, #0b1527)) !important;
+  box-shadow: var(--cq-inset-highlight, inset 0 1px 0 rgba(255,255,255,.05)), 0 12px 26px rgba(2, 8, 18, .16) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-active-controls-heading {
+  padding: 0 0 9px !important;
+  border-bottom: 1px solid var(--cq-border, rgba(148,163,184,.18)) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-active-controls-heading h3 {
+  font-size: .96rem !important;
+  letter-spacing: -.01em !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-active-controls-heading p {
+  font-size: .7rem !important;
+}
+
+/* Keep essential actions visible without turning Restart into a hero. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls .play-primary-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls .play-primary-actions > .button,
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions > summary {
+  min-height: 38px !important;
+  font-size: .68rem !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls .play-start-button {
+  grid-column: auto !important;
+  order: 4 !important;
+  min-height: 34px !important;
+  border-color: var(--cq-border, rgba(148,163,184,.18)) !important;
+  color: var(--cq-text-muted, #99a7c1) !important;
+  background: var(--cq-surface-input, #101c31) !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls .play-flip-action {
+  order: 3;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls .play-extra-actions {
+  grid-column: auto !important;
+  order: 5;
+}
+
+/* Secondary context is one quiet stack, not a second dashboard. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details) {
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--cq-border, rgba(148,163,184,.16)) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details) > summary {
+  min-height: 42px !important;
+  padding: 0 2px !important;
+  color: var(--cq-text-primary, #f5f7ff) !important;
+  background: transparent !important;
+  font-size: .7rem !important;
+  list-style: none;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details) > summary::-webkit-details-marker,
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-game-details .play-rail-drawer > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Existing general drawer rules intentionally render rich panel contents.
+   In the live rail that defeats progressive disclosure, so closed details
+   must be genuinely absent from the visual stack. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details):not([open]) > :not(summary),
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-game-details .play-rail-drawer:not([open]) > :not(summary) {
+  display: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details) > summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--cq-text-subtle, #71809a);
+  font-size: 1rem;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details)[open] > summary::after {
+  content: "−";
+  color: var(--cq-accent-tertiary, #65e7f7);
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-game-details-content {
+  display: grid;
+  gap: 8px;
+  padding: 0 0 10px;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-game-details .play-rail-drawer {
+  border: 0 !important;
+  border-top: 1px solid var(--cq-border, rgba(148,163,184,.14)) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-game-details .play-rail-drawer > summary {
+  min-height: 36px !important;
+  color: var(--cq-text-muted, #99a7c1) !important;
+  font-size: .65rem !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-game-details .captured-row,
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-game-details .trainer-note {
+  margin: 0 !important;
+  padding: 8px 0 !important;
+  border-top: 1px solid var(--cq-border, rgba(148,163,184,.14)) !important;
+  background: transparent !important;
+}
+
+/* Captures and PGN use the same nested disclosure as move history. Their
+   content should begin cleanly below its own summary rather than reading as
+   a permanently visible rail card. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-game-details :is(.play-rail-drawer--captures .captured-row, .play-rail-drawer--pgn .trainer-note) {
+  padding: 0 0 10px !important;
+  border-top: 0 !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #enginePanel .play-rail-drawer-content {
+  padding: 0 0 10px !important;
+}
+
+/* Post-game prioritizes Play Again; Review remains available but quieter. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-actions #postGameAgain {
+  order: -2;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 70%, transparent) !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #6749cb, #8066ff) !important;
+  box-shadow: 0 8px 18px rgba(86, 62, 188, .22) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-actions #postGameReview {
+  color: var(--cq-text-primary, #f5f7ff) !important;
+  background: var(--cq-surface-input, #101c31) !important;
+  box-shadow: none !important;
+}
+
+/* Give the existing Nschessn set a little breathing room without touching
+   board dimensions, square math, or the fullscreen controller. */
+html body #play#play:not(.is-review-mode) #coachBoard .piece-svg,
+html body #play#play:not(.is-review-mode) #coachBoard .piece-symbol {
+  width: 87% !important;
+  height: 87% !important;
+}
+
 /* Wider fullscreen viewports have enough edge space for the existing focus
    action to live as a fixed overlay. Keep it outside the board's pointer
    surface without reserving a permanent rail in the board fit calculation. */
@@ -2551,5 +3421,285 @@ html body.site-tab-mode #play#play.play-lobby .play-board-wrap > .play-lobby-boa
     inset-inline-end: auto !important;
     inset-block-start: calc((var(--interactive-board-size, 720px) / 2) - 13px) !important;
     inset-block-end: auto !important;
+  }
+}
+
+/* Final lobby frame: compact navigation, board, one bot/setup rail. */
+@media (min-width: 1181px) {
+  html body.site-tab-mode #play#play.play-lobby {
+    --play-lobby-left: clamp(150px, 11vw, 172px);
+    --play-lobby-right: clamp(232px, 16vw, 276px);
+    --play-lobby-gap: clamp(12px, 1.1vw, 18px);
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-shell {
+    grid-template-columns: var(--play-lobby-left) max-content var(--play-lobby-right) !important;
+    width: min(calc(100% - 32px), 1220px) !important;
+    max-width: 1220px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-left-sidebar,
+  html body.site-tab-mode #play#play.play-lobby .play-right-sidebar {
+    position: sticky;
+    inset-block-start: 88px;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-left-sidebar { gap: 8px; }
+  html body.site-tab-mode #play#play.play-lobby .play-mode-nav { padding: 7px !important; }
+  html body.site-tab-mode #play#play.play-lobby .play-mode-head { margin: 2px 3px 6px !important; }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card {
+    grid-template-columns: 24px minmax(0, 1fr) !important;
+    min-height: 40px !important;
+    margin-bottom: 3px !important;
+    padding: 5px 6px !important;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card > span:nth-child(2) { gap: 0; }
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card small,
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card > b { display: none !important; }
+  html body.site-tab-mode #play#play.play-lobby .play-mode-card strong { font-size: .68rem !important; white-space: nowrap; }
+  html body.site-tab-mode #play#play.play-lobby .play-mode-icon { font-size: .9rem; }
+
+  html body.site-tab-mode #play#play.play-lobby .coach-library > summary {
+    min-height: 36px;
+    padding-inline: 9px;
+    font-size: .6rem;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-right-sidebar {
+    gap: 8px;
+    max-height: calc(100svh - 108px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-lobby-settings { padding: 12px; }
+  html body.site-tab-mode #play#play.play-lobby .play-lobby-panel-heading { padding-bottom: 9px; }
+
+  html body.site-tab-mode #play#play.play-lobby .play-lobby-ready-summary {
+    gap: 4px;
+    padding: 11px 0 9px;
+  }
+
+  html body.site-tab-mode #play#play.play-lobby .play-lobby-start {
+    min-height: 56px;
+    margin-top: 10px;
+    padding: 8px 11px;
+  }
+}
+
+@media (max-width: 900px) {
+  html body.site-tab-mode #play#play.play-lobby .play-shell {
+    grid-template-areas: "center" "right" "left" !important;
+  }
+}
+
+/* Last Play surface hierarchy: this sits after the legacy route layers so
+   the board and the current decision remain the only elevated elements. */
+html body #play#play:not(.is-review-mode) :is(.play-left-sidebar, .play-right-sidebar),
+html body #play#play.play-lobby .match-board-column {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play.play-lobby .match-board-column { padding: 0 !important; }
+
+html body #play#play.play-lobby .play-mode-nav {
+  padding: 4px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play.play-lobby .play-mode-head { margin: 5px 6px 8px !important; }
+
+html body #play#play.play-lobby .play-mode-head strong,
+html body #play#play.play-lobby :is(.play-lobby-ready-kicker, .play-active-controls-heading .section-kicker, .post-game-head small) {
+  color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 78%, var(--cq-text-primary, #f5f7ff)) !important;
+  font-size: .59rem !important;
+  font-weight: 900 !important;
+  letter-spacing: .105em !important;
+}
+
+html body #play#play.play-lobby .play-mode-card {
+  margin-bottom: 5px !important;
+  border-color: transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+}
+
+html body #play#play.play-lobby .play-mode-card:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 8%, transparent) !important;
+}
+
+html body #play#play.play-lobby .play-mode-card:is([data-play-mode="ai"], .is-selected) {
+  border-inline-start-color: var(--cq-accent-primary, #e7b65d) !important;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 13%, transparent), transparent 78%) !important;
+  box-shadow: inset 2px 0 0 var(--cq-accent-primary, #e7b65d) !important;
+}
+
+html body #play#play.play-lobby :is(.coach-library, .play-lobby-bot-info) {
+  border: 0 !important;
+  border-top: 1px solid color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 74%, transparent) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play.play-lobby .play-lobby-settings {
+  padding: 8px 0 10px 12px !important;
+  border: 0 !important;
+  border-inline-start: 2px solid color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 72%, transparent) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body #play#play:not(.is-review-mode) .match-board-column > :is(.ai-player-card, .match-player-card) {
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 58%, transparent) !important;
+  background: color-mix(in srgb, var(--cq-surface-glass, #0b1527) 52%, transparent) !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar { gap: 14px !important; }
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > .play-active-controls {
+  gap: 12px !important;
+  padding: 15px !important;
+  border: 0 !important;
+  border-inline-start: 2px solid color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 72%, transparent) !important;
+  border-radius: 0 14px 14px 0 !important;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 9%, transparent), transparent 74%) !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-active-controls-heading {
+  padding-bottom: 10px !important;
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 60%, transparent) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) :is(.play-active-controls-heading h3, .post-game-head strong) {
+  font-size: 1rem !important;
+  letter-spacing: -.018em !important;
+  line-height: 1.15 !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details) {
+  border-bottom-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 64%, transparent) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar > :is(.play-lobby-bot-info, .play-rail-drawer, .play-game-details) > summary {
+  min-height: 46px !important;
+  color: var(--cq-text-secondary, #c4cee2) !important;
+  font-size: .68rem !important;
+  letter-spacing: .025em;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-rail-drawer-content > :is(.featured-coach-card, .simple-coach, .opening-compass) {
+  margin: 0 !important;
+  padding-inline: 0 !important;
+  border: 0 !important;
+  border-top: 1px solid color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 52%, transparent) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) {
+  padding: 16px !important;
+  border: 0 !important;
+  border-inline-start: 2px solid var(--cq-accent-primary, #e7b65d) !important;
+  border-radius: 0 14px 14px 0 !important;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 10%, transparent), color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 6%, transparent)) !important;
+  box-shadow: none !important;
+}
+
+/* Completion actions lead; Restart stays a quiet, live-game utility. */
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) #playActiveControls #restartGame {
+  order: 4 !important;
+  min-height: 34px !important;
+  border-color: color-mix(in srgb, var(--cq-border, rgba(148,163,184,.18)) 84%, transparent) !important;
+  color: var(--cq-text-muted, #99a7c1) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-areas: "review again" "next new" "history share" "home home" !important;
+  gap: 8px !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions > .button { min-height: 36px; font-size: .68rem; }
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameReview {
+  grid-area: review !important;
+  order: initial !important;
+  min-height: 44px !important;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 78%, transparent) !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #6749cb, #8066ff) !important;
+  box-shadow: 0 9px 20px rgba(86, 62, 188, .25) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameAgain {
+  grid-area: again !important;
+  order: initial !important;
+  min-height: 44px !important;
+  border-color: color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 68%, transparent) !important;
+  color: var(--cq-text-primary, #f5f7ff) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 22%, var(--cq-surface-input, #101c31)), color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 12%, var(--cq-surface-input, #101c31))) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 18px rgba(3, 8, 18, .18) !important;
+}
+
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameNextBot { grid-area: next; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameNew { grid-area: new; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameHistory { grid-area: history; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameShare { grid-area: share; }
+html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) #postGameHome { grid-area: home; }
+
+html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-board-actions, .play-lobby-board-actions) { gap: 5px !important; }
+
+/* 1024px is wide enough for the board and one compact rail. Keep the
+   768px-and-under board-first stack, but do not make a tablet landscape user
+   scroll past the board just to reach live controls. The shared board
+   controller still owns the rendered square and all manual resize/fullscreen
+   behavior inside this center track. */
+@media (min-width: 960px) and (max-width: 1180px) {
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-shell {
+    grid-template-areas: "center right" !important;
+    grid-template-columns: minmax(0, 1fr) minmax(248px, 272px) !important;
+    gap: 16px !important;
+    width: min(calc(100% - 24px), 980px) !important;
+    max-width: 980px !important;
+  }
+
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .play-right-sidebar {
+    align-self: start !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-auto-flow: row !important;
+    max-height: calc(100svh - 104px) !important;
+    overflow: auto !important;
+    scrollbar-width: thin;
+  }
+}
+
+html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-board-actions, .play-lobby-board-actions) > :is(.interactive-board-fullscreen-button, .interactive-board-settings-button, [data-board-fullscreen-action]) {
+  inline-size: 32px !important;
+  min-inline-size: 32px !important;
+  block-size: 32px !important;
+  min-block-size: 32px !important;
+  padding: 0 !important;
+  border-radius: 9px !important;
+  box-shadow: 0 6px 14px rgba(3, 8, 18, .16) !important;
+}
+
+@media (max-width: 620px) {
+  html body:not(.interactive-board-fullscreen-active) #play#play.is-active-game:not(.is-review-mode) .post-game-flow:not([hidden]) .post-game-actions {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: "review" "again" "next" "new" "history" "share" "home" !important;
   }
 }

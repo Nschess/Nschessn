@@ -39016,6 +39016,217 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   }
 }
 
+/* AI roster: identity first, controls second, details on demand. The 38-bot
+   data set and its Play action are unchanged; this only reduces visual noise
+   around choosing an opponent. */
+#bots .ai-bot-browser {
+  padding: clamp(16px, 2.2vw, 24px);
+}
+
+#bots .ai-bot-controls {
+  grid-template-columns: minmax(0, 1.45fr) minmax(148px, .55fr) minmax(162px, .6fr);
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+#bots .ai-bot-controls > :is(label, .ai-bot-search-field) {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--cq-text-secondary, var(--soft));
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+#bots .ai-bot-controls :is(input, select) {
+  min-height: 40px;
+  border-radius: 10px;
+  font-size: .78rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+#bots .ai-bot-search-input {
+  position: relative;
+  display: block;
+}
+
+#bots .ai-bot-search-input input { padding-right: 38px; }
+
+#bots .ai-bot-clear {
+  position: absolute;
+  inset: 50% 7px auto auto;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: var(--cq-text-muted, var(--muted));
+  background: transparent;
+  font: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+#bots .ai-bot-clear:hover,
+#bots .ai-bot-clear:focus-visible {
+  color: var(--cq-text-primary, var(--text));
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 13%, transparent);
+  outline: none;
+}
+
+#bots .ai-bot-browser-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+  margin-bottom: 15px;
+}
+
+#bots #aiBotResults {
+  margin: 0;
+  color: var(--cq-text-muted, var(--muted));
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+#bots .ai-bot-reset {
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--cq-accent-tertiary, #65e7f7);
+  background: transparent;
+  font: inherit;
+  font-size: .67rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+#bots .ai-bot-reset:hover,
+#bots .ai-bot-reset:focus-visible {
+  color: var(--cq-text-primary, var(--text));
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 12%, transparent);
+  outline: none;
+}
+
+#bots .ai-bot-roster { gap: 20px; }
+#bots .ai-bot-grid { gap: 9px; }
+
+#bots .ai-bot-card {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 8px 12px;
+  padding: 13px;
+  border-radius: 13px;
+}
+
+#bots .ai-bot-avatar {
+  grid-row: 1 / 3;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+#bots .ai-bot-card-copy {
+  gap: 4px;
+}
+
+#bots .ai-bot-card-name-line strong {
+  font-size: .91rem;
+  line-height: 1.15;
+}
+
+#bots .ai-bot-card-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 7px;
+}
+
+#bots .ai-bot-card-meta span {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: .65rem;
+  line-height: 1.3;
+}
+
+#bots .ai-bot-card-meta .ai-bot-rating {
+  color: var(--cq-accent-primary, #e7b65d);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+#bots .ai-bot-card-meta .ai-bot-identity {
+  color: var(--cq-text-secondary, var(--soft));
+  font-weight: 700;
+}
+
+#bots .ai-bot-card-copy p {
+  display: block;
+  min-height: 0;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+#bots .ai-bot-card-details {
+  margin-top: 1px;
+}
+
+#bots .ai-bot-card-details > summary {
+  min-height: 22px;
+  color: var(--cq-text-muted, var(--muted));
+  font-size: .61rem;
+}
+
+#bots .ai-bot-card-details > summary:hover,
+#bots .ai-bot-card-details > summary:focus-visible {
+  color: var(--cq-accent-tertiary, #65e7f7);
+  outline: none;
+}
+
+#bots .ai-bot-card-details-copy {
+  padding: 3px 0 1px;
+}
+
+#bots .ai-bot-card > .button {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  align-self: center;
+  min-width: 56px;
+  min-height: 33px;
+  padding-inline: 9px;
+}
+
+@media (max-width: 860px) {
+  #bots .ai-bot-controls { grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 1fr)); }
+  #bots .ai-bot-search-field { grid-column: 1 / -1; }
+}
+
+@media (max-width: 600px) {
+  #bots .ai-bot-controls { grid-template-columns: 1fr; }
+  #bots .ai-bot-search-field { grid-column: auto; }
+  #bots .ai-bot-card { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 7px 10px; padding: 11px; }
+  #bots .ai-bot-avatar { width: 38px; height: 38px; }
+  #bots .ai-bot-card-meta { grid-template-columns: 1fr; gap: 1px; }
+}
+
+@media (max-width: 420px) {
+  #bots .ai-bot-card { grid-template-columns: 38px minmax(0, 1fr); }
+  #bots .ai-bot-avatar { width: 34px; height: 34px; }
+  #bots .ai-bot-card > .button { grid-column: 2; grid-row: 3; justify-self: start; margin-top: 2px; }
+}
+
 /* Home discovery belongs to the Home route; keep it out of every site panel
    so route pages retain their own layout and responsive gutters. */
 body.site-tab-mode #top > .home-discovery-section {
@@ -39349,6 +39560,161 @@ body.site-tab-mode #top > .home-discovery-section {
 }
 @media (max-width: 390px) {
   .ai-bot-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Targeted Play bot-discovery refinement. The roster is part of the Play
+   journey, but these selectors stay scoped to #bots and do not alter other
+   page cards. */
+#bots .ai-featured-coach {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border-color: var(--ns-border, var(--cq-border));
+  background: linear-gradient(135deg, rgba(117, 84, 237, .12), rgba(8, 18, 32, .86) 54%);
+  box-shadow: var(--ns-shadow, var(--cq-shadow-sm));
+}
+
+#bots .ai-featured-coach-copy { min-width: 0; }
+#bots .ai-featured-coach-copy > :is(h3, p) { margin-block: 0; }
+#bots .ai-featured-coach-copy h3 { font-size: clamp(1.05rem, 1.7vw, 1.35rem); }
+#bots .ai-featured-coach-copy > p:not(.ai-featured-coach-kicker) { max-width: 58ch; font-size: .82rem; line-height: 1.45; }
+#bots .ai-featured-coach .button { min-height: 38px; white-space: nowrap; }
+
+#bots .ai-bot-browser {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#bots .ai-bot-controls {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--ns-border, var(--cq-border));
+  border-radius: 14px;
+  background: var(--ns-surface-soft, rgba(13, 25, 44, .72));
+}
+
+#bots .ai-bot-roster { gap: 22px; }
+/* Bot categories are application-generated sections. The global editorial
+   section rhythm was adding 76px of top padding to every category, which
+   made the roster look needlessly sparse and detached from its heading. */
+#bots .ai-bot-category { gap: 9px; padding: 0; }
+#bots .ai-bot-category-head h3 { font-size: 1rem; }
+#bots .ai-bot-category-head span { font-size: .68rem; }
+
+#bots .ai-bot-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#bots .ai-bot-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: start;
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--ns-border, var(--cq-border)) 84%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ns-surface-soft, var(--cq-surface-panel)) 82%, transparent);
+  box-shadow: none;
+}
+
+#bots .ai-bot-card:hover,
+#bots .ai-bot-card:focus-within {
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 46%, var(--cq-border));
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 8%, var(--ns-surface-soft, var(--cq-surface-panel)));
+}
+
+#bots .ai-bot-avatar {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+
+#bots .ai-bot-card-copy {
+  grid-column: 2;
+  grid-row: 1;
+  gap: 4px;
+  min-width: 0;
+}
+
+#bots .ai-bot-card-name-line,
+#bots .ai-bot-card-name-line strong { min-width: 0; }
+#bots .ai-bot-card-name-line strong { font-size: .9rem; }
+#bots .ai-bot-card-meta { gap: 4px; }
+#bots .ai-bot-card-meta span { padding: 2px 5px; font-size: .59rem; }
+#bots .ai-bot-card-copy p {
+  display: -webkit-box;
+  min-height: 0;
+  margin: 1px 0 0;
+  overflow: hidden;
+  color: var(--cq-text-muted, var(--muted));
+  font-size: .7rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+#bots .ai-bot-card-details {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  margin-top: 5px;
+}
+
+#bots .ai-bot-card-details > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--cq-accent-tertiary, #65e7f7);
+  font-size: .62rem;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+#bots .ai-bot-card-details > summary::-webkit-details-marker { display: none; }
+#bots .ai-bot-card-details > summary::before { content: "+"; margin-right: 4px; font-size: .86rem; }
+#bots .ai-bot-card-details[open] > summary::before { content: "−"; }
+#bots .ai-bot-card-details-copy { display: grid; gap: 3px; padding-top: 4px; color: var(--cq-text-muted, var(--muted)); font-size: .64rem; line-height: 1.35; }
+
+#bots .ai-bot-card > .button {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  align-self: center;
+  min-width: 54px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-color: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 44%, var(--cq-border));
+  color: var(--cq-text-primary, var(--text));
+  background: color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 12%, var(--cq-surface-input, var(--panel)));
+  box-shadow: none;
+}
+
+@media (min-width: 1440px) {
+  #bots .ai-bot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  #bots .ai-featured-coach { grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
+  #bots .ai-featured-coach .button { grid-column: 1 / -1; width: 100%; }
+  #bots .ai-bot-grid { grid-template-columns: minmax(0, 1fr); }
+  #bots .ai-bot-card { grid-template-columns: 38px minmax(0, 1fr) auto; padding: 10px; }
+  #bots .ai-bot-avatar { width: 34px; height: 34px; }
+  #bots .ai-bot-card > .button { min-width: 48px; padding-inline: 8px; }
+}
+
+@media (max-width: 420px) {
+  #bots .ai-featured-coach { grid-template-columns: 1fr; }
+  #bots .ai-featured-coach-avatar { justify-self: start; }
+  #bots .ai-bot-card { grid-template-columns: 36px minmax(0, 1fr); }
+  #bots .ai-bot-card > .button { grid-column: 2; grid-row: 3; justify-self: start; margin-top: 4px; }
 }
 
 /* A board owns the compact viewport. The top header remains available while

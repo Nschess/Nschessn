@@ -2807,7 +2807,15 @@
           </div>
           <button class="button" type="button" id="aiFeaturedCoachPlay">Play KingNorbert</button>
         </article>
-        <section class="ai-bot-browser cq-panel" aria-label="AI bot roster"><div class="ai-bot-controls"><label>Search bots<input id="aiBotSearch" type="search" placeholder="Name, style, or opening" autocomplete="off" /></label><label>Difficulty<select id="aiBotFilter"><option value="All">All difficulties</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option><option value="Master">Master</option></select></label></div><div class="ai-bot-roster" id="aiBotRoster" aria-live="polite"></div></section>
+        <section class="ai-bot-browser cq-panel" aria-label="AI bot roster">
+          <div class="ai-bot-controls" role="search">
+            <div class="ai-bot-search-field"><label for="aiBotSearch">Search roster</label><span class="ai-bot-search-input"><input id="aiBotSearch" type="search" placeholder="Name, style, or opening" autocomplete="off" aria-describedby="aiBotResults" /><button class="ai-bot-clear" id="aiBotClear" type="button" aria-label="Clear bot search" hidden>&times;</button></span></div>
+            <label><span>Level</span><select id="aiBotFilter"><option value="All">All levels</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option><option value="Master">Master</option></select></label>
+            <label><span>Sort</span><select id="aiBotSort"><option value="rating-asc">Rating: low to high</option><option value="rating-desc">Rating: high to low</option><option value="name">Name: A to Z</option></select></label>
+          </div>
+          <div class="ai-bot-browser-meta"><p id="aiBotResults" role="status" aria-live="polite"></p><button class="ai-bot-reset" id="aiBotReset" type="button" hidden>Reset filters</button></div>
+          <div class="ai-bot-roster" id="aiBotRoster" aria-live="polite"></div>
+        </section>
       </div>
     </section>
 
@@ -3416,22 +3424,24 @@
               </dl>
               <p id="playLobbyBotDescription">Choose an AI opponent to see their play style and challenge.</p>
             </details>
-            <section class="engine-panel cq-panel" id="enginePanel" aria-live="polite" aria-labelledby="gameAnalysisTitle" hidden>
-              <div class="engine-panel-head">
+            <details class="engine-panel play-rail-drawer cq-panel" id="enginePanel" aria-live="polite" hidden>
+              <summary class="engine-panel-head">
                 <span><small>Post-game engine</small><strong id="gameAnalysisTitle">Quick game analysis</strong></span>
                 <b id="engineEvalText">0.00</b>
+              </summary>
+              <div class="play-rail-drawer-content">
+                <div class="analysis-sparkline" aria-label="Evaluation trend visualization">
+                  <svg viewBox="0 0 240 70" role="img" aria-label="Evaluation trend"><path d="M1 47 L18 52 L34 44 L52 48 L69 37 L85 31 L102 35 L118 20 L136 28 L153 17 L170 25 L188 18 L206 30 L223 23 L239 28" fill="none" pathLength="1"/><path d="M1 47 L18 52 L34 44 L52 48 L69 37 L85 31 L102 35 L118 20 L136 28 L153 17 L170 25 L188 18 L206 30 L223 23 L239 28 L239 70 L1 70 Z" aria-hidden="true"/></svg>
+                </div>
+                <div class="engine-row">
+                  <span>Rating <strong id="engineRating">1100</strong></span>
+                  <span>Depth <strong id="engineDepth">4</strong></span>
+                  <span id="engineThinking">Engine idle</span>
+                </div>
+                <div class="engine-eval" aria-label="Stockfish evaluation"><span id="engineEvalFill"></span></div>
+                <div class="engine-row engine-row--footer"><span>Best move <strong id="engineBestMove">--</strong></span><span>Live line</span></div>
               </div>
-              <div class="analysis-sparkline" aria-label="Evaluation trend visualization">
-                <svg viewBox="0 0 240 70" role="img" aria-label="Evaluation trend"><path d="M1 47 L18 52 L34 44 L52 48 L69 37 L85 31 L102 35 L118 20 L136 28 L153 17 L170 25 L188 18 L206 30 L223 23 L239 28" fill="none" pathLength="1"/><path d="M1 47 L18 52 L34 44 L52 48 L69 37 L85 31 L102 35 L118 20 L136 28 L153 17 L170 25 L188 18 L206 30 L223 23 L239 28 L239 70 L1 70 Z" aria-hidden="true"/></svg>
-              </div>
-              <div class="engine-row">
-                <span>Rating <strong id="engineRating">1100</strong></span>
-                <span>Depth <strong id="engineDepth">4</strong></span>
-                <span id="engineThinking">Engine idle</span>
-              </div>
-              <div class="engine-eval" aria-label="Stockfish evaluation"><span id="engineEvalFill"></span></div>
-              <div class="engine-row engine-row--footer"><span>Best move <strong id="engineBestMove">--</strong></span><span>Live line</span></div>
-            </section>
+            </details>
             <details class="play-rail-drawer play-rail-drawer--coach cq-panel" id="coachToolsDrawer" data-play-drawer="coach">
               <summary><span>Coach Advice</span><small>Open insights</small></summary>
               <div class="play-rail-drawer-content">
@@ -3621,34 +3631,49 @@
               <div class="review-move-list" id="reviewMoveList" aria-label="Reviewed moves"></div>
             </div>
             <div class="mini-game-row" id="coachPracticeLinks" hidden aria-label="Recommended practice"></div>
-            <details class="play-rail-drawer play-rail-drawer--moves cq-panel" id="moveHistoryDrawer" data-play-drawer="moves">
-              <summary><span>Move history</span><small>Game record</small></summary>
-              <div class="play-rail-drawer-content">
-                <div class="move-history" id="moveHistory" aria-label="Move history"></div>
-              </div>
-            </details>
-            <div class="captured-row" aria-label="Captured pieces">
-              <div>
-                <strong>White captured</strong>
-                <div class="captured-pieces" id="whiteCaptured"></div>
-              </div>
-              <div>
-                <strong>Black captured</strong>
-                <div class="captured-pieces" id="blackCaptured"></div>
-              </div>
-            </div>
-            <p class="trainer-note" id="gamePgn">PGN appears here after export.</p>
-            <details class="play-rail-drawer play-rail-drawer--chat cq-panel" id="friendGameChatDrawer" data-play-drawer="chat" hidden>
-              <summary><span>Game chat</span><small>Messages</small></summary>
-              <div class="play-rail-drawer-content">
-            <section class="friend-game-chat" id="friendGameChat" hidden aria-label="Game chat">
-              <div class="friend-game-chat-head"><strong>Game chat</strong><span class="friend-game-chat-actions"><small>Friendly and game-focused</small><button class="button secondary" type="button" id="friendGameChatReport">Report</button><button class="button secondary" type="button" id="friendGameChatBlock">Block</button></span></div>
-              <div class="friend-game-chat-messages" id="friendGameChatMessages" aria-live="polite"></div>
-              <form class="friend-game-chat-form" id="friendGameChatForm">
-                <input id="friendGameChatInput" maxlength="240" autocomplete="off" placeholder="Good luck!" aria-label="Game chat message" />
-                <button class="button secondary" type="submit">Send</button>
-              </form>
-            </section>
+            <details class="play-game-details play-rail-drawer cq-panel" id="playGameDetails">
+              <summary><span>More game details</span><small>Moves, captures, export</small></summary>
+              <div class="play-game-details-content play-rail-drawer-content">
+                <details class="play-rail-drawer play-rail-drawer--moves" id="moveHistoryDrawer" data-play-drawer="moves">
+                  <summary><span>Move history</span><small>Game record</small></summary>
+                  <div class="play-rail-drawer-content">
+                    <div class="move-history" id="moveHistory" aria-label="Move history"></div>
+                  </div>
+                </details>
+                <details class="play-rail-drawer play-rail-drawer--captures" id="capturedPiecesDrawer" data-play-drawer="captures">
+                  <summary><span>Captured pieces</span><small>Material</small></summary>
+                  <div class="play-rail-drawer-content">
+                    <div class="captured-row" aria-label="Captured pieces">
+                      <div>
+                        <strong>White captured</strong>
+                        <div class="captured-pieces" id="whiteCaptured"></div>
+                      </div>
+                      <div>
+                        <strong>Black captured</strong>
+                        <div class="captured-pieces" id="blackCaptured"></div>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+                <details class="play-rail-drawer play-rail-drawer--pgn" id="gamePgnDrawer" data-play-drawer="pgn">
+                  <summary><span>PGN</span><small>Exported game</small></summary>
+                  <div class="play-rail-drawer-content">
+                    <p class="trainer-note" id="gamePgn">PGN appears here after export.</p>
+                  </div>
+                </details>
+                <details class="play-rail-drawer play-rail-drawer--chat" id="friendGameChatDrawer" data-play-drawer="chat" hidden>
+                  <summary><span>Game chat</span><small>Messages</small></summary>
+                  <div class="play-rail-drawer-content">
+                    <section class="friend-game-chat" id="friendGameChat" hidden aria-label="Game chat">
+                      <div class="friend-game-chat-head"><strong>Game chat</strong><span class="friend-game-chat-actions"><small>Friendly and game-focused</small><button class="button secondary" type="button" id="friendGameChatReport">Report</button><button class="button secondary" type="button" id="friendGameChatBlock">Block</button></span></div>
+                      <div class="friend-game-chat-messages" id="friendGameChatMessages" aria-live="polite"></div>
+                      <form class="friend-game-chat-form" id="friendGameChatForm">
+                        <input id="friendGameChatInput" maxlength="240" autocomplete="off" placeholder="Good luck!" aria-label="Game chat message" />
+                        <button class="button secondary" type="submit">Send</button>
+                      </form>
+                    </section>
+                  </div>
+                </details>
               </div>
             </details>
           </aside>
