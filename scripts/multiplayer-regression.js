@@ -9,11 +9,13 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 
 const root = path.resolve(__dirname, "..");
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const hardeningMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260819_release_candidate_security_hardening.sql"), "utf8");
 const matchmakingMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260814_intelligent_quick_match.sql"), "utf8");
+const fenContractMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260912_multiplayer_fen_en_passant_contract.sql"), "utf8");
 
 const boardMove = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 
@@ -39,6 +41,37 @@ function acceptRemote({ current, remote, pending }) {
   if (shouldDeferRemote({ pending, remote })) return current;
   if (current && current.id === remote.id && Number(remote.revision || 0) < Number(current.revision || 0)) return current;
   return remote;
+}
+
+function normalizePresenceForRegression(row = {}) {
+  const hasLivePresence = typeof row.online === "boolean";
+  const rawStatus = String(row.presence_status || row.presenceStatus || row.status || "").toLowerCase();
+  const hasPresenceStatus = ["online", "in_game", "looking", "idle", "offline"].includes(rawStatus);
+  const presenceConfirmed = Boolean(row.presenceConfirmed) || hasLivePresence || hasPresenceStatus;
+  const presenceStatus = hasPresenceStatus ? rawStatus : hasLivePresence ? (row.online ? "online" : "offline") : "unknown";
+  return {
+    presenceConfirmed,
+    presenceStatus,
+    online: presenceConfirmed && (hasLivePresence ? Boolean(row.online) && presenceStatus !== "offline" : presenceStatus !== "offline" && presenceStatus !== "unknown")
+  };
+}
+
+function runPresenceTruthRegression() {
+  // A profile timestamp is historical identity data, not a live heartbeat.
+  const staleInference = normalizePresenceForRegression({ last_login_at: new Date().toISOString() });
+  assert.deepEqual(staleInference, { presenceConfirmed: false, presenceStatus: "unknown", online: false });
+  assert.equal(normalizePresenceForRegression({ online: true, presence_status: "looking" }).online, true);
+  assert.equal(normalizePresenceForRegression({ online: false, presence_status: "online" }).online, false);
+
+  // Realtime friend_presence events deliberately omit identity columns. Their
+  // merge must only change presence fields and never reset player metadata.
+  const friend = { id: "friend-1", name: "Real Name", rating: 1842, avatar: "♞", title: "Candidate Master", online: false };
+  const presencePatch = { online: true, presenceConfirmed: true, presenceStatus: "online", lastSeenAt: "2026-09-11T00:00:00.000Z" };
+  const merged = { ...friend, ...presencePatch };
+  assert.equal(merged.name, "Real Name");
+  assert.equal(merged.rating, 1842);
+  assert.equal(merged.avatar, "♞");
+  assert.equal(merged.online, true);
 }
 
 function runActiveRevisionWatchdogRegression() {
@@ -303,7 +336,14 @@ async function run() {
   assert.match(e2eSource, /\/\^\[A-Z2-9\]\{8,16\}\$\//);
   assert.match(e2eSource, /gotoHash\(pageB, baseUrl, "#play\?mode=friend"\)/);
   assert.match(e2eSource, /#friendChallenge[\s\S]*?#friendJoinTab/);
-  assert.match(e2eSource, /joinCode\.inputValue\(\) === code/);
+  assert.match(e2eSource, /Account B received the real friend-request notification/);
+  assert.match(e2eSource, /Account B rendered the friend-request notification/);
+  assert.match(e2eSource, /friend_declined/);
+  assert.match(e2eSource, /friend_accepted/);
+  assert.match(e2eSource, /Account B received the real challenge notification/);
+  assert.match(e2eSource, /Account B rendered the challenge notification/);
+  assert.match(e2eSource, /Account A received the challenge-accepted notification/);
+  assert.match(e2eSource, /both accounts kept the same completed result and opened Review/);
   assert.match(e2eSource, /fresh Account A\/B contexts resolved live Supabase sessions before multiplayer/);
   assert.match(e2eSource, /const waitForFriendStartReady = async/);
   assert.match(e2eSource, /waitForFriendStartReady\(pageA, code, "browser: Account A friend challenge state hydrated before Start"\)/);
@@ -346,9 +386,21 @@ async function run() {
   assert.match(e2eSource, /accountBFixture\.profile\.coins === 1_000_000_000/);
   const fixtureSource = fs.readFileSync(path.join(root, "scripts", "provision-e2e-account.cjs"), "utf8");
   assert.match(fixtureSource, /const environmentCheck = process\.argv\.includes\("--environment-check"\)/);
+  assert.match(fixtureSource, /async function ensurePrimaryE2EUser\(/);
+  assert.match(fixtureSource, /email_confirm: true, user_metadata: identity\.metadata/);
+  assert.match(fixtureSource, /role: "account_a", allowMissing: true/);
+  assert.match(fixtureSource, /Account A Auth metadata is missing the required generated E2E marker/);
+  assert.match(fixtureSource, /function expectedPrimaryNameStyle\(values\)/);
+  assert.match(fixtureSource, /await equipDistinctiveNameStyle\(baseUrl, serviceKey, primaryUser\.id, primaryExpectedNameStyle\.itemId\)/);
+  assert.match(fixtureSource, /verifyStoreState\(baseUrl, anonKey, primarySession\.access_token, primaryExpectedNameStyle\.itemId\)/);
   assert.match(fixtureSource, /refusing to continue because fixture isolation is not proven/);
   assert.match(fixtureSource, /const fixtureOnly = process\.argv\.includes\("--fixture-only"\)/);
   assert.match(fixtureSource, /fixture-only reset did not return the canonical Account B profile baseline/);
+  assert.match(fixtureSource, /\["friend_requests", "Friend requests"\]/);
+  assert.match(fixtureSource, /\["friend_presence", "Friend presence"\]/);
+  assert.match(fixtureSource, /\["social_notifications", "Social notifications"\]/);
+  assert.match(fixtureSource, /async function resetSocialFixtures\(/);
+  assert.match(fixtureSource, /await resetSocialFixtures\(baseUrl, serviceKey, primaryUser\.id, secondaryUser\.id\)/);
   assert.match(fixtureSource, /const E2E_PRIMARY_MATCHMAKING_RATING = 1450/);
   assert.match(fixtureSource, /const E2E_SECONDARY_MATCHMAKING_RATING = 1520/);
   assert.match(fixtureSource, /fixture-only reset did not set the canonical Account A matchmaking rating/);
@@ -360,6 +412,21 @@ async function run() {
   assert.match(e2eSource, /request\.method\(\) !== "POST"/);
   assert.match(e2eSource, /rpcCalls\.a\.length === 2 && rpcCalls\.b\.length === 1/);
   assert.match(matchmakingMigration, /abs\(candidate\.rating - self_row\.rating\) <= rating_band/);
+
+  // The client and locked server validator must agree on all six FEN fields.
+  // chess.js emits no en-passant target after e2e4 because Black has no legal
+  // en-passant capture; the server must serialize the same canonical position.
+  const { Chess } = await import(pathToFileURL(path.join(root, "assets", "vendor", "chess.js-1.0.0.mjs")).href);
+  const fenContractGame = new Chess();
+  fenContractGame.move({ from: "e2", to: "e4" });
+  assert.equal(fenContractGame.fen(), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+  const enPassantContractGame = new Chess();
+  [["e2", "e4"], ["a7", "a6"], ["e4", "e5"], ["d7", "d5"]].forEach(([from, to]) => enPassantContractGame.move({ from, to }));
+  assert.equal(enPassantContractGame.fen(), "rnbqkbnr/1pp1pppp/p7/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3");
+  assert.match(fenContractMigration, /create or replace function public\.ns_chess_en_passant_capture_is_legal\(/);
+  assert.match(fenContractMigration, /if canonical_ep <> '-' and not public\.ns_chess_en_passant_capture_is_legal\(p_board, p_turn, canonical_ep\) then/);
+  assert.match(fenContractMigration, /create or replace function public\.ns_chess_board_fen\(/);
+  assert.match(fenContractMigration, /revoke all on function public\.ns_chess_en_passant_capture_is_legal\(jsonb, text, text\) from public;/);
 
   // Friend Challenge route setup can run before Supabase session hydration.
   // The invite must queue, replay after authentication, and remain idempotent
@@ -377,6 +444,14 @@ async function run() {
   assert.match(appSource, /async function refreshFriendNetwork\(force = false\) \{[\s\S]{0,260}getCachedAccount\?\.\(\) \|\| \{\};[\s\S]{0,220}if \(!accountId\) return false;/);
   assert.match(appSource, /function ensureFriendRealtime\(provider = getFriendProvider\(\)\) \{[\s\S]{0,360}if \(!friendNetworkSubscriptionUserId\) return;/);
   assert.match(appSource, /function startFriendNetworkSync\(\) \{[\s\S]{0,300}if \(!activeUserId\) return;/);
+  assert.match(appSource, /function normalizeFriendRecord\(row = \{\}\) \{[\s\S]{0,850}presenceStatus = hasPresenceStatus[\s\S]{0,180}"unknown"/);
+  assert.doesNotMatch(appSource, /function normalizeFriendRecord\(row = \{\}\) \{[\s\S]{0,1200}last_login_at/,
+    "friend presence must not infer Online from an old profile login timestamp");
+  assert.match(appSource, /function applyFriendPresenceRow\(row = \{\}\) \{[\s\S]{0,1250}presencePatch[\s\S]{0,600}Merge only presence fields/);
+  assert.doesNotMatch(appSource, /function applyFriendPresenceRow\(row = \{\}\) \{[\s\S]{0,400}normalizeFriendRecord\(row\)/,
+    "sparse realtime presence must not replace friend identity through normalization defaults");
+  assert.match(appSource, /function toFriendChallengeState\([\s\S]{0,900}targetPresence[\s\S]{0,2000}presenceConfirmed,[\s\S]{0,140}online: presenceConfirmed && Boolean\(targetPresence\?\.online\)/);
+  assert.match(appSource, /friendNetworkTimer = window\.setInterval\(\(\) => \{[\s\S]{0,600}void refreshFriendNetwork\(true\);[\s\S]{0,100}void refreshSocialNotifications\(\);/);
   // A joined realtime channel is not proof that every table update arrived.
   // While a friend challenge is still pending/accepted, the shared lifecycle
   // must keep an authoritative refresh alive and stop it once the game starts.
@@ -393,6 +468,7 @@ async function run() {
   assert.match(appSource, /if \(playVisible && isRealtimeMatchActive\(\)\) startRealtimeMatchLifecycle\(\)/);
   assert.match(appSource, /stopFriendNetworkSync\(\);[\s\S]{0,120}stopRealtimeMatchLifecycle\(\);/);
   runActiveRevisionWatchdogRegression();
+  runPresenceTruthRegression();
   await runFriendInviteHydrationRegression();
   await runFriendChallengeRefreshLifecycleRegression();
 

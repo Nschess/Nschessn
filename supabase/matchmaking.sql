@@ -122,6 +122,10 @@ declare
   increment_value integer;
   created public.game_challenges;
 begin
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'Authenticated user does not match matchmaking queue owner';
+  end if;
+
   perform public.expire_matchmaking_queue();
   select * into self_row
   from public.matchmaking_queue
@@ -171,13 +175,10 @@ begin
     return public.matchmaking_status_payload(self_row, 'waiting');
   end if;
 
-  if self_row.joined_at <= opponent_row.joined_at then
-    creator_row := self_row;
-    opponent_user_row := opponent_row;
-  else
-    creator_row := opponent_row;
-    opponent_user_row := self_row;
-  end if;
+  -- game_challenges security requires creator_id = auth.uid(). The caller
+  -- may be newer than the candidate, so age cannot determine creator identity.
+  creator_row := self_row;
+  opponent_user_row := opponent_row;
 
   creator_color := public.resolve_matchmaking_creator_color(creator_row.preferred_color, opponent_user_row.preferred_color);
   code_value := public.make_game_challenge_code();

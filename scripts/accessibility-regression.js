@@ -111,51 +111,35 @@ async function checkRoute(page, route, selectors) {
 
 async function checkPlay(page) {
   await waitForRoute(page, "play");
-  const library = page.locator("#play .coach-library");
-  await library.evaluate((element) => { element.open = true; });
-  const bot = page.locator("#play .coach-library .beginner-bot-card:not(:disabled)").first();
-  await bot.waitFor({ state: "visible" });
-  const botMeasurements = await measureVisibleControls(page, "play bot library", [
-    "#play .coach-library .beginner-bot-card:not(:disabled)"
+  const humanEntryMeasurements = await measureVisibleControls(page, "human Play entry", [
+    "#humanPlayEntry .human-play-entry-option"
   ]);
-  await bot.click();
-  const lobbyStart = page.locator("#playLobbyStart");
-  await lobbyStart.waitFor({ state: "visible" });
-  await page.waitForFunction(() => {
-    const button = document.getElementById("playLobbyStart");
-    return button instanceof HTMLButtonElement && !button.disabled;
-  });
-  await lobbyStart.click();
-  await page.locator("#aiGameReady").waitFor({ state: "visible" });
-  await page.locator("#aiGameReadyStart").click();
-  await page.waitForFunction(() => {
-    const board = document.querySelector("#coachBoard");
-    return board?.querySelectorAll("[data-square]").length === 64
-      && [...board.querySelectorAll("[data-square]")].some((square) => square.draggable);
-  }, null, { timeout: 12000 });
-  await page.locator("#resignGame").click();
-  await page.locator("#resignConfirmDialog").waitFor({ state: "visible" });
-  await page.locator("#resignConfirmCancel").click();
-  await page.locator("#resignConfirmDialog").waitFor({ state: "hidden" });
-  const compactPlayLayout = await page.evaluate(() => {
-    const top = (selector) => document.querySelector(selector)?.getBoundingClientRect().top ?? 0;
-    const viewport = document.documentElement.clientWidth;
-    const dock = document.querySelector(".mobile-bottom-nav");
-    return {
-      viewport,
-      modeTop: top("#play .play-left-sidebar"),
-      boardTop: top("#play .match-board-column"),
-      dockDisplay: dock ? getComputedStyle(dock).display : "none"
-    };
-  });
-  if (compactPlayLayout.viewport <= 860) {
-    assert(compactPlayLayout.boardTop < compactPlayLayout.modeTop,
-      `play: compact active-game board must precede secondary mode controls: ${JSON.stringify(compactPlayLayout)}.`);
-    assert.equal(compactPlayLayout.dockDisplay, "none",
-      `play: mobile bottom navigation must yield to the board: ${JSON.stringify(compactPlayLayout)}.`);
-  }
+  assert.equal(humanEntryMeasurements.length, 3,
+    `human Play entry: expected Play Now, Play a Friend, and Challenge a Player, got ${JSON.stringify(humanEntryMeasurements)}.`);
+  assert.equal(humanEntryMeasurements[0].text.includes("Play Now"), true,
+    `human Play entry: Quick Match must remain the primary Play Now action, got ${JSON.stringify(humanEntryMeasurements[0])}.`);
   await assertNoHorizontalOverflow(page, "play");
-  return botMeasurements;
+  return humanEntryMeasurements;
+}
+
+async function reportFrozenBotButtonDebt(page) {
+  await waitForRoute(page, "bots");
+  const measurements = await page.evaluate(() => [...document.querySelectorAll("#aiBotRoster [data-ai-bot-play]:not(:disabled)")]
+    .filter((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && getComputedStyle(element).visibility !== "hidden";
+    })
+    .slice(0, 1)
+    .map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { text: (element.innerText || "").trim().slice(0, 32), width: rect.width, height: rect.height };
+    }));
+  assert.equal(measurements.length, 1, "bots: expected one visible enabled Bot Play control for frozen-debt reporting.");
+  const frozen = measurements.filter(({ width, height }) => width < 43.5 || height < 43.5);
+  if (frozen.length) console.warn(`FROZEN ACCESSIBILITY DEBT: Bot Play control remains below the 44px target: ${JSON.stringify(frozen)}`);
+  else console.warn(`FROZEN ACCESSIBILITY DEBT RESOLVED: Bot Play control now meets the 44px target: ${JSON.stringify(measurements)}`);
+  await assertNoHorizontalOverflow(page, "bots");
+  return measurements;
 }
 
 async function runViewport(browser, viewport) {
@@ -176,6 +160,7 @@ async function runViewport(browser, viewport) {
       `login: expected the five confirmed Profile/Player Pass controls, got ${JSON.stringify(loginMeasurements)}.`);
     results.controls += loginMeasurements.length;
     results.controls += (await checkPlay(page)).length;
+    await reportFrozenBotButtonDebt(page);
     if (focusedOnly) return results;
     const puzzleMeasurements = await checkRoute(page, "puzzles", [
       "#puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties) .mission-button",

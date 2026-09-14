@@ -276,7 +276,7 @@ declare
   piece text;
   row_text text := '';
 begin
-  for rank_index in reverse 1..8 loop
+  for rank_index in reverse 8..1 loop
     if rank_index < 8 then row_text := row_text || '/'; end if;
     empty_count := 0;
     for file_index in 1..8 loop

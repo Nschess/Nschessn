@@ -40,18 +40,26 @@ function sendJson(response, status, payload) {
 
 const server = http.createServer((request, response) => {
   if (String(request.url || "").split("?")[0] === "/api/auth-config") {
-    const config = discoverSupabaseConfig();
+    let config;
+    try {
+      config = discoverSupabaseConfig();
+    } catch (error) {
+      if (error.code !== "E2E_PROJECT_NOT_APPROVED") throw error;
+      sendJson(response, 503, { error: error.message, code: error.code });
+      return;
+    }
     if (!config.hasUrl || !config.hasAnonKey) {
       sendJson(response, 503, {
         error: `Local E2E Supabase configuration is missing a public ${!config.hasUrl ? "URL" : "anon key"}. Set only the missing public value in .env.e2e or the process environment.`,
         code: "E2E_SUPABASE_NOT_CONFIGURED",
-        missing: [!config.hasUrl ? "SUPABASE_URL" : "", !config.hasAnonKey ? "SUPABASE_PUBLISHABLE_KEY" : ""].filter(Boolean)
+        missing: [!config.hasUrl ? "E2E_SUPABASE_URL" : "", !config.hasAnonKey ? "E2E_SUPABASE_ANON_KEY" : ""].filter(Boolean)
       });
       return;
     }
     sendJson(response, 200, {
       url: config.url,
       anonKey: config.anonKey,
+      e2eServerInstance: process.env.E2E_SERVER_INSTANCE_ID || "",
       authRedirectOrigins: [`http://127.0.0.1:${port}`]
     });
     return;

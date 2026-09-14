@@ -1,15 +1,15 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v188-tournament-density";
+const CACHE_NAME = "nschess-shell-v189-multiplayer-truth";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v218-focus-fit-pieces",
+  "./assets/app.css?v=review-v219-multiplayer-truth",
   "./assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces",
-  "./assets/app.js?v=play-tournament-density-v238",
+  "./assets/app.js?v=play-multiplayer-truth-v239",
   "./site.webmanifest",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"

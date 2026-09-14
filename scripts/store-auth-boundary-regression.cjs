@@ -1,11 +1,10 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const http = require("http");
-const { spawn } = require("child_process");
 const { chromium } = require("playwright");
-const { parseEnvFile, discoverSupabaseConfig } = require("./e2e-config.cjs");
+const { parseEnvFile, discoverSupabaseConfig, assertApprovedE2EProject } = require("./e2e-config.cjs");
 const { run: runTestEnvironment } = require("./test-environment.cjs");
+const { startE2EServer } = require("./e2e-local-server.cjs");
 
 const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
@@ -17,7 +16,6 @@ for (const [key, value] of Object.entries(parseEnvFile(envFile))) {
 
 const port = Number(process.env.E2E_PORT || 4173);
 const baseUrl = (process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, "");
-const local = /localhost|127\.0\.0\.1/i.test(baseUrl);
 const tempFiles = [];
 
 function redact(id) {
@@ -28,22 +26,6 @@ function redact(id) {
 function requireEnv(name) {
   if (!String(process.env[name] || "").trim()) throw new Error(`${name} is not configured in ${envFile}.`);
   return process.env[name];
-}
-
-async function waitForLocalServer() {
-  const deadline = Date.now() + 15000;
-  let lastError = "";
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`${baseUrl}/api/auth-config`, { cache: "no-store" });
-      if (response.ok) return;
-      lastError = `auth-config returned ${response.status}`;
-    } catch (error) {
-      lastError = error?.message || String(error);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`Local E2E server did not become ready: ${lastError}`);
 }
 
 async function gotoHash(page, hash) {
@@ -106,6 +88,7 @@ async function logout(page, label) {
 }
 
 async function main() {
+  assertApprovedE2EProject();
   if (!environmentPreflighted) {
     await runTestEnvironment();
     process.env.NSCHESS_ENVIRONMENT_PRECHECKED = "1";
@@ -127,10 +110,7 @@ async function main() {
   let restoredState = "";
 
   try {
-    if (local) {
-      server = spawn(process.execPath, [path.join(root, "scripts", "e2e-server.cjs")], { cwd: root, stdio: ["ignore", "ignore", "ignore"] });
-      await waitForLocalServer();
-    }
+    server = await startE2EServer({ root, baseUrl, stdio: ["ignore", "ignore", "ignore"], timeoutMs: 15000 });
     browser = await chromium.launch({ headless: true });
 
     initialContext = await browser.newContext({ viewport: { width: 1366, height: 900 }, serviceWorkers: "allow" });

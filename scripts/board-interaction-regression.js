@@ -317,11 +317,15 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v182-startup-performance";
-const cacheVersion = "review-v226-startup-performance";
-assert.match(html, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current asset version");
-assert.match(app, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Lazy route loaders do not use the current asset version");
-assert.match(worker, new RegExp(cacheVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell assets do not use the current asset version");
+const cacheName = "nschess-shell-v189-multiplayer-truth";
+const shellCssVersion = "review-v219-multiplayer-truth";
+const shellAppVersion = "play-multiplayer-truth-v239";
+const routeModuleVersion = "review-v226-startup-performance";
+assert.match(html, new RegExp(shellCssVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current stylesheet version");
+assert.match(html, new RegExp(shellAppVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current application version");
+assert.match(app, new RegExp(routeModuleVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Lazy route loaders do not use their current module version");
+assert.match(worker, new RegExp(shellCssVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell stylesheet is not current");
+assert.match(worker, new RegExp(shellAppVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell application is not current");
 assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker cache name is not current");
 const installShell = worker.slice(worker.indexOf("const APP_SHELL"), worker.indexOf('self.addEventListener("install"'));
 assert.doesNotMatch(installShell, /assets\/vendor\/chess\.js-1\.0\.0\.mjs/, "Route-specific chess.js vendor module must not block first shell install");

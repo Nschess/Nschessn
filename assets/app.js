@@ -17160,7 +17160,7 @@
       }
       if (state.active && state.status === "active") {
         const opponent = getFriendMatchProfiles(state).opponent;
-        if (opponent && !opponent.online) return { state: "opponent-disconnected", message: "Opponent disconnected" };
+        if (opponent?.presenceConfirmed && !opponent.online) return { state: "opponent-disconnected", message: "Opponent disconnected" };
       }
       return friendConnectionState.message ? friendConnectionState : {
         state: friendRealtimeReady ? "connected" : "syncing",
@@ -24360,6 +24360,9 @@
       const username = String(source.username || source.displayName || source.display_name || fallback.name || "Chess Player").trim() || "Chess Player";
       const storedAvatar = String(source.avatar || "").trim();
       const avatarImage = /^(?:https?:\/\/|data:image\/|assets\/)/i.test(storedAvatar) ? storedAvatar : "";
+      const rawPresenceStatus = String(source.presenceStatus || source.presence_status || "").toLowerCase();
+      const hasPresenceStatus = ["online", "in_game", "looking", "idle", "offline"].includes(rawPresenceStatus);
+      const presenceConfirmed = typeof source.online === "boolean" || hasPresenceStatus;
       return {
         id: String(source.id || fallback.id || ""),
         username,
@@ -24374,7 +24377,8 @@
         avatarEffect: String(source.avatarEffect || source.avatar_effect || fallback.avatarEffect || fallback.avatar_effect || "").trim(),
         avatarRarity: String(source.avatarRarity || source.avatar_rarity || fallback.avatarRarity || fallback.avatar_rarity || "").trim(),
         rating: Math.max(400, Number(source.rating) || Number(fallback.rating) || 450),
-        online: Boolean(source.online)
+        presenceConfirmed,
+        online: presenceConfirmed && (typeof source.online === "boolean" ? source.online : rawPresenceStatus !== "offline")
       };
     }
 
@@ -24437,6 +24441,10 @@
       const isParticipant = Boolean(me && (remote.creatorId === me || remote.opponentId === me));
       const spectator = Boolean(remote.viewerRole === "spectator" || previous?.spectator && !isParticipant);
       const incoming = Boolean(me && !isCreator && remote.status === "pending" && (remote.opponentId === me || !remote.opponentId));
+      const targetId = isCreator ? remote.opponentId : remote.creatorId;
+      const targetPresence = (friendNetworkState.directory || []).find((friend) => String(friend?.id || "") === String(targetId || ""));
+      const observedAt = Number(targetPresence?.presenceObservedAt || friendNetworkLastRefresh || 0);
+      const presenceConfirmed = Boolean(targetPresence?.presenceConfirmed && observedAt && Date.now() - observedAt < 45000);
       return {
         ...previous,
         code: remote.code,
@@ -24446,7 +24454,7 @@
         opponentId: remote.opponentId,
         creatorProfile: remote.creatorProfile,
         opponentProfile: remote.opponentProfile,
-        targetId: isCreator ? remote.opponentId : remote.creatorId,
+        targetId,
         targetName: isCreator ? (remote.opponentName || "Friend") : remote.creatorName,
         inviteType: remote.inviteType,
         gameType: remote.gameType,
@@ -24457,7 +24465,8 @@
         pending: !spectator && (remote.status === "pending" || remote.status === "accepted"),
         active: remote.status === "active",
         incoming: spectator ? false : incoming,
-        online: true,
+        presenceConfirmed,
+        online: presenceConfirmed && Boolean(targetPresence?.online),
         fen: remote.fen,
         moves: remote.moves,
         result: remote.result,
@@ -24867,12 +24876,15 @@
     }
 
     function normalizeFriendRecord(row = {}) {
-      const lastLogin = String(row.last_login_at || row.lastLoginAt || "");
       const hasLivePresence = typeof row.online === "boolean";
       const rawStatus = String(row.presence_status || row.presenceStatus || row.status || "").toLowerCase();
-      const presenceStatus = ["online", "in_game", "looking", "idle", "offline"].includes(rawStatus)
+      const hasPresenceStatus = ["online", "in_game", "looking", "idle", "offline"].includes(rawStatus);
+      // Only a live directory/presence response may assert that a person is
+      // online. A recent profile login is not a presence heartbeat.
+      const presenceConfirmed = Boolean(row.presenceConfirmed) || hasLivePresence || hasPresenceStatus;
+      const presenceStatus = hasPresenceStatus
         ? rawStatus
-        : (hasLivePresence ? (row.online ? "online" : "offline") : (lastLogin && Date.now() - Date.parse(lastLogin) < 5 * 60 * 1000 ? "online" : "offline"));
+        : hasLivePresence ? (row.online ? "online" : "offline") : "unknown";
       return {
         id: String(row.public_id || row.id || row.user_id || ""),
         name: String(row.display_name || row.displayName || row.username || row.name || "Player"),
@@ -24885,7 +24897,9 @@
         rating: Number(row.rating) || 450,
         avatar: String(row.avatar || "auto"),
         country: String(row.country_flag || row.country || ""),
-        online: hasLivePresence ? Boolean(row.online) && presenceStatus !== "offline" : presenceStatus !== "offline" && Boolean(lastLogin && Date.now() - Date.parse(lastLogin) < 5 * 60 * 1000),
+        presenceConfirmed,
+        presenceObservedAt: Number(row.presenceObservedAt || row.presence_observed_at || 0) || 0,
+        online: presenceConfirmed && (hasLivePresence ? Boolean(row.online) && presenceStatus !== "offline" : presenceStatus !== "offline" && presenceStatus !== "unknown"),
         presenceStatus,
         lastSeenAt: String(row.last_seen_at || row.lastSeenAt || ""),
         mutualFriendsCount: Number(row.mutual_friends_count || row.mutualFriendsCount || 0) || 0,
@@ -24900,7 +24914,15 @@
     function getSocialFriends() {
       if (!isApplicationAuthenticated()) return [];
       const remote = Array.isArray(friendNetworkState?.directory) ? friendNetworkState.directory : [];
-      const local = readFriendDirectoryState().friends.map(normalizeFriendRecord);
+      // Local storage can retain an old directory, but it cannot prove that
+      // someone is still present. Preserve it as an address book only.
+      const local = readFriendDirectoryState().friends.map((row) => ({
+        ...normalizeFriendRecord(row),
+        online: false,
+        presenceConfirmed: false,
+        presenceStatus: "unknown",
+        presenceObservedAt: 0
+      }));
       const source = remote.length ? remote : local;
       const seen = new Set();
       return source.filter((friend) => !friend.requestStatus || friend.requestStatus === "accepted").filter((friend) => !isNschessUserBlocked(friend.id, friend.name)).filter((friend) => {
@@ -24949,7 +24971,7 @@
         const avatarText = friend.avatar && friend.avatar !== "auto" ? friend.avatar.slice(0, 2) : friend.name.slice(0, 1).toUpperCase();
         const avatar = createBookText("span", "player-identity-avatar", avatarText);
         applySharedAvatarElement(avatar, getPlayerIdentityModel({ ...friend, countryCode: friend.country || friend.countryCode, isPlayer: false }, { isPlayer: false, variant: "compact" }), { variant: "compact" });
-        avatar.title = `${friend.name} - ${friend.online ? "Online" : "Offline"}`;
+        avatar.title = `${friend.name} - ${friendPresenceLabel(friend)}`;
         avatar.setAttribute("aria-label", avatar.title);
         return avatar;
       }));
@@ -24970,7 +24992,8 @@
       friendNetworkRefreshPromise = (async () => {
         const [directory, challenges] = await Promise.all([provider.getFriendDirectory(), provider.listFriendChallenges()]);
         if (requestId !== friendNetworkRequest) return false;
-        friendNetworkState.directory = (Array.isArray(directory) ? directory : []).map(normalizeFriendRecord).filter((friend) => friend.id);
+        const presenceObservedAt = Date.now();
+        friendNetworkState.directory = (Array.isArray(directory) ? directory : []).map((row) => ({ ...normalizeFriendRecord(row), presenceObservedAt })).filter((friend) => friend.id);
         friendNetworkState.challenges = (Array.isArray(challenges) ? challenges : []).map(normalizeRemoteFriendChallenge).filter(Boolean);
         friendNetworkLastRefresh = Date.now();
         ensureSocialPresenceRealtime(provider);
@@ -25180,7 +25203,8 @@
         const maxRating = options.maxRating ?? friendHubState.maxRating;
         const rows = await provider.searchRegisteredPlayers(text, minRating, maxRating);
         if (requestId !== friendSearchRequest) return;
-        friendNetworkState.search = (Array.isArray(rows) ? rows : []).map(normalizeFriendRecord).filter((friend) => friend.id);
+        const presenceObservedAt = Date.now();
+        friendNetworkState.search = (Array.isArray(rows) ? rows : []).map((row) => ({ ...normalizeFriendRecord(row), presenceObservedAt })).filter((friend) => friend.id);
       } catch (error) {
         if (requestId !== friendSearchRequest) return;
         friendNetworkState.search = [];
@@ -25317,13 +25341,13 @@
       const meta = document.getElementById("friendRequestMeta");
       const isPending = Boolean(state.pending);
       card.hidden = !isPending;
-      if (title) title.textContent = state.incoming ? `${state.targetName || "Friend"} challenged you` : state.online ? `${state.targetName || "Friend"} can accept now` : "Share link ready";
+      if (title) title.textContent = state.incoming ? `${state.targetName || "Friend"} challenged you` : state.targetId ? "Challenge sent" : "Share link ready";
       if (meta) {
         meta.textContent = state.incoming
           ? `${state.clock === "none" ? "No clock" : state.clock} • ${state.color === "random" ? "Random color" : `You play ${state.color === "w" ? "White" : "Black"}`}. Accept to start.`
-          : state.online
-          ? `${state.clock === "none" ? "No clock" : state.clock} • ${state.color === "random" ? "Random color" : state.color === "w" ? "You play White" : "You play Black"} • waiting for accept.`
-          : "Friend is not online here. Send the invite link or challenge code.";
+          : state.targetId
+          ? `${state.clock === "none" ? "No clock" : state.clock} • ${state.color === "random" ? "Random color" : state.color === "w" ? "You play White" : "You play Black"} • ${state.presenceConfirmed && state.online ? "friend is online • " : ""}waiting for accept.`
+          : "Send the invite link or challenge code to your friend.";
       }
     }
 
@@ -25357,7 +25381,7 @@
       if (joinCode && document.activeElement !== joinCode) joinCode.value = "";
       if (status) {
         status.textContent = state.pending
-          ? (state.incoming ? "Incoming challenge received. Accept to start the match." : state.online ? "Challenge sent. Share the link if your friend is on another device." : "Offline invite created. Copy the link or code to send it.")
+          ? (state.incoming ? "Incoming challenge received. Accept to start the match." : state.targetId ? `Challenge sent. ${state.presenceConfirmed && state.online ? "Your friend is online and can accept now." : "Waiting for your friend to accept."}` : "Private invite created. Copy the link or code to send it.")
           : state.active
           ? `Live friend board: ${state.gameType === "rated" ? "Rated" : "Casual"} • ${state.clock === "none" ? "No clock" : `${state.clock} clock`} • ${state.gameType === "casual" ? "takebacks allowed" : "rated rules"}.`
            : state.status === "declined"
@@ -27176,7 +27200,13 @@
       if (!friendNetworkTimer) friendNetworkTimer = window.setInterval(() => {
         const socialWorkspaceVisible = document.getElementById("play")?.classList.contains("is-active-panel")
           || document.getElementById("friends")?.classList.contains("is-active-panel");
-        if (!document.hidden && socialWorkspaceVisible && !friendRealtimeReady) void refreshFriendNetwork(true);
+        // A subscribed channel is a fast path, not proof that every database
+        // event arrived. Reconcile while visible so presence and invitations
+        // cannot stay stale behind a healthy-looking websocket.
+        if (!document.hidden && socialWorkspaceVisible) {
+          void refreshFriendNetwork(true);
+          void refreshSocialNotifications();
+        }
       }, 30000);
       if (!friendChallengeSyncTimer) friendChallengeSyncTimer = window.setInterval(() => {
         const state = friendChallengeState || readFriendChallengeState();
@@ -36396,7 +36426,7 @@
     }
 
     function friendPresenceLabel(friend = {}) {
-      const labels = { online: "Online", in_game: "In game", looking: "Looking for a match", idle: "Idle", offline: "Offline" };
+      const labels = { online: "Online", in_game: "In game", looking: "Looking for a match", idle: "Idle", offline: "Offline", unknown: "Presence unavailable" };
       if (friend.presenceStatus === "offline" && friend.lastSeenAt) {
         const elapsed = Date.now() - Date.parse(friend.lastSeenAt);
         if (Number.isFinite(elapsed) && elapsed > 0 && elapsed < 24 * 60 * 60 * 1000) {
@@ -36408,14 +36438,30 @@
     }
 
     function friendPresenceClass(friend = {}) {
-      const status = ["online", "in_game", "looking", "idle", "offline"].includes(friend.presenceStatus) ? friend.presenceStatus : (friend.online ? "online" : "offline");
+      const status = ["online", "in_game", "looking", "idle", "offline", "unknown"].includes(friend.presenceStatus) ? friend.presenceStatus : (friend.online ? "online" : "unknown");
       return `friend-status-dot is-${status.replace(/_/g, "-")}`;
     }
 
     function applyFriendPresenceRow(row = {}) {
-      const normalized = normalizeFriendRecord(row);
-      if (!normalized.id) return;
-      const update = (friend) => friend?.id === normalized.id ? { ...friend, ...normalized } : friend;
+      const id = String(row.public_id || row.id || row.user_id || "");
+      const rawStatus = String(row.presence_status || row.presenceStatus || row.status || "").toLowerCase();
+      const hasPresenceStatus = ["online", "in_game", "looking", "idle", "offline"].includes(rawStatus);
+      const hasLivePresence = typeof row.online === "boolean";
+      if (!id || (!hasLivePresence && !hasPresenceStatus)) return;
+      const presenceStatus = hasPresenceStatus ? rawStatus : (row.online ? "online" : "offline");
+      const presencePatch = {
+        online: hasLivePresence ? Boolean(row.online) && presenceStatus !== "offline" : presenceStatus !== "offline",
+        presenceConfirmed: true,
+        presenceStatus,
+        lastSeenAt: String(row.last_seen_at || row.lastSeenAt || ""),
+        presenceObservedAt: Date.now(),
+        inGame: presenceStatus === "in_game",
+        looking: presenceStatus === "looking"
+      };
+      // Realtime presence payloads intentionally contain no profile identity.
+      // Merge only presence fields so they cannot replace a player's name,
+      // rating, or avatar with normalizeFriendRecord defaults.
+      const update = (friend) => friend?.id === id ? { ...friend, ...presencePatch } : friend;
       let changed = false;
       friendNetworkState.directory = friendNetworkState.directory.map((friend) => { const next = update(friend); changed ||= next !== friend; return next; });
       friendNetworkState.search = friendNetworkState.search.map((friend) => update(friend));
@@ -36424,7 +36470,9 @@
         if (friendHubState.view !== "messages") renderFriendsHub();
         else {
           const active = messagingCurrentConversation();
-          const participant = active && active.participantId === normalized.id ? normalized : null;
+          const participant = active && active.participantId === id
+            ? [...friendNetworkState.directory, ...friendNetworkState.search].find((friend) => friend?.id === id) || null
+            : null;
           const meta = document.getElementById("friendsHubConversationMeta");
           if (participant && meta && !messagingHubState.reconnecting) meta.textContent = `${friendPresenceLabel(participant)} · independent from active games`;
         }
@@ -36719,7 +36767,7 @@
       const friendIdentity = getPlayerIdentityModel({ ...friend, countryCode: cachedProfile?.country || friend.country, profileId: friend.id, isPlayer: false }, { isPlayer: false, variant: "standard", profileId: friend.id });
       if (name) renderSharedIdentityLine(name.parentElement, friendIdentity, { nameSelector: "#friendsHubProfileName", variant: "standard" });
       applySharedAvatarElement(avatar, friendIdentity, { variant: "standard" });
-      if (bio) bio.textContent = friend.inGame ? "Currently playing a live game." : friend.online ? "Ready for a focused game?" : "Invite them when they are back online.";
+      if (bio) bio.textContent = friend.inGame ? "Currently playing a live game." : friend.online ? "Ready for a focused game?" : friend.presenceConfirmed ? "Invite them when they are back online." : "Presence is unavailable. You can still send a challenge.";
       renderFriendProfileDetails(cachedProfile);
       const add = document.getElementById("friendsHubProfileAdd");
       const remove = document.getElementById("friendsHubProfileRemove");

@@ -9,7 +9,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { parseEnvFile } = require("./e2e-config.cjs");
+const { parseEnvFile, assertApprovedE2EProject } = require("./e2e-config.cjs");
 
 const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
@@ -127,13 +127,80 @@ async function readCatalogItem(baseUrl, serviceKey, itemId) {
 }
 
 async function probeRequiredIntegrationTables(baseUrl, serviceKey) {
-  for (const [table, feature] of [["profiles", "Auth profiles"], ["store_catalog", "Store authority"], ["matchmaking_queue", "Quick Match matchmaking"], ["game_challenges", "Realtime game challenges"]]) {
+  for (const [table, feature] of [["profiles", "Auth profiles"], ["store_catalog", "Store authority"], ["matchmaking_queue", "Quick Match matchmaking"], ["friend_requests", "Friend requests"], ["friend_presence", "Friend presence"], ["social_notifications", "Social notifications"], ["game_challenges", "Realtime game challenges"]]) {
     try {
       await requestJson(`${baseUrl}/rest/v1/${table}?select=*&limit=0`, serviceKey, { serverCredential: true });
     } catch (error) {
       fail(`${feature} migration surface is unavailable at public.${table}: ${error.message || error}`);
     }
   }
+}
+
+async function deleteFixtureRows(baseUrl, serviceKey, table, filter) {
+  await requestJson(`${baseUrl}/rest/v1/${table}?${filter}`, serviceKey, {
+    method: "DELETE",
+    serverCredential: true,
+    headers: { Prefer: "return=minimal" }
+  });
+}
+
+async function resetSocialFixtures(baseUrl, serviceKey, primaryUserId, secondaryUserId) {
+  assertApprovedE2EProject({ E2E_SUPABASE_URL: baseUrl });
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuid.test(primaryUserId) || !uuid.test(secondaryUserId)
+    || primaryUserId.toLowerCase() === secondaryUserId.toLowerCase()) fail("fixture cleanup requires two distinct exact account UUIDs");
+  const primary = encodeURIComponent(primaryUserId);
+  const secondary = encodeURIComponent(secondaryUserId);
+  const pair = `(${primaryUserId},${secondaryUserId})`;
+  const participants = encodeURIComponent(`(creator_id.in.${pair},or(opponent_id.in.${pair},opponent_id.is.null))`);
+  const friends = encodeURIComponent(`(sender_id.in.${pair},receiver_id.in.${pair})`);
+  const notifications = encodeURIComponent(`(recipient_id.in.${pair},actor_id.in.${pair})`);
+  const readRows = async (table, query) => {
+    const rows = await requestJson(`${baseUrl}/rest/v1/${table}?${query}`, serviceKey, { serverCredential: true });
+    if (!Array.isArray(rows)) fail(`cleanup cannot inspect public.${table}; no cleanup is authorized`);
+    return rows;
+  };
+  const assertSafeChildren = async (challengeId) => {
+    // These FKs CASCADE in friends.sql and 20260813_multiplayer_production_readiness.
+    // Include NULL actors: unattributed events cannot be proven fixture-owned.
+    for (const [table, owner] of [["game_challenge_messages", "user_id"], ["game_challenge_presence", "user_id"], ["game_challenge_validation_events", "actor_id"]]) {
+      const outsideScope = encodeURIComponent(`(${owner}.is.null,${owner}.not.in.${pair})`);
+      const rows = await readRows(table, `challenge_id=eq.${challengeId}&or=${outsideScope}&select=challenge_id&limit=1`);
+      if (rows.length) fail(`fixture contamination: public.${table} has non-fixture ownership for challenge ${challengeId}; refusing parent deletion`);
+    }
+    // ON DELETE SET NULL would mutate an event outside this social fixture scope,
+    // even if the tournament pairing itself happened to contain only A and B.
+    const tournamentRows = await readRows("tournament_pairings", `challenge_id=eq.${challengeId}&select=challenge_id&limit=1`);
+    if (tournamentRows.length) fail(`fixture contamination: tournament linkage for challenge ${challengeId}; refusing parent deletion`);
+  };
+  const challenges = [];
+  let cursor = "";
+  for (;;) {
+    const rows = await readRows("game_challenges", `and=${participants}&select=id,revision&order=id.asc&limit=100${cursor ? `&id=gt.${cursor}` : ""}`);
+    if (!rows.length) break;
+    for (const row of rows) {
+      if (!uuid.test(row.id) || (cursor && row.id <= cursor) || !Number.isSafeInteger(row.revision) || row.revision < 0) {
+        fail("cleanup challenge inspection returned an invalid identity/revision or pagination order");
+      }
+      await assertSafeChildren(row.id);
+      challenges.push(row);
+      cursor = row.id;
+    }
+  }
+  // Complete the contamination audit before any mutation. Pin deletes to the
+  // inspected IDs, participants and revisions, not a freshly matching bulk set.
+  // REST reads/deletes are not atomic: run fixtures exclusively; concurrent
+  // third-party inserts require a future separately reviewed transactional guard.
+  // Every identified party must belong to this pair. Preserve third-party
+  // interactions and unattributed system notifications, even after failure.
+  await deleteFixtureRows(baseUrl, serviceKey, "matchmaking_queue", `user_id=in.(${primary},${secondary})`);
+  for (const challenge of challenges) {
+    await assertSafeChildren(challenge.id);
+    await deleteFixtureRows(baseUrl, serviceKey, "game_challenges", `id=eq.${challenge.id}&revision=eq.${challenge.revision}&and=${participants}`);
+  }
+  await deleteFixtureRows(baseUrl, serviceKey, "friend_requests", `and=${friends}`);
+  await deleteFixtureRows(baseUrl, serviceKey, "social_notifications", `and=${notifications}`);
+  await deleteFixtureRows(baseUrl, serviceKey, "friend_presence", `user_id=in.(${primary},${secondary})`);
 }
 
 async function readProfile(baseUrl, serviceKey, userId) {
@@ -206,13 +273,16 @@ async function verifyStoreState(baseUrl, anonKey, accessToken, expectedItemId) {
   return { coins: Number(state?.coins) || 0, inventoryCount: inventory.length };
 }
 
-async function resolveExactUser(users, email, label, { requireGenerated = true, role = "" } = {}) {
+async function resolveExactUser(users, email, label, { requireGenerated = true, role = "", allowMissing = false } = {}) {
   if (requireGenerated && !isGeneratedE2eEmail(email) && !isGeneratedPrimaryE2eEmail(email)) {
     fail(`refusing to modify a non-generated ${label} email`);
   }
   const matches = users.filter((candidate) => String(candidate.email || "").trim().toLowerCase() === String(email).toLowerCase());
   if (matches.length > 1) fail(`multiple Auth users match the exact generated ${label} email`);
-  if (!matches.length) fail(`the exact generated ${label} Auth user was not found`);
+  if (!matches.length) {
+    if (allowMissing) return null;
+    fail(`the exact generated ${label} Auth user was not found`);
+  }
   if (role) {
     const metadata = matches[0].user_metadata || {};
     if (metadata.e2e !== true || String(metadata.e2e_role || "") !== role) {
@@ -222,10 +292,66 @@ async function resolveExactUser(users, email, label, { requireGenerated = true, 
   return matches[0];
 }
 
+function primaryFixtureIdentity(email) {
+  if (!isGeneratedPrimaryE2eEmail(email)) {
+    fail("refusing to bootstrap a non-generated primary E2E email; use nschess-e2e-<8 hex>@proton.me");
+  }
+  const suffix = safeEmailLocal(email).replace(/^nschess-e2e-/, "");
+  const username = `e2e_a_${suffix}`;
+  return {
+    username,
+    metadata: { username, e2e: true, e2e_account: "primary", e2e_role: "account_a" }
+  };
+}
+
+function expectedPrimaryNameStyle(values) {
+  const value = envValue("E2E_EXPECTED_NAME_STYLE", values).toLowerCase();
+  if (!value) return { value: "", itemId: "" };
+  if (!/^[a-z0-9-]{1,40}$/.test(value)) {
+    fail("E2E_EXPECTED_NAME_STYLE must name a safe generated Store Name Style value");
+  }
+  return { value, itemId: `name-${value}` };
+}
+
+async function ensurePrimaryE2EUser(users, baseUrl, serviceKey, anonKey, email, password) {
+  const existing = await resolveExactUser(users, email, "primary E2E", { role: "account_a", allowMissing: true });
+  if (existing) return { user: existing, action: "existing" };
+
+  const identity = primaryFixtureIdentity(email);
+  const created = await requestJson(`${baseUrl}/auth/v1/admin/users`, serviceKey, {
+    method: "POST",
+    serverCredential: true,
+    body: JSON.stringify({ email, password, email_confirm: true, user_metadata: identity.metadata })
+  });
+  const userId = String(created?.id || "");
+  if (!/^[0-9a-f-]{36}$/i.test(userId)) fail("Supabase Admin Auth did not return a valid Account A user ID");
+
+  const confirmedPayload = await readAdminUser(baseUrl, serviceKey, userId);
+  const confirmedUser = confirmedPayload?.user || confirmedPayload;
+  const confirmedMetadata = confirmedUser?.user_metadata || {};
+  if (String(confirmedUser?.email || "").trim().toLowerCase() !== email) {
+    fail("Supabase Admin Auth did not create the exact generated Account A email");
+  }
+  if (!confirmedUser?.email_confirmed_at) fail("Account A was not email-confirmed by the Auth Admin provisioning response");
+  if (confirmedMetadata.e2e !== true || String(confirmedMetadata.e2e_role || "") !== "account_a") {
+    fail("Account A Auth metadata is missing the required generated E2E marker");
+  }
+
+  const profile = await readProfile(baseUrl, serviceKey, userId);
+  if (!profile) fail("Auth succeeded but the auth.users → public.profiles trigger did not create Account A's profile; apply the project auth migration before retrying");
+  const session = await passwordLogin(baseUrl, anonKey, email, password);
+  await verifyStoreState(baseUrl, anonKey, session.access_token, "");
+  return { user: confirmedUser, action: "created" };
+}
+
 async function main() {
+  const values = readE2eValues();
+  assertApprovedE2EProject({
+    E2E_SUPABASE_URL: envValue("E2E_SUPABASE_URL", values),
+    E2E_BASE_URL: envValue("E2E_BASE_URL", values)
+  });
   const ci = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
   if (!fs.existsSync(envFile) && !ci) fail(`the local ${path.basename(envFile)} file is missing; refusing to create a partial E2E configuration`);
-  const values = readE2eValues();
   const target = envValue("E2E_ENVIRONMENT", values).toLowerCase();
   const explicitBaseUrl = envValue("E2E_SUPABASE_URL", values);
   const explicitAnonKey = envValue("E2E_SUPABASE_ANON_KEY", values);
@@ -253,6 +379,7 @@ async function main() {
   const publicId = `e2e_b_${suffix.slice(0, 24)}`;
   const nameStyleItem = "name-violet";
   const nameStyleValue = "violet";
+  const primaryExpectedNameStyle = expectedPrimaryNameStyle(values);
 
   const primaryEmail = envValue("E2E_EMAIL", values).toLowerCase();
   const primaryPassword = String(process.env.E2E_PASSWORD || values.E2E_PASSWORD || "");
@@ -262,19 +389,32 @@ async function main() {
 
   const nameStyle = await readCatalogItem(baseUrl, serviceKey, nameStyleItem);
   if (!nameStyle || nameStyle.item_type !== "nameStyle") fail(`active Store catalog item ${nameStyleItem} is unavailable`);
+  const primaryNameStyle = primaryExpectedNameStyle.itemId
+    ? await readCatalogItem(baseUrl, serviceKey, primaryExpectedNameStyle.itemId)
+    : null;
+  if (primaryExpectedNameStyle.itemId && (!primaryNameStyle || primaryNameStyle.item_type !== "nameStyle")) {
+    fail(`active Store catalog item ${primaryExpectedNameStyle.itemId} is unavailable`);
+  }
   const users = await listAdminUsers(baseUrl, serviceKey);
-  const primaryUser = await resolveExactUser(users, primaryEmail, "primary E2E");
+  const primaryFixture = await ensurePrimaryE2EUser(users, baseUrl, serviceKey, anonKey, primaryEmail, primaryPassword);
+  const primaryUser = primaryFixture.user;
 
   if (fixtureOnly) {
     const secondaryEmail = configuredEmail;
     if (!secondaryEmail || !configuredPassword) fail("fixture-only reset requires the already-provisioned generated Account B credentials");
     const secondaryUser = await resolveExactUser(users, secondaryEmail, "secondary E2E", { role: "account_b" });
+    await resetSocialFixtures(baseUrl, serviceKey, primaryUser.id, secondaryUser.id);
     const primaryFixtureProfile = await updateProfile(baseUrl, serviceKey, primaryUser.id, {
       rating: E2E_PRIMARY_MATCHMAKING_RATING,
       updated_at: new Date().toISOString()
     });
     if (Number(primaryFixtureProfile?.rating) !== E2E_PRIMARY_MATCHMAKING_RATING) {
       fail("fixture-only reset did not set the canonical Account A matchmaking rating");
+    }
+    if (primaryExpectedNameStyle.itemId) {
+      await equipDistinctiveNameStyle(baseUrl, serviceKey, primaryUser.id, primaryExpectedNameStyle.itemId);
+      const primarySession = await passwordLogin(baseUrl, anonKey, primaryEmail, primaryPassword);
+      await verifyStoreState(baseUrl, anonKey, primarySession.access_token, primaryExpectedNameStyle.itemId);
     }
     const fixtureProfile = await updateProfile(baseUrl, serviceKey, secondaryUser.id, {
       username,
@@ -415,8 +555,11 @@ async function main() {
     fail("primary E2E fixture did not receive the canonical matchmaking rating");
   }
   const primaryBalance = await resetWallet(baseUrl, serviceKey, primaryUser.id, "primary E2E");
+  if (primaryExpectedNameStyle.itemId) {
+    await equipDistinctiveNameStyle(baseUrl, serviceKey, primaryUser.id, primaryExpectedNameStyle.itemId);
+  }
   const primarySession = await passwordLogin(baseUrl, anonKey, primaryEmail, primaryPassword);
-  const primaryStore = await verifyStoreState(baseUrl, anonKey, primarySession.access_token, "");
+  const primaryStore = await verifyStoreState(baseUrl, anonKey, primarySession.access_token, primaryExpectedNameStyle.itemId);
   if (primaryBalance !== E2E_WALLET_BALANCE || Number(primaryStore.coins) !== E2E_WALLET_BALANCE) {
     fail("primary E2E wallet reset did not verify through the authenticated Store RPC");
   }
@@ -448,7 +591,9 @@ async function main() {
   }, null, 2));
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   console.error(JSON.stringify({ error: error.message, status: error.status || 0, code: error.code || "" }, null, 2));
-  process.exitCode = 1;
+  process.exitCode = error.exitCode || 1;
 });
+
+module.exports = { resetSocialFixtures, resolveExactUser, primaryFixtureIdentity, expectedPrimaryNameStyle };

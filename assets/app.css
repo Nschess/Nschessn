@@ -13477,7 +13477,8 @@
       box-shadow: 0 0 10px rgba(127, 166, 80, 0.5);
     }
 
-    .friend-status-dot.is-offline {
+    .friend-status-dot.is-offline,
+    .friend-status-dot.is-unknown {
       background: #8b8677;
       box-shadow: none;
     }
@@ -26913,7 +26914,8 @@
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--cq-success) 16%, transparent);
     }
 
-    :is(body:not(.theme-light), body.theme-light) #play .friend-status-dot.is-offline {
+    :is(body:not(.theme-light), body.theme-light) #play .friend-status-dot.is-offline,
+    :is(body:not(.theme-light), body.theme-light) #play .friend-status-dot.is-unknown {
       background: var(--cq-text-subtle);
       box-shadow: none;
     }
@@ -43678,4 +43680,17 @@ body.tournament-mode #play .tournament-create-grid {
   body.tournament-mode #play .tournament-card-actions .button {
     flex: 1 1 120px;
   }
+}
+
+/* Friend Challenge is an interactive multiplayer workspace. Keep its compact
+   composition, but give each primary control a reliable 44px touch target at
+   every viewport instead of only on the mobile button fallback. */
+body.friend-challenge-mode #play :is(
+  .friend-mode-tabs button,
+  .friend-search-row .button,
+  .friend-share-row .button,
+  .friend-request-card .button,
+  .friend-match-actions .button
+) {
+  min-height: 44px;
 }

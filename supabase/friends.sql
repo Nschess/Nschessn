@@ -394,13 +394,15 @@ begin
     white_score := .5;
   end if;
 
-  select rating into white_rating from public.profiles where id = white_user_id;
-  select rating into black_rating from public.profiles where id = black_user_id;
-  if white_rating is not null and black_rating is not null then
-    white_expected := 1 / (1 + power(10::numeric, (black_rating - white_rating)::numeric / 400));
-    rating_delta := round(16 * (white_score - white_expected));
-    update public.profiles set rating = greatest(400, least(3000, rating + rating_delta)), updated_at = now() where id = white_user_id;
-    update public.profiles set rating = greatest(400, least(3000, rating - rating_delta)), updated_at = now() where id = black_user_id;
+  if found.game_type = 'rated' then
+    select rating into white_rating from public.profiles where id = white_user_id;
+    select rating into black_rating from public.profiles where id = black_user_id;
+    if white_rating is not null and black_rating is not null then
+      white_expected := 1 / (1 + power(10::numeric, (black_rating - white_rating)::numeric / 400));
+      rating_delta := round(16 * (white_score - white_expected));
+      update public.profiles set rating = greatest(400, least(3000, rating + rating_delta)), updated_at = now() where id = white_user_id;
+      update public.profiles set rating = greatest(400, least(3000, rating - rating_delta)), updated_at = now() where id = black_user_id;
+    end if;
   end if;
 
   if p_result = 'draw' then

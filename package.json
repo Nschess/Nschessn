@@ -5,6 +5,7 @@
   "description": "Nschess static site and authenticated browser verification harness",
   "scripts": {
     "test:affected": "node scripts/e2e-runner.cjs affected",
+    "test:e2e-safety": "node scripts/e2e-safety-regression.cjs",
     "test:environment": "node scripts/test-environment.cjs",
     "test:full": "npm run test:environment && node scripts/e2e-runner.cjs full --required --environment-preflighted",
     "test:e2e": "npm run test:environment && node scripts/e2e-runner.cjs e2e --required --environment-preflighted",

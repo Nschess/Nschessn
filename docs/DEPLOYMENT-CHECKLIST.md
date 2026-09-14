@@ -18,6 +18,7 @@
 - [ ] Apply `supabase/migrations/20260819_release_candidate_security_hardening.sql` after `friends.sql` and before enabling multiplayer; this replaces the foundation move-position RPC with server-authoritative legal-FEN validation.
 - [ ] Apply `supabase/migrations/20260908_matchmaking_rating_hardening.sql` after the security hardening and Quick Match migrations; this keeps Elo updates exclusive to rated multiplayer games.
 - [ ] Apply `supabase/migrations/20260908_matchmaking_pairing_security.sql` after the Quick Match migrations; this keeps the authenticated queue caller aligned with the protected challenge creator identity during server pairing.
+- [ ] Apply `supabase/migrations/20260912_multiplayer_fen_en_passant_contract.sql` after the security hardening migration; this keeps server-authoritative move validation compatible with the bundled chess.js FEN serialization.
 - [ ] Apply `moderation.sql`, `tournaments.sql` when enabled, then the ordered migrations documented in `README.md`.
 - [ ] Apply the privacy-schema repair before the Activity Feed migration when upgrading a database with the older privacy composite shape.
 - [ ] Apply Quick Match queue migrations in order when Quick Match is enabled.

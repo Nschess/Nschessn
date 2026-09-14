@@ -12,7 +12,7 @@ const path = require("path");
 const crypto = require("crypto");
 const https = require("https");
 const { spawnSync } = require("child_process");
-const { parseEnvFile } = require("./e2e-config.cjs");
+const { parseEnvFile, assertApprovedE2EProject } = require("./e2e-config.cjs");
 
 const root = path.resolve(__dirname, "..");
 const envFile = process.env.E2E_ENV_FILE || path.join(root, ".env.e2e");
@@ -70,6 +70,10 @@ function trackedCredentialFileIssues() {
 }
 
 function requiredConfiguration(values, { requireSecondary = true } = {}) {
+  assertApprovedE2EProject({
+    E2E_SUPABASE_URL: value("E2E_SUPABASE_URL", values),
+    E2E_BASE_URL: value("E2E_BASE_URL", values)
+  });
   const issues = [...protectedFileIssues(values), ...trackedCredentialFileIssues()];
   const target = value("E2E_ENVIRONMENT", values).toLowerCase();
   const baseUrl = value("E2E_BASE_URL", values);
@@ -223,8 +227,8 @@ async function run() {
   ({ configuration } = refreshConfiguration());
   if (configuration.missing.length || configuration.issues.length) block(configuration);
   await checkRealtime(configuration);
-  console.log("PASS  test environment: dedicated non-production Supabase, two disposable accounts, reset/isolation, migrations, and Realtime are ready");
-  console.log("PASS  test environment: no production fixture path or file-stored privileged credential was accepted");
+  console.log("PASS  test environment: reviewed E2E project, two disposable accounts, fixture setup, migration surface, and Realtime checks passed");
+  console.log("PASS  test environment: production/unregistered project identities and file-stored privileged credentials are forbidden");
 }
 
 if (require.main === module) {

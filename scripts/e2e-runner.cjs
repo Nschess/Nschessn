@@ -7,10 +7,10 @@
  */
 const fs = require("fs");
 const path = require("path");
-const http = require("http");
 const crypto = require("crypto");
-const { spawn, spawnSync } = require("child_process");
-const { discoverSupabaseConfig } = require("./e2e-config.cjs");
+const { spawnSync } = require("child_process");
+const { discoverSupabaseConfig, assertApprovedE2EProject, assertApprovedBrowserConfig } = require("./e2e-config.cjs");
+const { startE2EServer } = require("./e2e-local-server.cjs");
 const { run: runTestEnvironment } = require("./test-environment.cjs");
 
 const root = path.resolve(__dirname, "..");
@@ -22,8 +22,7 @@ const snapshotDir = path.join(root, "tests", "e2e", "snapshots");
 // runner cannot overwrite/rename a file while the first runner is still using
 // it. The legacy fixed-name files remain read-only cache inputs below.
 const sharedAuthDir = path.join(root, ".playwright", "auth");
-fs.mkdirSync(sharedAuthDir, { recursive: true });
-const runAuthDir = fs.mkdtempSync(path.join(sharedAuthDir, "run-"));
+let runAuthDir;
 const mode = process.argv[2] || "affected";
 const visualOnly = mode === "visual";
 const matchmakingOnly = mode === "matchmaking";
@@ -237,6 +236,463 @@ function redactDiagnosticText(value) {
     .slice(0, 240);
 }
 
+const storeHydrationTraces = new WeakMap();
+
+function getStoreHydrationEndpoint(url) {
+  const value = String(url || "");
+  if (/\/rest\/v1\/rpc\/get_store_state(?:\?|$)/i.test(value)) return "get_store_state";
+  const rpc = value.match(/\/rest\/v1\/rpc\/([^/?#]+)(?:\?|$)/i);
+  if (rpc?.[1]) return `rpc:${decodeURIComponent(rpc[1])}`;
+  if (/\/auth\/v1\/user(?:\?|$)/i.test(value)) return "auth_user";
+  return "";
+}
+
+async function attachStoreHydrationTrace(page, label) {
+  const trace = { label: String(label || ""), events: [], pending: new Map(), requestSequence: 0 };
+  const append = (event) => {
+    trace.events.push({ at: Date.now(), ...event });
+    if (trace.events.length > 120) trace.events.splice(0, trace.events.length - 120);
+  };
+  page.on("request", (request) => {
+    const endpoint = getStoreHydrationEndpoint(request.url());
+    if (!endpoint) return;
+    const startedAt = Date.now();
+    const event = {
+      requestId: `${trace.label || "page"}:request-${++trace.requestSequence}`,
+      startedAt,
+      endpoint,
+      phase: "request",
+      method: request.method(),
+      url: redactTraceUrl(request.url())
+    };
+    trace.pending.set(request, event);
+    append(event);
+  });
+  page.on("response", (response) => {
+    const request = response.request();
+    const event = trace.pending.get(request);
+    if (!event) return;
+    trace.pending.delete(request);
+    append({
+      endpoint: event.endpoint,
+      requestId: event.requestId,
+      phase: "response",
+      method: event.method,
+      url: event.url,
+      status: response.status(),
+      durationMs: Math.max(0, Date.now() - event.startedAt)
+    });
+  });
+  page.on("requestfailed", (request) => {
+    const event = trace.pending.get(request);
+    if (!event) return;
+    trace.pending.delete(request);
+    append({
+      endpoint: event.endpoint,
+      requestId: event.requestId,
+      phase: "failed",
+      method: event.method,
+      url: event.url,
+      failure: redactDiagnosticText(request.failure()?.errorText || "request failed"),
+      durationMs: Math.max(0, Date.now() - event.startedAt)
+    });
+  });
+  storeHydrationTraces.set(page, trace);
+  // Store's refresh promise and the authenticated startup fan-out are
+  // intentionally private to the app. Trace only public method names and
+  // sanitized call stacks; every wrapper preserves the original promise and
+  // result so it cannot change hydration behavior or assertions.
+  await page.addInitScript(() => {
+    const events = [];
+    const pendingStoreRpcCalls = new Map();
+    const storeRpcFetchQueue = [];
+    let callSequence = 0;
+    let fetchSequence = 0;
+    const safeText = (value) => String(value || "")
+      .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [redacted]")
+      .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+\b/g, "[jwt-redacted]")
+      .slice(0, 500);
+    const caller = () => safeText(String(new Error().stack || "")
+      .split("\n")
+      .filter((line) => /(?:assets\/app\.js|<anonymous>)/.test(line))
+      .slice(1, 6)
+      .join("\n"));
+    const append = (phase, details = {}) => {
+      events.push({
+        at: Date.now(),
+        phase,
+        ...details,
+        authState: String(document.documentElement?.dataset?.authState || ""),
+        storeSyncStatus: String(document.documentElement?.dataset?.storeSyncStatus || ""),
+        storeStatus: String(document.getElementById("storeStatus")?.textContent || "").trim().slice(0, 240),
+        providerReady: Boolean(window.CheckmateQuestAuthProvider?.getStoreState),
+        clientReady: Boolean(window.CheckmateQuestSupabaseClient?.client)
+      });
+      if (events.length > 120) events.splice(0, events.length - 120);
+    };
+    const traceMethod = (target, method, label, detailForArgs = () => ({})) => {
+      if (!target || typeof target[method] !== "function") return;
+      const original = target[method];
+      if (original.__nschessStoreHydrationTraceWrapped) return;
+      const traced = function(...args) {
+        let details = {};
+        try { details = detailForArgs(args) || {}; } catch {}
+        const callId = `${label}-${++callSequence}`;
+        const callDetails = { ...details, callId };
+        const trackedStoreRpc = label === "client-rpc" && String(details.rpc || "").toLowerCase() === "get_store_state";
+        if (trackedStoreRpc) {
+          pendingStoreRpcCalls.set(callId, {
+            callId,
+            startedAt: Date.now(),
+            fetchId: "",
+            fetchStartedAt: 0,
+            settled: "pending"
+          });
+          storeRpcFetchQueue.push(callId);
+        }
+        append(`${label}-start`, { ...callDetails, caller: caller() });
+        let result;
+        try {
+          result = original.apply(this, args);
+        } catch (error) {
+          if (trackedStoreRpc) {
+            const tracked = pendingStoreRpcCalls.get(callId);
+            if (tracked) tracked.settled = "threw";
+          }
+          append(`${label}-throw`, { ...callDetails, error: safeText(error?.message || error) });
+          throw error;
+        }
+        return Promise.resolve(result).then((value) => {
+          if (trackedStoreRpc) {
+            const tracked = pendingStoreRpcCalls.get(callId);
+            if (tracked) {
+              tracked.settled = "resolved";
+              tracked.settledAt = Date.now();
+            }
+          }
+          append(`${label}-resolved`, callDetails);
+          return value;
+        }, (error) => {
+          if (trackedStoreRpc) {
+            const tracked = pendingStoreRpcCalls.get(callId);
+            if (tracked) {
+              tracked.settled = "rejected";
+              tracked.settledAt = Date.now();
+            }
+          }
+          append(`${label}-rejected`, { ...callDetails, error: safeText(error?.message || error) });
+          throw error;
+        });
+      };
+      try {
+        Object.defineProperty(traced, "__nschessStoreHydrationTraceWrapped", { value: true });
+        target[method] = traced;
+      } catch {
+        append(`${label}-trace-unavailable`);
+      }
+    };
+    const installProviderTrace = () => {
+      const provider = window.CheckmateQuestAuthProvider;
+      if (!provider) return;
+      [
+        "getStoreState",
+        "listGiftInbox",
+        "setFriendPresenceStatus",
+        "getFriendDirectory",
+        "listFriendChallenges",
+        "getSocialNotifications",
+        "getSocialActivityFeed",
+        "getUserPrivacySettings",
+        "listUserBlocks"
+      ].forEach((method) => traceMethod(provider, method, `provider-${method}`));
+    };
+    const installClientTrace = () => {
+      const client = window.CheckmateQuestSupabaseClient?.client;
+      if (!client) return;
+      traceMethod(client.auth, "getUser", "client-auth-getUser");
+      traceMethod(client, "rpc", "client-rpc", (args) => ({ rpc: safeText(args[0]) }));
+    };
+    const endpointForFetch = (input) => {
+      const url = typeof input === "string" ? input : String(input?.url || "");
+      if (/\/rest\/v1\/rpc\/get_store_state(?:\?|$)/i.test(url)) return "get_store_state";
+      if (/\/auth\/v1\/user(?:\?|$)/i.test(url)) return "auth_user";
+      return "";
+    };
+    const installFetchTrace = () => {
+      const original = window.fetch;
+      if (typeof original !== "function" || original.__nschessStoreHydrationFetchTraceWrapped) return;
+      const tracedFetch = function(input, init) {
+        const endpoint = endpointForFetch(input);
+        if (!endpoint) return original.apply(this, arguments);
+        const fetchId = `fetch-${++fetchSequence}`;
+        const storeRpcCallId = endpoint === "get_store_state" ? (storeRpcFetchQueue.shift() || "") : "";
+        const startedAt = Date.now();
+        if (storeRpcCallId) {
+          const tracked = pendingStoreRpcCalls.get(storeRpcCallId);
+          if (tracked) {
+            tracked.fetchId = fetchId;
+            tracked.fetchStartedAt = startedAt;
+          }
+        }
+        append("browser-fetch-start", { endpoint, fetchId, storeRpcCallId });
+        let result;
+        try {
+          result = original.apply(this, arguments);
+        } catch (error) {
+          append("browser-fetch-throw", { endpoint, fetchId, storeRpcCallId, error: safeText(error?.message || error) });
+          throw error;
+        }
+        return Promise.resolve(result).then((response) => {
+          append("browser-fetch-resolved", {
+            endpoint,
+            fetchId,
+            storeRpcCallId,
+            status: Number(response?.status) || 0,
+            durationMs: Math.max(0, Date.now() - startedAt)
+          });
+          return response;
+        }, (error) => {
+          append("browser-fetch-rejected", {
+            endpoint,
+            fetchId,
+            storeRpcCallId,
+            error: safeText(error?.message || error),
+            durationMs: Math.max(0, Date.now() - startedAt)
+          });
+          throw error;
+        });
+      };
+      try {
+        Object.defineProperty(tracedFetch, "__nschessStoreHydrationFetchTraceWrapped", { value: true });
+        window.fetch = tracedFetch;
+      } catch {
+        append("browser-fetch-trace-unavailable");
+      }
+    };
+    const observe = () => {
+      append("observer-ready");
+      const observer = new MutationObserver((records) => {
+        if (records.some((record) => record.type === "attributes" && (record.attributeName === "data-store-sync-status" || record.attributeName === "data-auth-state"))) append("state-change");
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-store-sync-status", "data-auth-state"] });
+      installFetchTrace();
+      installProviderTrace();
+      installClientTrace();
+      window.setInterval(() => {
+        installFetchTrace();
+        installProviderTrace();
+        installClientTrace();
+      }, 20);
+    };
+    if (document.documentElement) observe();
+    else document.addEventListener("DOMContentLoaded", observe, { once: true });
+    window.__nschessReadStoreHydrationTrace = () => events.map((event) => ({ ...event }));
+    window.__nschessReadStoreHydrationCorrelation = () => [...pendingStoreRpcCalls.values()].map((entry) => ({ ...entry }));
+  });
+  return trace;
+}
+
+async function readStoreHydrationDiagnostics(page) {
+  const trace = storeHydrationTraces.get(page);
+  const runtime = await page.evaluate(() => {
+    const resources = performance.getEntriesByType("resource")
+      .filter((entry) => /\/rest\/v1\/rpc\/get_store_state(?:\?|$)|\/auth\/v1\/user(?:\?|$)/i.test(String(entry.name || "")))
+      .slice(-20)
+      .map((entry) => ({
+        endpoint: /get_store_state/i.test(String(entry.name || "")) ? "get_store_state" : "auth_user",
+        durationMs: Math.round(Number(entry.duration) || 0),
+        transferSize: Number(entry.transferSize) || 0,
+        responseStatus: Number(entry.responseStatus) || 0
+      }));
+    return {
+      authState: String(document.documentElement.dataset.authState || ""),
+      storeSyncStatus: String(document.documentElement.dataset.storeSyncStatus || ""),
+      storeStatus: String(document.getElementById("storeStatus")?.textContent || "").trim().slice(0, 240),
+      provider: {
+        ready: Boolean(window.CheckmateQuestAuthProvider),
+        getStoreState: typeof window.CheckmateQuestAuthProvider?.getStoreState === "function",
+        getAuthenticatedUserId: typeof window.CheckmateQuestAuthProvider?.getAuthenticatedUserId === "function"
+      },
+      lifecycle: typeof window.__nschessReadStoreHydrationTrace === "function"
+        ? window.__nschessReadStoreHydrationTrace().slice(-80)
+        : [],
+      correlation: typeof window.__nschessReadStoreHydrationCorrelation === "function"
+        ? window.__nschessReadStoreHydrationCorrelation().slice(-20)
+        : [],
+      resources,
+      authDebug: Array.isArray(window.__nschessAuthDebugLog) ? window.__nschessAuthDebugLog.slice(-20) : []
+    };
+  }).catch((error) => ({ evaluationError: redactDiagnosticText(error?.message || error) }));
+  return {
+    runtime,
+    network: trace ? {
+      label: trace.label,
+      events: trace.events.slice(-80),
+      pending: [...trace.pending.values()].map((event) => ({
+        ...event,
+        phase: "pending",
+        ageMs: Math.max(0, Date.now() - event.startedAt)
+      }))
+    } : null
+  };
+}
+
+// This probe runs only after the normal Store-hydration assertion has already
+// failed. It opens the same authenticated browser storage state with app.js
+// deliberately inert, then makes exactly one auth.getUser() -> get_store_state
+// call using the same browser Supabase client version. It distinguishes app
+// startup fan-out from a browser/PostgREST request that cannot settle. No
+// credential, response body, header, or token leaves the page.
+async function runControlledStoreRpcProbe(browser, baseUrl, storageState, label) {
+  let context;
+  try {
+    assertApprovedE2EProject({ ...process.env, E2E_BASE_URL: baseUrl });
+    context = await browser.newContext({ storageState, serviceWorkers: "block" });
+    await context.route((url) => /\/assets\/app\.js(?:\?|$)/i.test(url.href), (route) => route.fulfill({
+      status: 200,
+      contentType: "application/javascript",
+      body: ""
+    }));
+    const page = await context.newPage();
+    await page.exposeFunction("__nschessValidateE2EConfig", assertApprovedBrowserConfig);
+    const network = [];
+    const appendNetwork = (phase, request, extra = {}) => {
+      const endpoint = getStoreHydrationEndpoint(request.url());
+      if (!endpoint) return;
+      network.push({
+        at: Date.now(),
+        phase,
+        endpoint,
+        method: request.method(),
+        ...extra
+      });
+      if (network.length > 30) network.splice(0, network.length - 30);
+    };
+    page.on("request", (request) => appendNetwork("request", request));
+    page.on("response", (response) => appendNetwork("response", response.request(), { status: response.status() }));
+    page.on("requestfailed", (request) => appendNetwork("failed", request, {
+      failure: redactDiagnosticText(request.failure()?.errorText || "request failed")
+    }));
+    await page.goto(new URL("/#login", `${baseUrl}/`).toString(), { waitUntil: "domcontentloaded" });
+    const probe = await page.evaluate(async () => {
+      const maxWindowMs = 15000;
+      const deadline = performance.now() + maxWindowMs;
+      const events = [];
+      let fetchSequence = 0;
+      const safe = (value) => String(value || "")
+        .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [redacted]")
+        .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+\b/g, "[jwt-redacted]")
+        .slice(0, 180);
+      const endpointForFetch = (input) => {
+        const url = typeof input === "string" ? input : String(input?.url || "");
+        if (/\/rest\/v1\/rpc\/get_store_state(?:\?|$)/i.test(url)) return "get_store_state";
+        if (/\/auth\/v1\/user(?:\?|$)/i.test(url)) return "auth_user";
+        return "";
+      };
+      const append = (event) => {
+        events.push({ at: Date.now(), perf: Math.round(performance.now()), ...event });
+        if (events.length > 30) events.splice(0, events.length - 30);
+      };
+      const originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        const endpoint = endpointForFetch(input);
+        if (!endpoint) return originalFetch.apply(this, arguments);
+        const fetchId = `controlled-fetch-${++fetchSequence}`;
+        const startedAt = performance.now();
+        append({ phase: "fetch-start", endpoint, fetchId });
+        let result;
+        try {
+          result = originalFetch.apply(this, arguments);
+        } catch (error) {
+          append({ phase: "fetch-throw", endpoint, fetchId, error: safe(error?.message || error) });
+          throw error;
+        }
+        return Promise.resolve(result).then((response) => {
+          append({ phase: "fetch-resolved", endpoint, fetchId, status: Number(response?.status) || 0, durationMs: Math.max(0, Math.round(performance.now() - startedAt)) });
+          return response;
+        }, (error) => {
+          append({ phase: "fetch-rejected", endpoint, fetchId, error: safe(error?.message || error), durationMs: Math.max(0, Math.round(performance.now() - startedAt)) });
+          throw error;
+        });
+      };
+      const settleBeforeDeadline = async (name, invoke) => {
+        const remainingMs = Math.max(0, Math.round(deadline - performance.now()));
+        if (!remainingMs) return { name, outcome: "pending_at_window_end" };
+        let timer = null;
+        const timeout = new Promise((resolve) => {
+          timer = window.setTimeout(() => resolve({ name, outcome: "pending_at_window_end" }), remainingMs);
+        });
+        const settled = Promise.resolve().then(invoke).then((value) => ({ name, outcome: "resolved", value }), (error) => ({ name, outcome: "rejected", error: safe(error?.message || error) }));
+        const result = await Promise.race([settled, timeout]);
+        window.clearTimeout(timer);
+        return result;
+      };
+      const loadClient = () => new Promise((resolve, reject) => {
+        if (typeof window.supabase?.createClient === "function") return resolve();
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0";
+        script.async = true;
+        script.onload = () => typeof window.supabase?.createClient === "function"
+          ? resolve()
+          : reject(new Error("Supabase client did not load."));
+        script.onerror = () => reject(new Error("Supabase client could not load."));
+        document.head.append(script);
+      });
+      try {
+        const configResponse = await fetch("/api/auth-config", { cache: "no-store", redirect: "error" });
+        const receivedConfig = await configResponse.json().catch(() => ({}));
+        if (!configResponse.ok) {
+          return { outcome: "config_unavailable", status: configResponse.status || 0, events };
+        }
+        const config = await window.__nschessValidateE2EConfig(receivedConfig);
+        const clientLoad = await settleBeforeDeadline("load_client", loadClient);
+        if (clientLoad.outcome !== "resolved") return { outcome: "client_unavailable", clientLoad, events };
+        const client = window.supabase.createClient(config.url, config.anonKey, {
+          auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false }
+        });
+        const auth = await settleBeforeDeadline("auth_getUser", () => client.auth.getUser());
+        if (auth.outcome !== "resolved") return { outcome: "auth_not_settled", auth, events };
+        const userPresent = Boolean(auth.value?.data?.user?.id) && !auth.value?.error;
+        if (!userPresent) {
+          return {
+            outcome: "controlled_auth_missing",
+            auth: { name: auth.name, outcome: auth.outcome, userPresent: false, error: safe(auth.value?.error?.message || "") },
+            events
+          };
+        }
+        const rpc = await settleBeforeDeadline("get_store_state", () => client.rpc("get_store_state"));
+        if (rpc.outcome === "resolved") {
+          return {
+            outcome: "rpc_settled",
+            auth: { name: auth.name, outcome: auth.outcome, userPresent: true },
+            rpc: {
+              name: rpc.name,
+              outcome: rpc.outcome,
+              hasError: Boolean(rpc.value?.error),
+              error: safe(rpc.value?.error?.message || ""),
+              dataType: Array.isArray(rpc.value?.data) ? "array" : typeof rpc.value?.data
+            },
+            events
+          };
+        }
+        return {
+          outcome: "rpc_not_settled",
+          auth: { name: auth.name, outcome: auth.outcome, userPresent: true },
+          rpc,
+          events
+        };
+      } catch (error) {
+        return { outcome: "probe_error", error: safe(error?.message || error), events };
+      }
+    });
+    return { label: String(label || ""), startupAppScriptBlocked: true, probe, network };
+  } catch (error) {
+    return { label: String(label || ""), startupAppScriptBlocked: true, outcome: "probe_setup_error", error: redactDiagnosticText(error?.message || error) };
+  } finally {
+    await context?.close().catch(() => {});
+  }
+}
+
 function runNode(script, args = []) {
   const result = spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: "utf8", stdio: "inherit" });
   if (result.status !== 0) throw new Error(`${script} exited with ${result.status}`);
@@ -259,6 +715,102 @@ function resetLiveE2eAccountBFixture() {
   runNode("scripts/provision-e2e-account.cjs", ["--fixture-only"]);
 }
 
+function exactDiagnosticText(value) {
+  const text = String(value ?? "");
+  return { json: JSON.stringify(text), length: text.length };
+}
+
+function liveE2EDiagnosticAccess() {
+  assertApprovedE2EProject();
+  // Match the E2E environment gate: the administrative diagnostic is allowed
+  // only for the explicitly configured disposable target, never a discovered
+  // fallback URL or a production-labelled environment.
+  const environment = String(process.env.E2E_ENVIRONMENT || "").trim().toLowerCase();
+  const baseUrl = String(process.env.E2E_SUPABASE_URL || "").trim().replace(/\/$/, "");
+  const key = String(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  if (!new Set(["local", "development", "test", "staging"]).has(environment)
+    || !/^https:\/\/[^/]+\.supabase\.co$/i.test(baseUrl)
+    || !key) {
+    throw new Error("The failure-only server-state diagnostic requires the same explicit non-production E2E configuration and process-only credential already required by the live test.");
+  }
+  return { baseUrl, key, modernSecret: /^sb_secret_/i.test(key) };
+}
+
+async function readLiveChallengeServerState(challengeCode, submittedPfen) {
+  const code = String(challengeCode || "").trim().toUpperCase();
+  const submitted = String(submittedPfen ?? "");
+  if (!/^[A-Z2-9]{8,16}$/.test(code)) return { code, readError: "invalid challenge code" };
+  try {
+    const { baseUrl, key, modernSecret } = liveE2EDiagnosticAccess();
+    const requestJson = async (path, options = {}) => {
+      const response = await fetch(`${baseUrl}${path}`, {
+        ...options,
+        headers: {
+          apikey: key,
+          ...(modernSecret ? {} : { Authorization: `Bearer ${key}` }),
+          Accept: "application/json",
+          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...(options.headers || {})
+        }
+      });
+      const raw = await response.text();
+      let body = null;
+      try { body = raw ? JSON.parse(raw) : null; } catch { body = raw; }
+      if (!response.ok) {
+        const error = new Error(String(body?.message || body?.error || `HTTP ${response.status}`));
+        error.status = response.status;
+        error.code = String(body?.code || "");
+        throw error;
+      }
+      return body;
+    };
+    const query = new URLSearchParams({
+      code: `eq.${code}`,
+      select: "code,fen,moves,revision,status,active_color",
+      limit: "1"
+    });
+    const rows = await requestJson(`/rest/v1/game_challenges?${query.toString()}`);
+    const challenge = Array.isArray(rows) ? rows[0] || null : null;
+    if (!challenge) return { code, rowFound: false, submittedPfen: exactDiagnosticText(submitted) };
+
+    let serverExpectedFen = "";
+    let serverExpectedFenError = "";
+    try {
+      const appliedResponse = await requestJson("/rest/v1/rpc/ns_chess_apply_move", {
+        method: "POST",
+        body: JSON.stringify({ p_fen: String(challenge.fen || ""), p_uci: "e2e4" })
+      });
+      const applied = Array.isArray(appliedResponse) ? appliedResponse[0] : appliedResponse;
+      serverExpectedFen = String(applied?.fen || "");
+    } catch (error) {
+      // Retain the row proof if this private helper has no direct REST grant.
+      // The original E2E failure remains authoritative and is never masked.
+      serverExpectedFenError = redactDiagnosticText(`${error?.code || ""} ${error?.message || error}`);
+    }
+    const normalStartingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    return {
+      code: String(challenge.code || code).toUpperCase(),
+      rowFound: true,
+      fen: exactDiagnosticText(challenge.fen),
+      moves: Array.isArray(challenge.moves) ? challenge.moves.map(String) : [],
+      revision: Number(challenge.revision || 0),
+      status: String(challenge.status || ""),
+      activeColor: String(challenge.active_color || ""),
+      serverExpectedFen: exactDiagnosticText(serverExpectedFen),
+      serverExpectedFenError,
+      submittedPfen: exactDiagnosticText(submitted),
+      serverExpectedFenEqualsSubmittedPfen: Boolean(serverExpectedFen) && serverExpectedFen === submitted,
+      challengeFenIsNormalStartingFen: String(challenge.fen || "") === normalStartingFen
+    };
+  } catch (error) {
+    return {
+      code,
+      submittedPfen: exactDiagnosticText(submitted),
+      readError: redactDiagnosticText(error?.message || error)
+    };
+  }
+}
+
 function changedFiles() {
   const diff = spawnSync("git", ["diff", "--name-only", "HEAD"], { cwd: root, encoding: "utf8" });
   const status = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
@@ -269,8 +821,9 @@ function changedFiles() {
 
 function runStaticChecks(full) {
   const checks = [
+    ["offline E2E safety", () => runNode("scripts/e2e-safety-regression.cjs")],
     ["JavaScript syntax", () => runNode("--check", ["assets/app.js"])],
-    ["E2E harness syntax", () => ["scripts/e2e-config.cjs", "scripts/e2e-runner.cjs", "scripts/e2e-server.cjs", "scripts/test-environment.cjs", "scripts/provision-e2e-account.cjs", "scripts/store-preflight.cjs", "scripts/store-auth-boundary-regression.cjs", "scripts/oauth-auth-regression.js", "scripts/auth-logout-regression.js"].forEach((file) => runNode("--check", [file]))],
+    ["E2E harness syntax", () => ["scripts/e2e-config.cjs", "scripts/e2e-local-server.cjs", "scripts/e2e-safety-regression.cjs", "scripts/e2e-runner.cjs", "scripts/e2e-server.cjs", "scripts/test-environment.cjs", "scripts/provision-e2e-account.cjs", "scripts/store-preflight.cjs", "scripts/store-auth-boundary-regression.cjs", "scripts/oauth-auth-regression.js", "scripts/auth-logout-regression.js"].forEach((file) => runNode("--check", [file]))],
     ["OAuth redirect policy", () => runNode("scripts/oauth-auth-regression.js")],
     ["auth logout regression", () => runNode("scripts/auth-logout-regression.js")],
     ["board interaction regression", () => runNode("scripts/board-interaction-regression.js")],
@@ -290,26 +843,6 @@ function runStaticChecks(full) {
   const diff = spawnSync("git", ["diff", "--check"], { cwd: root, encoding: "utf8" });
   if (diff.status === 0) pass("static: git diff --check");
   else fail("static: git diff --check", new Error(diff.stdout || diff.stderr || "Whitespace errors detected."));
-}
-
-function waitForLocalServer(url) {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + 10000;
-    const attempt = () => {
-      const request = http.get(url, (response) => {
-        response.resume();
-        if (response.statusCode && response.statusCode < 500) return resolve();
-        retry();
-      });
-      request.on("error", retry);
-      request.setTimeout(1000, () => { request.destroy(); retry(); });
-    };
-    const retry = () => {
-      if (Date.now() > deadline) reject(new Error(`Timed out waiting for ${url}`));
-      else setTimeout(attempt, 100);
-    };
-    attempt();
-  });
 }
 
 function getPlaywright() {
@@ -720,7 +1253,8 @@ async function waitForStoreHydration(page, label) {
     }, null, { timeout: 15000 });
   } catch (error) {
     const snapshot = await readAuthRuntimeSnapshot(page);
-    throw new Error(`${label} Store state did not settle: ${JSON.stringify({ timeout: error.message, snapshot, storeSyncStatus: await page.evaluate(() => document.documentElement.dataset.storeSyncStatus || "") })}`);
+    const diagnostics = await readStoreHydrationDiagnostics(page);
+    throw new Error(`${label} Store state did not settle: ${JSON.stringify({ timeout: error.message, snapshot, storeSyncStatus: await page.evaluate(() => document.documentElement.dataset.storeSyncStatus || ""), diagnostics })}`);
   }
 }
 
@@ -926,6 +1460,7 @@ async function prepareAuth(browser, baseUrl, email, password, label, options = {
     }
     if (cachedContext) {
     const cachedPage = await cachedContext.newPage();
+    await attachStoreHydrationTrace(cachedPage, `${label} cached`);
     await gotoHash(cachedPage, baseUrl, "#login");
     // A stored refresh token can look authenticated for one microtask before
     // Supabase resolves it as signed out.  Validate after the app's explicit
@@ -977,6 +1512,7 @@ async function prepareAuth(browser, baseUrl, email, password, label, options = {
   }
   const context = await browser.newContext();
   const page = await context.newPage();
+  await attachStoreHydrationTrace(page, label);
   const trace = { consoleErrors: [], pageErrors: [], requestFailures: [], authResponses: [] };
   page.on("console", (message) => {
     if (message.type() === "error") trace.consoleErrors.push(redactDiagnosticText(message.text()));
@@ -1028,7 +1564,16 @@ async function prepareAuth(browser, baseUrl, email, password, label, options = {
       throw new Error(`E2E login returned without an authenticated account. ${JSON.stringify({ snapshot: finalSnapshot, trace })}`);
     }
   }
-  await waitForStoreHydration(page, `${label} Store hydration`);
+  try {
+    await waitForStoreHydration(page, `${label} Store hydration`);
+  } catch (error) {
+    // The assertion above remains the source of truth. This is a one-shot
+    // failure-only control: same session, same client version, but no app
+    // startup fan-out. It never retries the application's pending request.
+    const storageState = await context.storageState();
+    const controlledProbe = await runControlledStoreRpcProbe(browser, baseUrl, storageState, `${label} controlled Store RPC`);
+    throw new Error(`${error.message || error}\nCONTROLLED_STORE_RPC_DIAGNOSTIC ${JSON.stringify(controlledProbe)}`);
+  }
   await gotoHash(page, baseUrl, "#top");
   await waitForAuthenticatedHydration(page, `${label} identity hydration`);
   await waitForStoreHydration(page, `${label} identity Store hydration`);
@@ -2285,6 +2830,97 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
     ]);
     assert(accountA && accountB && accountA !== accountB, "live-game E2E accounts did not resolve to distinct authenticated users.");
 
+    const waitForSocialNotification = async (page, expected, label) => {
+      await page.waitForFunction(async (criteria) => {
+        const provider = window.CheckmateQuestAuthProvider;
+        if (!provider?.getSocialNotifications) return false;
+        try {
+          const notes = await provider.getSocialNotifications(100);
+          return Array.isArray(notes) && notes.some((note) => String(note?.type || "") === criteria.type
+            && (!criteria.actorId || String(note?.actor_id || note?.actorId || "") === criteria.actorId)
+            && (!criteria.entityCode || String(note?.entity_code || note?.entityCode || "").toUpperCase() === criteria.entityCode));
+        } catch {
+          return false;
+        }
+      }, expected, { timeout: 20000 });
+      pass(label);
+    };
+    const waitForRenderedSocialNotification = async (page, title, label) => {
+      await page.locator("#siteNotificationsOpen").click();
+      try {
+        await page.waitForFunction((expectedTitle) => [...document.querySelectorAll("#siteNotificationsList .site-notification-item strong")]
+          .some((item) => String(item.textContent || "").includes(expectedTitle)), title, { timeout: 10000 });
+      } finally {
+        const close = page.locator("#siteNotificationsClose");
+        if (await close.isVisible().catch(() => false)) await close.click();
+      }
+      pass(label);
+    };
+    const waitForFriendDirectory = async (page, targetId, expectedStatus, label) => {
+      await page.waitForFunction(async ({ target, status }) => {
+        const provider = window.CheckmateQuestAuthProvider;
+        if (!provider?.getFriendDirectory) return false;
+        try {
+          const directory = await provider.getFriendDirectory();
+          return Array.isArray(directory) && directory.some((friend) => String(friend?.public_id || friend?.id || "") === target
+            && String(friend?.request_status || friend?.requestStatus || "") === status);
+        } catch {
+          return false;
+        }
+      }, { target: targetId, status: expectedStatus }, { timeout: 20000 });
+      pass(label);
+    };
+
+    // The fixture reset leaves these two generated accounts without a social
+    // relationship. Exercise the actual RPC/trigger path, including a real
+    // recipient notification, decline, resend, and accept—not a local mock.
+    const firstRequest = await pageA.evaluate((targetId) => window.CheckmateQuestAuthProvider?.sendFriendRequest?.(targetId), accountB);
+    assert(firstRequest, "Account A did not create a server friend request for account B.");
+    await waitForSocialNotification(pageB, { type: "friend_request", actorId: accountA }, "browser: Account B received the real friend-request notification");
+    await waitForRenderedSocialNotification(pageB, "New friend request", "browser: Account B rendered the friend-request notification");
+    await waitForFriendDirectory(pageB, accountA, "pending", "browser: Account B directory received the pending friend request");
+    const declined = await pageB.evaluate(async (targetId) => {
+      const directory = await window.CheckmateQuestAuthProvider?.getFriendDirectory?.();
+      const incoming = Array.isArray(directory) && directory.find((friend) => String(friend?.public_id || friend?.id || "") === targetId
+        && String(friend?.request_status || friend?.requestStatus || "") === "pending"
+        && String(friend?.request_direction || friend?.requestDirection || "") === "incoming");
+      if (!incoming?.request_id && !incoming?.requestId) return false;
+      await window.CheckmateQuestAuthProvider.respondFriendRequest(incoming.request_id || incoming.requestId, false);
+      return true;
+    }, accountA);
+    assert(declined, "Account B could not decline the real pending friend request.");
+    await waitForSocialNotification(pageA, { type: "friend_declined", actorId: accountB }, "browser: Account A received the friend-request decline notification");
+
+    const resentRequest = await pageA.evaluate((targetId) => window.CheckmateQuestAuthProvider?.sendFriendRequest?.(targetId), accountB);
+    assert(resentRequest, "Account A could not resend the declined friend request.");
+    await waitForSocialNotification(pageB, { type: "friend_request", actorId: accountA }, "browser: Account B received the resent friend-request notification");
+    const accepted = await pageB.evaluate(async (targetId) => {
+      const directory = await window.CheckmateQuestAuthProvider?.getFriendDirectory?.();
+      const incoming = Array.isArray(directory) && directory.find((friend) => String(friend?.public_id || friend?.id || "") === targetId
+        && String(friend?.request_status || friend?.requestStatus || "") === "pending"
+        && String(friend?.request_direction || friend?.requestDirection || "") === "incoming");
+      if (!incoming?.request_id && !incoming?.requestId) return false;
+      await window.CheckmateQuestAuthProvider.respondFriendRequest(incoming.request_id || incoming.requestId, true);
+      return true;
+    }, accountA);
+    assert(accepted, "Account B could not accept the real pending friend request.");
+    await waitForSocialNotification(pageA, { type: "friend_accepted", actorId: accountB }, "browser: Account A received the friend-request acceptance notification");
+    await Promise.all([
+      waitForFriendDirectory(pageA, accountB, "accepted", "browser: Account A directory confirmed the accepted friendship"),
+      waitForFriendDirectory(pageB, accountA, "accepted", "browser: Account B directory confirmed the accepted friendship")
+    ]);
+
+    await Promise.all([
+      pageA.evaluate(() => window.CheckmateQuestAuthProvider?.setFriendPresenceStatus?.("online", true)),
+      pageB.evaluate(() => window.CheckmateQuestAuthProvider?.setFriendPresenceStatus?.("online", true))
+    ]);
+    await pageA.waitForFunction(async (targetId) => {
+      const directory = await window.CheckmateQuestAuthProvider?.getFriendDirectory?.();
+      const friend = Array.isArray(directory) && directory.find((item) => String(item?.public_id || item?.id || "") === targetId);
+      return friend?.online === true;
+    }, accountB, { timeout: 20000 });
+    pass("browser: Account A observed Account B through server-authoritative presence");
+
     const created = await pageA.evaluate(async ({ targetId, challengeCode }) => {
       const provider = window.CheckmateQuestAuthProvider;
       return provider.createFriendChallenge({
@@ -2299,15 +2935,13 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
     assert(String(created?.code || "").toUpperCase() === code && created?.status === "pending", "live-game E2E did not create a pending challenge for account B.");
 
     await gotoHash(pageA, baseUrl, "#play?challenge=" + code);
-    await pageB.locator("#friendJoinTab").click();
-    const joinCode = pageB.locator("#friendJoinCode");
-    assert(await joinCode.isVisible(), "Friend Challenge join input is not visible after selecting the join tab.");
-    await joinCode.fill(code);
-    assert(await joinCode.inputValue() === code, "The valid challenge code was not entered into the Friend Challenge join form.");
-    await pageB.locator("#friendJoin").click();
+    await waitForSocialNotification(pageB, { type: "challenge_received", actorId: accountA, entityCode: code }, "browser: Account B received the real challenge notification");
+    await waitForRenderedSocialNotification(pageB, "New challenge", "browser: Account B rendered the challenge notification");
+    await gotoHash(pageB, baseUrl, "#play?challenge=" + code);
     await pageB.waitForFunction(() => !document.getElementById("friendRequestCard")?.hidden, null, { timeout: 15000 });
     await pageB.locator("#friendAccept").click();
     await waitForRemoteStatus(pageA, "active", "browser: two-account challenge became active");
+    await waitForSocialNotification(pageA, { type: "challenge_accepted", actorId: accountB, entityCode: code }, "browser: Account A received the challenge-accepted notification");
 
     await gotoHash(pageA, baseUrl, "#play?challenge=" + code);
     await waitForFriendStartReady(pageA, code, "browser: Account A friend challenge state hydrated before Start");
@@ -2372,15 +3006,12 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
     await waitForBoard(pageB, "account B after reload");
     pass("browser: route/reload recovery restored live FEN, moves, and turn state");
 
-    await gotoHash(pageA, baseUrl, "#play");
-    await pageA.locator("#authPanelLogout").click({ noWaitAfter: true });
-    await pageA.waitForFunction(() => document.documentElement.dataset.authState === "guest"
-      && !localStorage.getItem("checkmateQuest.friendChallenge.v1"), null, { timeout: 10000 });
-    pass("browser: logout removed live-game state and stopped account A lifecycle");
-
     await pageB.locator("#resignGame").click();
-    await waitForRemoteStatus(pageB, "completed", "browser: completion settled exactly once on the server");
-    const settled = await pageB.evaluate(async (challengeCode) => {
+    await Promise.all([
+      waitForRemoteStatus(pageA, "completed", "browser: Account A received the completed shared result"),
+      waitForRemoteStatus(pageB, "completed", "browser: completion settled exactly once on the server")
+    ]);
+    const [settledA, settledB] = await Promise.all([pageA, pageB].map((page) => page.evaluate(async (challengeCode) => {
       const provider = window.CheckmateQuestAuthProvider;
       const first = await provider.getFriendChallenge(challengeCode);
       const second = await provider.touchFriendChallengePresence(challengeCode, true);
@@ -2391,12 +3022,20 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
         secondRevision: Number(second?.revision || 0),
         result: String(second?.result || "")
       };
-    }, code);
-    assert(settled.firstStatus === "completed" && settled.secondStatus === "completed"
+    }, code)));
+    assert([settledA, settledB].every((settled) => settled.firstStatus === "completed" && settled.secondStatus === "completed"
       && settled.firstRevision === settled.secondRevision
-      && ["white", "black", "draw", "aborted"].includes(settled.result), "completed challenge was not idempotent or did not preserve its result.");
+      && ["white", "black", "draw", "aborted"].includes(settled.result)), "completed challenge was not idempotent or did not preserve its result.");
+    assert(settledA.result === settledB.result && settledA.firstRevision === settledB.firstRevision,
+      `both accounts did not observe the same authoritative result: ${JSON.stringify({ settledA, settledB })}`);
+    await Promise.all([pageA, pageB].map(async (page) => {
+      await page.waitForFunction(() => !document.getElementById("postGameDecision")?.hidden, null, { timeout: 20000 });
+      await page.locator("#postGameDecisionReview").click();
+      await page.waitForFunction(() => document.getElementById("gameReview")?.classList.contains("is-review-page"), null, { timeout: 20000 });
+      assert(await page.locator("#gameReview").isVisible(), "completed Friend Challenge did not open the existing Game Review workspace.");
+    }));
     completed = true;
-    pass("browser: result persistence and exactly-once completion are idempotent");
+    pass("browser: both accounts kept the same completed result and opened Review");
   } finally {
     if (!completed && code) {
       try {
@@ -2432,6 +3071,14 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
   const contextB = await browser.newContext({ storageState: secondState, viewport: { width: 1024, height: 800 }, serviceWorkers: "allow" });
   const pageA = await contextA.newPage();
   const pageB = await contextB.newPage();
+  // The accounts used for the live two-browser exercise are new contexts, not
+  // the short-lived contexts used to create their storage states. Attach the
+  // same passive trace here so a Quick Match failure can be correlated with
+  // actual auth/RPC activity in the pages that made the queue requests.
+  await Promise.all([
+    attachStoreHydrationTrace(pageA, "live-matchmaking-account-a"),
+    attachStoreHydrationTrace(pageB, "live-matchmaking-account-b")
+  ]);
   const rpcCalls = { a: [], b: [] };
   const leaveCalls = { a: [], b: [] };
   const runtimeTrace = {
@@ -2441,7 +3088,10 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
   const installQuickMatchDiagnostics = async (page, key) => {
     await page.addInitScript((traceKey) => {
       const trace = [];
+      const pendingResponseBodies = new Set();
+      const pendingPositionProviderCalls = [];
       let sequence = 0;
+      let positionSequence = 0;
       const append = (event) => {
         trace.push({ seq: ++sequence, at: Date.now(), perf: Math.round(performance.now()), ...event });
         if (trace.length > 200) trace.splice(0, trace.length - 200);
@@ -2471,8 +3121,60 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
           };
         } catch { return String(body).slice(0, 600); }
       };
+      const exactText = (value) => {
+        const text = String(value ?? "");
+        return { json: JSON.stringify(text), length: text.length };
+      };
+      const positionDetails = (body) => {
+        if (typeof body !== "string") return null;
+        try {
+          const parsed = JSON.parse(body);
+          const moves = Array.isArray(parsed?.p_moves) ? parsed.p_moves.map(String) : [];
+          return {
+            code: exactText(parsed?.p_code),
+            pFen: exactText(parsed?.p_fen),
+            status: String(parsed?.p_status || ""),
+            expectedRevision: Number.isFinite(Number(parsed?.p_expected_revision)) ? Number(parsed.p_expected_revision) : null,
+            moveApplied: Boolean(parsed?.p_move_applied),
+            moves: moves.length,
+            lastMove: exactText(moves.at(-1)),
+            movesJson: JSON.stringify(moves),
+            rawBodyJson: JSON.stringify(body),
+            rawBodyLength: body.length
+          };
+        } catch { return { invalidBody: true, rawBodyJson: JSON.stringify(body), rawBodyLength: body.length }; }
+      };
+      const positionResponseDetails = (body) => {
+        const raw = String(body ?? "");
+        try {
+          const parsed = JSON.parse(raw);
+          const moves = Array.isArray(parsed?.moves) ? parsed.moves.map(String) : [];
+          return {
+            status: String(parsed?.status || ""),
+            revision: Number(parsed?.revision || 0),
+            moves: moves.length,
+            lastMove: exactText(moves.at(-1)),
+            activeColor: String(parsed?.clockState?.activeColor || parsed?.clock_state?.active_color || ""),
+            error: {
+              code: exactText(parsed?.code),
+              message: exactText(parsed?.message || parsed?.error),
+              details: exactText(parsed?.details),
+              hint: exactText(parsed?.hint)
+            },
+            rawBodyJson: JSON.stringify(raw),
+            rawBodyLength: raw.length
+          };
+        } catch {
+          return { error: { message: exactText(redactText(raw)) }, rawBodyJson: JSON.stringify(raw), rawBodyLength: raw.length };
+        }
+      };
+      const redactText = (value) => String(value || "")
+        .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [redacted]")
+        .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+\b/g, "[jwt-redacted]")
+        .slice(0, 240);
       window.__nschessQuickMatchTrace = trace;
       window.__nschessReadQuickMatchTrace = () => trace.map((event) => ({ ...event }));
+      window.__nschessFlushQuickMatchTrace = async () => { await Promise.all([...pendingResponseBodies]); };
       window.__nschessMarkQuickMatchTrace = (label, details = {}) => append({ kind: "e2e-marker", label: String(label || ""), ...details });
 
       const originalAddEventListener = EventTarget.prototype.addEventListener;
@@ -2537,30 +3239,42 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
       const originalFetch = window.fetch;
       window.fetch = function(input, init) {
         const url = typeof input === "string" ? input : input?.url || "";
-        if (!/\/rpc\/join_matchmaking_queue(?:\?|$)/i.test(String(url))) return originalFetch.apply(this, arguments);
+        const endpoint = /\/rpc\/join_matchmaking_queue(?:\?|$)/i.test(String(url))
+          ? "join"
+          : /\/rpc\/save_game_challenge_position(?:\?|$)/i.test(String(url))
+            ? "position"
+            : "";
+        if (!endpoint) return originalFetch.apply(this, arguments);
         const requestInit = init || (typeof input === "object" ? input : null) || {};
         const method = String(requestInit.method || input?.method || "GET").toUpperCase();
         const body = requestInit.body ?? input?.body ?? null;
+        const providerPositionId = endpoint === "position" ? (pendingPositionProviderCalls.shift() || "") : "";
         const event = {
-          kind: "join-fetch-start",
+          kind: `${endpoint}-fetch-start`,
           method,
           url: String(url).split("?")[0],
-          payload: bodyDetails(typeof body === "string" ? body : ""),
+          providerPositionId,
+          payload: endpoint === "position" ? positionDetails(typeof body === "string" ? body : "") : bodyDetails(typeof body === "string" ? body : ""),
           stack: String(new Error().stack || "").slice(0, 2400)
         };
         append(event);
         return originalFetch.apply(this, arguments).then((response) => {
           const clone = response.clone();
-          void clone.text().then((rawBody) => append({
-            kind: "join-fetch-response",
+          const responseRead = clone.text().then((rawBody) => append({
+            kind: `${endpoint}-fetch-response`,
             method,
             url: String(url).split("?")[0],
+            providerPositionId,
             status: response.status,
-            responseBody: String(rawBody || "").slice(0, 1200)
-          })).catch((error) => append({ kind: "join-fetch-response-read-error", method, status: response.status, error: String(error?.message || error) }));
+            ...(endpoint === "position"
+              ? { response: positionResponseDetails(rawBody) }
+              : { responseBody: String(rawBody || "").slice(0, 1200) })
+          })).catch((error) => append({ kind: `${endpoint}-fetch-response-read-error`, method, providerPositionId, status: response.status, error: redactText(error?.message || error) }));
+          pendingResponseBodies.add(responseRead);
+          void responseRead.finally(() => pendingResponseBodies.delete(responseRead));
           return response;
         }, (error) => {
-          append({ kind: "join-fetch-error", method, url: String(url).split("?")[0], error: String(error?.message || error) });
+          append({ kind: `${endpoint}-fetch-error`, method, url: String(url).split("?")[0], providerPositionId, error: redactText(error?.message || error) });
           throw error;
         });
       };
@@ -2568,8 +3282,24 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
         if (!owner || typeof owner[name] !== "function" || owner[`__nschessTraced_${name}`]) return;
         const original = owner[name];
         const traced = function(...args) {
+          const challenge = args[0] && typeof args[0] === "object" ? args[0] : null;
+          const providerPositionId = kind === "provider-save-position" ? `provider-position-${++positionSequence}` : "";
+          if (providerPositionId) pendingPositionProviderCalls.push(providerPositionId);
+          const position = providerPositionId ? {
+            providerPositionId,
+            // syncFriendChallengePosition passes this directly from
+            // coachGame.fen(), immediately before calling this provider API.
+            localCoachFenAtProviderBoundary: exactText(challenge?.fen),
+            movesJson: JSON.stringify(Array.isArray(challenge?.moves) ? challenge.moves.map(String) : []),
+            lastMove: exactText(Array.isArray(challenge?.moves) ? challenge.moves.at(-1) : ""),
+            expectedRevision: Number.isFinite(Number(challenge?.serverRevision)) ? Number(challenge.serverRevision) : null,
+            moveApplied: Boolean(challenge?.moveApplied),
+            status: exactText(challenge?.status),
+            code: exactText(challenge?.code)
+          } : null;
           append({
             kind: `${kind}-start`,
+            ...(position ? { position } : {}),
             options: args[0] && typeof args[0] === "object" ? {
               queue: String(args[0].queue || ""),
               timeControl: String(args[0].timeControl || args[0].clock || ""),
@@ -2581,11 +3311,11 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
           });
           let result;
           try { result = original.apply(this, args); } catch (error) {
-            append({ kind: `${kind}-throw`, error: String(error?.message || error) });
+            append({ kind: `${kind}-throw`, providerPositionId, error: String(error?.message || error) });
             throw error;
           }
           return Promise.resolve(result).then((value) => {
-            append({ kind: `${kind}-result`, result: value && typeof value === "object" ? {
+            append({ kind: `${kind}-result`, providerPositionId, result: value && typeof value === "object" ? {
               status: String(value.status || ""),
               queueState: String(value.queueState || value.queue_state || ""),
               ticketId: String(value.ticketId || value.ticket_id || ""),
@@ -2593,7 +3323,7 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
             } : value });
             return value;
           }, (error) => {
-            append({ kind: `${kind}-error`, error: String(error?.message || error), code: String(error?.code || "") });
+            append({ kind: `${kind}-error`, providerPositionId, error: String(error?.message || error), code: String(error?.code || "") });
             throw error;
           });
         };
@@ -2604,6 +3334,7 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
       };
       const installAvailableMethodTraces = () => {
         installMethodTrace(window.CheckmateQuestAuthProvider, "joinMatchmakingQueue", "provider-join");
+        installMethodTrace(window.CheckmateQuestAuthProvider, "saveFriendChallengePosition", "provider-save-position");
         installMethodTrace(window.NschessOnlineMatchmaking, "findMatch", "adapter-findMatch");
       };
       installAvailableMethodTraces();
@@ -2735,6 +3466,92 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
       } : null
     };
   });
+  const readQuickMatchMoveSyncDiagnostics = (page, challengeCode) => page.evaluate(async (code) => {
+    const readStoredState = () => {
+      try { return JSON.parse(localStorage.getItem("checkmateQuest.friendChallenge.v1") || "null"); } catch { return null; }
+    };
+    const summarizeLocal = (state) => state ? {
+      code: String(state.code || "").toUpperCase(),
+      remoteId: String(state.remoteId || ""),
+      remote: state.remote === true,
+      active: state.active === true,
+      status: String(state.status || ""),
+      color: String(state.color || ""),
+      serverRevision: Number(state.serverRevision || 0),
+      moves: Array.isArray(state.moves) ? state.moves.map(String) : [],
+      fen: String(state.fen || "")
+    } : null;
+    const summarizeRemote = (remote) => remote ? {
+      id: String(remote.id || ""),
+      code: String(remote.code || "").toUpperCase(),
+      status: String(remote.status || ""),
+      revision: Number(remote.revision || 0),
+      activeColor: String(remote.clockState?.activeColor || remote.clock_state?.active_color || ""),
+      moves: Array.isArray(remote.moves) ? remote.moves.map(String) : [],
+      fen: String(remote.fen || "")
+    } : null;
+    const state = readStoredState();
+    const provider = window.CheckmateQuestAuthProvider;
+    let remote = null;
+    let remoteError = "";
+    try {
+      remote = await provider?.getFriendChallenge?.(String(code || state?.code || ""));
+    } catch (error) {
+      remoteError = String(error?.message || error || "");
+    }
+    const client = window.CheckmateQuestSupabaseClient?.client;
+    const channels = typeof client?.getChannels === "function"
+      ? client.getChannels().map((channel) => ({
+        topic: String(channel?.topic || ""),
+        state: String(channel?.state || "")
+      }))
+      : [];
+    const connection = document.getElementById("friendConnectionStatus");
+    const status = document.getElementById("friendChallengeStatus");
+    if (typeof window.__nschessFlushQuickMatchTrace === "function") {
+      await window.__nschessFlushQuickMatchTrace();
+    }
+    const trace = typeof window.__nschessReadQuickMatchTrace === "function"
+      ? window.__nschessReadQuickMatchTrace().filter((event) => /(?:position|save-position)/.test(String(event?.kind || ""))).slice(-20)
+      : [];
+    return {
+      document: {
+        visibilityState: String(document.visibilityState || ""),
+        hidden: document.hidden === true,
+        hasFocus: document.hasFocus(),
+        hash: String(location.hash || "")
+      },
+      local: summarizeLocal(state),
+      authoritative: summarizeRemote(remote),
+      remoteError,
+      realtime: { channels },
+      ui: {
+        connectionState: String(connection?.dataset?.state || ""),
+        connectionText: String(connection?.textContent || "").trim(),
+        challengeStatus: String(status?.textContent || "").trim(),
+        boardSquares: document.querySelectorAll("#coachBoard [data-square]").length
+      },
+      moveTrace: trace
+    };
+  }, challengeCode);
+  const readSubmittedQuickMatchPosition = (page) => page.evaluate(async () => {
+    if (typeof window.__nschessFlushQuickMatchTrace === "function") {
+      await window.__nschessFlushQuickMatchTrace();
+    }
+    const trace = typeof window.__nschessReadQuickMatchTrace === "function"
+      ? window.__nschessReadQuickMatchTrace()
+      : [];
+    const request = [...trace].reverse().find((event) => event?.kind === "position-fetch-start");
+    const value = request?.payload?.pFen?.json;
+    let pFen = "";
+    try { pFen = typeof value === "string" ? JSON.parse(value) : ""; } catch {}
+    return {
+      pFen,
+      json: typeof value === "string" ? value : JSON.stringify(""),
+      length: Number(request?.payload?.pFen?.length || 0),
+      providerPositionId: String(request?.providerPositionId || "")
+    };
+  });
   const readMatchmakingDiagnostics = async (page, key) => page.evaluate(async (ticketIds) => {
     const safeJson = (value) => {
       try { return JSON.parse(JSON.stringify(value)); } catch { return null; }
@@ -2840,6 +3657,52 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
       return [{ kind: "trace-read-error", error: redactDiagnosticText(error?.message || error), key }];
     }
   };
+  // This snapshot intentionally reads only in-memory/DOM state. It does not
+  // make a status RPC while cancellation is already stuck, so the diagnostic
+  // cannot mask or extend the server operation being investigated.
+  const readQuickMatchCancellationSnapshot = (page) => page.evaluate(() => {
+    const summary = (element) => element ? {
+      hidden: element.hidden === true,
+      display: String(getComputedStyle(element).display || ""),
+      ariaBusy: String(element.getAttribute("aria-busy") || ""),
+      disabled: "disabled" in element ? element.disabled === true : false,
+      text: String(element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 300)
+    } : null;
+    const client = window.CheckmateQuestSupabaseClient?.client;
+    const channels = typeof client?.getChannels === "function"
+      ? client.getChannels().map((channel) => ({
+        topic: String(channel?.topic || ""),
+        state: String(channel?.state || "")
+      }))
+      : [];
+    const account = window.CheckmateQuestAuthProvider?.getCachedAccount?.() || null;
+    return {
+      location: { hash: String(location.hash || "") },
+      auth: {
+        state: String(document.documentElement.dataset.authState || ""),
+        storeSyncStatus: String(document.documentElement.dataset.storeSyncStatus || ""),
+        providerReady: Boolean(window.CheckmateQuestAuthProvider),
+        clientReady: Boolean(client),
+        cachedAccountId: String(account?.authUserId || account?.publicId || "")
+      },
+      quickMatch: {
+        setup: summary(document.getElementById("quickMatchSetup")),
+        overlay: summary(document.getElementById("quickMatchOverlay")),
+        status: summary(document.getElementById("quickMatchStatus")),
+        searchState: summary(document.getElementById("quickMatchSearchState")),
+        cancel: summary(document.getElementById("quickMatchCancel")),
+        stop: summary(document.getElementById("quickMatchStop")),
+        bodySearching: document.body.classList.contains("quick-match-searching")
+      },
+      realtime: { channels },
+      quickMatchTrace: typeof window.__nschessReadQuickMatchTrace === "function"
+        ? window.__nschessReadQuickMatchTrace().slice(-80)
+        : [],
+      hydrationTrace: typeof window.__nschessReadStoreHydrationTrace === "function"
+        ? window.__nschessReadStoreHydrationTrace().slice(-80)
+        : []
+    };
+  }).catch((error) => ({ readError: redactDiagnosticText(error?.message || error) }));
   const attachBrowserTrace = async () => {
     runtimeTrace.a.browserEvents = await readBrowserQuickMatchTrace(pageA, "a");
     runtimeTrace.b.browserEvents = await readBrowserQuickMatchTrace(pageB, "b");
@@ -2935,8 +3798,25 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
     await pageA.locator("#quickMatchSetupForm button[type=submit]").click();
     await pageA.waitForFunction(() => !document.getElementById("quickMatchOverlay")?.hidden, null, { timeout: 10000 });
     assert(/Searching for a human opponent/i.test(await pageA.locator("#quickMatchStatus").textContent()), "Account A did not enter the online searching state.");
+    const cancellationBefore = await readQuickMatchCancellationSnapshot(pageA);
     await pageA.locator("#quickMatchStop").click();
-    await pageA.waitForFunction(() => document.getElementById("quickMatchOverlay")?.hidden === true, null, { timeout: 10000 });
+    try {
+      await pageA.waitForFunction(() => document.getElementById("quickMatchOverlay")?.hidden === true, null, { timeout: 10000 });
+    } catch (error) {
+      await attachBrowserTrace();
+      const [cancellationAfter, hydration] = await Promise.all([
+        readQuickMatchCancellationSnapshot(pageA),
+        readStoreHydrationDiagnostics(pageA)
+      ]);
+      throw new Error(`${error.message || error}\nQUICK_MATCH_CANCELLATION_DIAGNOSTIC ${JSON.stringify({
+        before: cancellationBefore,
+        after: cancellationAfter,
+        hydration,
+        leaveCalls: leaveCalls.a,
+        joins: rpcCalls.a,
+        runtimeTrace: runtimeTrace.a
+      })}`);
+    }
     await pageA.waitForTimeout(250);
     assert(leaveCalls.a.length >= 1 && leaveCalls.a[0], "cancelling a live Quick Match search did not call the server queue-leave RPC with a ticket.");
     await pageA.waitForFunction(async (ticketId) => {
@@ -3028,12 +3908,44 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
     const blackPage = whitePage === pageA ? pageB : pageA;
     await whitePage.locator('#coachBoard [data-square="e2"]').click();
     await whitePage.locator('#coachBoard [data-square="e4"]').click();
-    await blackPage.waitForFunction((code) => {
+    try {
+      await blackPage.waitForFunction((code) => {
+        try {
+          const state = JSON.parse(localStorage.getItem("checkmateQuest.friendChallenge.v1") || "null");
+          return state?.code === code && Array.isArray(state.moves) && state.moves.includes("e2e4");
+        } catch { return false; }
+      }, challengeCode, { timeout: 20000 });
+    } catch (error) {
+      let diagnostic = null;
+      let serverState = null;
       try {
-        const state = JSON.parse(localStorage.getItem("checkmateQuest.friendChallenge.v1") || "null");
-        return state?.code === code && Array.isArray(state.moves) && state.moves.includes("e2e4");
-      } catch { return false; }
-    }, challengeCode, { timeout: 20000 });
+        const [accountA, accountB] = await Promise.all([
+          readQuickMatchMoveSyncDiagnostics(pageA, challengeCode),
+          readQuickMatchMoveSyncDiagnostics(pageB, challengeCode)
+        ]);
+        diagnostic = {
+          challengeCode,
+          whiteAccount: whitePage === pageA ? "A" : "B",
+          blackAccount: blackPage === pageA ? "A" : "B",
+          accountA,
+          accountB
+        };
+      } catch (diagnosticError) {
+        diagnostic = { diagnosticError: redactDiagnosticText(diagnosticError?.message || diagnosticError) };
+      }
+      try {
+        const submitted = await readSubmittedQuickMatchPosition(whitePage);
+        // This is deliberately before the throw below, whose finally block
+        // cleans the disposable fixture. It performs only a row read and the
+        // deterministic read-only chess helper against that row's live FEN.
+        serverState = await readLiveChallengeServerState(challengeCode, submitted.pFen);
+        console.error(`LIVE_CHALLENGE_SERVER_STATE ${JSON.stringify(serverState)}`);
+      } catch (serverDiagnosticError) {
+        serverState = { code: challengeCode, readError: redactDiagnosticText(serverDiagnosticError?.message || serverDiagnosticError) };
+        console.error(`LIVE_CHALLENGE_SERVER_STATE ${JSON.stringify(serverState)}`);
+      }
+      throw new Error(`${error.message || error}\nLIVE_QUICK_MATCH_MOVE_SYNC_DIAGNOSTIC ${JSON.stringify({ ...diagnostic, serverState })}`);
+    }
     pass("browser: Quick Match move synchronized through the authoritative server path");
 
     await blackPage.reload({ waitUntil: "domcontentloaded" });
@@ -3269,9 +4181,11 @@ async function runVisualSmokeTests(browser, baseUrl) {
 }
 
 async function runBrowserTests() {
+  assertApprovedE2EProject();
+  fs.mkdirSync(sharedAuthDir, { recursive: true });
+  runAuthDir = fs.mkdtempSync(path.join(sharedAuthDir, "run-"));
   let server = null;
   const configuredBaseUrl = String(process.env.E2E_BASE_URL || "").trim();
-  const local = !configuredBaseUrl || /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?$/i.test(configuredBaseUrl.replace(/\/$/, ""));
   const port = Number(process.env.E2E_PORT || 4173);
   const baseUrl = (configuredBaseUrl || `http://127.0.0.1:${port}`).replace(/\/$/, "");
   if (matchmakingOnly) requireLiveE2EAdminCredential();
@@ -3279,18 +4193,15 @@ async function runBrowserTests() {
     throw new Error(`Authenticated E2E tests are required but ${envFile} does not contain E2E_EMAIL and E2E_PASSWORD. Copy .env.e2e.example, use dedicated test accounts, and retry.`);
   }
   const localSupabase = discoverSupabaseConfig();
-  if (!visualOnly && local && process.env.E2E_EMAIL && process.env.E2E_PASSWORD && (!localSupabase.hasUrl || !localSupabase.hasAnonKey)) {
+  if (!visualOnly && process.env.E2E_EMAIL && process.env.E2E_PASSWORD && (!localSupabase.hasUrl || !localSupabase.hasAnonKey)) {
     const missing = [!localSupabase.hasUrl ? "public Supabase URL" : "", !localSupabase.hasAnonKey ? "public Supabase anon/publishable key" : ""].filter(Boolean).join(" and ");
     throw new Error(`Local E2E auth cannot initialize Supabase: ${missing} is not discoverable from project config or ${envFile}. Set only the missing public value; the local server will return E2E_SUPABASE_NOT_CONFIGURED instead of falling back to Guest Explorer.`);
   }
-  if (local) {
-    server = spawn(process.execPath, [path.join(root, "scripts", "e2e-server.cjs")], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
-    server.stdout.on("data", (chunk) => process.stdout.write(`[e2e-server] ${chunk}`));
-    server.stderr.on("data", (chunk) => process.stderr.write(`[e2e-server] ${chunk}`));
-    await waitForLocalServer(baseUrl);
-  }
   let browser = null;
   try {
+    server = await startE2EServer({ root, baseUrl, stdio: ["ignore", "pipe", "pipe"] });
+    server.stdout.on("data", (chunk) => process.stdout.write(`[e2e-server] ${chunk}`));
+    server.stderr.on("data", (chunk) => process.stderr.write(`[e2e-server] ${chunk}`));
     browser = await createBrowser();
     if (visualOnly) {
       await runVisualSmokeTests(browser, baseUrl);
@@ -3347,10 +4258,14 @@ function printSummary() {
 
 async function main() {
   const full = mode === "full";
+  // Static-only affected runs need no project. Every live mode is guarded
+  // before even checking changed files, regardless of preflight-skipping flags.
+  if (mode !== "affected") assertApprovedE2EProject();
   if (mode !== "e2e" && mode !== "visual") {
     const files = changedFiles();
     const appAffected = full || files.length === 0 || files.some((file) => /^(index\.html|assets\/|service-worker\.js|tests\/e2e\/|scripts\/e2e-)/.test(file));
     const needsBrowserEnvironment = mode !== "affected" || appAffected;
+    if (needsBrowserEnvironment) assertApprovedE2EProject();
     if (needsBrowserEnvironment && !environmentPreflighted) await runTestEnvironment();
     if (needsBrowserEnvironment) process.env.NSCHESS_ENVIRONMENT_PRECHECKED = "1";
     runStaticChecks(full);
@@ -3358,7 +4273,7 @@ async function main() {
     // Any run that can execute a real Store purchase must prove the disposable
     // account's authoritative wallet first. This prevents affected-only runs
     // from silently exercising a guest/localStorage purchase path.
-    if (!matchmakingOnly && (full || purchaseTestConfigured)) {
+    if (needsBrowserEnvironment && !matchmakingOnly && (full || purchaseTestConfigured)) {
       try {
         runNode("scripts/store-preflight.cjs");
         pass("static: authoritative Store budget preflight");
@@ -3380,7 +4295,8 @@ async function main() {
   printSummary();
 }
 
-main().catch((error) => {
+module.exports = { main, runControlledStoreRpcProbe };
+if (require.main === module) main().catch((error) => {
   const message = error.message || String(error);
   if (/^BLOCKED\/ENVIRONMENT:/i.test(message)) console.error(message);
   else console.error(`FAIL: ${error.stack || error}`);

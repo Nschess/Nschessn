@@ -9,7 +9,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { discoverSupabaseConfig } = require("./e2e-config.cjs");
+const { discoverSupabaseConfig, assertApprovedE2EProject } = require("./e2e-config.cjs");
 const { run: runTestEnvironment } = require("./test-environment.cjs");
 
 const root = path.resolve(__dirname, "..");
@@ -99,17 +99,11 @@ async function jsonRequest(url, options = {}) {
 async function resolveSupabaseConfig() {
   const discovered = discoverSupabaseConfig();
   if (discovered.hasUrl && discovered.hasAnonKey) return { url: discovered.url, anonKey: discovered.anonKey, source: `${discovered.urlSource}/${discovered.keySource}` };
-  const baseUrl = String(process.env.E2E_BASE_URL || "").trim().replace(/\/$/, "");
-  if (!baseUrl || /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?$/i.test(baseUrl)) {
-    const missing = [!discovered.hasUrl ? "public Supabase URL" : "", !discovered.hasAnonKey ? "public Supabase anon/publishable key" : ""].filter(Boolean).join(" and ");
-    throw new Error(`Local E2E auth needs ${missing} in project config or .env.e2e. No private key is accepted.`);
-  }
-  const payload = await jsonRequest(`${baseUrl}/api/auth-config`, { headers: { Accept: "application/json" } });
-  if (!payload.url || !payload.anonKey) throw new Error("The deployed /api/auth-config response did not include a Supabase URL and public anon key.");
-  return { url: String(payload.url).replace(/\/$/, ""), anonKey: String(payload.anonKey), source: "deployed-api" };
+  throw new Error("Explicit E2E_SUPABASE_ANON_KEY is required; remote auth-config discovery is forbidden.");
 }
 
 async function main() {
+  assertApprovedE2EProject();
   if (!environmentPreflighted) {
     await runTestEnvironment();
     process.env.NSCHESS_ENVIRONMENT_PRECHECKED = "1";

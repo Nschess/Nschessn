@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Offline E2E safety (no project or credentials)
+        run: npm run test:e2e-safety
       - run: node scripts/verify-site.js
       - run: node --check api/_supabase.js && node --check api/auth-config.js && node --check api/health.js && node --check api/leaderboard.js
       - run: node scripts/build-pages.js
