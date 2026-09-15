@@ -183,17 +183,6 @@
       if (asset && /(?:assets|vendor|verified-puzzles)/.test(asset)) reportDeployAssetError(asset, target.tagName);
     }, true);
 
-    const heroPieces = [
-      "r", "n", "b", "q", "k", "b", "n", "r",
-      "p", "p", "p", "", "p", "p", "p", "p",
-      "", "", "", "", "", "", "", "",
-      "", "", "", "p", "", "", "", "",
-      "", "", "", "P", "", "", "", "",
-      "", "", "N", "", "", "N", "", "",
-      "P", "P", "P", "", "P", "P", "P", "P",
-      "R", "", "B", "Q", "K", "B", "", "R"
-    ];
-
     // The nine checkpoints below are taken from the verified score of Paul
     // Morphy's 1858 Paris Opera Game. The first checkpoint is the legal
     // position immediately before the study's starting idea, 10.Nxb5!;
@@ -5623,27 +5612,6 @@
     let readerFontScale = 1.08;
     let firstVisitSetupClose = null;
 
-    function buildHeroBoard() {
-      [["heroBoard", "hero-square"], ["homeMainBoard", "home-main-square"]].forEach(([id, squareClass]) => {
-        const board = document.getElementById(id);
-        if (!board) return;
-        const renderKey = `${pieceSvgRenderVersion}:${activePieceSvgSet}`;
-        if (board.dataset.pieceRenderKey === renderKey && board.childElementCount === heroPieces.length) return;
-        board.replaceChildren();
-        heroPieces.forEach((piece, index) => {
-          const square = document.createElement("span");
-          const row = Math.floor(index / 8);
-          const col = index % 8;
-          square.className = `${squareClass} ${(row + col) % 2 === 0 ? "light" : "dark"}`;
-          const colorClass = piece?.color ? (piece.color === "w" ? "white-piece" : "black-piece") : pieceColorClass(piece);
-          if (colorClass) square.classList.add(colorClass);
-          renderPieceOnSquare(square, piece);
-          board.appendChild(square);
-        });
-        board.dataset.pieceRenderKey = renderKey;
-      });
-    }
-
     function verifyFeaturedStudyData(Chess) {
       try {
         const game = new Chess();
@@ -7926,6 +7894,17 @@
       window.setTimeout(() => document.getElementById("realPuzzles")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     }
 
+    function openDailyPuzzleExperience() {
+      selectDailyPuzzle();
+      const dailyRoute = "#puzzles?mode=daily";
+      if (window.location.hash !== dailyRoute) {
+        window.location.hash = dailyRoute;
+        return;
+      }
+      void reconcileDailyPuzzleRoute();
+      window.setTimeout(() => document.getElementById("realPuzzles")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    }
+
     function openPuzzleByTitle(title) {
       openRealPuzzleExperience(title);
     }
@@ -7965,7 +7944,7 @@
       }
 
       if (action === "daily-puzzle") {
-        openRealPuzzleExperience("Easy");
+        openDailyPuzzleExperience();
         return;
       }
 
@@ -9628,7 +9607,6 @@
       const refreshBoardSurfaces = () => {
         deferredCosmeticRefreshFrame = 0;
         renderMiniBoards();
-        buildHeroBoard();
         renderAdventureMission();
         renderPuzzle();
         renderCoachBoard();
@@ -15327,12 +15305,12 @@
         ? ["Practice one tactic pattern before playing. This stops free-piece losses fast.", "#puzzles", "Train tactics", "puzzle-plan", "Tactics"]
         : completedToday
           ? [`Open Lesson ${nextLesson} and learn one tiny rule.`, "#paths", "Continue learning", "", ""]
-          : ["Solve today's puzzle for XP and coins.", "#puzzles", "Start daily puzzle", "daily-puzzle", ""];
+          : ["Solve today's puzzle for XP and coins.", "#puzzles?mode=daily", "Start daily puzzle", "daily-puzzle", ""];
       const onboardingPlan = authenticated && !safeGameStats.played && !lessonCount ? getOnboardingPlan(readLearnerProfile()) : null;
       const nextStep = onboardingPlan || defaultNextStep;
       const recommendations = [
         { label: `Continue Lesson ${nextLesson}`, href: "#paths" },
-        { label: completedToday ? "Continue Learning" : "Puzzle of the Day", href: "#puzzles", action: completedToday ? "" : "daily-puzzle" },
+        { label: completedToday ? "Continue Learning" : "Puzzle of the Day", href: completedToday ? "#paths" : "#puzzles?mode=daily", action: completedToday ? "" : "daily-puzzle" },
         { label: needsTactics ? "Fork Practice" : focus.related, href: needsTactics ? "#puzzles" : focus.href, action: needsTactics || focus.href === "#puzzles" ? "puzzle-plan" : "", plan: focusPuzzlePlan },
         { label: "Practice Mistakes", href: "#play" }
       ];
@@ -27542,6 +27520,7 @@
         solution: (puzzle?.moves || []).join(" "),
         themes: getRealPuzzleThemes(puzzle),
         playableInTier: indexes.length,
+        dailyCatalogueSize: getDailyPuzzleIndexes().length,
         uniqueFensInTier: new Set(indexes.map((index) => getRealPuzzlePositionKey(realPuzzleBank[index]))).size,
         tierCounts: tiers
       };
@@ -27550,10 +27529,83 @@
       return snapshot;
     }
 
-    function getRealDailyIndex(indexes = getRealPuzzleIndexes()) {
+    function getDailyPuzzleDateKey(date = new Date()) {
+      const safeDate = date instanceof Date && Number.isFinite(date.getTime()) ? date : new Date();
+      const year = safeDate.getFullYear();
+      const month = String(safeDate.getMonth() + 1).padStart(2, "0");
+      const day = String(safeDate.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function getDailyPuzzleHash(value) {
+      let hash = 2166136261;
+      for (const character of String(value || "")) {
+        hash ^= character.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    }
+
+    function getDailyPuzzleOrdinal(dateKey) {
+      const [year, month, day] = String(dateKey || "").split("-").map(Number);
+      const timestamp = Date.UTC(year, (month || 1) - 1, day || 1);
+      return Number.isFinite(timestamp) ? Math.floor(timestamp / 86400000) : 0;
+    }
+
+    function getDailyPuzzleIndexes() {
+      // Daily identity must never depend on progressive validation/prefetch
+      // state. Those sets change as the app warms up; the published catalogue
+      // order does not. A route opened later must therefore resolve the same
+      // date to the same record the homepage already showed.
+      return realPuzzleBank.map((_, index) => index).filter((index) => {
+        const puzzle = realPuzzleBank[index];
+        return Boolean(puzzle?.id && puzzle?.fen && Array.isArray(puzzle.moves) && puzzle.moves.length);
+      });
+    }
+
+    function getRealDailyIndex(indexes = getDailyPuzzleIndexes(), dateKey = getDailyPuzzleDateKey()) {
       if (!indexes.length) return 0;
-      const daySeed = Math.floor(Date.now() / 86400000);
-      return indexes[daySeed % indexes.length];
+      // A stable product offset keeps the sequence tied to this catalogue,
+      // while the ordinal makes consecutive calendar days select neighbours.
+      // With more than one verified puzzle, tomorrow cannot repeat today's one.
+      const offset = getDailyPuzzleHash("nschessn-daily-puzzle-v1") % indexes.length;
+      return indexes[(getDailyPuzzleOrdinal(dateKey) + offset) % indexes.length];
+    }
+
+    function getDailyPuzzle(date = new Date()) {
+      const dateKey = getDailyPuzzleDateKey(date);
+      const index = getRealDailyIndex(getDailyPuzzleIndexes(), dateKey);
+      const puzzle = realPuzzleBank[index] || null;
+      return puzzle ? { dateKey, index, puzzle } : null;
+    }
+
+    function isDailyPuzzleRoute() {
+      const rawHash = String(window.location.hash || "").replace(/^#/, "");
+      const [route, query = ""] = rawHash.split("?");
+      return route === "puzzles" && new URLSearchParams(query).get("mode") === "daily";
+    }
+
+    function selectDailyPuzzle() {
+      const daily = getDailyPuzzle();
+      realPuzzleMode = "Daily";
+      realPuzzleDifficulty = "All";
+      if (daily) realPuzzleIndex = daily.index;
+      return daily;
+    }
+
+    function reconcileDailyPuzzleRoute() {
+      // The home action can run before the deferred puzzles feature has
+      // finished restoring persisted Trainer state. Apply the route-owned
+      // Daily selection both now and after that feature settles so a generic
+      // selector cannot replace #puzzles?mode=daily.
+      const daily = selectDailyPuzzle();
+      if (document.getElementById("realPuzzleBoard")) renderRealPuzzle();
+      return initializeDeferredFeature("puzzles").then(() => {
+        if (!isDailyPuzzleRoute()) return daily;
+        const resolved = selectDailyPuzzle();
+        renderRealPuzzle();
+        return resolved;
+      });
     }
 
     function getRealPuzzleIndexes() {
@@ -27575,7 +27627,8 @@
           seenPositions.add(key);
           return true;
         });
-      const result = realPuzzleMode === "Daily" ? (indexes.length ? [getRealDailyIndex(indexes)] : []) : indexes;
+      const daily = realPuzzleMode === "Daily" ? getDailyPuzzle() : null;
+      const result = realPuzzleMode === "Daily" ? (daily ? [daily.index] : []) : indexes;
       realPuzzleIndexCache.set(cacheKey, result);
       return result;
     }
@@ -28451,6 +28504,15 @@
     function renderRealPuzzleBoard() {
       const board = document.getElementById("realPuzzleBoard");
       if (!board) return;
+      const puzzle = realPuzzleBank[realPuzzleIndex] || null;
+      board.dataset.puzzleId = String(puzzle?.id || "");
+      board.dataset.puzzleMode = realPuzzleMode;
+      board.dataset.sideToMove = realPuzzleSide;
+      board.dataset.sourceFen = String(puzzle?.fen || "");
+      board.dataset.sourceSideToMove = String(puzzle?.fen || "").trim().split(/\s+/)[1] || "";
+      board.dataset.positionFen = typeof realPuzzleGame?.fen === "function" ? realPuzzleGame.fen() : board.dataset.sourceFen;
+      if (realPuzzleMode === "Daily") board.dataset.dailyDate = getDailyPuzzleDateKey();
+      else delete board.dataset.dailyDate;
       sharedInteractiveBoardWorkspace.scheduleSync();
       bindRealPuzzleBoardEvents(board);
       const legalByTarget = new Map(realPuzzleLegalMoves.map((move) => [move.to, move]));
@@ -28874,7 +28936,14 @@
     }
 
     async function setupRealPuzzles() {
-      if (!document.getElementById("realPuzzleBoard") || setupRealPuzzles.ready) return;
+      if (!document.getElementById("realPuzzleBoard")) return;
+      if (setupRealPuzzles.ready) {
+        if (isDailyPuzzleRoute()) {
+          selectDailyPuzzle();
+          renderRealPuzzle();
+        }
+        return;
+      }
       setupRealPuzzles.ready = true;
       document.getElementById("realPuzzles")?.setAttribute("data-loading", "true");
       const [rules, collection] = await Promise.allSettled([
@@ -28892,12 +28961,14 @@
         realPuzzleValidationErrors.push("Puzzle collection is temporarily unavailable.");
       }
       if (rules.status === "rejected" && puzzleCollectionReady) retryRealPuzzleRulesOnce();
+      if (isDailyPuzzleRoute()) selectDailyPuzzle();
       reportRealPuzzleDiagnostics();
       refreshPuzzleCollectionStatus();
       document.querySelectorAll("[data-real-mode]").forEach((button) => {
         button.addEventListener("click", () => {
           realPuzzleMode = button.dataset.realMode || "Trainer";
-          realPuzzleIndex = realPuzzleMode === "Daily" ? getRealDailyIndex(getRealPuzzleIndexes()) : getRealPuzzleIndexes()[0] || 0;
+          if (realPuzzleMode === "Daily") selectDailyPuzzle();
+          else realPuzzleIndex = getRealPuzzleIndexes()[0] || 0;
           renderRealPuzzle();
         });
       });
@@ -29508,7 +29579,6 @@
         setupFirstVisitSetup();
         setupFeaturedGameStudy();
         void initializeDeferredFeature("audio");
-        buildHeroBoard();
       },
       coachQuotes: setupCoachQuotes,
       dailyGoals: setupDailyGoals,
@@ -29655,6 +29725,9 @@
       const panelElement = document.getElementById(panel);
       panelElement?.setAttribute("data-route-tab", tab);
       const eagerRouteStyles = { play: ["play-lobby"], friends: ["friends"], openings: ["openings"] }[panel] || [];
+      // The feature promise is cached. Reapply the route-owned Daily selection
+      // when an already initialized puzzles panel is entered.
+      if (panel === "puzzles" && isDailyPuzzleRoute()) void reconcileDailyPuzzleRoute();
       void syncOptionalRouteStylesheets(eagerRouteStyles).then(() => sharedInteractiveBoardWorkspace.sync());
       const fallbackFeatureNames = [...({
         login: ["login"],
@@ -33064,7 +33137,6 @@
       syncPreferenceLocks();
       if (preferencesRequireBoardRender(patch)) {
         renderMiniBoards();
-        buildHeroBoard();
         renderAdventureMission();
         renderPuzzle();
         renderCoachBoard();
@@ -36194,11 +36266,9 @@
       if (window.__checkmateQuestVisualEntrancesBound) return;
       window.__checkmateQuestVisualEntrancesBound = true;
       const sections = [...document.querySelectorAll("main > section")];
-      const boards = [...document.querySelectorAll("#heroBoard, #homeMainBoard")];
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       sections.forEach((section) => section.classList.add("section-reveal"));
-      boards.forEach((board) => board.classList.add("board-intro"));
       if (reducedMotion || !("IntersectionObserver" in window)) {
         sections.forEach((section) => section.classList.add("is-revealed"));
       } else {

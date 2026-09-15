@@ -79,7 +79,8 @@ if (imagesWithoutAlt.length) {
 
 const prohibitedStaticMarkup = [
   ["legacy Play preference panel", /\bid="learnerPreferences"/],
-  ["legacy direct preference controls", /\bid="pref(?:Theme|Coords|BoardScale|BoardBorder|Speed|Motion|Contrast|Pressure)"/]
+  ["legacy direct preference controls", /\bid="pref(?:Theme|Coords|BoardScale|BoardBorder|Speed|Motion|Contrast|Pressure)"/],
+  ["homepage Daily Puzzle preview", /\bid="(?:heroBoard|homePuzzlePreview|homePuzzleAction|homePuzzleTurn|homePuzzlePrompt)"/]
 ];
 for (const [label, pattern] of prohibitedStaticMarkup) {
   if (pattern.test(html)) throw new Error("Forbidden legacy markup: " + label + ".");
@@ -163,7 +164,8 @@ const requiredRegressionContracts = [
   ["player pass compact breakpoint", /@media \(max-width: 760px\) \{[\s\S]*?#login \.login-shell \{ grid-template-columns: minmax\(0, 1fr\); grid-template-rows: none; \}/],
   ["profile stats first", /grid-template-areas:\s*\n\s*"overview"\s*\n\s*"stats"\s*\n\s*"ratings"\s*\n\s*"progress"/],
   ["premium daily session", /id="homeSessionCard"[\s\S]*?id="homeSessionAction"[\s\S]*?id="homeSessionWhy"/],
-  ["homepage daily command deck", /class="hero hero-command-center home-command-deck"[\s\S]*?home-command-session[\s\S]*?hero-quick-card--learn/],
+  ["board-free homepage launch", /class="hero hero-command-center home-command-deck home-revamp-slice"[\s\S]*?id="homePlayAction" href="#play\?mode=quick" data-site-tab="play" data-site-panel="play" data-play-mode="quick"[\s\S]*?href="#play\?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge"[\s\S]*?id="homeBotsAction" href="#bots" data-site-tab="bots" data-site-panel="bots"[\s\S]*?id="newToChessButton" href="#puzzles\?mode=daily" data-site-tab="puzzles" data-site-panel="puzzles" data-home-action="daily-puzzle"[\s\S]*?id="homeContinueLearningAction" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"[\s\S]*?home-featured-chess/],
+  ["homepage Daily Puzzle route contract", /(?=[\s\S]*?id="newToChessButton" href="#puzzles\?mode=daily"[^>]*data-home-action="daily-puzzle")(?=[\s\S]*?href="#puzzles\?mode=daily" id="homeNextAction" data-home-action="daily-puzzle")/],
   ["profile Chess DNA dashboard", /class="profile-progress-insights"[\s\S]*?id="profileDnaTitle"[\s\S]*?id="profileDnaSkills"[\s\S]*?id="profileDnaAction"/],
   ["profile progress insights renderer", /function renderProfileProgressInsights\([\s\S]*?profileDnaSkills[\s\S]*?profileMomentumDays/],
   ["profile progress insights mount", /renderProfileProgressInsights\(profile\);/],
