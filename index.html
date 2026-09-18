@@ -2925,18 +2925,13 @@
             <div>
               <p class="section-kicker">Friend challenge</p>
               <h3 id="friendChallengeTitle">Play a friend</h3>
-              <p>Create or join a private game.</p>
-            </div>
-            <div class="friend-code-card" id="friendCodeCard" hidden>
-              <small>Invite code</small>
-              <strong id="friendChallengeCode">READY</strong>
-              <button class="button secondary" type="button" id="friendNewCode">New code</button>
+              <p>Challenge someone you know, then move straight to the board when they accept.</p>
             </div>
           </div>
 
           <div class="friend-mode-tabs" role="tablist" aria-label="Friend challenge actions">
-            <button class="is-active" type="button" role="tab" id="friendCreateTab" aria-controls="friendCreatePanel" aria-selected="true">Create invite</button>
-            <button type="button" role="tab" id="friendJoinTab" aria-controls="friendJoinPanel" aria-selected="false" tabindex="-1">Join a game</button>
+            <button class="is-active" type="button" role="tab" id="friendCreateTab" aria-controls="friendCreatePanel" aria-selected="true">Challenge a friend</button>
+            <button type="button" role="tab" id="friendJoinTab" aria-controls="friendJoinPanel" aria-selected="false" tabindex="-1">Invite by code</button>
           </div>
 
           <div class="friend-request-card" id="friendRequestCard" hidden>
@@ -2947,6 +2942,7 @@
             <span class="friend-request-actions">
               <button class="button success" type="button" id="friendAccept">Accept</button>
               <button class="button secondary" type="button" id="friendDecline">Decline</button>
+              <button class="button secondary" type="button" id="friendCancel" hidden>Cancel challenge</button>
             </span>
           </div>
 
@@ -2966,8 +2962,12 @@
             </div>
 
             <details class="friend-match-settings" id="friendMatchSettings">
-              <summary><span>Match details</span><small>5+0 · Casual · Random color</small></summary>
+              <summary><span>Challenge settings</span><small>5+0 · Casual · Random color</small></summary>
               <div class="friend-match-settings-body">
+                <div class="friend-selected-target" id="friendChallengeTarget" hidden>
+                  <span><strong id="friendChallengeTargetName">Challenge a friend</strong><small>Review the settings, then send the challenge.</small></span>
+                  <button class="button secondary" type="button" id="friendClearTarget">Change</button>
+                </div>
                 <input id="friendInviteType" type="hidden" value="private" />
                 <div class="friend-lobby-grid">
                   <label>Game style
@@ -2988,26 +2988,24 @@
                     <select id="friendClock" aria-label="Time control"><option value="none">No clock</option><option value="3+2">3+2 Blitz</option><option value="5+0" selected>5+0 Blitz</option><option value="10+0">10+0 Rapid</option><option value="15+10">15+10 Rapid</option></select>
                   </fieldset>
                 </div>
+                <button class="button" type="button" id="friendSend" disabled>Send challenge</button>
               </div>
             </details>
-
-            <div class="friend-share-card" aria-label="Create and share a private invite">
-              <div class="friend-share-card-copy"><strong><span aria-hidden="true">&#128279;</span> Invite / share</strong><span>Create a private link and code when your friend is not here.</span></div>
-              <div class="friend-share-row">
-                <input id="friendInviteLink" readonly aria-label="Friend challenge invite link" placeholder="Create an invite to get a share link" />
-                <button class="button secondary" type="button" id="friendCopyLink" disabled>Copy link</button>
-                <button class="button secondary" type="button" id="friendCopyCode" disabled>Copy code</button>
-                <button class="button" type="button" id="friendStart">Create invite</button>
-              </div>
-            </div>
           </section>
 
           <section class="friend-lobby-panel friend-join-panel" id="friendJoinPanel" role="tabpanel" aria-labelledby="friendJoinTab" hidden>
             <div class="friend-join-card">
-              <div><strong>Have an invite code?</strong><span>Enter the 10-character code from your friend. You can review the game settings before accepting.</span></div>
+              <div><strong>Invite by code</strong><span>Create a private code to share, or enter a code you received from a friend.</span></div>
+              <div class="friend-share-row">
+                <button class="button" type="button" id="friendStart">Create code invite</button>
+                <input id="friendInviteLink" readonly aria-label="Friend challenge invite link" placeholder="Create a code invite to get a share link" />
+                <button class="button secondary" type="button" id="friendCopyLink" disabled>Copy link</button>
+                <button class="button secondary" type="button" id="friendCopyCode" disabled>Copy code</button>
+              </div>
+              <div class="friend-code-status" id="friendCodeCard" hidden><small>Invite code</small><strong id="friendChallengeCode">READY</strong></div>
               <div class="friend-share-row">
                 <input id="friendJoinCode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="Enter 10-character friend code" aria-label="Enter friend challenge code" />
-                <button class="button" type="button" id="friendJoin">Join game</button>
+                <button class="button" type="button" id="friendJoin">Open invite</button>
                 <button class="button secondary" type="button" id="friendSpectate">Watch</button>
               </div>
             </div>

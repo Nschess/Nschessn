@@ -16801,6 +16801,8 @@
     let friendChallengeRefreshQueued = false;
     let friendChallengeRefreshQueuedCode = "";
     let friendChallengeRefreshQueuedRestoreBoard = false;
+    let friendChallengeAutoStartCode = "";
+    let friendChallengeAutoStartKey = "";
     let friendInviteHydrationPromise = null;
     let friendInviteHydrationCode = "";
     let friendInviteHydrationQueued = false;
@@ -16816,6 +16818,7 @@
     let realtimeMatchWatchdogDelay = 4500;
     let friendSpectatorRefreshTimer = 0;
     let friendIncomingNoticeCode = "";
+    let friendChallengeTarget = null;
     let friendUiAbortController = null;
     const friendActionLocks = new Map();
     let coachPremove = null;
@@ -22422,7 +22425,11 @@
       const play = document.getElementById("play");
       if (!play) return;
       const inReview = Boolean(document.getElementById("gameReview")?.classList.contains("is-review-page"));
-      const isSpecialLobby = document.body.classList.contains("friend-challenge-mode") || document.body.classList.contains("tournament-mode");
+      // The Friend route is a lobby only until its authoritative challenge is
+      // active. A live accepted game must enter the same board workspace as
+      // any other active Play session, while retaining its friend route.
+      const friendLobbyVisible = document.body.classList.contains("friend-challenge-mode") && !friendChallengeState?.active;
+      const isSpecialLobby = friendLobbyVisible || document.body.classList.contains("tournament-mode");
       const isPreGame = Boolean(coachGame && !isSpecialLobby && !coachSessionActive && !friendChallengeState?.active && !reviewSelfAnalysisState && !reviewRetryState && !inReview);
       // The lobby has its own layout contract. Keeping it on a dedicated
       // class prevents its grid from competing with the active-game board
@@ -24480,6 +24487,11 @@
       };
     }
 
+    function isCurrentUserFriendChallengeParticipant(remote) {
+      const me = getFriendCurrentUserId();
+      return Boolean(me && (String(remote?.creatorId || "") === me || String(remote?.opponentId || "") === me));
+    }
+
     function getFriendChallengeRevision(remote) {
       const moves = Array.isArray(remote?.moves) ? remote.moves : [];
       const lastMove = moves.length ? JSON.stringify(moves[moves.length - 1]) : "";
@@ -24537,6 +24549,9 @@
       const remote = normalizeRemoteFriendChallenge(raw);
       if (!remote) return false;
       const previous = friendChallengeState || readFriendChallengeState();
+      // A delayed active event for a different challenge must never replace a
+      // board that is already running for this signed-in participant.
+      if (previous?.remote && previous.active && previous.remoteId && previous.remoteId !== remote.id && remote.status === "active") return true;
       if (previous?.remoteId && previous.remoteId !== remote.id) invalidateFriendChallengeSync();
       if (remoteMatchesPendingFriendMove(remote)) clearPendingFriendMove(remote);
       else if (shouldDeferRemoteForPendingFriendMove(remote)) return true;
@@ -24563,6 +24578,10 @@
       const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteRevision === revision && previous.remoteMessageStamp === messageStamp;
       if (unchanged && !boardNeedsRestore) return true;
       const next = normalizeFriendChallengeState(toFriendChallengeState(remote));
+      const shouldAutoStart = remote.status === "active"
+        && !next.spectator
+        && isCurrentUserFriendChallengeParticipant(remote)
+        && !coachSessionActive;
       let restoredFriendGame = null;
       if (boardNeedsRestore) {
         restoredFriendGame = buildFriendChallengeGameFromMoves(next);
@@ -24577,6 +24596,15 @@
         next.terminalOutcome = null;
       }
       friendChallengeState = next;
+      // A global recipient prompt is actionable only while this exact server
+      // invitation remains pending. Realtime/reconnect terminal updates must
+      // dismiss that one notice; a cancellation, decline, expiry, or accept
+      // must never leave a stale action surface on another route.
+      if (remote.status !== "pending" && friendIncomingNoticeCode === remote.code) {
+        friendIncomingNoticeCode = "";
+        dismissFriendChallengeNotice();
+      }
+      if (remote.status !== "draft") friendChallengeTarget = null;
       if (remote.status === "active") noteRealtimeMatchAuthoritativeState(remote);
       if (remote.status === "active" && (previous?.status === "completed" || Boolean(completedGameSignature || coachTerminalOutcome || coachDrawAgreed || matchClockExpiredColor))) {
         coachMoveToken += 1;
@@ -24685,7 +24713,41 @@
       renderFriendGameChat(next);
       renderFriendChallengeLobby({ renderDirectory: false });
       if (remote.status !== "active") renderPlaySocialBar();
+      if (shouldAutoStart) queueAcceptedFriendChallengeStart(remote.code, remote.id);
       return true;
+    }
+
+    function queueAcceptedFriendChallengeStart(code, remoteId = friendChallengeState?.remoteId) {
+      const challengeCode = String(code || "").toUpperCase();
+      const handoffKey = `${String(remoteId || "")}:${challengeCode}`;
+      if (!challengeCode || !remoteId || friendChallengeAutoStartKey === handoffKey) return;
+      friendChallengeAutoStartCode = challengeCode;
+      friendChallengeAutoStartKey = handoffKey;
+      setFriendConnectionState("syncing", "Friend accepted — connecting...");
+      const beginWhenPlayIsMounted = () => {
+        const state = friendChallengeState;
+        if (friendChallengeAutoStartCode !== challengeCode || friendChallengeAutoStartKey !== handoffKey) return;
+        if (!state?.remote || state.remoteId !== remoteId || state.code !== challengeCode || state.status !== "active" || isFriendSpectatorMode(state) || coachSessionActive) return;
+        const play = document.getElementById("play");
+        if (location.hash !== "#play?mode=friend" || play?.hidden) {
+          if (location.hash !== "#play?mode=friend") location.hash = "play?mode=friend";
+          window.setTimeout(beginWhenPlayIsMounted, 80);
+          return;
+        }
+        // A global acceptance can reach Play before its lazy chess rules
+        // import finishes. Keep the same identity-keyed handoff pending until
+        // the existing board runtime is actually ready instead of consuming
+        // it with startFriendChallenge's intentional early return.
+        if (!CoachChess) {
+          void loadChessRules().then(() => window.setTimeout(beginWhenPlayIsMounted, 0)).catch(() => {
+            setFriendChallengeStatus("The chessboard could not load. Reconnect to the active game.");
+          });
+          return;
+        }
+        friendChallengeAutoStartCode = "";
+        startFriendChallenge(false);
+      };
+      window.setTimeout(beginWhenPlayIsMounted, 80);
     }
 
     function getFriendInviteLink(state = friendChallengeState || readFriendChallengeState()) {
@@ -24882,9 +24944,15 @@
       // Only a live directory/presence response may assert that a person is
       // online. A recent profile login is not a presence heartbeat.
       const presenceConfirmed = Boolean(row.presenceConfirmed) || hasLivePresence || hasPresenceStatus;
-      const presenceStatus = hasPresenceStatus
-        ? rawStatus
-        : hasLivePresence ? (row.online ? "online" : "offline") : "unknown";
+      // The directory's boolean is the server-authoritative answer: it
+      // already applies the 75-second heartbeat grace period. Do not retain
+      // an older raw status such as "online" after that answer becomes false.
+      const onlineNow = hasLivePresence
+        ? Boolean(row.online) && rawStatus !== "offline"
+        : hasPresenceStatus && rawStatus !== "offline";
+      const presenceStatus = !presenceConfirmed ? "unknown"
+        : !onlineNow ? "offline"
+        : hasPresenceStatus ? rawStatus : "online";
       return {
         id: String(row.public_id || row.id || row.user_id || ""),
         name: String(row.display_name || row.displayName || row.username || row.name || "Player"),
@@ -24899,7 +24967,7 @@
         country: String(row.country_flag || row.country || ""),
         presenceConfirmed,
         presenceObservedAt: Number(row.presenceObservedAt || row.presence_observed_at || 0) || 0,
-        online: presenceConfirmed && (hasLivePresence ? Boolean(row.online) && presenceStatus !== "offline" : presenceStatus !== "offline" && presenceStatus !== "unknown"),
+        online: presenceConfirmed && onlineNow,
         presenceStatus,
         lastSeenAt: String(row.last_seen_at || row.lastSeenAt || ""),
         mutualFriendsCount: Number(row.mutual_friends_count || row.mutualFriendsCount || 0) || 0,
@@ -24924,8 +24992,19 @@
         presenceObservedAt: 0
       }));
       const source = remote.length ? remote : local;
+      const presenceGraceMs = 75_000;
+      const now = Date.now();
       const seen = new Set();
-      return source.filter((friend) => !friend.requestStatus || friend.requestStatus === "accepted").filter((friend) => !isNschessUserBlocked(friend.id, friend.name)).filter((friend) => {
+      return source.map((friend) => {
+        const lastSeen = Date.parse(friend.lastSeenAt || "");
+        // A cached directory row must not outlive the same heartbeat window
+        // enforced by get_friend_directory(). A later refresh remains the
+        // authority; this only prevents a stale UI label between refreshes.
+        if (friend.online && Number.isFinite(lastSeen) && now - lastSeen > presenceGraceMs) {
+          return { ...friend, online: false, presenceStatus: "offline" };
+        }
+        return friend;
+      }).filter((friend) => !friend.requestStatus || friend.requestStatus === "accepted").filter((friend) => !isNschessUserBlocked(friend.id, friend.name)).filter((friend) => {
         const key = String(friend.id || friend.name || "").toLowerCase();
         if (!key || seen.has(key)) return false;
         seen.add(key);
@@ -25005,11 +25084,29 @@
           return true;
         }
         const matching = state.remote ? friendNetworkState.challenges.find((challenge) => challenge.code === state.code) : null;
+        const activeForCurrentUser = friendNetworkState.challenges.find((challenge) => challenge.status === "active" && isCurrentUserFriendChallengeParticipant(challenge));
         const incoming = friendNetworkState.challenges.find((challenge) => challenge.status === "pending" && challenge.opponentId === getFriendCurrentUserId());
-        if (matching) applyRemoteFriendChallenge(matching, true);
+        const retainedRemoteIsTerminal = Boolean(state.remote && ["completed", "declined", "cancelled", "expired"].includes(String(state.status || "").toLowerCase()));
+        // A closed post-game surface can retain its terminal challenge for
+        // review. It must not eclipse a later pending invitation received by
+        // the same player; the new authoritative invite becomes actionable.
+        if (incoming && !state.active && retainedRemoteIsTerminal) {
+          applyRemoteFriendChallenge(incoming, false);
+          showIncomingFriendChallengeNotice(incoming);
+        }
+        else if (matching) applyRemoteFriendChallenge(matching, true);
+        else if (activeForCurrentUser && !state.active) applyRemoteFriendChallenge(activeForCurrentUser, true);
         else if (incoming && !state.active) {
           applyRemoteFriendChallenge(incoming, false);
           showIncomingFriendChallengeNotice(incoming);
+        }
+        // Terminal invitations are intentionally omitted from the lightweight
+        // pending/active directory list. If this participant still retains a
+        // pending remote invitation that is no longer listed, fetch that one
+        // authoritative challenge by code so a cancellation/decline/expiry
+        // reconciles the local prompt instead of leaving it actionable.
+        else if (state.remote && state.pending && state.code) {
+          void refreshActiveFriendChallenge(state.code, false);
         }
         else if (state.remote && state.creatorId !== getFriendCurrentUserId() && state.opponentId !== getFriendCurrentUserId()) {
           saveFriendChallengeState({ ...readFriendChallengeState(), code: createFriendChallengeCode(), remote: false, pending: false, active: false, status: "draft" });
@@ -25112,6 +25209,11 @@
       return Boolean((code && code === state.code) || (challengeId && challengeId === state.remoteId));
     }
 
+    function realtimeEventTargetsCurrentUserActiveChallenge(event) {
+      const row = normalizeRemoteFriendChallenge(event?.payload?.new || {});
+      return Boolean(row?.status === "active" && isCurrentUserFriendChallengeParticipant(row));
+    }
+
     function scheduleFriendRealtimeReconnect(generation) {
       if (generation !== friendNetworkSubscriptionGeneration || friendRealtimeReconnectTimer || friendRealtimeReconnectAttempts >= 4) return;
       const delay = Math.min(500 * (2 ** friendRealtimeReconnectAttempts), 5000);
@@ -25146,6 +25248,13 @@
       if (event?.table === "game_challenges" && realtimeEventMatchesActiveChallenge(event)) {
         noteRealtimeMatchGameEvent();
         void refreshActiveFriendChallenge(friendChallengeState?.code, true);
+        return;
+      }
+      if (event?.table === "game_challenges" && realtimeEventTargetsCurrentUserActiveChallenge(event)) {
+        // The recipient may have refreshed or opened the Friendly Challenge
+        // route without a local invite snapshot. Reconcile the full, allowed
+        // server row rather than trusting the partial realtime payload.
+        queueFriendNetworkRefresh();
         return;
       }
       if (["game_challenge_messages", "game_challenge_presence"].includes(event?.table) && realtimeEventMatchesActiveChallenge(event)) {
@@ -25339,11 +25448,27 @@
       if (!card) return;
       const title = document.getElementById("friendRequestTitle");
       const meta = document.getElementById("friendRequestMeta");
+      const actions = card.querySelector(".friend-request-actions");
+      const accept = document.getElementById("friendAccept");
+      const decline = document.getElementById("friendDecline");
+      const cancel = document.getElementById("friendCancel");
       const isPending = Boolean(state.pending);
+      // Direction comes from the authenticated participant and authoritative
+      // challenge identities, never a persisted incoming flag from an older
+      // route reconciliation.
+      const currentUserId = getFriendCurrentUserId();
+      const isCreator = isPending && Boolean(currentUserId && state.creatorId === currentUserId);
+      const isOpponent = isPending && Boolean(currentUserId && state.opponentId === currentUserId);
+      const isIncoming = isOpponent;
+      const isOutgoing = isCreator && Boolean(state.remote && state.targetId);
       card.hidden = !isPending;
-      if (title) title.textContent = state.incoming ? `${state.targetName || "Friend"} challenged you` : state.targetId ? "Challenge sent" : "Share link ready";
+      if (actions) actions.hidden = !isIncoming && !isOutgoing;
+      if (accept) accept.hidden = !isIncoming;
+      if (decline) decline.hidden = !isIncoming;
+      if (cancel) cancel.hidden = !isOutgoing;
+      if (title) title.textContent = isIncoming ? `${state.targetName || "Friend"} challenged you` : state.targetId ? "Challenge sent" : "Share link ready";
       if (meta) {
-        meta.textContent = state.incoming
+        meta.textContent = isIncoming
           ? `${state.clock === "none" ? "No clock" : state.clock} • ${state.color === "random" ? "Random color" : `You play ${state.color === "w" ? "White" : "Black"}`}. Accept to start.`
           : state.targetId
           ? `${state.clock === "none" ? "No clock" : state.clock} • ${state.color === "random" ? "Random color" : state.color === "w" ? "You play White" : "You play Black"} • ${state.presenceConfirmed && state.online ? "friend is online • " : ""}waiting for accept.`
@@ -25393,7 +25518,10 @@
       setValue("friendGameType", state.gameType);
       setValue("friendColor", state.color);
       setValue("friendClock", state.clock);
-      const challengeLocked = Boolean(state.remote);
+      // A terminal server challenge is history, not an in-progress invite.
+      // Leaving its settings disabled prevents a player from challenging the
+      // same friend again after a completed, declined, or cancelled game.
+      const challengeLocked = Boolean(state.remote && ["pending", "accepted", "active"].includes(state.status));
       ["friendInviteType", "friendGameType", "friendColor", "friendClock"].forEach((id) => {
         const control = document.getElementById(id);
         if (control) control.disabled = challengeLocked;
@@ -25405,7 +25533,7 @@
       });
       const primary = document.getElementById("friendStart");
       if (primary) {
-        primary.textContent = !state.remote ? "Create invite" : state.status === "active" ? "Open game" : state.status === "accepted" ? "Start game" : "Invite sent";
+        primary.textContent = !state.remote ? "Create code invite" : state.status === "active" ? "Open game" : state.status === "accepted" ? "Start game" : "Invite sent";
         primary.disabled = Boolean(state.remote && !["accepted", "active"].includes(state.status));
       }
       const newCode = document.getElementById("friendNewCode");
@@ -25423,8 +25551,69 @@
       if (spectateLink) spectateLink.hidden = !state.remote || !["active", "completed"].includes(state.status) || spectator;
       renderFriendQr(state.code);
       renderFriendRequestCard(state);
+      renderFriendChallengeTarget();
       if (renderDirectory) renderFriendDirectory();
       renderFriendConnectionStatus(state);
+    }
+
+    function renderFriendChallengeTarget() {
+      const target = friendChallengeTarget;
+      const summary = document.getElementById("friendChallengeTarget");
+      const name = document.getElementById("friendChallengeTargetName");
+      const send = document.getElementById("friendSend");
+      if (summary) summary.hidden = !target;
+      if (name) name.textContent = target ? `Challenge ${target.name || "friend"}` : "Challenge a friend";
+      if (send) send.disabled = !target || Boolean(friendChallengeState?.remote);
+    }
+
+    function chooseFriendChallengeTarget(friend) {
+      if (!friend?.id) return;
+      if (isNschessUserBlocked(friend.id, friend.name)) {
+        setFriendChallengeStatus("Unblock this player in Privacy settings before sending a challenge.");
+        return;
+      }
+      const existing = friendChallengeState || readFriendChallengeState();
+      if (existing.remote && ["pending", "accepted", "active"].includes(existing.status)) {
+        setFriendChallengeStatus(existing.status === "pending"
+          ? "A challenge is already waiting. Cancel it or wait for your friend to respond before sending another."
+          : "This Friendly Challenge is already in progress.");
+        renderFriendChallengeLobby({ renderDirectory: false });
+        return;
+      }
+      // A terminal challenge remains available to history/review, but it is
+      // never a live invite. Start a fresh local draft only when the player
+      // deliberately selects a new opponent so completed, declined, cancelled
+      // or expired A↔B fixtures cannot lock a later challenge.
+      if (existing.remote) {
+        saveFriendChallengeState({
+          ...existing,
+          code: createFriendChallengeCode(),
+          remote: false,
+          remoteId: "",
+          creatorId: "",
+          opponentId: "",
+          targetId: "",
+          targetName: "",
+          pending: false,
+          active: false,
+          incoming: false,
+          status: "draft",
+          fen: "",
+          moves: [],
+          messages: [],
+          terminalPending: false,
+          terminalSignal: "",
+          terminalKind: "",
+          terminalOutcome: null
+        }, { render: false });
+      }
+      rememberRecentFriendPlayer(friend);
+      friendChallengeTarget = { id: String(friend.id), name: String(friend.name || "Friend") };
+      const settings = document.getElementById("friendMatchSettings");
+      if (settings) settings.open = true;
+      setFriendChallengeLobbyView("create");
+      renderFriendChallengeLobby();
+      window.setTimeout(() => document.getElementById("friendSend")?.focus(), 0);
     }
 
     function updateFriendChallengeFromControls() {
@@ -25443,11 +25632,12 @@
       saveFriendChallengeState(friendChallengeState);
     }
 
-    function sendFriendChallenge(target = null) {
+    function sendFriendChallenge(target = null, options = {}) {
       if (target && isNschessUserBlocked(target.id, target.name)) {
         setFriendChallengeStatus("Unblock this player in Privacy settings before sending a challenge.");
         return;
       }
+      if (target && !options.immediate) return chooseFriendChallengeTarget(target);
       if (target) rememberRecentFriendPlayer(target);
       return runFriendAction(`challenge:create:${target?.id || "invite"}`, () => createFriendChallengeRequest(target));
     }
@@ -25460,7 +25650,7 @@
         return;
       }
       const state = friendChallengeState || readFriendChallengeState();
-      const friend = target && typeof target === "object" ? target : null;
+      const friend = target && typeof target === "object" ? target : friendChallengeTarget;
       try {
         const remote = await provider.createFriendChallenge({
           targetId: friend?.id || null,
@@ -25471,6 +25661,13 @@
           clock: state.clock
         });
         applyRemoteFriendChallenge(remote, false);
+        friendChallengeTarget = null;
+        const settings = document.getElementById("friendMatchSettings");
+        if (settings) settings.open = false;
+        // `applyRemoteFriendChallenge()` renders before the target is cleared.
+        // Render once more so the sender is left with one outgoing-state card,
+        // not a stale settings panel with another send control.
+        renderFriendChallengeLobby({ renderDirectory: false });
         setFriendChallengeStatus(friend ? `Challenge sent to ${friend.name}. They can accept from their Friendly Challenge panel.` : "Private invite created. Copy the link or code to share it.");
       } catch (error) {
         setFriendChallengeStatus(error?.message || "Could not create that challenge.");
@@ -25487,9 +25684,11 @@
     }
 
     async function acceptFriendChallengeRequest(state) {
+      let acceptedRemote = null;
       try {
         const remote = await getFriendProvider()?.respondFriendChallenge(state.code, "accept");
         if (!remote) throw new Error("Sign in to accept this challenge.");
+        acceptedRemote = remote;
         applyRemoteFriendChallenge(remote, false);
         friendIncomingNoticeCode = "";
         dismissFriendChallengeNotice();
@@ -25497,12 +25696,34 @@
         setFriendChallengeStatus(error?.message || "Could not accept that challenge.");
         return;
       }
-      startFriendChallenge(false);
+      // Accept can originate from the global notice while another workspace
+      // is mounted. Use the same route-aware handoff as Realtime events.
+      queueAcceptedFriendChallengeStart(acceptedRemote.code, acceptedRemote.id);
     }
 
     function declineFriendChallenge() {
       const state = friendChallengeState || readFriendChallengeState();
       return runFriendAction(`challenge:${state.code}:decline`, () => declineFriendChallengeRequest(state));
+    }
+
+    function cancelFriendChallenge() {
+      const state = friendChallengeState || readFriendChallengeState();
+      return runFriendAction(`challenge:${state.code}:cancel`, () => cancelFriendChallengeRequest(state));
+    }
+
+    async function cancelFriendChallengeRequest(state) {
+      if (!state?.remote || state.creatorId !== getFriendCurrentUserId() || !["pending", "accepted"].includes(state.status)) {
+        setFriendChallengeStatus("Only the challenge creator can cancel a waiting invite.");
+        return;
+      }
+      try {
+        const remote = await getFriendProvider()?.respondFriendChallenge(state.code, "cancel");
+        if (!remote) throw new Error("Sign in to cancel this challenge.");
+        applyRemoteFriendChallenge(remote, false);
+        setFriendChallengeStatus("Challenge cancelled. No game was created.");
+      } catch (error) {
+        setFriendChallengeStatus(error?.message || "Could not cancel that challenge.");
+      }
     }
 
     async function declineFriendChallengeRequest(state) {
@@ -25538,7 +25759,7 @@
         return;
       }
       if (rematch) {
-        return sendFriendChallenge({ id: state.targetId, name: state.targetName });
+        return sendFriendChallenge({ id: state.targetId, name: state.targetName }, { immediate: true });
       }
       if (state.status === "pending") {
         setFriendChallengeStatus(state.incoming ? "Accept this challenge before starting." : "Waiting for your friend to accept.");
@@ -25679,6 +25900,8 @@
 
     function invalidateFriendChallengeSync() {
       friendChallengeSyncEpoch += 1;
+      friendChallengeAutoStartCode = "";
+      friendChallengeAutoStartKey = "";
       friendChallengeSyncQueue = Promise.resolve();
       friendChallengeLastPositionSignature = "";
       friendChallengePendingMove = null;
@@ -26902,6 +27125,8 @@
       friendChallengeRefreshQueued = false;
       friendChallengeRefreshQueuedCode = "";
       friendChallengeRefreshQueuedRestoreBoard = false;
+      friendChallengeAutoStartCode = "";
+      friendChallengeAutoStartKey = "";
       friendInviteHydrationPromise = null;
       friendInviteHydrationCode = "";
       friendInviteHydrationQueued = false;
@@ -27164,9 +27389,14 @@
         startFriendNetworkSync();
         if (playVisible && isRealtimeMatchActive()) startRealtimeMatchLifecycle();
       } else {
-        // Release social subscriptions when no social workspace is open;
-        // they are re-established when the route becomes active again.
-        stopFriendNetworkSync();
+        // Incoming Friendly Challenges are global signed-in events. Retain
+        // their lightweight Realtime subscription across routes so a player
+        // can accept or decline without having to reopen Friends or Play.
+        // The lightweight global reconciliation inside startFriendNetworkSync
+        // keeps incoming invitations recoverable even if a channel event is
+        // missed before the recipient opens a social workspace.
+        if (getFriendCurrentUserId()) startFriendNetworkSync();
+        else stopFriendNetworkSync();
         stopRealtimeMatchLifecycle();
       }
       if (tournamentVisible) {
@@ -27198,16 +27428,15 @@
       void refreshFriendNetwork(true);
       void refreshSocialNotifications();
       if (!friendNetworkTimer) friendNetworkTimer = window.setInterval(() => {
-        const socialWorkspaceVisible = document.getElementById("play")?.classList.contains("is-active-panel")
-          || document.getElementById("friends")?.classList.contains("is-active-panel");
         // A subscribed channel is a fast path, not proof that every database
-        // event arrived. Reconcile while visible so presence and invitations
-        // cannot stay stale behind a healthy-looking websocket.
-        if (!document.hidden && socialWorkspaceVisible) {
+        // event arrived. While the signed-in tab is visible, reconcile the
+        // authoritative invitation list on every route so a recipient never
+        // needs to refresh or reopen Friends after a dropped event.
+        if (!document.hidden) {
           void refreshFriendNetwork(true);
           void refreshSocialNotifications();
         }
-      }, 30000);
+      }, 10000);
       if (!friendChallengeSyncTimer) friendChallengeSyncTimer = window.setInterval(() => {
         const state = friendChallengeState || readFriendChallengeState();
         const socialWorkspaceVisible = document.getElementById("play")?.classList.contains("is-active-panel")
@@ -27263,9 +27492,14 @@
       listen("friendNewCode", "click", () => void replaceFriendChallengeCode());
       listen("friendCopyLink", "click", () => copyFriendChallengeText(getFriendInviteLink(friendChallengeState || readFriendChallengeState()), "Invite link"));
       listen("friendCopyCode", "click", () => copyFriendChallengeText((friendChallengeState || readFriendChallengeState()).code, "Challenge code"));
-      listen("friendSend", "click", () => void sendFriendChallenge());
+      listen("friendSend", "click", () => void sendFriendChallenge(friendChallengeTarget, { immediate: true }));
+      listen("friendClearTarget", "click", () => {
+        friendChallengeTarget = null;
+        renderFriendChallengeLobby({ renderDirectory: false });
+      });
       listen("friendAccept", "click", () => void acceptFriendChallenge());
       listen("friendDecline", "click", () => void declineFriendChallenge());
+      listen("friendCancel", "click", () => void cancelFriendChallenge());
       listen("friendSearchButton", "click", () => {
         const state = readFriendDirectoryState();
         const query = document.getElementById("friendSearchInput")?.value || "";
@@ -27281,7 +27515,7 @@
       });
       listen("friendStart", "click", () => {
         const state = friendChallengeState || readFriendChallengeState();
-        if (!state.remote) return void sendFriendChallenge();
+        if (!state.remote) return void sendFriendChallenge(null, { immediate: true });
         startFriendChallenge(false);
       });
       listen("friendJoin", "click", () => void joinFriendChallengeCode());
@@ -36448,9 +36682,12 @@
       const hasPresenceStatus = ["online", "in_game", "looking", "idle", "offline"].includes(rawStatus);
       const hasLivePresence = typeof row.online === "boolean";
       if (!id || (!hasLivePresence && !hasPresenceStatus)) return;
-      const presenceStatus = hasPresenceStatus ? rawStatus : (row.online ? "online" : "offline");
+      const onlineNow = hasLivePresence
+        ? Boolean(row.online) && rawStatus !== "offline"
+        : rawStatus !== "offline";
+      const presenceStatus = onlineNow ? (hasPresenceStatus ? rawStatus : "online") : "offline";
       const presencePatch = {
-        online: hasLivePresence ? Boolean(row.online) && presenceStatus !== "offline" : presenceStatus !== "offline",
+        online: onlineNow,
         presenceConfirmed: true,
         presenceStatus,
         lastSeenAt: String(row.last_seen_at || row.lastSeenAt || ""),

@@ -12865,9 +12865,15 @@
       display: none;
     }
 
-    body.friend-challenge-mode #play .friend-lobby {
-      display: grid;
-    }
+body.friend-challenge-mode #play .friend-lobby {
+  display: grid;
+}
+
+/* Once an accepted invitation is active, retain the Friend route for its
+   lifecycle but yield the space to the real shared board workspace. */
+body.friend-challenge-mode #play.is-active-game .friend-lobby {
+  display: none;
+}
 
     .tournament-lobby {
       display: none;
@@ -13600,6 +13606,14 @@
 
     .friend-request-card[hidden] {
       display: none;
+    }
+
+    /* Pending challenge actions are participant-specific.  Keep the HTML
+       hidden state authoritative even though the shared .button component
+       establishes an inline-flex display value. */
+    .friend-request-card .friend-request-actions[hidden],
+    .friend-request-card .button[hidden] {
+      display: none !important;
     }
 
     .friend-request-card strong,
@@ -31175,6 +31189,36 @@ body.low-performance #store .store-tier-signal::after { animation: none; }
   margin-top: 4px;
   color: var(--muted);
   line-height: 1.4;
+}
+
+.friend-selected-target,
+.friend-code-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(111, 168, 220, 0.2);
+  border-radius: 12px;
+  background: rgba(37, 51, 101, 0.22);
+}
+
+.friend-selected-target strong,
+.friend-selected-target small,
+.friend-code-status small,
+.friend-code-status strong {
+  display: block;
+}
+
+.friend-selected-target small,
+.friend-code-status small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.friend-code-status strong {
+  color: #d7efff;
+  letter-spacing: .08em;
 }
 
 .friend-share-row:has(#friendInviteLink) {

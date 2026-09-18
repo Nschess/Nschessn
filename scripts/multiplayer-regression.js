@@ -16,6 +16,7 @@ const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const hardeningMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260819_release_candidate_security_hardening.sql"), "utf8");
 const matchmakingMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260814_intelligent_quick_match.sql"), "utf8");
 const fenContractMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260912_multiplayer_fen_en_passant_contract.sql"), "utf8");
+const friendChallengeHardeningMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260916_friendly_challenge_notification_idempotency.sql"), "utf8");
 
 const boardMove = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 
@@ -48,12 +49,69 @@ function normalizePresenceForRegression(row = {}) {
   const rawStatus = String(row.presence_status || row.presenceStatus || row.status || "").toLowerCase();
   const hasPresenceStatus = ["online", "in_game", "looking", "idle", "offline"].includes(rawStatus);
   const presenceConfirmed = Boolean(row.presenceConfirmed) || hasLivePresence || hasPresenceStatus;
-  const presenceStatus = hasPresenceStatus ? rawStatus : hasLivePresence ? (row.online ? "online" : "offline") : "unknown";
+  const onlineNow = hasLivePresence
+    ? Boolean(row.online) && rawStatus !== "offline"
+    : hasPresenceStatus && rawStatus !== "offline";
+  const presenceStatus = !presenceConfirmed ? "unknown"
+    : !onlineNow ? "offline"
+    : hasPresenceStatus ? rawStatus : "online";
   return {
     presenceConfirmed,
     presenceStatus,
-    online: presenceConfirmed && (hasLivePresence ? Boolean(row.online) && presenceStatus !== "offline" : presenceStatus !== "offline" && presenceStatus !== "unknown")
+    online: presenceConfirmed && onlineNow
   };
+}
+
+function runFriendChallengeBackendHardeningModelRegression() {
+  // MODEL TEST: this is a lifecycle model, not a PostgreSQL transaction
+  // simulation. The source-contract assertions below describe the forward
+  // migration; dedicated-E2E proof is still required before release.
+  const notes = [];
+  const received = { recipient: "B", actor: "A", type: "challenge_received", challengeId: "c1", actionable: true };
+  notes.push(received);
+  const transition = (from, to, actor = "B") => {
+    if (from === "pending" && to === "active") notes.push({ recipient: "A", actor, type: "challenge_accepted", challengeId: "c1", actionable: true });
+    if (from === "pending" && ["active", "declined", "cancelled", "expired"].includes(to)) received.actionable = false;
+  };
+
+  transition("pending", "active");
+  transition("active", "active");
+  assert.equal(notes.filter((note) => note.type === "challenge_accepted" && note.recipient === "A").length, 1,
+    "only the authoritative pending-to-active transition notifies the challenger");
+  assert.equal(received.actionable, false, "accept resolves the challengee's received invitation");
+
+  for (const terminal of ["cancelled", "declined", "expired"]) {
+    const pending = { actionable: true };
+    pending.actionable = false;
+    assert.equal(pending.actionable, false, `${terminal} resolves the incoming pending notification`);
+  }
+
+  const pendingByFingerprint = new Map();
+  let nextChallengeNumber = 1;
+  const createEquivalent = (fingerprint) => {
+    if (!pendingByFingerprint.has(fingerprint)) pendingByFingerprint.set(fingerprint, { status: "pending", id: `challenge-${nextChallengeNumber++}` });
+    return pendingByFingerprint.get(fingerprint);
+  };
+  const first = createEquivalent("private|casual|random|10+0");
+  const second = createEquivalent("private|casual|random|10+0");
+  assert.equal(first.id, second.id, "equivalent concurrent creates reconcile to the same pending challenge");
+  assert.equal(pendingByFingerprint.size, 1);
+  first.status = "cancelled";
+  pendingByFingerprint.delete("private|casual|random|10+0");
+  assert.notEqual(createEquivalent("private|casual|random|10+0").id, first.id,
+    "a terminal challenge never prevents a new invitation");
+
+  const canRespond = ({ actor, creator, opponent, status, response }) => (
+    (response === "accept" && actor === opponent && status === "pending")
+    || (response === "decline" && actor === opponent && status === "pending")
+    || (response === "cancel" && actor === creator && ["pending", "accepted"].includes(status))
+  );
+  assert.equal(canRespond({ actor: "third-party", creator: "A", opponent: "B", status: "pending", response: "accept" }), false,
+    "an unrelated account cannot accept a targeted challenge");
+  assert.equal(canRespond({ actor: "third-party", creator: "A", opponent: "B", status: "pending", response: "cancel" }), false,
+    "an unrelated account cannot cancel a targeted challenge");
+  assert.equal(canRespond({ actor: "B", creator: "A", opponent: "B", status: "completed", response: "accept" }), false,
+    "a terminal challenge cannot be reactivated");
 }
 
 function runPresenceTruthRegression() {
@@ -61,7 +119,9 @@ function runPresenceTruthRegression() {
   const staleInference = normalizePresenceForRegression({ last_login_at: new Date().toISOString() });
   assert.deepEqual(staleInference, { presenceConfirmed: false, presenceStatus: "unknown", online: false });
   assert.equal(normalizePresenceForRegression({ online: true, presence_status: "looking" }).online, true);
-  assert.equal(normalizePresenceForRegression({ online: false, presence_status: "online" }).online, false);
+  const expiredServerPresence = normalizePresenceForRegression({ online: false, presence_status: "online" });
+  assert.deepEqual(expiredServerPresence, { presenceConfirmed: true, presenceStatus: "offline", online: false },
+    "the authoritative directory boolean must override a stale raw online label");
 
   // Realtime friend_presence events deliberately omit identity columns. Their
   // merge must only change presence fields and never reset player metadata.
@@ -72,6 +132,52 @@ function runPresenceTruthRegression() {
   assert.equal(merged.rating, 1842);
   assert.equal(merged.avatar, "♞");
   assert.equal(merged.online, true);
+}
+
+function runFriendAutoPairContractRegression() {
+  // MODEL TEST: a single authoritative challenge becomes active once. Both
+  // participants retain that one challenge identity, FEN, clock, and
+  // complementary colors; client-side routing must not manufacture a second
+  // match while the server state is unchanged.
+  const challenge = {
+    id: "challenge-1",
+    code: "ABC23456",
+    status: "active",
+    fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    clock: "5+0",
+    creatorColor: "w"
+  };
+  const accountA = { ...challenge, color: challenge.creatorColor };
+  const accountB = { ...challenge, color: challenge.creatorColor === "w" ? "b" : "w" };
+  assert.equal(accountA.id, accountB.id);
+  assert.equal(accountA.code, accountB.code);
+  assert.equal(accountA.fen, accountB.fen);
+  assert.equal(accountA.clock, accountB.clock);
+  assert.notEqual(accountA.color, accountB.color);
+}
+
+function runFriendActiveHandoffRegression() {
+  // MODEL TEST: immediate RPC results, realtime events, and reconciliation all
+  // converge on one active game handoff. This is not a browser navigation
+  // simulation; browser/E2E validates the rendered board separately.
+  const active = { id: "challenge-1", code: "ABC23456", status: "active", creatorId: "A", opponentId: "B" };
+  const handoff = (state, remote, userId, seen) => {
+    if (remote.status !== "active" || ![remote.creatorId, remote.opponentId].includes(userId)) return { state, seen, started: false };
+    if ((state?.active || state?.status === "active") && state.id !== remote.id) return { state, seen, started: false };
+    const key = `${remote.id}:${remote.code}`;
+    if (seen === key) return { state: remote, seen, started: false };
+    return { state: remote, seen: key, started: true };
+  };
+  const challenger = handoff({ id: active.id, status: "pending" }, active, "A", "");
+  const challengee = handoff({ id: active.id, status: "pending" }, active, "B", "");
+  assert.equal(challenger.started, true, "the challenger must hand off from the authoritative active state");
+  assert.equal(challengee.started, true, "the challengee must hand off from the Accept response");
+  assert.equal(handoff(challengee.state, active, "B", challengee.seen).started, false,
+    "duplicate realtime/reconciliation active events must not initialize the board twice");
+  assert.equal(handoff({ id: "newer", status: "active" }, active, "B", "newer:OTHER").started, false,
+    "a stale active challenge cannot replace a newer live board");
+  assert.equal(handoff(null, active, "B", "").started, true,
+    "refresh recovery must hand off when no local invitation snapshot exists");
 }
 
 function runActiveRevisionWatchdogRegression() {
@@ -444,13 +550,48 @@ async function run() {
   assert.match(appSource, /async function refreshFriendNetwork\(force = false\) \{[\s\S]{0,260}getCachedAccount\?\.\(\) \|\| \{\};[\s\S]{0,220}if \(!accountId\) return false;/);
   assert.match(appSource, /function ensureFriendRealtime\(provider = getFriendProvider\(\)\) \{[\s\S]{0,360}if \(!friendNetworkSubscriptionUserId\) return;/);
   assert.match(appSource, /function startFriendNetworkSync\(\) \{[\s\S]{0,300}if \(!activeUserId\) return;/);
-  assert.match(appSource, /function normalizeFriendRecord\(row = \{\}\) \{[\s\S]{0,850}presenceStatus = hasPresenceStatus[\s\S]{0,180}"unknown"/);
+  assert.match(appSource, /function syncActiveRouteRuntime\(panel = "", tab = ""\) \{[\s\S]{0,1000}else \{[\s\S]{0,700}if \(getFriendCurrentUserId\(\)\) startFriendNetworkSync\(\);[\s\S]{0,100}else stopFriendNetworkSync\(\);/,
+    "a signed-in recipient must retain the global Friendly Challenge subscription outside Play and Friends so incoming invitations arrive without a refresh");
+  assert.match(appSource, /friendNetworkTimer = window\.setInterval\(\(\) => \{[\s\S]{0,700}if \(!document\.hidden\) \{[\s\S]{0,180}refreshFriendNetwork\(true\);[\s\S]{0,100}refreshSocialNotifications\(\);[\s\S]{0,140}\}, 10000\);/,
+    "visible signed-in routes must reconcile Friendly Challenges when a realtime event is missed");
+  assert.match(appSource, /function normalizeFriendRecord\(row = \{\}\) \{[\s\S]{0,1100}const onlineNow = hasLivePresence[\s\S]{0,300}!onlineNow \? "offline"/,
+    "an authoritative false online flag must force the display state offline");
+  assert.match(appSource, /const presenceGraceMs = 75_000;[\s\S]{0,650}presenceStatus: "offline"/,
+    "cached friend rows must not outlive the server heartbeat grace period");
   assert.doesNotMatch(appSource, /function normalizeFriendRecord\(row = \{\}\) \{[\s\S]{0,1200}last_login_at/,
     "friend presence must not infer Online from an old profile login timestamp");
   assert.match(appSource, /function applyFriendPresenceRow\(row = \{\}\) \{[\s\S]{0,1250}presencePatch[\s\S]{0,600}Merge only presence fields/);
   assert.doesNotMatch(appSource, /function applyFriendPresenceRow\(row = \{\}\) \{[\s\S]{0,400}normalizeFriendRecord\(row\)/,
     "sparse realtime presence must not replace friend identity through normalization defaults");
   assert.match(appSource, /function toFriendChallengeState\([\s\S]{0,900}targetPresence[\s\S]{0,2000}presenceConfirmed,[\s\S]{0,140}online: presenceConfirmed && Boolean\(targetPresence\?\.online\)/);
+  assert.match(appSource, /function isCurrentUserFriendChallengeParticipant\(remote\)/,
+    "active handoff must be limited to the authenticated challenge participant");
+  assert.match(appSource, /const shouldAutoStart = remote\.status === "active"[\s\S]{0,360}isCurrentUserFriendChallengeParticipant\(remote\)[\s\S]{0,180}!coachSessionActive/,
+    "both participants must hand off from every authoritative active state, not only a local pending snapshot");
+  assert.match(appSource, /function queueAcceptedFriendChallengeStart\(code, remoteId = friendChallengeState\?\.remoteId\)[\s\S]{0,1100}friendChallengeAutoStartKey[\s\S]{0,700}const play = document\.getElementById\("play"\)[\s\S]{0,900}startFriendChallenge\(false\)/,
+    "the shared Friend Challenge handoff must be keyed by the authoritative game identity, wait for the Play workspace, and remain idempotent");
+  assert.match(appSource, /function queueAcceptedFriendChallengeStart\(code, remoteId = friendChallengeState\?\.remoteId\)[\s\S]{0,2100}if \(!CoachChess\) \{[\s\S]{0,260}loadChessRules\(\)\.then\(\(\) => window\.setTimeout\(beginWhenPlayIsMounted, 0\)\)/,
+    "an accepted global invitation must wait for the lazy chess runtime before consuming its route-aware board handoff");
+  assert.match(appSource, /const friendLobbyVisible = document\.body\.classList\.contains\("friend-challenge-mode"\) && !friendChallengeState\?\.active;[\s\S]{0,700}play\.classList\.toggle\("is-active-game", !isPreGame && !inReview && !isSpecialLobby\);/,
+    "an active Friend Challenge must leave its setup lobby and mount the shared Play board workspace");
+  assert.match(appSource, /const activeForCurrentUser = friendNetworkState\.challenges\.find\([\s\S]{0,240}challenge\.status === "active" && isCurrentUserFriendChallengeParticipant\(challenge\)/,
+    "refresh/reconnect must identify an active challenge for the signed-in participant");
+  assert.match(appSource, /const retainedRemoteIsTerminal = Boolean\(state\.remote && \["completed", "declined", "cancelled", "expired"\]\.includes\(String\(state\.status \|\| ""\)\.toLowerCase\(\)\)\);[\s\S]{0,520}if \(incoming && !state\.active && retainedRemoteIsTerminal\) \{[\s\S]{0,180}showIncomingFriendChallengeNotice\(incoming\);/,
+    "a terminal retained challenge must not hide a later pending invite for the same recipient");
+  assert.match(appSource, /else if \(activeForCurrentUser && !state\.active\) applyRemoteFriendChallenge\(activeForCurrentUser, true\)/,
+    "refresh/reconnect must recover an active participant challenge without a local pending invite");
+  assert.match(appSource, /function realtimeEventTargetsCurrentUserActiveChallenge\(event\)[\s\S]{0,220}isCurrentUserFriendChallengeParticipant\(row\)/,
+    "realtime must identify an active event for the signed-in participant");
+  assert.match(appSource, /event\?\.table === "game_challenges" && realtimeEventTargetsCurrentUserActiveChallenge\(event\)[\s\S]{0,360}queueFriendNetworkRefresh\(\)/,
+    "an active realtime event without local state must trigger authoritative reconciliation");
+  assert.match(appSource, /function cancelFriendChallenge\(\)[\s\S]{0,800}respondFriendChallenge\(state\.code, "cancel"\)/,
+    "outgoing cancellation must use the existing authenticated server RPC");
+  assert.match(appSource, /function chooseFriendChallengeTarget\(friend\) \{[\s\S]{0,1200}if \(existing\.remote\) \{[\s\S]{0,700}remote: false,[\s\S]{0,450}status: "draft"/,
+    "a terminal remote invitation must become a fresh local draft only after the player explicitly selects a new challenge target");
+  assert.match(appSource, /if \(remote\.status !== "pending" && friendIncomingNoticeCode === remote\.code\) \{[\s\S]{0,160}dismissFriendChallengeNotice\(\);/,
+    "a terminal update must dismiss only the matching global recipient invitation prompt");
+  assert.match(appSource, /else if \(state\.remote && state\.pending && state\.code\) \{[\s\S]{0,120}refreshActiveFriendChallenge\(state\.code, false\);/,
+    "a pending invitation omitted from the lightweight list must reconcile its authoritative terminal state by code");
   assert.match(appSource, /friendNetworkTimer = window\.setInterval\(\(\) => \{[\s\S]{0,600}void refreshFriendNetwork\(true\);[\s\S]{0,100}void refreshSocialNotifications\(\);/);
   // A joined realtime channel is not proof that every table update arrived.
   // While a friend challenge is still pending/accepted, the shared lifecycle
@@ -469,6 +610,9 @@ async function run() {
   assert.match(appSource, /stopFriendNetworkSync\(\);[\s\S]{0,120}stopRealtimeMatchLifecycle\(\);/);
   runActiveRevisionWatchdogRegression();
   runPresenceTruthRegression();
+  runFriendChallengeBackendHardeningModelRegression();
+  runFriendAutoPairContractRegression();
+  runFriendActiveHandoffRegression();
   await runFriendInviteHydrationRegression();
   await runFriendChallengeRefreshLifecycleRegression();
 
@@ -478,6 +622,27 @@ async function run() {
   assert.match(hardeningMigration, /p_expected_revision is not null and p_expected_revision <> found\.revision/);
   assert.match(hardeningMigration, /applied := public\.ns_chess_apply_move\(found\.fen, new_item\)/);
   assert.match(hardeningMigration, /applied ->> 'fen' <> p_fen/);
+
+  // SOURCE CONTRACT ASSERTION: dedicated E2E must execute this migration to
+  // prove row locks, trigger execution, and RLS behavior in PostgreSQL.
+  assert.match(friendChallengeHardeningMigration, /add column if not exists request_fingerprint text/);
+  assert.match(friendChallengeHardeningMigration, /create unique index if not exists game_challenges_pending_target_fingerprint_key/);
+  assert.match(friendChallengeHardeningMigration, /where status = 'pending'[\s\S]{0,180}opponent_id is not null[\s\S]{0,180}request_fingerprint is not null/);
+  assert.match(friendChallengeHardeningMigration, /perform pg_advisory_xact_lock\(hashtextextended\([\s\S]{0,220}nschess:friend-challenge/);
+  assert.match(friendChallengeHardeningMigration, /perform public\.expire_game_challenges\(\);/,
+    "expired pending invitations must become terminal before idempotency lookup");
+  assert.match(friendChallengeHardeningMigration, /challenge\.request_fingerprint = requested_fingerprint[\s\S]{0,260}for update/,
+    "equivalent targeted creation must reuse the locked pending challenge");
+  assert.match(friendChallengeHardeningMigration, /old\.status = 'pending' and new\.status = 'active'[\s\S]{0,350}challenge_accepted/,
+    "acceptance notification follows the authoritative status transition");
+  assert.doesNotMatch(friendChallengeHardeningMigration, /old\.opponent_id is distinct from new\.opponent_id[\s\S]{0,350}challenge_accepted/,
+    "targeted acceptance cannot depend on opponent assignment changing");
+  assert.match(friendChallengeHardeningMigration, /old\.status in \('pending', 'accepted'\)[\s\S]{0,160}new\.status in \('active', 'declined', 'cancelled', 'expired'\)/);
+  assert.match(friendChallengeHardeningMigration, /type = 'challenge_received'[\s\S]{0,140}entity_id = new\.id[\s\S]{0,140}expires_at > now\(\)/,
+    "only the affected received-invitation notification is resolved");
+  assert.match(friendChallengeHardeningMigration, /security definer set search_path = public/);
+  assert.match(friendChallengeHardeningMigration, /revoke all on function public\.create_game_challenge\(uuid, text, text, text, text, text\) from public/);
+  assert.match(friendChallengeHardeningMigration, /grant execute on function public\.create_game_challenge\(uuid, text, text, text, text, text\) to authenticated/);
   assert.match(hardeningMigration, /select \* into found from public\.finalize_game_challenge\(found\.id/);
   const foundationSql = fs.readFileSync(path.join(root, "supabase", "friends.sql"), "utf8");
   const readmeSource = fs.readFileSync(path.join(root, "README.md"), "utf8");
