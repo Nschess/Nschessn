@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=daily-original-v1" />
+  <link rel="stylesheet" href="assets/app.css?v=daily-compact-v1" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -4360,19 +4360,19 @@
           </div>
 
           <article class="daily-puzzle-panel" id="dailyPuzzlePanel" aria-labelledby="dailyPuzzleHeading" hidden>
-            <div class="daily-puzzle-intro">
-              <div>
-                <p class="section-kicker">One original position, every day</p>
+            <header class="daily-puzzle-header">
+              <div class="daily-puzzle-heading">
+                <p class="section-kicker">DAILY CHALLENGE · UTC</p>
                 <h3 id="dailyPuzzleHeading">Daily Puzzle</h3>
-                <p>One shared puzzle selected by the UTC date. Practice and progress stay on this device—no account rewards or sync.</p>
+                <p class="daily-puzzle-subtitle">Find the forcing move.</p>
               </div>
-              <div class="daily-puzzle-summary" aria-label="Device-local daily progress">
-                <div><strong id="dailyPuzzleDate">UTC date</strong><span>Today's puzzle</span></div>
-                <div><strong id="dailyPuzzleAttempts">0</strong><span>Attempts today</span></div>
-                <div><strong id="dailyPuzzleStreak">0</strong><span>Device-local streak</span></div>
+              <div class="daily-puzzle-summary" aria-label="Device-local puzzle progress">
+                <div><strong id="dailyPuzzleDate">UTC date</strong><span>Today</span></div>
+                <div><strong id="dailyPuzzleAttempts">0</strong><span>Attempts</span></div>
+                <div><strong id="dailyPuzzleStreak">0</strong><span>Local streak</span></div>
+                <div><strong id="dailyPuzzleNext">—</strong><span>Next puzzle</span></div>
               </div>
-            </div>
-            <p class="daily-puzzle-local-note">Progress is stored locally in this browser and is not synced or rewarded with XP, rating, coins, or account progression.</p>
+            </header>
             <div class="daily-puzzle-play" id="dailyPuzzlePlay" hidden>
               <div class="daily-puzzle-board-wrap real-puzzle-board-wrap">
                 <div class="puzzle-board daily-puzzle-board" id="dailyPuzzleBoard" role="group" aria-roledescription="chess board" aria-label="Daily puzzle board. Focus a square, use arrow keys to move, and press Enter or Space to select or move." data-interactive-board></div>
@@ -4383,20 +4383,16 @@
                   <span class="badge" id="dailyPuzzleSide">White to move</span>
                 </div>
                 <h4 id="dailyPuzzleTitle">Today's position</h4>
-                <p id="dailyPuzzlePrompt">Find the strongest move.</p>
-                <p class="daily-puzzle-feedback" id="dailyPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Select a piece, then a highlighted destination.</p>
+                <p id="dailyPuzzlePrompt">Find the forcing move.</p>
+                <p class="daily-puzzle-feedback" id="dailyPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose your move.</p>
                 <p class="daily-puzzle-hint" id="dailyPuzzleHint" hidden></p>
-                <p class="daily-puzzle-next" id="dailyPuzzleNext"></p>
                 <div class="daily-puzzle-actions" aria-label="Daily puzzle actions">
                   <button class="button secondary" type="button" id="dailyPuzzleHintButton">Hint</button>
-                  <button class="button secondary" type="button" id="dailyPuzzleRevealButton">Show solution</button>
-                  <button class="button secondary" type="button" id="dailyPuzzleRestartButton">Restart position</button>
+                  <button class="button secondary" type="button" id="dailyPuzzleRevealButton" hidden>Show solution</button>
+                  <button class="button" type="button" id="dailyPuzzleRestartButton" hidden>Practice again</button>
                 </div>
+                <p class="daily-puzzle-local-note" id="dailyPuzzleStorageStatus" aria-live="polite">Device-local practice · no account rewards</p>
               </div>
-            </div>
-            <div class="daily-puzzle-launch-row">
-              <button class="button" type="button" id="dailyPuzzleStartButton" disabled>Preparing today's puzzle…</button>
-              <p class="daily-puzzle-offline" id="dailyPuzzleStorageStatus" aria-live="polite">Puzzle content is checked for legal moves before play.</p>
             </div>
           </article>
 
@@ -4746,6 +4742,6 @@
 
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
   <script defer src="assets/app.js?v=play-multiplayer-truth-v239"></script>
-  <script type="module" src="assets/daily-puzzle-launcher.mjs?v=daily-original-v2"></script>
+  <script type="module" src="assets/daily-puzzle-launcher.mjs?v=daily-compact-v1"></script>
 </body>
 </html>

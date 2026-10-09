@@ -317,8 +317,8 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v190-original-daily-puzzle";
-const shellCssVersion = "daily-original-v1";
+const cacheName = "nschess-shell-v192-daily-puzzle-ux-perf";
+const shellCssVersion = "daily-compact-v1";
 const shellAppVersion = "play-multiplayer-truth-v239";
 const routeModuleVersion = "review-v226-startup-performance";
 assert.match(html, new RegExp(shellCssVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current stylesheet version");

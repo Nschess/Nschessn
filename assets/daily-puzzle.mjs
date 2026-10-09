@@ -11,14 +11,16 @@ export async function bootDailyPuzzle() {
   if (!response.ok) throw new Error("Reconnect once to cache the original puzzle pack for offline play.");
   const catalog = await response.json();
   if (catalog.version !== 1 || !Array.isArray(catalog.puzzles) || catalog.puzzles.length < 30) throw new Error("The original puzzle pack must include at least 30 verified positions.");
-  const puzzles = catalog.puzzles.map((puzzle) => validatePuzzle(puzzle));
+  const puzzles = catalog.puzzles;
   if (new Set(puzzles.map((puzzle) => puzzle.id)).size !== puzzles.length) throw new Error("Puzzle identifiers must be unique.");
 
   const elements = {
     panel: root,
     board: document.getElementById("dailyPuzzleBoard"),
     play: document.getElementById("dailyPuzzlePlay"),
-    start: document.getElementById("dailyPuzzleStartButton"),
+    hintButton: document.getElementById("dailyPuzzleHintButton"),
+    replayButton: document.getElementById("dailyPuzzleRestartButton"),
+    revealButton: document.getElementById("dailyPuzzleRevealButton"),
     date: document.getElementById("dailyPuzzleDate"),
     attempts: document.getElementById("dailyPuzzleAttempts"),
     streak: document.getElementById("dailyPuzzleStreak"),
@@ -46,6 +48,9 @@ export async function bootDailyPuzzle() {
   let inSession = false;
   let solvedThisSession = false;
   let dailyTimer = 0;
+  const squareButtons = new Map();
+  let boardSquares = [];
+  let boardSide = "";
 
   function readState() {
     try {
@@ -80,14 +85,13 @@ export async function bootDailyPuzzle() {
 
   function renderSummary() {
     const record = dayRecord();
-    elements.date.textContent = dayKey;
+    const streak = dailyStreak(state, dayKey);
+    const date = new Date(`${dayKey}T00:00:00Z`);
+    elements.date.textContent = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" }).format(date);
+    elements.date.setAttribute("aria-label", `Puzzle date ${dayKey} UTC`);
+    elements.date.title = `${dayKey} UTC`;
     elements.attempts.textContent = String(record.attempts);
-    elements.streak.textContent = `${dailyStreak(state, dayKey)} day${dailyStreak(state, dayKey) === 1 ? "" : "s"}`;
-    elements.start.textContent = record.completed ? "Practice today's puzzle again" : "Play today's puzzle";
-    elements.start.setAttribute("aria-label", record.completed ? "Practice today's completed puzzle again; local progress will not change" : "Play today's Daily Puzzle");
-    if (!elements.storage.textContent || elements.storage.textContent === "Puzzle content is checked for legal moves before play.") {
-      elements.storage.textContent = record.completed ? "Completed on this device · no XP or account reward" : "Device-local progress · no XP or account reward";
-    }
+    elements.streak.textContent = `${streak} day${streak === 1 ? "" : "s"}`;
     updateNextPuzzle();
   }
 
@@ -95,11 +99,19 @@ export async function bootDailyPuzzle() {
     const remaining = Math.max(0, nextUtcMidnight() - Date.now());
     const hours = Math.floor(remaining / 3600000);
     const minutes = Math.floor((remaining % 3600000) / 60000);
-    elements.next.textContent = `A new shared puzzle is selected at 00:00 UTC (in ${hours}h ${minutes}m).`;
+    elements.next.textContent = `${hours}h ${minutes}m`;
+    elements.next.setAttribute("aria-label", `Next shared puzzle in ${hours} hours and ${minutes} minutes at 00:00 UTC`);
   }
 
   function currentDayPuzzle() {
-    return selectDailyPuzzle(dayKey, puzzles);
+    const selected = selectDailyPuzzle(dayKey, puzzles);
+    const validated = selected ? validatePuzzle(selected) : null;
+    if (validated) {
+      elements.theme.textContent = validated.theme;
+      elements.title.textContent = validated.title;
+      elements.prompt.textContent = validated.prompt;
+    }
+    return validated;
   }
 
   function ensureToday() {
@@ -116,8 +128,11 @@ export async function bootDailyPuzzle() {
     solvedThisSession = false;
     inSession = wasPlaying;
     renderSummary();
-    if (inSession) renderBoard();
-    if (wasPlaying) elements.feedback.textContent = "The UTC day changed. Today's new original position is ready.";
+    if (wasPlaying) {
+      inSession = false;
+      startOrReplay(false);
+      elements.feedback.textContent = "The UTC day changed. Today's new original position is ready.";
+    }
   }
 
   function openDailyMode() {
@@ -127,6 +142,7 @@ export async function bootDailyPuzzle() {
     elements.launch.setAttribute("aria-pressed", "true");
     document.querySelectorAll(".real-puzzle-modes [data-real-mode]").forEach((button) => button.setAttribute("aria-pressed", "false"));
     ensureToday();
+    if (!inSession) startOrReplay(false);
     elements.panel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -137,31 +153,44 @@ export async function bootDailyPuzzle() {
     if (ordinaryShell) ordinaryShell.hidden = false;
   }
 
-  function startOrReplay() {
+  function startOrReplay(practiceReplay = false) {
     ensureToday();
     inSession = true;
-    solvedThisSession = false;
+    solvedThisSession = Boolean(dayRecord().completed && !practiceReplay);
     hintStep = 0;
     assisted = false;
     selectedSquare = "";
     lastMove = null;
     game = new Chess(puzzle.fen);
     elements.play.hidden = false;
-    elements.start.hidden = true;
     elements.hint.hidden = true;
-    elements.feedback.textContent = dayRecord().completed
-      ? "This is already complete today on this device. Replay for practice; the saved record will not change."
-      : "Select a piece, then a highlighted destination. Arrow keys, Enter, and Space also work.";
+    elements.hintButton.textContent = "Hint";
+    elements.hintButton.disabled = false;
+    elements.hintButton.hidden = solvedThisSession;
+    elements.revealButton.hidden = !solvedThisSession;
+    elements.replayButton.hidden = !solvedThisSession;
+    elements.feedback.classList.remove("is-success");
+    elements.feedback.textContent = solvedThisSession
+      ? "Solved today · saved on this device. You can review the solution or practice again; your record will not change."
+      : dayRecord().completed
+        ? "Practice replay · this completed record will not change."
+        : "Find the forcing move. Select a piece, then a highlighted destination.";
+    elements.storage.textContent = dayRecord().completed ? "Completed on this device · no account reward" : "Progress saved on this device · no account rewards";
     renderBoard();
-    const first = elements.board.querySelector("button[data-square]");
-    first?.focus({ preventScroll: true });
-    focusedSquare = first?.dataset.square || "";
+    if (!solvedThisSession) {
+      const first = elements.board.querySelector("button[data-square]");
+      first?.focus({ preventScroll: true });
+      focusedSquare = first?.dataset.square || "";
+    }
   }
 
   function getBoardSquares() {
+    if (boardSide === puzzle.side && boardSquares.length === 64) return boardSquares;
     const files = puzzle.side === "b" ? "hgfedcba" : "abcdefgh";
     const ranks = puzzle.side === "b" ? "12345678" : "87654321";
-    return [...ranks].flatMap((rank) => [...files].map((file) => `${file}${rank}`));
+    boardSide = puzzle.side;
+    boardSquares = [...ranks].flatMap((rank) => [...files].map((file) => `${file}${rank}`));
+    return boardSquares;
   }
 
   function renderBoard() {
@@ -180,32 +209,42 @@ export async function bootDailyPuzzle() {
       const legal = byTarget.get(square);
       const [file, rank] = [square.charCodeAt(0) - 97, Number(square[1])];
       const light = (file + rank) % 2 === 0;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `real-puzzle-square puzzle-square play-square ${light ? "light" : "dark"}`;
-      if (piece) button.classList.add(piece.color === "w" ? "white-piece" : "black-piece");
-      if (square === selectedSquare) button.classList.add("selected");
-      if (legal) button.classList.add(legal.captured || String(legal.flags).includes("e") ? "capture" : "legal");
-      if (lastMove && (square === lastMove.from || square === lastMove.to)) button.classList.add("last-move");
-      if (square === checkedSquare) button.classList.add("in-check");
-      button.dataset.square = square;
-      button.tabIndex = square === focusedSquare || (!focusedSquare && index === 0) ? 0 : -1;
-      button.setAttribute("aria-label", `${square}, ${piece ? `${piece.color === "w" ? "white" : "black"} ${pieceName(piece.type)}` : "empty"}${square === selectedSquare ? ", selected" : ""}${legal ? ", legal destination" : ""}${square === checkedSquare ? ", king in check" : ""}`);
-      button.disabled = solvedThisSession;
-      if (piece) {
-        const image = document.createElement("img");
-        image.className = `piece-svg ${piece.color === "w" ? "white-piece-svg" : "black-piece-svg"}`;
-        image.src = new URL(`./pieces/merida/${piece.color}${piece.type.toUpperCase()}.svg`, import.meta.url).href;
-        image.alt = "";
-        image.setAttribute("aria-hidden", "true");
-        image.draggable = false;
-        image.decoding = "async";
-        button.append(image);
-        button.draggable = piece.color === game.turn() && !solvedThisSession;
+      let button = squareButtons.get(square);
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        squareButtons.set(square, button);
+      }
+      const className = `real-puzzle-square puzzle-square play-square ${light ? "light" : "dark"}${piece ? ` ${piece.color === "w" ? "white-piece" : "black-piece"}` : ""}${square === selectedSquare ? " selected" : ""}${legal ? ` ${legal.captured || String(legal.flags).includes("e") ? "capture" : "legal"}` : ""}${lastMove && (square === lastMove.from || square === lastMove.to) ? " last-move" : ""}${square === checkedSquare ? " in-check" : ""}`;
+      if (button.className !== className) button.className = className;
+      if (button.dataset.square !== square) button.dataset.square = square;
+      const tabIndex = square === focusedSquare || (!focusedSquare && index === 0) ? 0 : -1;
+      if (button.tabIndex !== tabIndex) button.tabIndex = tabIndex;
+      const label = `${square}, ${piece ? `${piece.color === "w" ? "white" : "black"} ${pieceName(piece.type)}` : "empty"}${square === selectedSquare ? ", selected" : ""}${legal ? ", legal destination" : ""}${square === checkedSquare ? ", king in check" : ""}`;
+      if (button.getAttribute("aria-label") !== label) button.setAttribute("aria-label", label);
+      if (button.disabled !== solvedThisSession) button.disabled = solvedThisSession;
+      const draggable = Boolean(piece && piece.color === game.turn() && !solvedThisSession);
+      if (button.draggable !== draggable) button.draggable = draggable;
+      const pieceKey = piece ? `${piece.color}${piece.type}` : "";
+      if (button.dataset.piece !== pieceKey) {
+        button.replaceChildren();
+        if (piece) {
+          const image = document.createElement("img");
+          image.className = `piece-svg ${piece.color === "w" ? "white-piece-svg" : "black-piece-svg"}`;
+          image.src = new URL(`./pieces/merida/${piece.color}${piece.type.toUpperCase()}.svg`, import.meta.url).href;
+          image.alt = "";
+          image.setAttribute("aria-hidden", "true");
+          image.draggable = false;
+          image.decoding = "async";
+          button.append(image);
+        }
+        button.dataset.piece = pieceKey;
       }
       return button;
     });
-    elements.board.replaceChildren(...nodes);
+    if (elements.board.childElementCount !== 64 || nodes.some((button, index) => elements.board.children[index] !== button)) {
+      elements.board.replaceChildren(...nodes);
+    }
   }
 
   function pieceName(type) {
@@ -259,11 +298,20 @@ export async function bootDailyPuzzle() {
     selectedSquare = "";
     const correct = isObjectiveComplete(puzzle, game, move, mover);
     if (dayRecord().completed) {
-      elements.feedback.textContent = correct
-        ? `Good move, ${move.san}. This local puzzle was already completed today; replay does not change its saved record.`
-        : `Not the puzzle idea. ${move.san} is legal; restart the position and try again.`;
-      if (!correct) restartPosition(false);
-      else renderBoard();
+      if (correct) {
+        solvedThisSession = true;
+        elements.feedback.classList.add("is-success");
+        elements.hint.hidden = true;
+        elements.hintButton.hidden = true;
+        elements.revealButton.hidden = false;
+        elements.replayButton.hidden = false;
+        elements.feedback.textContent = `Solved: ${move.san}. Practice only · today's saved record is unchanged.`;
+        renderBoard();
+      } else {
+        elements.feedback.classList.remove("is-success");
+        elements.feedback.textContent = `Not quite. ${move.san} is legal; the position is reset. Today's saved record is unchanged.`;
+        resetPosition();
+      }
       return;
     }
     state = recordDailyAttempt(state, dayKey, correct, assisted);
@@ -271,15 +319,17 @@ export async function bootDailyPuzzle() {
     renderSummary();
     if (correct) {
       solvedThisSession = true;
+      elements.feedback.classList.add("is-success");
       const saved = state.days[dayKey];
       elements.feedback.textContent = `Solved: ${move.san}. ${puzzle.explanation} ${saved?.assisted ? "Assisted solve · " : ""}Saved on this device only; no XP, rating, coins, or account reward.`;
       elements.hint.hidden = true;
-      elements.start.hidden = false;
-      elements.start.textContent = "Practice today's puzzle again";
-      elements.start.setAttribute("aria-label", "Practice today's completed puzzle again; local progress will not change");
+      elements.hintButton.hidden = true;
+      elements.revealButton.hidden = false;
+      elements.replayButton.hidden = false;
     } else {
-      elements.feedback.textContent = `Not the tactical idea yet. ${move.san} is legal; the position is reset so you can try again.`;
-      restartPosition(false);
+      elements.feedback.classList.remove("is-success");
+      elements.feedback.textContent = `Not quite. ${move.san} is legal; the position is reset so you can try again.`;
+      resetPosition();
     }
     renderBoard();
   }
@@ -300,22 +350,11 @@ export async function bootDailyPuzzle() {
     });
   }
 
-  function restartPosition(announce = true) {
-    ensureToday();
+  function resetPosition() {
     if (!puzzle) return;
     game = new Chess(puzzle.fen);
     selectedSquare = "";
     lastMove = null;
-    hintStep = 0;
-    assisted = false;
-    solvedThisSession = false;
-    inSession = true;
-    elements.play.hidden = false;
-    elements.start.hidden = true;
-    elements.hint.hidden = true;
-    if (announce) elements.feedback.textContent = dayRecord().completed
-      ? "Position restarted for practice. Today's completed local record will not change."
-      : "Position restarted. Select a piece, then a highlighted destination.";
     renderBoard();
   }
 
@@ -327,19 +366,23 @@ export async function bootDailyPuzzle() {
     hintStep += 1;
     elements.hint.textContent = text;
     elements.hint.hidden = false;
+    elements.hintButton.textContent = hintStep < puzzle.hints.length ? "Another hint" : "Hint shown";
+    elements.hintButton.disabled = hintStep >= puzzle.hints.length;
     elements.feedback.textContent = `Hint ${Math.min(hintStep, puzzle.hints.length)} of ${puzzle.hints.length}. Take your time; hints do not count as attempts.`;
   }
 
   function revealSolution() {
     ensureToday();
-    if (!inSession || !puzzle || solvedThisSession) return;
-    assisted = true;
+    if (!inSession || !puzzle || !dayRecord().completed || !solvedThisSession) return;
     const example = new Chess(puzzle.fen);
     const move = example.move({ from: puzzle.solutionUci.slice(0, 2), to: puzzle.solutionUci.slice(2, 4), ...(puzzle.solutionUci.length > 4 ? { promotion: puzzle.solutionUci[4] } : {}) });
     if (!move) return;
-    elements.hint.textContent = `One correct move: ${move.san}. Revealing does not complete the puzzle; play a correct move to record a local solve.`;
+    game = example;
+    lastMove = { from: move.from, to: move.to };
+    elements.hint.textContent = `Solution: ${move.san}. ${puzzle.explanation}`;
     elements.hint.hidden = false;
-    elements.feedback.textContent = puzzle.explanation;
+    elements.feedback.textContent = "Solution preview · your completed record stays unchanged.";
+    renderBoard();
   }
 
   function validatePuzzle(item) {
@@ -383,7 +426,7 @@ export async function bootDailyPuzzle() {
     elements.board.querySelector(`[data-square="${focusedSquare}"]`)?.focus({ preventScroll: true });
   }
 
-  elements.start.addEventListener("click", startOrReplay);
+  elements.replayButton.addEventListener("click", () => startOrReplay(true));
   elements.board.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-square]");
     if (button) handleSquare(button.dataset.square);
@@ -416,7 +459,6 @@ export async function bootDailyPuzzle() {
   });
   document.getElementById("dailyPuzzleHintButton").addEventListener("click", showHint);
   document.getElementById("dailyPuzzleRevealButton").addEventListener("click", revealSolution);
-  document.getElementById("dailyPuzzleRestartButton").addEventListener("click", () => restartPosition(true));
   document.querySelector(".real-puzzle-modes")?.addEventListener("click", (event) => {
     if (event.target.closest("[data-real-mode]")) closeDailyMode();
   }, true);
@@ -429,12 +471,10 @@ export async function bootDailyPuzzle() {
       renderSummary();
     }
   });
-  elements.start.disabled = false;
   dayKey = utcDayKey();
   puzzle = currentDayPuzzle();
   game = new Chess(puzzle.fen);
   renderSummary();
-  elements.storage.textContent = "Device-local progress · offline ready after this puzzle pack is cached";
   updateNextPuzzle();
   dailyTimer = window.setInterval(() => {
     ensureToday();

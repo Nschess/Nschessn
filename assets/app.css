@@ -43830,12 +43830,12 @@ body.friend-challenge-mode #play :is(
    studio. Keep these rules scoped so Trainer/Rush/Streak/Battle are unchanged. */
 #puzzles .daily-puzzle-panel {
   min-width: 0;
-  margin: 0 0 16px;
-  padding: clamp(14px, 2.5vw, 24px);
-  border: 1px solid color-mix(in srgb, var(--line) 78%, var(--green));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--panel) 88%, transparent);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .12);
+  margin: 0 0 12px;
+  padding: clamp(12px, 1.8vw, 20px);
+  border: 1px solid color-mix(in srgb, var(--line) 78%, var(--blue));
+  border-radius: 14px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--panel) 94%, var(--blue) 6%), color-mix(in srgb, var(--panel) 97%, #7258d6 3%));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .13);
 }
 
 #puzzles .daily-puzzle-panel[hidden],
@@ -43846,39 +43846,48 @@ body.friend-challenge-mode #play :is(
 
 #puzzles .real-puzzle-shell[hidden] { display: none !important; }
 
-#puzzles .daily-puzzle-intro {
+#puzzles .daily-puzzle-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, .9fr);
-  gap: 18px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr);
+  gap: 14px 24px;
+  align-items: end;
 }
 
-#puzzles .daily-puzzle-intro h3 {
-  margin: 2px 0 8px;
-  font-size: clamp(1.35rem, 2.6vw, 1.8rem);
+#puzzles .daily-puzzle-heading .section-kicker {
+  margin: 0 0 3px;
+  color: var(--blue);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .12em;
 }
 
-#puzzles .daily-puzzle-intro p { max-width: 64ch; margin: 0; }
+#puzzles .daily-puzzle-heading h3 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2vw, 1.55rem);
+  letter-spacing: -.025em;
+}
+
+#puzzles .daily-puzzle-subtitle { margin: 3px 0 0; color: var(--muted); font-size: .86rem; }
 
 #puzzles .daily-puzzle-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
   min-width: 0;
 }
 
 #puzzles .daily-puzzle-summary > div {
   min-width: 0;
-  padding: 10px 11px;
+  padding: 8px 9px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  background: color-mix(in srgb, var(--panel-2, var(--panel)) 68%, transparent);
 }
 
 #puzzles .daily-puzzle-summary strong,
 #puzzles .daily-puzzle-summary span { display: block; overflow-wrap: anywhere; }
-#puzzles .daily-puzzle-summary strong { color: var(--soft); font-size: 1rem; }
-#puzzles .daily-puzzle-summary span { color: var(--muted); font-size: .72rem; font-weight: 700; }
+#puzzles .daily-puzzle-summary strong { color: var(--soft); font-size: .94rem; line-height: 1.15; }
+#puzzles .daily-puzzle-summary span { color: var(--muted); font-size: .66rem; font-weight: 700; }
 
 #puzzles .daily-puzzle-local-note,
 #puzzles .daily-puzzle-offline,
@@ -43887,29 +43896,24 @@ body.friend-challenge-mode #play :is(
   font-size: .84rem;
 }
 
-#puzzles .daily-puzzle-local-note {
-  margin: 14px 0 0;
-  padding: 9px 12px;
-  border-inline-start: 3px solid var(--green);
-  background: color-mix(in srgb, var(--green) 9%, transparent);
-}
+#puzzles .daily-puzzle-local-note { margin: 0; font-size: .74rem; }
 
 #puzzles .daily-puzzle-play {
   display: grid;
-  grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
-  gap: clamp(16px, 3vw, 28px);
-  align-items: start;
-  margin-block-start: 18px;
+  grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
+  gap: clamp(14px, 2.4vw, 24px);
+  align-items: center;
+  margin-block-start: 14px;
 }
 
 #puzzles .daily-puzzle-board-wrap {
-  width: min(100%, 440px);
+  width: min(100%, 520px);
   min-width: 0;
   aspect-ratio: 1;
   margin-inline: auto;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 11px;
   background: var(--panel);
 }
 
@@ -43985,32 +43989,34 @@ body.friend-challenge-mode #play :is(
 
 #puzzles .daily-puzzle-details {
   display: grid;
-  gap: 12px;
+  gap: 9px;
   min-width: 0;
   align-content: start;
 }
 
-#puzzles .daily-puzzle-details h4 { margin: 0; font-size: 1.18rem; }
+#puzzles .daily-puzzle-details h4 { margin: 0; font-size: clamp(1.1rem, 1.5vw, 1.35rem); }
 #puzzles .daily-puzzle-details > p { margin: 0; }
 
 #puzzles .daily-puzzle-feedback,
 #puzzles .daily-puzzle-hint {
-  min-height: 48px;
-  padding: 11px 13px;
-  border-inline-start: 4px solid var(--green);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--green) 12%, var(--panel));
+  min-height: 42px;
+  padding: 9px 11px;
+  border-inline-start: 3px solid var(--blue);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--blue) 10%, var(--panel));
   color: var(--soft);
   line-height: 1.5;
 }
 
 #puzzles .daily-puzzle-hint {
-  border-inline-start-color: #e7b65d;
-  background: color-mix(in srgb, #e7b65d 12%, var(--panel));
+  border-inline-start-color: #8b78e6;
+  background: color-mix(in srgb, #8b78e6 12%, var(--panel));
 }
 
-#puzzles .daily-puzzle-actions,
-#puzzles .daily-puzzle-launch-row {
+#puzzles .daily-puzzle-feedback.is-success { border-inline-start-color: var(--green); background: color-mix(in srgb, var(--green) 12%, var(--panel)); }
+#puzzles .daily-puzzle-actions [hidden] { display: none !important; }
+
+#puzzles .daily-puzzle-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -44018,36 +44024,32 @@ body.friend-challenge-mode #play :is(
 }
 
 #puzzles .daily-puzzle-actions .button,
-#puzzles .daily-puzzle-launch-row .button,
 #puzzles .real-puzzle-modes [data-daily-puzzle-launch] {
   min-width: 44px;
   min-height: 44px;
 }
 
-#puzzles .daily-puzzle-launch-row {
-  margin-block-start: 14px;
-  justify-content: space-between;
-}
-
-#puzzles .daily-puzzle-offline { margin: 0; }
+#puzzles .daily-puzzle-actions .button { padding-inline: 14px; }
 
 @media (max-width: 760px) {
-  #puzzles .daily-puzzle-intro,
+  #puzzles .daily-puzzle-header,
   #puzzles .daily-puzzle-play {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  #puzzles .daily-puzzle-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #puzzles .daily-puzzle-header { gap: 10px; }
+  #puzzles .daily-puzzle-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   #puzzles .daily-puzzle-board-wrap { width: min(100%, calc(100vw - 40px), 520px); }
+  #puzzles .daily-puzzle-details { gap: 8px; }
 }
 
 @media (max-width: 360px) {
-  #puzzles .daily-puzzle-panel { padding: 12px; }
-  #puzzles .daily-puzzle-summary { gap: 5px; }
-  #puzzles .daily-puzzle-summary > div { padding: 8px 6px; }
-  #puzzles .daily-puzzle-summary span { font-size: .66rem; }
-  #puzzles .daily-puzzle-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #puzzles .daily-puzzle-actions .button { width: 100%; }
+  #puzzles .daily-puzzle-panel { padding: 10px; }
+  #puzzles .daily-puzzle-summary { gap: 4px; }
+  #puzzles .daily-puzzle-summary > div { padding: 7px 4px; }
+  #puzzles .daily-puzzle-summary strong { font-size: .82rem; }
+  #puzzles .daily-puzzle-summary span { font-size: .59rem; }
+  #puzzles .daily-puzzle-actions .button { flex: 1 1 auto; padding-inline: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,13 +1,13 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v191-original-daily-puzzle-32";
+const CACHE_NAME = "nschess-shell-v192-daily-puzzle-ux-perf";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=daily-original-v1",
+  "./assets/app.css?v=daily-compact-v1",
   "./assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces",
   "./assets/app.js?v=play-multiplayer-truth-v239",
   "./site.webmanifest",

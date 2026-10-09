@@ -14,7 +14,7 @@ if (launch) {
 
     launch.disabled = true;
     if (status) status.textContent = "Loading and checking today's original puzzle…";
-    loadPromise ||= import("./daily-puzzle.mjs?v=daily-original-v2")
+    loadPromise ||= import("./daily-puzzle.mjs?v=daily-compact-v1")
       .then((module) => module.bootDailyPuzzle());
     try {
       experience = await loadPromise;

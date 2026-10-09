@@ -72,6 +72,7 @@ async function main() {
   try {
     browser = await chromium.launch({ headless: true, timeout: 20000 });
     const context = await browser.newContext({ viewport: { width: 1366, height: 900 }, serviceWorkers: "allow" });
+    if (process.env.DAILY_BLOCK_EXTERNAL !== "0") await context.route("https://**/*", (route) => route.abort());
     const page = await context.newPage();
     await page.goto(`${origin}/#puzzles`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => {
@@ -79,10 +80,21 @@ async function main() {
       return button && !button.disabled;
     }, null, { timeout: 10000 });
     const beforeOpenResources = await page.evaluate(() => performance.getEntriesByType("resource").map((entry) => new URL(entry.name).pathname));
+    const initialShellBytes = await page.evaluate(() => performance.getEntriesByType("resource")
+      .filter((entry) => new URL(entry.name).origin === location.origin && /\/(?:index\.html|assets\/app\.(?:css|js)|assets\/daily-puzzle-launcher\.mjs)$/.test(new URL(entry.name).pathname))
+      .reduce((total, entry) => total + entry.decodedBodySize, 0));
     assert.equal(beforeOpenResources.some((pathname) => pathname.endsWith("/assets/daily-puzzle.mjs")), false, "the full Daily interaction module is not downloaded before the player opens the mode");
     assert.equal(beforeOpenResources.some((pathname) => pathname.endsWith("/data/daily-puzzles-original.v1.json")), false, "the Daily puzzle pack is not downloaded before the player opens the mode");
-    await page.locator("[data-daily-puzzle-launch]").click();
+    const dailyOpenStarted = await page.evaluate(() => {
+      window.__dailyOpenStarted = performance.now();
+      document.querySelector("[data-daily-puzzle-launch]").click();
+      return window.__dailyOpenStarted;
+    });
+    await page.waitForFunction(() => document.querySelector("[data-daily-puzzle-launch]")?.disabled === true);
     await assert.doesNotReject(() => page.locator("#dailyPuzzlePanel").waitFor({ state: "visible" }));
+    await page.waitForFunction(() => document.querySelector("[data-daily-puzzle-launch]")?.disabled === false);
+    const dailyOpenMs = await page.evaluate((started) => Math.round(performance.now() - started), dailyOpenStarted);
+    assert.ok(dailyOpenMs < 1800, `the selected puzzle opens within 1.8s in the local cold browser (${dailyOpenMs}ms)`);
     const afterOpenResources = await page.evaluate(() => performance.getEntriesByType("resource").map((entry) => new URL(entry.name).pathname));
     assert.ok(afterOpenResources.some((pathname) => pathname.endsWith("/assets/daily-puzzle.mjs")), "the Daily interaction module loads when requested");
     assert.ok(afterOpenResources.some((pathname) => pathname.endsWith("/data/daily-puzzles-original.v1.json")), "the original puzzle pack loads when requested");
@@ -99,9 +111,25 @@ async function main() {
     assert.ok(correct.length, `${puzzle.id} exposes at least one accepted move`);
     assert.ok(wrong, `${puzzle.id} has a legal alternative for wrong-move feedback`);
 
-    await page.locator("#dailyPuzzleStartButton").click();
     assert.equal(await page.locator("#dailyPuzzleBoard button[data-square]").count(), 64);
     assert.equal(await page.locator("#dailyPuzzleSide").innerText(), new Chess(puzzle.fen).turn() === "w" ? "White to move" : "Black to move", "the displayed side to move matches the validated FEN");
+    const boardIdentity = await page.evaluate((sourceSquare) => {
+      const board = document.getElementById("dailyPuzzleBoard");
+      const source = board.querySelector(`button[data-square="${sourceSquare}"]`);
+      const selectSamples = [];
+      for (let sample = 0; sample < 5; sample += 1) {
+        const started = performance.now();
+        source.click();
+        selectSamples.push(performance.now() - started);
+        source.click();
+      }
+      const retained = source === board.querySelector(`button[data-square="${source.dataset.square}"]`);
+      source.focus({ preventScroll: true });
+      selectSamples.sort((a, b) => a - b);
+      return { selectMs: Math.round(selectSamples[2] * 100) / 100, retained };
+    }, legal[0].from);
+    assert.equal(boardIdentity.retained, true, "selecting a square preserves the existing button node and keyboard focus");
+    assert.ok(boardIdentity.selectMs < 35, `selecting a square completes within 35ms (${boardIdentity.selectMs}ms)`);
     await page.keyboard.press("ArrowRight");
     assert.ok(await page.locator("#dailyPuzzleBoard button:focus").count(), "the board supports keyboard focus movement");
 
@@ -119,7 +147,7 @@ async function main() {
     await page.locator(`#dailyPuzzleBoard [data-square="${illegalFrom}"]`).click();
 
     await playMove(page, wrong);
-    await page.getByText(/Not the tactical idea|not the puzzle idea/i).waitFor({ state: "visible" });
+    await page.getByText(/Not quite/i).waitFor({ state: "visible" });
     let saved = await page.evaluate(() => JSON.parse(localStorage.getItem("nschess.dailyPuzzle.v1")));
     assert.equal(saved.days[today].attempts, 1);
     assert.equal(saved.days[today].wrong, 1);
@@ -127,11 +155,10 @@ async function main() {
 
     await page.locator("#dailyPuzzleHintButton").click();
     assert.equal(await page.locator("#dailyPuzzleHint").isVisible(), true);
-    await page.locator("#dailyPuzzleRevealButton").click();
-    assert.match(await page.locator("#dailyPuzzleHint").innerText(), /One correct move/);
+    assert.equal(await page.locator("#dailyPuzzleRevealButton").isHidden(), true, "solution stays out of the live solve flow");
+    assert.equal(await page.locator("#dailyPuzzleRestartButton").isHidden(), true, "no redundant restart/replay control appears before completion");
     saved = await page.evaluate(() => JSON.parse(localStorage.getItem("nschess.dailyPuzzle.v1")));
-    assert.equal(saved.days[today].completed, false, "revealing alone does not complete the local puzzle");
-    await page.locator("#dailyPuzzleRestartButton").click();
+    assert.equal(saved.days[today].completed, false, "a hint alone does not complete the local puzzle");
     await playMove(page, correct[0]);
     await page.getByText(/Solved:/).waitFor({ state: "visible" });
     saved = await page.evaluate(() => JSON.parse(localStorage.getItem("nschess.dailyPuzzle.v1")));
@@ -140,6 +167,11 @@ async function main() {
     assert.equal(saved.days[today].completed, true);
     assert.equal(await page.locator("#dailyPuzzleStreak").innerText(), "1 day");
     assert.match(await page.locator("#dailyPuzzleFeedback").innerText(), /no XP, rating, coins, or account reward/i);
+    assert.equal(await page.locator("#dailyPuzzleHintButton").isHidden(), true, "the hint action is replaced by post-solve options");
+    assert.equal(await page.locator("#dailyPuzzleRevealButton").isVisible(), true);
+    assert.equal(await page.locator("#dailyPuzzleRestartButton").innerText(), "Practice again");
+    await page.locator("#dailyPuzzleRevealButton").click();
+    assert.match(await page.locator("#dailyPuzzleHint").innerText(), /Solution:/);
 
     const layouts = [];
     for (const width of [1366, 390, 375, 320]) {
@@ -171,8 +203,10 @@ async function main() {
     await page.locator("[data-daily-puzzle-launch]").click();
     await page.locator("#dailyPuzzlePanel").waitFor({ state: "visible" });
     assert.equal(await page.locator("#dailyPuzzleAttempts").innerText(), "2", "attempts persist on reload");
-    assert.match(await page.locator("#dailyPuzzleStartButton").innerText(), /Practice today's puzzle again/);
-    await page.locator("#dailyPuzzleStartButton").click();
+    assert.match(await page.locator("#dailyPuzzleFeedback").innerText(), /Solved today/);
+    assert.equal(await page.locator("#dailyPuzzleBoard button[data-square]:disabled").count(), 64, "a saved completion reopens in a clear read-only success state");
+    assert.equal(await page.locator("#dailyPuzzleRestartButton").isVisible(), true);
+    await page.locator("#dailyPuzzleRestartButton").click();
     const beforeReplay = await page.evaluate(() => localStorage.getItem("nschess.dailyPuzzle.v1"));
     const replayWrong = new Chess(puzzle.fen).moves({ verbose: true }).find((move) => !objectiveMove(puzzle, move, Chess));
     await playMove(page, replayWrong);
@@ -198,15 +232,17 @@ async function main() {
     await page.locator("[data-daily-puzzle-launch]").click();
     await page.locator("#dailyPuzzlePanel").waitFor({ state: "visible" });
     assert.equal(await page.locator("#dailyPuzzlePanel").isVisible(), true, "cached puzzle module and catalog reopen offline");
-    await page.locator("#dailyPuzzleStartButton").click();
     assert.equal(await page.locator("#dailyPuzzleBoard button[data-square]").count(), 64, "the cached chess rules and pieces render offline");
     const beforeOfflineReplay = await page.evaluate(() => localStorage.getItem("nschess.dailyPuzzle.v1"));
     await playMove(page, correct[0]);
-    assert.match(await page.locator("#dailyPuzzleFeedback").innerText(), /already completed today/i, "an offline legal move is processed by the cached chess rules");
+    assert.match(await page.locator("#dailyPuzzleFeedback").innerText(), /Practice only|record is unchanged/i, "an offline legal move is processed by cached chess rules without changing the saved completion");
     assert.equal(await page.evaluate(() => localStorage.getItem("nschess.dailyPuzzle.v1")), beforeOfflineReplay, "offline replay does not mint another completion");
     await context.setOffline(false);
 
-    console.log(JSON.stringify({ result: "PASS", puzzle: puzzle.id, legalAlternatives: correct.length, wrongMove: wrong.san, completionPersisted: true, replayNoMutation: true, offlineReopen: true, layouts }, null, 2));
+    const dailyResourceMetrics = await page.evaluate(() => performance.getEntriesByType("resource")
+      .filter((entry) => /daily-puzzle|daily-puzzles-original|chess\.js-1\.0\.0|pieces\/merida/.test(entry.name))
+      .map((entry) => ({ path: new URL(entry.name).pathname, durationMs: Math.round(entry.duration), transferBytes: entry.transferSize, decodedBytes: entry.decodedBodySize })));
+    console.log(JSON.stringify({ result: "PASS", puzzle: puzzle.id, initialShellBytes, dailyOpenMs, boardSelectionMs: boardIdentity.selectMs, boardSelectionRetainsSquareNode: boardIdentity.retained, dailyResourceMetrics, legalAlternatives: correct.length, wrongMove: wrong.san, completionPersisted: true, replayNoMutation: true, offlineReopen: true, layouts }, null, 2));
     await context.close();
   } finally {
     if (browser) await browser.close();
