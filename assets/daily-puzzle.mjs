@@ -2,7 +2,7 @@ export async function bootDailyPuzzle() {
   const root = document.getElementById("dailyPuzzlePanel");
   if (!root) throw new Error("The Daily Puzzle interface is unavailable.");
   const [response, chessModule, dailyCore] = await Promise.all([
-    fetch(new URL("../data/daily-puzzles-original.v1.json", import.meta.url), { cache: "force-cache" }),
+    fetch(new URL("../data/daily-puzzles-original.v1.json?v=daily-original-v2", import.meta.url), { cache: "force-cache" }),
     import("./vendor/chess.js-1.0.0.mjs"),
     import("./daily-puzzle-core.mjs")
   ]);
@@ -10,7 +10,7 @@ export async function bootDailyPuzzle() {
   const { DAILY_STORAGE_KEY, dailyStreak, nextUtcMidnight, parseDailyState, recordDailyAttempt, selectDailyPuzzle, utcDayKey } = dailyCore;
   if (!response.ok) throw new Error("Reconnect once to cache the original puzzle pack for offline play.");
   const catalog = await response.json();
-  if (catalog.version !== 1 || !Array.isArray(catalog.puzzles) || catalog.puzzles.length < 4) throw new Error("The original puzzle pack has an unsupported format.");
+  if (catalog.version !== 1 || !Array.isArray(catalog.puzzles) || catalog.puzzles.length < 30) throw new Error("The original puzzle pack must include at least 30 verified positions.");
   const puzzles = catalog.puzzles.map((puzzle) => validatePuzzle(puzzle));
   if (new Set(puzzles.map((puzzle) => puzzle.id)).size !== puzzles.length) throw new Error("Puzzle identifiers must be unique.");
 
