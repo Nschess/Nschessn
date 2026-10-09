@@ -5402,6 +5402,23 @@
       activeAdventureBoss = adventureBosses.some((boss) => boss.id === bossBattleState.active) ? bossBattleState.active : "";
       flexBadgeState = normalizeFlexBadgeState(savedPuzzleState.flexBadges, savedPuzzleState.store, readJsonStorage(learnerPrefsStorageKey, {}));
 
+      // Review analysis is account-owned runtime state.  Invalidate it before
+      // restoring the new workspace so a delayed Stockfish result or cached
+      // review from A cannot become visible while B is hydrating (including
+      // an A -> B -> A transition).
+      cancelActiveReviewAnalysis("Account workspace changed");
+      activeMatchReview = null;
+      reviewRequestedPgn = "";
+      reviewRetryState = null;
+      reviewSelfAnalysisState = null;
+      postGameDecisionPgn = "";
+      // Terminal signatures and local recording guards are account-owned too.
+      // Clear them at the workspace boundary so a completed game can reopen
+      // its authoritative post-game Review after A → B → A without minting
+      // another server result.
+      completedGameSignature = "";
+      coachGameRecorded = false;
+
       // Non-rendered account services also keep in-memory state.  Reset them
       // at the same workspace boundary as the profile/progress globals so a
       // delayed A response cannot repopulate B's friends, messages, review,
@@ -18492,7 +18509,9 @@
           gameType: state.gameType || "casual",
           clock: state.clock || "none",
           serverRevision: state.serverRevision || 0,
-          completedAt: state.remoteUpdatedAt || state.updatedAt || new Date().toISOString()
+          completedAt: state.remoteUpdatedAt || state.updatedAt || new Date().toISOString(),
+          source: "server-authoritative",
+          authority: "server"
         }
       };
     }
@@ -19977,6 +19996,66 @@
     let postGameDecisionPgn = "";
     let reviewSelfAnalysisState = null;
 
+    const REVIEW_SKILL_DEFINITIONS = Object.freeze([
+      { key: "foundations", label: "Board foundations", explanation: "Build a reliable board-and-piece habit." },
+      { key: "piece_activity", label: "Piece activity", explanation: "Improve pieces by using their natural routes." },
+      { key: "opening_principles", label: "Opening principles", explanation: "Control the center, develop, and make the king safer." },
+      { key: "king_safety", label: "King safety", explanation: "Recognize checks and make the king harder to attack." },
+      { key: "piece_safety", label: "Piece safety", explanation: "Spot loose pieces and answer threats before they cost material." },
+      { key: "tactics", label: "Tactics & calculation", explanation: "Practice forcing moves: checks, captures, and threats." },
+      { key: "pawn_play", label: "Pawn play", explanation: "Use pawn breaks, special moves, and promotion ideas with purpose." },
+      { key: "endgames", label: "Endgame foundations", explanation: "Activate the king and convert simple advantages." },
+      { key: "mating_patterns", label: "Mating patterns", explanation: "Learn how checks become a safe, forced finish." }
+    ]);
+
+    function normalizeReviewProvenance(review = {}) {
+      const source = review?.provenance?.source === "server-authoritative"
+        ? "server-authoritative"
+        : "local";
+      return source === "server-authoritative"
+        ? {
+          source,
+          label: "Server-synced game",
+          note: "Completed authenticated game.",
+          canonical: true
+        }
+        : {
+          source: "local",
+          label: "Local game review",
+          note: "Local only · no Elo or canonical progress changes.",
+          canonical: false
+        };
+    }
+
+    function getReviewLearningSignal(review = null) {
+      const primary = getReviewPrimaryMoment(review).move;
+      if (!primary || !primary.engineVerified) return null;
+      const text = `${primary.tactic || ""} ${primary.explanation || ""} ${primary.san || ""}`.toLowerCase();
+      const key = /mate|check/.test(text)
+        ? "mating_patterns"
+        : /fork|pin|skewer|discovered|double|sacrifice|threat/.test(text)
+          ? "tactics"
+          : /king|castle|back rank/.test(text)
+            ? "king_safety"
+            : /pawn|promotion|en passant/.test(text)
+              ? "pawn_play"
+              : /endgame|opposition|king walk/.test(text)
+                ? "endgames"
+                : /hanging|loose|defend|safety|capture/.test(text)
+                  ? "piece_safety"
+                  : /opening|develop|center/.test(text)
+                    ? "opening_principles"
+                    : "foundations";
+      const definition = REVIEW_SKILL_DEFINITIONS.find((skill) => skill.key === key) || REVIEW_SKILL_DEFINITIONS[0];
+      return {
+        key: definition.key,
+        label: definition.label,
+        explanation: definition.explanation,
+        move: primary.san,
+        evidence: `Engine-verified moment ${primary.ply}: ${primary.san}.`
+      };
+    }
+
     const reviewQualityMeta = {
       "Opening Book": { icon: "OB", color: "#82c9ff", cue: "menu" },
       Brilliant: { icon: "!!", color: "#ffd36b", cue: "brilliant" },
@@ -20337,7 +20416,7 @@
       if (summary) summary.textContent = message;
     }
 
-    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}, sourceGame = coachGame) {
+    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}, sourceGame = coachGame, provenance = { source: "local", authority: "client" }) {
       if (!sourceGame || !CoachChess) return null;
       const moves = sourceGame.history({ verbose: true });
       if (!moves.length) return null;
@@ -20438,6 +20517,9 @@
       const mistakes = playerMoves.filter(isReviewLearningMove).sort((left, right) => getReviewMomentScore(right) - getReviewMomentScore(left));
       const mvp = playerMoves.find((move) => /Brilliant|Great|Best|Excellent/.test(move.label)) || playerMoves[0] || reviewed[0];
       const turning = mistakes[0] || mvp || reviewed[0];
+      const criticalMoments = [...new Map([turning, mistakes[0], mvp]
+        .filter(Boolean)
+        .map((move) => [move.ply, move])).values()].slice(0, 3);
       const verifiedMoves = reviewed.filter((move) => move.engineVerified).length;
       const averageDepth = analysisDepths.length
         ? Math.round(analysisDepths.reduce((sum, depth) => sum + depth, 0) / analysisDepths.length)
@@ -20460,6 +20542,8 @@
           totalMoves: reviewed.length,
           mode: getReviewAnalysisModeLabel(analysisConfig.reviewMode)
         },
+        provenance: normalizeReviewProvenance({ provenance }),
+        criticalMoments,
         summary: {
           opening,
           turning: `${turning.ply}. ${turning.san} (${turning.label})`,
@@ -20474,6 +20558,7 @@
 
     function saveActiveMatchReview(review) {
       if (!review) return;
+      review = { ...review, provenance: normalizeReviewProvenance(review) };
       const existingIndex = matchReviews.findIndex((item) => item.pgn === review.pgn);
       if (existingIndex >= 0) {
         matchReviews[existingIndex] = review;
@@ -20685,6 +20770,7 @@
       const repair = document.getElementById("reviewGrowthRepair");
       const progress = document.getElementById("reviewGrowthProgress");
       if (!habit || !repair || !progress) return;
+      const provenance = normalizeReviewProvenance(review);
       const playerMoves = (review?.moves || []).filter((move) => move.color === getReviewPlayerColor());
       const strongest = [...playerMoves]
         .filter((move) => ["Brilliant", "Best", "Excellent", "Great", "Good", "Opening Book"].includes(move.label))
@@ -20699,8 +20785,8 @@
       habit.textContent = `Best habit: ${habitTheme}.`;
       repair.textContent = `Repair next: ${repairTheme}.`;
       progress.textContent = recurring > 1
-        ? `${recurring} reviewed moments point to this pattern. Retry it once, then train it.`
-        : `${reliableMoves}/${playerMoves.length || 0} of your moves were reliable. Turn this new clue into a habit.`;
+        ? `${recurring} ${provenance.source === "server-authoritative" ? "server-synced" : "local"} review moments point to this pattern. Retry it once, then train it.`
+        : `${reliableMoves}/${playerMoves.length || 0} of your moves were reliable in this ${provenance.source === "server-authoritative" ? "server-synced game" : "local game"}. Turn this clue into a habit.`;
     }
 
     function cancelActiveReviewAnalysis(reason = "Review closed") {
@@ -20857,6 +20943,10 @@
     function suspendGameReviewWorkspaceForNavigation() {
       const reviewPage = document.getElementById("gameReview");
       if (!reviewPage?.classList.contains("is-review-page") || isGameReviewRoute()) return;
+      // Leaving Review transfers ownership to the destination route.  A
+      // late Stockfish result must not repaint the next screen or repopulate
+      // a review that the player has already abandoned.
+      cancelActiveReviewAnalysis("Review route changed");
       clearAllAnalysisOverlays();
       window.clearInterval(reviewReplayTimer);
       reviewReplayTimer = 0;
@@ -20912,6 +21002,8 @@
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
       mountGameReviewWorkspace();
       const active = review.moves[reviewReplayIndex] || review.moves[0];
+      const provenance = normalizeReviewProvenance(review);
+      const learningSignal = getReviewLearningSignal(review);
       const oneMoment = getReviewOneMoment(review);
       const oneMomentMove = oneMoment.move;
       const oneMomentTitle = document.getElementById("reviewOneMomentTitle");
@@ -20930,10 +21022,29 @@
       }
       const practiceRecommendationTitle = document.getElementById("reviewPracticeRecommendationTitle");
       const practiceRecommendationCopy = document.getElementById("reviewPracticeRecommendationCopy");
-      if (practiceRecommendationTitle) practiceRecommendationTitle.textContent = `Practice ${reviewPattern}`;
-      if (practiceRecommendationCopy) practiceRecommendationCopy.textContent = oneMomentMove
-        ? `Train ${reviewPattern} from move ${oneMomentMove.ply}.`
-        : "Train the pattern from this game once.";
+      const practiceRecommendation = document.getElementById("reviewPracticeRecommendation");
+      if (practiceRecommendation) {
+        const useLessonPath = Boolean(learningSignal && learningSignal.key !== "tactics");
+        practiceRecommendation.href = useLessonPath ? "#paths" : "#puzzles";
+        if (useLessonPath) {
+          practiceRecommendation.dataset.siteTab = "paths";
+          practiceRecommendation.dataset.sitePanel = "paths";
+        } else {
+          practiceRecommendation.dataset.siteTab = "puzzles";
+          practiceRecommendation.dataset.sitePanel = "puzzles";
+        }
+        practiceRecommendation.dataset.reviewSkill = learningSignal?.key || "";
+      }
+      if (practiceRecommendationTitle) practiceRecommendationTitle.textContent = learningSignal
+        ? `${learningSignal.key === "tactics" ? "Practice" : "Study"} ${learningSignal.label}`
+        : `Practice ${reviewPattern}`;
+      if (practiceRecommendationCopy) practiceRecommendationCopy.textContent = learningSignal
+        ? `${learningSignal.evidence} Use the existing ${learningSignal.key === "tactics" ? "Trainer" : "lesson path"} next.`
+        : oneMomentMove
+          ? `Train ${reviewPattern} from move ${oneMomentMove.ply}.`
+          : "Train the pattern from this game once.";
+      panel.dataset.reviewProvenance = provenance.source;
+      panel.dataset.reviewCanonical = String(provenance.canonical);
       renderReviewRetryControls(review);
       renderReviewSelfAnalysisControls(review);
       if (!active?.engineVerified) reviewCompareMode = "your";
@@ -20947,7 +21058,7 @@
         void focusCard.offsetWidth;
       }
       updateReviewEvalRail(active);
-      document.getElementById("reviewSummaryLine").textContent = `${review.summary.opening} - one move at a time.`;
+      document.getElementById("reviewSummaryLine").textContent = `${provenance.label} · ${review.summary.opening} - one move at a time.`;
       const playerIsWhite = coachPlayerColor !== "b";
       const playerAccuracy = playerIsWhite ? review.whiteAccuracy : review.blackAccuracy;
       const opponentAccuracy = playerIsWhite ? review.blackAccuracy : review.whiteAccuracy;
@@ -20965,7 +21076,7 @@
       }
       const qualityBadge = document.getElementById("reviewQualityBadge");
       const confidence = getReviewEngineConfidence(review);
-      setReviewDashboardText("reviewEngineConfidence", confidence);
+      setReviewDashboardText("reviewEngineConfidence", `${confidence} · ${provenance.note}`);
       if (qualityBadge && active) qualityBadge.textContent = `${meta.icon} ${active.label}`;
       const evalBadge = document.getElementById("reviewEvalBadge");
       if (evalBadge && active) evalBadge.textContent = active.cpLoss ? `Eval change: -${active.cpLoss} cp` : "Eval steady";
@@ -20991,14 +21102,19 @@
         keyRow.hidden = false;
         const primaryMoment = getReviewPrimaryMoment(review);
         const bestMoment = getReviewBestMoment(review);
-        const mistakeIndex = primaryMoment.index;
-        const bestIndex = bestMoment.index;
-        const keys = [
-          ["Focus", mistakeIndex >= 0 ? mistakeIndex : bestIndex],
-          ["Best", bestIndex],
-          ["Critical", mistakeIndex],
+        const fallbackKeys = [
+          ["Focus", primaryMoment.index >= 0 ? primaryMoment.index : bestMoment.index],
+          ["Best", bestMoment.index],
           ["Finish", review.moves.length - 1]
-        ].filter(([, index], position, list) => index >= 0 && list.findIndex(([, candidate]) => candidate === index) === position);
+        ];
+        const criticalIndices = (Array.isArray(review.criticalMoments) ? review.criticalMoments : [])
+          .map((moment) => review.moves.findIndex((move) => move?.ply === moment?.ply))
+          .filter((index, position, list) => index >= 0 && list.indexOf(index) === position)
+          .slice(0, 3);
+        const keys = (criticalIndices.length
+          ? criticalIndices.map((index, position) => [["Focus", "Critical", "Best"][position] || "Moment", index])
+          : fallbackKeys)
+          .filter(([, index], position, list) => index >= 0 && list.findIndex(([, candidate]) => candidate === index) === position);
         keyRow.replaceChildren(...keys.map(([label, index]) => {
           const move = review.moves[index];
           const keyMeta = getReviewQualityMeta(move.label);
@@ -22014,11 +22130,16 @@
       if (friendChallengeState?.remote) {
         const friendSnapshot = getFriendCanonicalReviewSnapshot(friendChallengeState);
         if (friendSnapshot && (friendChallengeState.status === "completed" || getFriendGameOutcome(friendChallengeState))) {
-          return { game: friendSnapshot.game, pgn: friendSnapshot.pgn, metadata: friendSnapshot.metadata };
+          return {
+            game: friendSnapshot.game,
+            pgn: friendSnapshot.pgn,
+            metadata: friendSnapshot.metadata,
+            provenance: { source: "server-authoritative", authority: "server", gameCode: friendSnapshot.metadata?.code || "" }
+          };
         }
       }
       if (coachGame && (isCoachGameOver() || coachDrawAgreed)) {
-        return { game: coachGame, pgn: coachGame.pgn() };
+        return { game: coachGame, pgn: coachGame.pgn(), provenance: { source: "local", authority: "client" } };
       }
       const savedReview = activeMatchReview;
       const pgn = String(savedReview?.pgn || "").trim();
@@ -22031,12 +22152,12 @@
             const applied = game.move({ from: move.from, to: move.to, ...(move.promotion ? { promotion: move.promotion } : {}) });
             if (!applied) return null;
           }
-          if (game.history().length === moves.length) return { game, pgn };
+          if (game.history().length === moves.length) return { game, pgn, provenance: { source: "local", authority: "client" } };
         }
         const game = new CoachChess();
         const loaded = typeof game.loadPgn === "function" ? game.loadPgn(pgn) : game.load_pgn?.(pgn);
         if (loaded === false || !game.history().length) return null;
-        return { game, pgn: game.pgn() };
+        return { game, pgn: game.pgn(), provenance: { source: "local", authority: "client" } };
       } catch {
         return null;
       }
@@ -22118,7 +22239,7 @@
         const label = mode === "deep" ? "Deep Review" : "Game Review";
         showReviewAnalysisError(token, `${label} stopped waiting for Stockfish. Try again to restart the engine.`);
       }, analysisTimeoutMs);
-      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && reviewRequestedPgn === pgn, updateAnalysisProgress, gameAtAnalysis)
+      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && reviewRequestedPgn === pgn, updateAnalysisProgress, gameAtAnalysis, analysisSnapshot.provenance)
         .then((review) => {
           window.clearTimeout(reviewWatchdog);
           if (!review || reviewAnalysisToken !== token || review.pgn !== pgn) return;
@@ -24617,12 +24738,31 @@
       const messageStamp = remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|");
       const revision = getFriendChallengeRevision(remote);
       const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteRevision === revision && previous.remoteMessageStamp === messageStamp;
-      if (unchanged && !boardNeedsRestore) return true;
+      // A completed challenge can be rehydrated from the same account-scoped
+      // snapshot after A → B → A.  The remote row is unchanged, but the
+      // account boundary intentionally cleared the post-game decision state;
+      // let the authoritative completion pass through once so Review can
+      // reopen without creating another server result.
+      const needsCompletedDecision = remote.status === "completed"
+        && !completedGameSignature
+        && !postGameDecisionPgn;
+      if (unchanged && !boardNeedsRestore && !needsCompletedDecision) return true;
       const next = normalizeFriendChallengeState(toFriendChallengeState(remote));
       let restoredFriendGame = null;
       if (boardNeedsRestore) {
         restoredFriendGame = buildFriendChallengeGameFromMoves(next);
         next.historyBasePly = restoredFriendGame ? 0 : getFriendMoveCount(remote);
+      }
+      // A completed friend result can be rehydrated after an account
+      // boundary.  Do not let a terminal signature from the previous
+      // session suppress the post-game decision for this fresh authoritative
+      // payload; duplicate payloads for the same mounted result still retain
+      // their existing idempotency guard.
+      const freshCompletedHydration = remote.status === "completed"
+        && (!previous?.remote || previous.remoteId !== remote.id);
+      if (freshCompletedHydration) {
+        completedGameSignature = "";
+        postGameDecisionPgn = "";
       }
       if (remote.status === "completed") {
         // The authoritative payload closes any locally persisted terminal
