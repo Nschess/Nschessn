@@ -24210,6 +24210,12 @@
         return;
       }
 
+      if (coachSelected) {
+        coachMessage = `${square} is not a legal destination. ${coachSelected} stays selected; choose a highlighted square.`;
+        scheduleCoachPanelUpdate();
+        return;
+      }
+
       coachSelected = "";
       coachLegalMoves = [];
       coachMessage = coachBotPaused
@@ -27563,11 +27569,12 @@
       renderGuidedGameReview(false);
       coachMessage = "Undo complete. Try a calmer move and check what is attacked.";
       renderCoachBoard();
+      scheduleCoachPanelUpdate();
     }
 
     function askCoachWhy() {
       coachMessage = coachWhyText;
-      renderCoachBoard();
+      scheduleCoachPanelUpdate();
     }
 
     function replayCoachMistake() {
