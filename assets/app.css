@@ -19856,6 +19856,19 @@
       .nav-mobile-panel { top: 64px; right: 9px; left: 9px; grid-template-columns: 1fr; }
     }
 
+    /* Preserve comfortable hit areas on touch layouts while keeping the
+       compact icon visuals and header hierarchy intact. */
+    @media (max-width: 760px) {
+      .nav-coin-chip,
+      .nav-icon-button {
+        min-width: 44px;
+        min-height: 44px;
+      }
+
+      .nav-icon-button { width: 44px; }
+      .nav-utilities .player-flex-chip { min-height: 44px; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .nav-coin-chip,
       .nav-icon-button { transition: none; }
@@ -38992,6 +39005,68 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   inline-size: min(100%, var(--interactive-board-size));
 }
 
+/* The turn/status signal belongs next to the board, not inside collapsed
+   setup controls. It is deliberately compact so the board remains primary. */
+.play-live-status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  inline-size: min(100%, var(--interactive-board-size, 720px));
+  margin: 0 auto 8px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--cq-accent-secondary, #7650ed) 38%, var(--cq-border, rgba(148, 163, 184, .22)));
+  border-radius: 12px;
+  color: var(--cq-text-primary, #f5f7ff);
+  background: color-mix(in srgb, var(--cq-surface-panel, #101a2d) 88%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+.play-live-status[hidden] { display: none; }
+
+.play-live-status-mark {
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: 50%;
+  background: var(--cq-accent-primary, #e7b65d);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cq-accent-primary, #e7b65d) 15%, transparent);
+}
+
+.play-live-status.is-your-turn .play-live-status-mark {
+  background: #6ee7b7;
+  box-shadow: 0 0 0 4px rgba(110, 231, 183, .14);
+}
+
+.play-live-status.is-thinking .play-live-status-mark {
+  background: #9b8cff;
+  box-shadow: 0 0 0 4px rgba(155, 140, 255, .14);
+}
+
+.play-live-status.is-complete .play-live-status-mark {
+  background: #8bd5ff;
+  box-shadow: 0 0 0 4px rgba(139, 213, 255, .14);
+}
+
+.play-live-status-copy {
+  display: grid;
+  gap: 2px;
+  min-inline-size: 0;
+}
+
+.play-live-status-copy strong,
+.play-live-status-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-live-status-copy strong { font-size: .82rem; letter-spacing: .02em; }
+.play-live-status-copy small { color: var(--cq-text-muted, #aab7ce); font-size: .72rem; }
+
+@media (max-width: 900px) {
+  .play-live-status { inline-size: calc(100% - 12px); }
+}
+
 @media (max-width: 620px) {
   .interactive-board-sizing-stage {
     max-inline-size: calc(100% - 12px) !important;
@@ -39070,8 +39145,8 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   position: absolute;
   inset: 50% 7px auto auto;
   display: grid;
-  width: 26px;
-  height: 26px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   padding: 0;
   border: 0;
@@ -39109,8 +39184,8 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
 }
 
 #bots .ai-bot-reset {
-  min-height: 28px;
-  padding: 4px 8px;
+  min-height: 44px;
+  padding: 6px 12px;
   border: 0;
   border-radius: 7px;
   color: var(--cq-accent-tertiary, #65e7f7);
@@ -39214,8 +39289,8 @@ body.name-effects-off .site-header .nav-utilities .player-flex-name.player-ident
   grid-column: 3;
   grid-row: 1 / 3;
   align-self: center;
-  min-width: 56px;
-  min-height: 33px;
+  min-width: 72px;
+  min-height: 44px;
   padding-inline: 9px;
 }
 
@@ -42895,11 +42970,11 @@ body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-card {
 
 @media (max-width: 699px) {
   .interactive-board-sizing-stage {
-    padding-block-end: 44px !important;
+    padding-block-end: 52px !important;
   }
 
   .interactive-board-actions {
-    inset: auto 0 -44px auto;
+    inset: auto 0 -52px auto;
     flex-direction: row;
     inline-size: auto;
     transform: none;
@@ -42914,7 +42989,12 @@ body:not(.site-tab-mode) #top > .home-feature-strip .home-feature-card {
   }
 
   .interactive-board-resize-handle::before { inset: 15px 3px 3px 15px !important; }
-  .interactive-board-fullscreen-button { min-block-size: 34px; }
+  .interactive-board-fullscreen-button,
+  .interactive-board-settings-button {
+    inline-size: 44px;
+    block-size: 44px;
+    min-block-size: 44px;
+  }
   .interactive-board-discovery { inset-inline-end: 64px; inset-block-end: 8px; max-inline-size: min(220px, calc(100% - 88px)); }
 }
 
@@ -42984,6 +43064,17 @@ html body #play:not(.is-review-mode) .match-board-column:fullscreen > .play-bott
 
 html body #play:not(.is-review-mode) .match-board-column:fullscreen > :not(.ai-player-card):not(.match-player-card):not(.play-board-wrap):not(.play-bottom-actionbar) {
   display: none !important;
+}
+
+/* The drag preview is appended to the fullscreen host so it remains in the
+   native top layer. Keep it visible while the generic fullscreen cleanup
+   hides utility children; without this exception the pointer state continues
+   to update but the held piece disappears during a fullscreen drag. */
+html body #play:not(.is-review-mode) .match-board-column:fullscreen >
+  :not(.ai-player-card):not(.match-player-card):not(.play-board-wrap):not(.play-bottom-actionbar).board-drag-ghost {
+  display: block !important;
+  position: fixed !important;
+  pointer-events: none !important;
 }
 
 html body #play:not(.is-review-mode) .match-board-column:fullscreen .interactive-board-sizing-stage {
@@ -43693,4 +43784,44 @@ body.friend-challenge-mode #play :is(
   .friend-match-actions .button
 ) {
   min-height: 44px;
+}
+
+/* Accessibility quality baseline: preserve compact card visuals while the
+   actual interactive hit areas remain comfortable on touch devices. */
+#bots .ai-bot-card > .button {
+  min-width: 72px;
+  min-height: 44px;
+  padding-inline: 10px;
+}
+
+#bots .ai-bot-clear {
+  width: 44px;
+  height: 44px;
+}
+
+#bots .ai-bot-reset {
+  min-height: 44px;
+  padding-inline: 12px;
+}
+
+@media (max-width: 760px) {
+  .nav-coin-chip,
+  .nav-icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .nav-icon-button { width: 44px; }
+  .nav-utilities .player-flex-chip { min-height: 44px; }
+}
+
+@media (max-width: 699px) {
+  .interactive-board-sizing-stage { padding-block-end: 52px !important; }
+  .interactive-board-actions { inset-block-end: -52px; }
+  .interactive-board-fullscreen-button,
+  .interactive-board-settings-button {
+    inline-size: 44px;
+    block-size: 44px;
+    min-block-size: 44px;
+  }
 }

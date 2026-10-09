@@ -17,6 +17,18 @@ const root = path.resolve(__dirname, "..");
 const port = Number(process.env.E2E_PORT || 4174);
 const baseUrl = `http://127.0.0.1:${port}`;
 
+// Chromium can leave the native fullscreen promise pending in restricted
+// headless environments.  Invoke the browser transition without returning
+// that promise to Playwright; the assertions below still wait for the actual
+// DOM/fullscreen state transition and report a bounded failure if it never
+// arrives.
+async function requestExitFullscreen(page) {
+  await page.evaluate(() => {
+    if (!document.fullscreenElement || typeof document.exitFullscreen !== "function") return;
+    try { void document.exitFullscreen(); } catch {}
+  }).catch(() => {});
+}
+
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
@@ -375,7 +387,7 @@ async function verifyPointerResizeAndFullscreen(page, selector) {
   assert.equal(await fullscreenHandle.boundingBox(), null,
     `${selector}: normal-mode resize handle remained visible in fullscreen.`);
 
-  await page.evaluate(() => document.exitFullscreen());
+  await requestExitFullscreen(page);
   await page.waitForFunction((target) => {
     const stageElement = document.querySelector(target)?.parentElement;
     return !document.fullscreenElement
@@ -733,7 +745,7 @@ async function runFullscreenResponsiveContract(browser) {
       assert.equal(await fullscreenHandle.boundingBox(), null,
         `fullscreen ${width}x${height}: normal-mode resize handle remained visible in fullscreen.`);
 
-      await page.evaluate(() => document.exitFullscreen());
+      await requestExitFullscreen(page);
       await page.waitForFunction((expected) => !document.fullscreenElement
         && !document.body.classList.contains("interactive-board-fullscreen-active")
         && Number(document.querySelector("#coachBoard")?.parentElement?.dataset.boardRequestedSize || 0) === expected,
@@ -753,9 +765,7 @@ async function runFullscreenResponsiveContract(browser) {
       await page.waitForFunction((previous) => Number(document.querySelector("#coachBoard")?.parentElement?.dataset.boardRequestedSize || 0) < previous,
         postFullscreenRequested, { timeout: 5000 });
     } finally {
-      if (await page.evaluate(() => Boolean(document.fullscreenElement)).catch(() => false)) {
-        await page.evaluate(() => document.exitFullscreen()).catch(() => {});
-      }
+      if (await page.evaluate(() => Boolean(document.fullscreenElement)).catch(() => false)) await requestExitFullscreen(page);
       await context.close();
     }
   }

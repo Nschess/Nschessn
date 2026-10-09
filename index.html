@@ -152,15 +152,15 @@
 
         <nav class="home-primary-actions" aria-label="Start an activity">
           <a class="home-primary-action is-primary" id="homePlayAction" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick"><span class="home-action-glyph" aria-hidden="true">&#9816;</span><span><strong>Play</strong><small>Start a focused game</small></span><b aria-hidden="true">&#8594;</b></a>
-          <a class="home-primary-action" id="newToChessButton" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles" data-home-action="daily-puzzle"><span class="home-action-glyph" aria-hidden="true">&#9671;</span><span><strong>Daily Puzzle</strong><small>Find today's pattern</small></span><b aria-hidden="true">&#8594;</b></a>
+          <a class="home-primary-action" id="newToChessButton" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive"><span class="home-action-glyph" aria-hidden="true">&#9671;</span><span><strong>Puzzle Practice</strong><small>Train with a position</small></span><b aria-hidden="true">&#8594;</b></a>
           <a class="home-primary-action" id="homeContinueLearningAction" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="home-action-glyph" aria-hidden="true">&#8961;</span><span><strong>Continue Learning</strong><small>Build one useful skill</small></span><b aria-hidden="true">&#8594;</b></a>
         </nav>
 
         <div class="home-command-grid">
           <section class="home-next-move" aria-labelledby="home-next-move-title">
             <div class="home-card-heading"><div><p class="home-command-kicker">Personalized focus</p><h2 id="home-next-move-title">Your Next Move</h2></div><span class="home-next-mark" aria-hidden="true">&#10022;</span></div>
-            <p class="home-next-reason" id="homeNextReason">Solve today's puzzle for XP and coins.</p>
-            <a class="button home-next-action" href="#puzzles" id="homeNextAction" data-home-action="daily-puzzle">Start daily puzzle</a>
+            <p class="home-next-reason" id="homeNextReason">Choose a puzzle to practice.</p>
+            <a class="button home-next-action" href="#puzzles" id="homeNextAction" data-home-action="puzzle-plan" data-home-plan="adaptive">Practice puzzles</a>
             <p class="home-insight" id="homeInsight">One clear idea is enough for today's session.</p>
             <div class="home-next-recommendations" id="homeRecommendations" aria-label="Other useful activities"></div>
           </section>
@@ -173,7 +173,7 @@
               <span class="home-command-stat"><strong id="homePuzzleAccuracy">—</strong><small>Puzzle accuracy</small></span>
               <span class="home-command-stat is-highlight"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
             </div>
-            <div class="home-progress-goal-line"><a id="homeWeeklyGoal" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Week goal: 0/120 XP</a><a id="homeDailyGoal" href="#puzzles" data-home-action="daily-puzzle">Daily: 0/3</a></div>
+            <div class="home-progress-goal-line"><a id="homeWeeklyGoal" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Week goal: 0/120 XP</a><a id="homeDailyGoal" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Today: 0/3</a></div>
             <div class="home-progress-legacy" aria-hidden="true"><span id="homeGamesPlayed">0</span><span id="homeThemesMastered">0</span><span id="homeLearningTime">0 min</span><span id="homeSkillsUnlocked">0</span></div>
             <div class="home-milestone-row"><span class="home-command-kicker">Next milestone</span><div id="homeUnlocks" aria-label="Achievement roadmap"></div></div>
           </section>
@@ -3241,6 +3241,13 @@
               </details>
               </div>
             </details>
+            <div class="play-live-status" id="playLiveStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+              <span class="play-live-status-mark" aria-hidden="true"></span>
+              <span class="play-live-status-copy">
+                <strong id="playLiveStatusTitle">Your turn</strong>
+                <small id="playLiveStatusDetail">Choose a move to begin.</small>
+              </span>
+            </div>
             <aside class="ai-player-card player-frame player-frame--opponent cq-player-card" id="aiPlayerCard" data-ai-rarity="Common" aria-label="Opponent player frame">
               <div class="player-frame-topline">
                 <span class="player-frame-kicker">Opponent</span>
@@ -3799,7 +3806,7 @@
         </section>
     </div>
 
-    <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" hidden>
+    <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" aria-describedby="postGameDecisionSummary" hidden>
       <div class="post-game-decision-card">
         <div class="post-game-decision-result">
           <span class="post-game-decision-icon" id="postGameDecisionIcon" aria-hidden="true">&#127942;</span>
@@ -4169,7 +4176,7 @@
             <div class="puzzle-meta">
               <span class="badge" id="puzzleLevel">Beginner</span>
               <span class="badge" id="puzzleSide">White to move</span>
-              <span class="badge daily-puzzle-badge" id="dailyPuzzleBadge">Today</span>
+              <span class="badge daily-puzzle-badge" id="dailyPuzzleBadge">Puzzle practice</span>
             </div>
             <div class="puzzle-brief" aria-label="Puzzle details">
               <span class="pressure-rating"><strong id="puzzleRating">400</strong> Elo</span>
@@ -4266,7 +4273,7 @@
                   <div class="progress-track"><span class="progress-fill" id="learnerXpFill"></span></div>
                 </div>
                 <div class="rpg-level-path" id="rpgLevelPath" aria-label="RPG level ladder"></div>
-                <p class="habit-reward" id="dailyReward">Reward locked: finish today's puzzle.</p>
+                <p class="habit-reward" id="dailyReward">Daily Puzzle is unavailable until a rights-cleared production catalog is approved.</p>
                 <p class="simple-coach" id="simpleCoach">Take one calm move at a time. Learning counts more than winning.</p>
                 <div class="achievement-row" id="achievementBadges" aria-label="Achievement badges"></div>
                 <div class="weekly-chart" id="weeklyChart" aria-label="Weekly progress chart"></div>
@@ -4310,7 +4317,7 @@
                 <button class="button secondary" type="button" id="prevPuzzle">Previous</button>
                 <button class="button" type="button" id="nextPuzzle">Next Puzzle</button>
                 <button class="button secondary" type="button" id="randomPuzzle">Random</button>
-                <button class="button secondary" type="button" id="dailyPuzzle">Today&apos;s Puzzle</button>
+                <button class="button secondary" type="button" id="dailyPuzzle" disabled aria-disabled="true">Daily Puzzle unavailable</button>
               </div>
               <div class="puzzle-action-row">
                 <button class="button secondary" type="button" id="hintPuzzle">Hint</button>
@@ -4365,7 +4372,7 @@
               <div class="real-puzzle-control">
                 <div class="real-puzzle-control-head"><span>Practice mode</span><small>Pick the pace that feels good today</small></div>
                 <div class="real-puzzle-modes" role="group" aria-label="Puzzle mode">
-                  <button class="mission-button" type="button" data-real-mode="Daily" aria-pressed="false">Daily</button>
+                  <button class="mission-button" type="button" disabled aria-disabled="true" title="Available after a rights-cleared production puzzle catalog is approved">Daily unavailable</button>
                   <button class="mission-button" type="button" data-real-mode="Trainer" aria-pressed="true">Trainer</button>
                   <button class="mission-button" type="button" data-real-mode="Rush" aria-pressed="false">Rush</button>
                   <button class="mission-button" type="button" data-real-mode="Streak" aria-pressed="false">Streak</button>

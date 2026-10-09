@@ -122,7 +122,7 @@ async function checkPlay(page) {
   return humanEntryMeasurements;
 }
 
-async function reportFrozenBotButtonDebt(page) {
+async function checkBotPlayTouchTarget(page) {
   await waitForRoute(page, "bots");
   const measurements = await page.evaluate(() => [...document.querySelectorAll("#aiBotRoster [data-ai-bot-play]:not(:disabled)")]
     .filter((element) => {
@@ -135,11 +135,35 @@ async function reportFrozenBotButtonDebt(page) {
       return { text: (element.innerText || "").trim().slice(0, 32), width: rect.width, height: rect.height };
     }));
   assert.equal(measurements.length, 1, "bots: expected one visible enabled Bot Play control for frozen-debt reporting.");
-  const frozen = measurements.filter(({ width, height }) => width < 43.5 || height < 43.5);
-  if (frozen.length) console.warn(`FROZEN ACCESSIBILITY DEBT: Bot Play control remains below the 44px target: ${JSON.stringify(frozen)}`);
-  else console.warn(`FROZEN ACCESSIBILITY DEBT RESOLVED: Bot Play control now meets the 44px target: ${JSON.stringify(measurements)}`);
+  const undersized = measurements.filter(({ width, height }) => width < 43.5 || height < 43.5);
+  assert.equal(undersized.length, 0,
+    `bots: Bot Play control must meet the 44px touch target: ${JSON.stringify(undersized)}.`);
   await assertNoHorizontalOverflow(page, "bots");
   return measurements;
+}
+
+async function checkDialogKeyboardBehavior(page) {
+  const searchOpen = page.locator("#siteSearchOpen");
+  await searchOpen.focus();
+  await searchOpen.press("Enter");
+  const dialog = page.locator("#siteSearchDialog");
+  await page.waitForFunction(() => {
+    const node = document.getElementById("siteSearchDialog");
+    return Boolean(node && !node.hidden && getComputedStyle(node).display !== "none");
+  }, null, { timeout: 3000 });
+  const input = page.locator("#siteSearchInput");
+  assert.equal(await input.evaluate((element) => document.activeElement === element), true,
+    "search dialog should move focus to its input.");
+  const focusables = dialog.locator("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])");
+  const count = await focusables.count();
+  assert(count >= 2, "search dialog should expose a close control and input.");
+  await focusables.first().focus();
+  await page.keyboard.press("Shift+Tab");
+  assert.equal(await focusables.nth(count - 1).evaluate((element) => document.activeElement === element), true,
+    "Shift+Tab at the first search control should wrap inside the dialog.");
+  await page.keyboard.press("Escape");
+  assert.equal(await dialog.getAttribute("hidden"), "", "Escape should close the search dialog.");
+  await searchOpen.focus();
 }
 
 async function runViewport(browser, viewport) {
@@ -160,7 +184,8 @@ async function runViewport(browser, viewport) {
       `login: expected the five confirmed Profile/Player Pass controls, got ${JSON.stringify(loginMeasurements)}.`);
     results.controls += loginMeasurements.length;
     results.controls += (await checkPlay(page)).length;
-    await reportFrozenBotButtonDebt(page);
+    await checkBotPlayTouchTarget(page);
+    if (viewport.width <= 390) await checkDialogKeyboardBehavior(page);
     if (focusedOnly) return results;
     const puzzleMeasurements = await checkRoute(page, "puzzles", [
       "#puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties) .mission-button",
@@ -216,7 +241,9 @@ async function main() {
       { width: 1366, height: 900 },
       { width: 1024, height: 768 },
       { width: 768, height: 1024 },
-      { width: 390, height: 844 }
+      { width: 390, height: 844 },
+      { width: 375, height: 844 },
+      { width: 320, height: 844 }
     ]) {
       results.push(await runViewport(browser, viewport));
     }

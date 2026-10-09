@@ -16,6 +16,16 @@ const port = 4197;
 const baseUrl = `http://127.0.0.1:${port}`;
 const reviewFixtureUserId = "00000000-0000-4000-8000-000000000001";
 
+// Native fullscreen can expose a never-settling promise in restricted
+// headless Chromium.  Do not return that promise through Playwright; the
+// following state assertion remains the source of truth for test success.
+async function requestExitFullscreen(page) {
+  await page.evaluate(() => {
+    if (!document.fullscreenElement || typeof document.exitFullscreen !== "function") return;
+    try { void document.exitFullscreen(); } catch {}
+  }).catch(() => {});
+}
+
 function installAuthenticatedReviewFixture(context) {
   return context.addInitScript({ content: `
     (() => {
@@ -258,7 +268,7 @@ async function runCase(browser, width, height) {
       await page.waitForFunction((previous) => document.getElementById("coachBoard")?.innerHTML !== previous, afterPrevious, { timeout: 5000 });
     }
 
-    await page.evaluate(() => document.exitFullscreen());
+    await requestExitFullscreen(page);
     await page.waitForFunction((expected) => !document.fullscreenElement
       && !document.body.classList.contains("interactive-board-fullscreen-active")
       && Number(document.querySelector("#reviewBoardSlot [data-interactive-board-stage]")?.dataset.boardRequestedSize || 0) === expected,
@@ -321,9 +331,7 @@ async function runCase(browser, width, height) {
 
     return `${width}x${height}:${Math.round(focused.board.width)}px`;
   } finally {
-    if (await page.evaluate(() => Boolean(document.fullscreenElement)).catch(() => false)) {
-      await page.evaluate(() => document.exitFullscreen()).catch(() => {});
-    }
+    if (await page.evaluate(() => Boolean(document.fullscreenElement)).catch(() => false)) await requestExitFullscreen(page);
     await context.close();
   }
 }

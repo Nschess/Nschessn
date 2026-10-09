@@ -465,8 +465,8 @@
           if (Math.abs(rect.width - state.ghostWidth) < 0.1 && Math.abs(rect.height - state.ghostHeight) < 0.1) return;
           state.ghostWidth = rect.width;
           state.ghostHeight = rect.height;
-          state.ghost.style.width = `${rect.width}px`;
-          state.ghost.style.height = `${rect.height}px`;
+          state.ghost.style.setProperty("width", `${rect.width}px`, "important");
+          state.ghost.style.setProperty("height", `${rect.height}px`, "important");
         };
         const positionGhost = () => {
           state.ghostFrame = 0;
@@ -503,8 +503,8 @@
           ghost.style.position = "fixed";
           ghost.style.left = "0";
           ghost.style.top = "0";
-          ghost.style.width = `${rect.width}px`;
-          ghost.style.height = `${rect.height}px`;
+          ghost.style.setProperty("width", `${rect.width}px`, "important");
+          ghost.style.setProperty("height", `${rect.height}px`, "important");
           ghost.style.minWidth = "0";
           ghost.style.minHeight = "0";
           ghost.style.maxWidth = "none";
@@ -1525,12 +1525,19 @@
         handle.setAttribute("aria-valuenow", handle.getAttribute("aria-valuenow") || String(legacyFallbackSize));
         handle.setAttribute("aria-valuetext", "Board size. Drag the lower-right corner to resize.");
 
+        const reviewOwnsBoardControls = Boolean(stage.closest("#gameReview.is-review-page"));
         let actions = stage.querySelector(":scope > [data-board-stage-actions]");
         if (!actions) {
           actions = document.createElement("div");
           actions.className = "interactive-board-actions";
           actions.dataset.boardStageActions = "true";
           stage.append(actions);
+        }
+        // Review and the static Play shell own their route-specific action
+        // rail styling. Apply the shared primitive only to dynamically
+        // created rails so Review does not inherit the normal-play geometry.
+        if (!reviewOwnsBoardControls && !actions.classList.contains("play-lobby-board-actions")) {
+          actions.classList.add("interactive-board-actions");
         }
         let fullscreen = actions.querySelector("[data-board-fullscreen-action]");
         if (!fullscreen || fullscreen.tagName !== "BUTTON") {
@@ -1542,6 +1549,9 @@
           fullscreen.innerHTML = '<span aria-hidden="true">⛶</span><span data-board-fullscreen-label>Fullscreen</span>';
           actions.append(fullscreen);
         }
+        if (!reviewOwnsBoardControls && !actions.classList.contains("play-lobby-board-actions")) {
+          fullscreen.classList.add("interactive-board-fullscreen-button");
+        }
         fullscreen.title = "Fullscreen — focus on your game";
         fullscreen.setAttribute("aria-label", "Fullscreen — focus on your game");
         let settings = actions.querySelector("[data-board-settings-action]");
@@ -1552,6 +1562,9 @@
           settings.dataset.boardSettingsAction = surface === "coach" ? "play" : surface;
           settings.innerHTML = '<span aria-hidden="true">⚙</span>';
           actions.append(settings);
+        }
+        if (!reviewOwnsBoardControls && !actions.classList.contains("play-lobby-board-actions")) {
+          settings.classList.add("interactive-board-settings-button");
         }
         settings.title = "Board controls";
         settings.setAttribute("aria-label", "Board controls");
@@ -2126,6 +2139,11 @@
         feedback
       }));
     }
+
+    // Keep the date-selected Daily Puzzle unavailable until a rights-cleared
+    // production catalog is approved. The existing collection remains usable
+    // through ordinary practice modes.
+    const dailyPuzzleLaunchEnabled = false;
 
     // The production collection and its validated fallback are created on demand.
     let puzzles = [];
@@ -3100,7 +3118,7 @@
       }
     })();
     const realPuzzleDifficultyLevels = ["All", "Beginner", "Intermediate", "Advanced", "Expert", "Master"];
-    const realPuzzleModes = ["Daily", "Trainer", "Rush", "Streak", "Battle"];
+    const realPuzzleModes = ["Trainer", "Rush", "Streak", "Battle"];
     const realPuzzleDifficultyAliases = { Easy: "Beginner", Medium: "Intermediate", Hard: "Advanced" };
     let puzzleCollectionReady = false;
     let realPuzzleCollectionSource = "data/puzzles.json";
@@ -7965,7 +7983,9 @@
       }
 
       if (action === "daily-puzzle") {
-        openRealPuzzleExperience("Easy");
+        // Older saved links may still use this action. Fail safely into normal
+        // practice; never select a date-derived puzzle or imply a Daily reward.
+        openRealPuzzleExperience("Trainer");
         return;
       }
 
@@ -12441,7 +12461,7 @@
 
     function completeDailyHabit() {
       const today = getTodayKey();
-      if (dailyHabit.rewardDate === today) return false;
+      if (!dailyPuzzleLaunchEnabled || dailyHabit.rewardDate === today) return false;
 
       const gap = dailyHabit.lastDate ? getDayDistance(dailyHabit.lastDate, today) : 999;
       dailyHabit.streak = gap === 1 ? dailyHabit.streak + 1 : 1;
@@ -14282,6 +14302,7 @@
     }
 
     function getDailyChallengeName() {
+      if (!dailyPuzzleLaunchEnabled) return "Puzzle practice";
       if (!Array.isArray(puzzles) || !puzzles.length) return "";
       const puzzle = puzzles[getDailyPuzzleIndex()];
       if (!puzzle) return "";
@@ -15306,7 +15327,7 @@
       if (dailyGoal) {
         dailyGoal.textContent = dailyGoalProgress.complete
           ? "Daily complete"
-          : `Daily: ${dailyGoalProgress.doneCount}/${dailyGoalProgress.goals.length}`;
+          : `Today: ${dailyGoalProgress.doneCount}/${dailyGoalProgress.goals.length}`;
         dailyGoal.title = dailyGoalProgress.complete
           ? "All daily goals are complete."
           : `${dailyGoalProgress.goals.length - dailyGoalProgress.doneCount} daily ${dailyGoalProgress.goals.length - dailyGoalProgress.doneCount === 1 ? "goal" : "goals"} left.`;
@@ -15327,12 +15348,12 @@
         ? ["Practice one tactic pattern before playing. This stops free-piece losses fast.", "#puzzles", "Train tactics", "puzzle-plan", "Tactics"]
         : completedToday
           ? [`Open Lesson ${nextLesson} and learn one tiny rule.`, "#paths", "Continue learning", "", ""]
-          : ["Solve today's puzzle for XP and coins.", "#puzzles", "Start daily puzzle", "daily-puzzle", ""];
+          : ["Choose a puzzle to practice.", "#puzzles", "Practice puzzles", "puzzle-plan", "adaptive"];
       const onboardingPlan = authenticated && !safeGameStats.played && !lessonCount ? getOnboardingPlan(readLearnerProfile()) : null;
       const nextStep = onboardingPlan || defaultNextStep;
       const recommendations = [
         { label: `Continue Lesson ${nextLesson}`, href: "#paths" },
-        { label: completedToday ? "Continue Learning" : "Puzzle of the Day", href: "#puzzles", action: completedToday ? "" : "daily-puzzle" },
+        { label: completedToday ? "Continue Learning" : "Puzzle practice", href: "#puzzles", action: completedToday ? "" : "puzzle-plan", plan: "adaptive" },
         { label: needsTactics ? "Fork Practice" : focus.related, href: needsTactics ? "#puzzles" : focus.href, action: needsTactics || focus.href === "#puzzles" ? "puzzle-plan" : "", plan: focusPuzzlePlan },
         { label: "Practice Mistakes", href: "#play" }
       ];
@@ -15347,7 +15368,7 @@
       }
       setHomeStat("homeGamesPlayed", formatProfileNumber(safeGameStats.played), safeGameStats.played ? `${safeGameStats.wins || 0} wins recorded` : "Play one friendly AI game to start this stat.");
       setHomeStat("homeThemesMastered", formatProfileNumber(masteredThemes.length), masteredThemes.length ? masteredThemes.join(", ") : "Solve two puzzles from one theme to master it.");
-      setHomeStat("homeStreak", `${formatProfileNumber(currentStreak)} days`, currentStreak ? "Keep the tiny daily habit alive." : "Finish one daily puzzle to start a streak.");
+      setHomeStat("homeStreak", `${formatProfileNumber(currentStreak)} days`, currentStreak ? "Keep the tiny daily habit alive." : "Complete today's practice goals to start a streak.");
       setHomeStat("homeLearningTime", formatLearningTime(learningMinutes), "Estimated from completed lessons, puzzles, attempts, and games.");
       setHomeStat("homeSkillsUnlocked", formatProfileNumber(unlockedSkills.length), unlockedSkills.length ? unlockedSkills.join(", ") : "First unlock: solve one puzzle.");
       setHomeStat("homeXp", `${formatProfileNumber(profileSnapshot?.xp ?? safePuzzleXp)} XP`, `${lessonCount} lessons done`);
@@ -15478,8 +15499,8 @@
         winRatePill.textContent = "Win rate 0%";
         solvedPill.textContent = "Puzzles solved 0";
         bestPill.textContent = "Best streak 0";
-        dailyPill.textContent = "Daily challenge";
-        dailyStreakPill.textContent = "Current streak 0";
+        dailyPill.textContent = dailyPuzzleLaunchEnabled ? "Daily challenge" : "Daily Puzzle unavailable";
+        dailyStreakPill.textContent = dailyPuzzleLaunchEnabled ? "Current streak 0" : "Daily Puzzle streak unavailable";
         lessonPill.textContent = "Missions completed 0";
         openingPill.textContent = "Favorite opening: None";
         openingPill.title = "Sign in to track opening progress.";
@@ -15488,7 +15509,9 @@
         if (moveQualityPill) moveQualityPill.textContent = "Move quality 0%";
         if (puzzleRatingPill) puzzleRatingPill.textContent = "Puzzle rating 400";
         if (timePill) timePill.textContent = "Time: ready";
-        dailyReward.textContent = "Sign in to track daily progress.";
+        dailyReward.textContent = dailyPuzzleLaunchEnabled
+          ? "Sign in to track daily progress."
+          : "Daily Puzzle is unavailable until a rights-cleared production catalog is approved.";
         coach.textContent = "Sign in to save your coach plan and puzzle progress.";
         badges.replaceChildren();
         chart.replaceChildren();
@@ -15530,8 +15553,10 @@
       solvedPill.textContent = `Puzzles solved ${solvedPuzzles.size}`;
       bestPill.textContent = `Best streak ${bestPuzzleStreak}`;
       const dailyChallengeName = getDailyChallengeName();
-      dailyPill.textContent = completedToday ? "Daily challenge done" : dailyChallengeName ? `Daily: ${dailyChallengeName}` : "Daily challenge unavailable";
-      dailyStreakPill.textContent = `Current streak ${dailyHabit.streak}`;
+      dailyPill.textContent = dailyPuzzleLaunchEnabled
+        ? completedToday ? "Daily challenge done" : dailyChallengeName ? `Daily: ${dailyChallengeName}` : "Daily challenge unavailable"
+        : "Daily Puzzle unavailable";
+      dailyStreakPill.textContent = dailyPuzzleLaunchEnabled ? `Current streak ${dailyHabit.streak}` : "Daily Puzzle streak unavailable";
       lessonPill.textContent = `Missions completed ${lessonCount}`;
       const mostReviewedOpening = getMostReviewedOpening();
       openingPill.textContent = `Favorite opening: ${favoriteOpening}`;
@@ -15547,9 +15572,11 @@
       const weakTheme = getCoachWeakTheme();
       const nextLesson = getCoachNextLesson();
       const smart = getSmartPuzzleRecommendation();
-      dailyReward.textContent = completedToday
-        ? `Daily reward unlocked. Weekly ${weeklyXp}/120 XP. Monthly chests ${puzzleChests}.`
-        : `Daily mission: solve 1 ${smart.type} puzzle, then open ${nextLesson.label}. Weekly ${weeklyXp}/120 XP.`;
+      dailyReward.textContent = !dailyPuzzleLaunchEnabled
+        ? "Daily Puzzle is unavailable until a rights-cleared production catalog is approved."
+        : completedToday
+          ? `Daily reward unlocked. Weekly ${weeklyXp}/120 XP. Monthly chests ${puzzleChests}.`
+          : `Daily mission: solve 1 ${smart.type} puzzle, then open ${nextLesson.label}. Weekly ${weeklyXp}/120 XP.`;
       const activePuzzle = Array.isArray(puzzles) ? puzzles[currentPuzzle] : null;
       const homeCoachMessage = puzzleAttempts
         ? `Nice effort. ${activePuzzlePlan === "adaptive" ? `Adaptive is giving you ${smart.level} puzzles. ` : ""}${smart.message} One helpful idea: ${activePuzzle?.hint || "scan checks, captures, and threats."}`
@@ -15615,7 +15642,7 @@
     }
 
     function getDailyPuzzleIndex() {
-      if (!Array.isArray(puzzles) || !puzzles.length) return -1;
+      if (!dailyPuzzleLaunchEnabled || !Array.isArray(puzzles) || !puzzles.length) return -1;
       const today = new Date();
       const key = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
       return Math.floor(key / 86400000) % puzzles.length;
@@ -15625,7 +15652,7 @@
       const badge = document.getElementById("dailyPuzzleBadge");
       if (!badge) return;
 
-      badge.textContent = currentPuzzle === getDailyPuzzleIndex() ? getDailyChallengeName() : "Practice puzzle";
+      badge.textContent = dailyPuzzleLaunchEnabled && currentPuzzle === getDailyPuzzleIndex() ? getDailyChallengeName() : "Puzzle practice";
     }
 
     function getPuzzleSideColor(puzzle) {
@@ -16118,7 +16145,7 @@
       const next = getNextRecommendedPuzzle();
       const smart = getSmartPuzzleRecommendation();
       summary.textContent = `Accuracy ${accuracy}%. Time ${document.getElementById("puzzleClock").textContent}. Rating ${getPuzzleRating()}. Themes: ${tags}. ${getPuzzleRuleResultText()} Solution: ${getPuzzleLine().join(" ")}`;
-      explanation.textContent = `Why it works: ${puzzles[currentPuzzle].feedback} ${smart.message} Try next: ${next?.title || "Daily Puzzle"}.`;
+      explanation.textContent = `Why it works: ${puzzles[currentPuzzle].feedback} ${smart.message} Try next: ${next?.title || "another practice puzzle"}.`;
     }
 
     function scheduleNextPuzzle() {
@@ -21866,10 +21893,13 @@
       else playWorkspace?.removeAttribute("inert");
     }
 
-    function hidePostGameDecision() {
+    let postGameDecisionReturnFocus = null;
+    function hidePostGameDecision({ restoreFocus = true } = {}) {
       const dialog = getPostGameDecisionDialog();
       dialog?.setAttribute("hidden", "");
       setPostGameDecisionModalState(false);
+      if (restoreFocus) postGameDecisionReturnFocus?.focus?.({ preventScroll: true });
+      postGameDecisionReturnFocus = null;
     }
 
     function showPostGameDecision() {
@@ -21879,6 +21909,7 @@
       const alreadyShown = Boolean(pgn) && postGameDecisionPgn === pgn;
       if (pgn) postGameDecisionPgn = pgn;
       if (alreadyShown) return;
+      postGameDecisionReturnFocus = document.activeElement;
       dialog.hidden = false;
       setPostGameDecisionModalState(true);
       window.requestAnimationFrame(() => {
@@ -22540,6 +22571,31 @@
       } else {
         statusBadge.textContent = coachBotPaused ? "Free play" : isCoachCheck() ? "Check" : "Playing";
         coach.textContent = coachMessage;
+      }
+      const liveStatus = document.getElementById("playLiveStatus");
+      const liveStatusTitle = document.getElementById("playLiveStatusTitle");
+      const liveStatusDetail = document.getElementById("playLiveStatusDetail");
+      if (liveStatus && liveStatusTitle && liveStatusDetail) {
+        const yourTurn = !waitingForSetup && !gameFinished && !coachThinking && coachGame.turn() === coachPlayerColor;
+        const statusTitle = waitingForSetup
+          ? "Ready to play"
+          : gameFinished
+            ? statusBadge.textContent || "Game complete"
+            : coachThinking
+              ? "Opponent is thinking"
+              : yourTurn
+                ? "Your turn"
+                : `${turn} to move`;
+        liveStatus.hidden = waitingForSetup;
+        liveStatusTitle.textContent = statusTitle;
+        liveStatusDetail.textContent = gameFinished
+          ? `${statusBadge.textContent || "Game complete"}. Review the game or start another.`
+          : coachThinking
+            ? coachMessage
+            : coachMessage || `${turn} to move.`;
+        liveStatus.classList.toggle("is-your-turn", yourTurn);
+        liveStatus.classList.toggle("is-thinking", Boolean(coachThinking));
+        liveStatus.classList.toggle("is-complete", Boolean(gameFinished));
       }
       coach.textContent = coachMemoryLine(coach.textContent);
       if (gameFinished) playCoachEndSound(isMate, Boolean(terminalOutcome?.result === "draw" || isDrawn));
@@ -25883,6 +25939,7 @@
       });
       dialog.addEventListener("click", (event) => { if (event.target === dialog) closeResignConfirmation(); });
       document.addEventListener("keydown", (event) => {
+        if (!dialog.hidden && trapDialogFocus(event, dialog)) return;
         if (event.key === "Escape" && !dialog.hidden) {
           event.preventDefault();
           closeResignConfirmation();
@@ -28896,8 +28953,10 @@
       refreshPuzzleCollectionStatus();
       document.querySelectorAll("[data-real-mode]").forEach((button) => {
         button.addEventListener("click", () => {
-          realPuzzleMode = button.dataset.realMode || "Trainer";
-          realPuzzleIndex = realPuzzleMode === "Daily" ? getRealDailyIndex(getRealPuzzleIndexes()) : getRealPuzzleIndexes()[0] || 0;
+          const requestedMode = button.dataset.realMode || "Trainer";
+          if (!realPuzzleModes.includes(requestedMode)) return;
+          realPuzzleMode = requestedMode;
+          realPuzzleIndex = getRealPuzzleIndexes()[0] || 0;
           renderRealPuzzle();
         });
       });
@@ -29124,6 +29183,18 @@
         hidePostGameDecision();
         openPostGameReview();
       });
+      const postGameDecisionDialog = document.getElementById("postGameDecision");
+      if (postGameDecisionDialog && !postGameDecisionDialog.dataset.accessibilityReady) {
+        postGameDecisionDialog.dataset.accessibilityReady = "true";
+        document.addEventListener("keydown", (event) => {
+          if (postGameDecisionDialog.hidden) return;
+          if (trapDialogFocus(event, postGameDecisionDialog)) return;
+          if (event.key === "Escape") {
+            event.preventDefault();
+            hidePostGameDecision();
+          }
+        });
+      }
       document.getElementById("postGameNextBot")?.addEventListener("click", playNextCoachOpponent);
       document.getElementById("postGameNew")?.addEventListener("click", () => {
         startSoloCoachGame();
