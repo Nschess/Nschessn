@@ -30198,6 +30198,33 @@
           if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           event.preventDefault();
 
+          const sameDestination = window.location.hash === href && (isHomeLink
+            ? !document.body.classList.contains("site-tab-mode") && homeLink?.classList.contains("is-active-tab")
+            : activePanel?.id === config.panel && links.find((item) => item.dataset.siteTab === config.tab)?.classList.contains("is-active-tab"));
+          if (sameDestination) {
+            // A same-page navigation should still close menus and preserve the
+            // usual scroll/focus/audio feedback, but must not re-run route
+            // lifecycle work or append a duplicate history entry.
+            closeNavMenus();
+            if (isHomeLink) {
+              playAudioCue("page-home");
+              window.scrollTo({ top: 0, behavior: "auto" });
+            } else {
+              const panel = document.getElementById(config.panel);
+              const activeLink = links.find((item) => item.dataset.siteTab === config.tab);
+              if (activeLink?.closest(".nav-links")) {
+                activeLink.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+              }
+              playSitePageSound(config.tab);
+              window.requestAnimationFrame(() => {
+                const target = document.getElementById(config.focus) || panel;
+                target?.scrollIntoView({ behavior: "auto", block: "start" });
+                panel?.focus({ preventScroll: true });
+              });
+            }
+            return;
+          }
+
           if (window.history?.pushState) {
             window.history.pushState(null, "", href);
           } else {
