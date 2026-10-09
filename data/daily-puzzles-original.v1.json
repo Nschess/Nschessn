@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "dateConvention": "UTC calendar day, YYYY-MM-DD",
+  "provenance": {
+    "authorship": "Eight compact chess compositions were newly set for this Nschess candidate on 2026-10-09. Their board positions and task wording were composed here from chess rules; no game, book, puzzle collection, or third-party puzzle database was consulted or adapted.",
+    "rightsNote": "Candidate-authored content, not sourced from the existing Lichess-derived practice collection. Organizational ownership should be confirmed before public launch; this file makes no third-party rights claim."
+  },
+  "puzzles": [
+    {
+      "id": "corner-mate-white",
+      "title": "Close the corner",
+      "theme": "Queen and king",
+      "objective": "mate-in-one",
+      "fen": "7k/5Q2/6K1/8/8/8/8/8 w - - 0 1",
+      "solutionUci": "f7g7",
+      "prompt": "Black's king is boxed in. Find any legal move that checkmates now.",
+      "hints": ["Use your queen and king together.", "Look for a queen move that covers h7 and g8 while your king protects the queen."],
+      "explanation": "The king and queen work as a team: the queen closes the escape squares while the king protects the mating square. Any legal checkmate in one is accepted.",
+      "authorNote": "Original three-piece mating composition; open objective accepts every legal mate-in-one alternative."
+    },
+    {
+      "id": "corner-mate-mirror",
+      "title": "Mirror the net",
+      "theme": "Queen and king",
+      "objective": "mate-in-one",
+      "fen": "k7/2Q5/1K6/8/8/8/8/8 w - - 0 1",
+      "solutionUci": "c7b7",
+      "prompt": "The same mating idea appears on the other wing. Find any checkmate in one.",
+      "hints": ["Check the king's available flight squares.", "A queen move on the seventh rank can be protected by your king."],
+      "explanation": "Bring the queen close enough to seal the corner, with your king guarding the checking square. Any legal checkmate in one is accepted.",
+      "authorNote": "Original mirrored mating composition; no external position was used as a template."
+    },
+    {
+      "id": "corner-mate-black",
+      "title": "Black-side finish",
+      "theme": "Queen and king",
+      "objective": "mate-in-one",
+      "fen": "8/8/8/8/8/6k1/5q2/7K b - - 0 1",
+      "solutionUci": "f2g2",
+      "prompt": "You are playing Black. Find any legal move that checkmates White now.",
+      "hints": ["The white king is on the edge.", "Use the queen while keeping the mating square protected by your king."],
+      "explanation": "A close queen move works because the black king protects the queen and the edge removes escape squares. Any legal checkmate in one is accepted.",
+      "authorNote": "Original black-to-move mating composition."
+    },
+    {
+      "id": "corner-mate-reflect",
+      "title": "Hold the mating square",
+      "theme": "Queen and king",
+      "objective": "mate-in-one",
+      "fen": "8/8/8/8/8/6K1/5Q2/7k w - - 0 1",
+      "solutionUci": "f2g2",
+      "prompt": "The black king is trapped on the opposite edge. Find any checkmate in one.",
+      "hints": ["Your king is already close enough to help.", "Look for a queen move that the king protects."],
+      "explanation": "Keep the queen safe with king support while taking away every flight square. Any legal checkmate in one is accepted.",
+      "authorNote": "Original reflected mating composition."
+    },
+    {
+      "id": "knight-fork-white",
+      "title": "Royal fork",
+      "theme": "Knight fork",
+      "objective": "royal-fork",
+      "fen": "4q3/7k/8/3N4/8/8/8/K7 w - - 0 1",
+      "solutionUci": "d5f6",
+      "prompt": "Give check with your knight and attack the queen at the same time.",
+      "hints": ["A knight can attack two distant targets at once.", "Find a checking knight jump that also attacks e8."],
+      "explanation": "The knight checks the king on h7 while attacking the queen on e8. The king must answer the check, leaving the queen attacked.",
+      "authorNote": "Original fork composition; every legal checking knight move that attacks the queen is accepted."
+    },
+    {
+      "id": "knight-fork-mirror",
+      "title": "Fork across the board",
+      "theme": "Knight fork",
+      "objective": "royal-fork",
+      "fen": "3q4/k7/8/4N3/8/8/8/7K w - - 0 1",
+      "solutionUci": "e5c6",
+      "prompt": "Find a checking knight move that also attacks the queen.",
+      "hints": ["Look for a knight jump near the black king.", "The destination should attack both a7 and d8."],
+      "explanation": "A knight check on a7 also attacks the queen on d8. The king has to move first, so the queen remains under attack.",
+      "authorNote": "Original horizontally reflected fork composition."
+    },
+    {
+      "id": "knight-fork-black",
+      "title": "Fork from Black's side",
+      "theme": "Knight fork",
+      "objective": "royal-fork",
+      "fen": "7k/8/8/8/4n3/8/K7/3Q4 b - - 0 1",
+      "solutionUci": "e4c3",
+      "prompt": "As Black, check the king and attack the white queen with one knight move.",
+      "hints": ["The knight can attack the king and queen together.", "Look for a checking jump that reaches a2 and d1."],
+      "explanation": "The knight checks the king on a2 and attacks the queen on d1. Answering the check leaves the queen attacked.",
+      "authorNote": "Original black-to-move fork composition, reflected and color-swapped from the author's own board setup."
+    },
+    {
+      "id": "knight-fork-edge",
+      "title": "Find the checking fork",
+      "theme": "Knight fork",
+      "objective": "royal-fork",
+      "fen": "K7/8/8/8/3N4/8/7k/4q3 w - - 0 1",
+      "solutionUci": "d4f3",
+      "prompt": "Find a checking knight move that attacks the queen as well.",
+      "hints": ["The knight is central; search its checks.", "The fork should attack h2 and e1."],
+      "explanation": "The knight checks the king on h2 while attacking the queen on e1. The king must move, leaving the queen attacked.",
+      "authorNote": "Original edge-of-board fork composition."
+    }
+  ]
+}

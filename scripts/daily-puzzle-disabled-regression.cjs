@@ -1,5 +1,5 @@
-/* Production-baseline contract: date-selected Daily puzzles stay unavailable
- * until rights-cleared production content is explicitly approved. */
+/* Production-baseline contract: the legacy server-backed Daily reward path
+ * stays disabled until rights-cleared account content is explicitly approved. */
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -39,11 +39,12 @@ assert.match(app, /if \(action === "daily-puzzle"\) \{[\s\S]*?openRealPuzzleExpe
 assert.match(app, /realPuzzleMode = realPuzzleModes\.includes\(savedRealPuzzleState\.mode\) \? savedRealPuzzleState\.mode : "Trainer";/, "A previously saved Daily mode must hydrate to supported Trainer mode.");
 assert.doesNotMatch(html, /data-real-mode="Daily"/, "No selectable Daily mode may remain in the page markup.");
 assert.match(html, /id="dailyPuzzle"[^>]*disabled[^>]*>Daily Puzzle unavailable<\/button>/, "The legacy Daily control must be visibly and semantically disabled.");
-assert.match(html, /disabled aria-disabled="true" title="Available after a rights-cleared production puzzle catalog is approved">Daily unavailable<\/button>/, "The modern Daily mode must explain its disabled state.");
+assert.match(html, /data-daily-puzzle-launch[^>]*aria-pressed="false"[^>]*aria-controls="dailyPuzzlePanel"[^>]*disabled[^>]*aria-disabled="true">Daily · local<\/button>/, "The new Daily mode is a distinct device-local experience, not the old server-backed Daily mode.");
+assert.match(html, /id="dailyPuzzlePanel"[^>]*hidden/, "The local Daily interface is not shown until the player enters its mode.");
 assert.match(html, /id="dailyPuzzleBadge">Puzzle practice<\/span>/, "The puzzle badge must not flash a Daily label before the practice renderer runs.");
 assert.match(html, /id="newToChessButton"[^>]*data-home-action="puzzle-plan"[^>]*><span[\s\S]*?<strong>Puzzle Practice<\/strong>/, "Home's primary puzzle action must offer ordinary practice, not a Daily challenge.");
 assert.doesNotMatch(html, /data-home-action="daily-puzzle"|Start daily puzzle|Find today's pattern/, "Home must not advertise a date-selected Daily Puzzle.");
 assert.match(app, /badge\.textContent = dailyPuzzleLaunchEnabled && currentPuzzle === getDailyPuzzleIndex\(\) \? getDailyChallengeName\(\) : "Puzzle practice";/, "The puzzle UI must identify every currently selectable puzzle as practice.");
 assert.match(app, /dailyReward\.textContent = !dailyPuzzleLaunchEnabled\s*\? "Daily Puzzle is unavailable until a rights-cleared production catalog is approved\."/, "The reward panel must not imply a disabled Daily puzzle can be completed.");
 
-console.log("PASS production Daily Puzzle disabled state; general puzzle practice retained");
+console.log("PASS legacy server-backed Daily rewards remain disabled; local Daily mode is distinct and general puzzle practice is retained");
