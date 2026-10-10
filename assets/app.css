@@ -14926,7 +14926,6 @@
       background: color-mix(in srgb, var(--panel) 66%, transparent);
     }
 
-    .real-puzzle-name-list[hidden],
     .real-puzzle-source[hidden] {
       display: none;
     }
@@ -44056,4 +44055,35 @@ body.friend-challenge-mode #play :is(
   #puzzles .daily-puzzle-panel *,
   #puzzles .daily-puzzle-panel *::before,
   #puzzles .daily-puzzle-panel *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; }
+}
+
+/* Phase 4: keep mode guidance and device-local practice facts explicit. */
+#puzzles .real-puzzle-mode-description {
+  margin: 0;
+  padding: 10px 12px;
+  border-inline-start: 3px solid var(--blue);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--blue) 9%, var(--panel));
+  color: var(--soft);
+  font-size: .86rem;
+  line-height: 1.45;
+}
+
+#puzzles .real-puzzle-local-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: .76rem;
+  line-height: 1.45;
+}
+
+#puzzles .real-puzzle-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+#puzzles .real-puzzle-info .real-puzzle-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#puzzles .real-puzzle-actions .button { min-height: 44px; }
+
+@media (max-width: 580px) {
+  #puzzles .real-puzzle-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #puzzles .real-puzzle-info .real-puzzle-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #puzzles :is(.real-puzzle-modes, .real-puzzle-difficulties, .real-board-quick-actions, .real-puzzle-analysis-tools, .real-puzzle-actions) button {
+    min-height: 44px;
+  }
 }

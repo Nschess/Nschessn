@@ -4155,9 +4155,9 @@
         <div class="section-head">
           <div>
             <p class="section-kicker">Puzzle board</p>
-            <h2 id="puzzles-title">Puzzle Trainer</h2>
+            <h2 id="puzzles-title">Puzzles</h2>
           </div>
-          <p class="section-intro">Become a Chess Ninja: pick one 60-second trick, move the pieces, solve the mini puzzle, then jump to the next idea.</p>
+          <p class="section-intro">Choose a mode, find the forcing move, and learn from the line.</p>
         </div>
 
         <div class="puzzle-shell" hidden aria-hidden="true">
@@ -4338,9 +4338,9 @@
         <article class="real-puzzles-panel" id="realPuzzles" aria-labelledby="realPuzzlesTitle">
           <div class="real-puzzles-head">
             <div>
-              <p class="section-kicker">Puzzle studio</p>
+              <p class="section-kicker">Puzzle practice</p>
               <h3 id="realPuzzlesTitle">Find the winning idea</h3>
-              <p>Play the line, learn one tactical pattern, and collect progress without the pressure.</p>
+              <p>Practice positions from the Lichess puzzle database, distributed under CC0.</p>
             </div>
             <div class="real-puzzle-source" hidden aria-hidden="true">
               <p id="realPuzzleSource"></p>
@@ -4355,7 +4355,7 @@
               <button class="mission-button" type="button" data-real-mode="Trainer" aria-pressed="true">Trainer</button>
               <button class="mission-button" type="button" data-real-mode="Rush" aria-pressed="false">Rush</button>
               <button class="mission-button" type="button" data-real-mode="Streak" aria-pressed="false">Streak</button>
-              <button class="mission-button" type="button" data-real-mode="Battle" aria-pressed="false">Battle</button>
+              <button class="mission-button" type="button" data-real-mode="Battle" aria-pressed="false">Solo Battle</button>
             </div>
           </div>
 
@@ -4402,7 +4402,7 @@
                 <div class="puzzle-board play-board" id="realPuzzleBoard" role="group" aria-roledescription="chess board" aria-label="Real puzzle board. Select a piece, then its highlighted destination." data-interactive-board></div>
               </div>
               <div class="real-board-quick-actions" aria-label="Quick puzzle actions">
-                <button class="button secondary" type="button" id="realPuzzleBoardRestart">Restart</button>
+                <button class="button secondary" type="button" id="realPuzzleBoardRestart">Restart position</button>
                 <button class="button" type="button" id="realPuzzleBoardNext">Next Puzzle</button>
               </div>
               <div class="real-puzzle-analysis-tools" aria-label="Puzzle analysis tools">
@@ -4411,11 +4411,12 @@
               </div>
             </div>
             <div class="real-puzzle-info">
+              <p class="real-puzzle-mode-description" id="realPuzzleModeDescription">Trainer · no time pressure. Study the full line; the solved explanation stays until you choose another position.</p>
               <div class="puzzle-meta">
                 <span class="badge" id="realPuzzleDifficulty">Easy</span>
                 <span class="badge" id="realPuzzleSide">White to move</span>
                 <span class="badge" id="realPuzzleTheme">Tactic</span>
-                <span class="badge" id="realPuzzleTimer">00:00</span>
+                <span class="badge" id="realPuzzleTimer" aria-live="off" aria-label="Time spent on this position">00:00</span>
               </div>
               <div class="real-puzzle-control">
                 <div class="real-puzzle-control-head"><span>Difficulty</span><small>Challenge yourself at your own speed</small></div>
@@ -4432,31 +4433,26 @@
                 <span>Choose a challenge</span>
                 <select class="real-puzzle-select" id="realPuzzleSelect"></select>
               </label>
-              <div class="real-puzzle-name-list" id="realPuzzleNameList" aria-label="All real puzzle names" hidden></div>
               <div class="real-puzzle-stats" aria-label="Real puzzle progress">
-                <div class="real-puzzle-card"><strong id="realPuzzleCounter">1 / 12</strong><span>Progress</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleAccuracy">100%</strong><span>Accuracy</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleCounter">1 / 12</strong><span>Position</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleAccuracy">—</strong><span>Accuracy</span></div>
                 <div class="real-puzzle-card"><strong id="realPuzzleStreak">0</strong><span>Streak</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleRating">600</strong><span>Puzzle rating</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleCoins">0</strong><span>Rewards</span></div>
-                <div hidden><strong id="realPuzzleSolved">0</strong><strong id="realPuzzleBest">--</strong><strong id="realPuzzleRecommend">Mate</strong></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleRating">600</strong><span>Practice rating · local</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleSolved">0/0</strong><span>Solved in set</span></div>
+                <div class="real-puzzle-card" hidden><strong id="realPuzzleRushScore">0</strong><span>Rush score</span></div>
               </div>
               <h3 id="realPuzzleTitle">Puzzle ready</h3>
               <p id="realPuzzlePrompt">Find the strongest move and follow the idea.</p>
               <p class="real-puzzle-hint" id="realPuzzleHint">Hints appear here.</p>
               <p class="real-puzzle-feedback" id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose a piece to start.</p>
+              <p class="real-puzzle-local-note">Practice rating and streak are saved on this device. Puzzle practice does not award account XP, coins, or Elo.</p>
               <div class="real-puzzle-moves" id="realPuzzleMoves" aria-label="Played solution line"></div>
               <div class="real-puzzle-actions">
-                <button class="button secondary" type="button" id="realPuzzlePrev">Previous</button>
-                <button class="button secondary" type="button" id="realPuzzleNext">Next</button>
-                <button class="button secondary" type="button" id="realPuzzleRandom">Random</button>
-                <button class="button secondary" type="button" id="realPuzzleRestart">Restart</button>
                 <button class="button secondary" type="button" id="realPuzzleHintButton">Hint</button>
-                <button class="button secondary" type="button" id="realPuzzleReplay">Replay</button>
-                <button class="button secondary" type="button" id="realPuzzleFlip">Flip</button>
-                <button class="button" type="button" id="realPuzzleNextUnsolved">Next Unsolved</button>
+                <button class="button secondary" type="button" id="realPuzzleReplay">Replay line</button>
+                <button class="button secondary" type="button" id="realPuzzleFlip">Flip board</button>
               </div>
-              <div class="real-puzzle-achievements" id="realPuzzleAchievements" aria-label="Real puzzle achievements"></div>
+              <div class="real-puzzle-achievements" id="realPuzzleAchievements" aria-label="Device-local practice milestones"></div>
             </div>
           </div>
         </article>

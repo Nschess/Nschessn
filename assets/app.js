@@ -143,9 +143,14 @@
     function clearAccountWorkspaceAfterLogout(accountId = "") {
       const id = normalizeAccountWorkspaceId(accountId || activeAccountWorkspaceId);
       if (id) persistAccountWorkspace(id);
+      // At startup the last guest snapshot has already been saved and active
+      // keys intentionally cleared pending identity resolution. With no active
+      // owner, do not replace that snapshot with the temporary empty workspace.
       clearActiveAccountWorkspaceStorage();
       activeAccountWorkspaceId = "";
       try { localStorage.setItem(accountWorkspaceOwnerKey, "guest"); } catch {}
+      restoreAccountWorkspace("guest");
+      activeAccountWorkspaceId = "guest";
     }
 
     // Never paint a previous account's local workspace while Supabase is
@@ -154,9 +159,21 @@
     // available in switchAccountWorkspace().
     (() => {
       const previousOwner = normalizeAccountWorkspaceId(readRawStorageValue(accountWorkspaceOwnerKey));
-      if (previousOwner && previousOwner !== "guest") persistAccountWorkspace(previousOwner);
+      if (previousOwner) persistAccountWorkspace(previousOwner);
       clearActiveAccountWorkspaceStorage();
       activeAccountWorkspaceId = "";
+      if (previousOwner === "guest") {
+        // Guest practice is device-local and may be restored immediately; it
+        // cannot contain another verified account's workspace.
+        restoreAccountWorkspace("guest");
+        activeAccountWorkspaceId = "guest";
+      } else if (!previousOwner) {
+        // Legacy/unowned keys were cleared above. New anonymous work starts in
+        // an explicit guest scope so it survives reload without crossing into
+        // a later authenticated account.
+        try { localStorage.setItem(accountWorkspaceOwnerKey, "guest"); } catch {}
+        activeAccountWorkspaceId = "guest";
+      }
     })();
 
     function reportDeployAssetError(asset, detail = "") {
@@ -5115,7 +5132,15 @@
     let realPuzzleSide = "w";
     let realPuzzleHintStep = 0;
     let realPuzzleStartedAt = 0;
+    let realPuzzleElapsedMs = 0;
     let realPuzzleTimerId = 0;
+    const realPuzzleRushDurationMs = 3 * 60 * 1000;
+    let realPuzzleRushRemainingMs = realPuzzleRushDurationMs;
+    let realPuzzleRushSegmentStartedAt = 0;
+    let realPuzzleRushTimerId = 0;
+    let realPuzzleRushScore = 0;
+    let realPuzzleRushStarted = false;
+    let realPuzzleRushFinished = false;
     let realPuzzleMistakes = 0;
     let realPuzzleMoveSans = [];
     let realPuzzleFlipped = false;
@@ -27496,7 +27521,8 @@
       else stopMatchPlayerTimer();
       if (activePanel === "puzzles") {
         resumePuzzleTimer();
-        if (realPuzzleStartedAt && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+        if ((realPuzzleStartedAt || realPuzzleElapsedMs > 0) && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+        else if (realPuzzleMode === "Rush" && realPuzzleRushStarted) resumeRealPuzzleRushClock();
       } else {
         stopPuzzleTimer();
         stopRealPuzzleTimer();
@@ -28391,18 +28417,124 @@
     }
 
     function getRealPuzzleAccuracy() {
-      return realPuzzleAttempts ? Math.round((realPuzzleCorrect / realPuzzleAttempts) * 100) : 100;
+      return realPuzzleAttempts ? Math.round((realPuzzleCorrect / realPuzzleAttempts) * 100) : null;
     }
 
-    function getRealPuzzleRecommendation() {
-      const solvedThemes = new Map();
-      realPuzzleBank.forEach((puzzle) => {
-        if (!realPuzzleSolved.has(puzzle.id)) return;
-        getRealPuzzleThemes(puzzle).forEach((theme) => solvedThemes.set(theme, (solvedThemes.get(theme) || 0) + 1));
-      });
-      const unsolved = realPuzzleValidIndexes.map((index) => realPuzzleBank[index]).filter((puzzle) => !realPuzzleSolved.has(puzzle.id));
-      const pick = unsolved.sort((a, b) => (solvedThemes.get(a.theme) || 0) - (solvedThemes.get(b.theme) || 0))[0];
-      return pick?.theme || "Tactics";
+    function updateRealPuzzleProgressStats() {
+      const progress = realPuzzleManager.progress();
+      const counter = document.getElementById("realPuzzleCounter");
+      const solved = document.getElementById("realPuzzleSolved");
+      const accuracy = document.getElementById("realPuzzleAccuracy");
+      const streakValue = document.getElementById("realPuzzleStreak");
+      const rating = document.getElementById("realPuzzleRating");
+      const rushScore = document.getElementById("realPuzzleRushScore");
+      if (counter) counter.textContent = getRealPuzzlePositionLabel();
+      if (solved) solved.textContent = `${progress.solved}/${progress.total}`;
+      if (accuracy) {
+        const value = getRealPuzzleAccuracy();
+        accuracy.textContent = value === null ? "—" : `${value}%`;
+        accuracy.setAttribute("aria-label", value === null ? "Practice accuracy unavailable; no attempts yet" : `Practice accuracy ${value} percent`);
+      }
+      if (streakValue) streakValue.textContent = `${realPuzzleStreak}/${realPuzzleBestStreak}`;
+      if (rating) rating.textContent = String(realPuzzleRating);
+      if (rushScore) {
+        rushScore.textContent = String(realPuzzleRushScore);
+        const card = rushScore.closest(".real-puzzle-card");
+        if (card) card.hidden = realPuzzleMode !== "Rush";
+      }
+    }
+
+    function getRealPuzzleModeDescription() {
+      if (realPuzzleMode === "Rush") {
+        if (realPuzzleRushFinished) return `Rush complete · ${realPuzzleRushScore} solved in three minutes. Start a new run when ready.`;
+        if (realPuzzleRushStarted) return `Three-minute Rush · ${realPuzzleRushScore} solved. The clock pauses while you leave Puzzles.`;
+        return "Three-minute Rush · solve as many as you can. The clock starts when you first select a piece.";
+      }
+      if (realPuzzleMode === "Streak") return "Streak · solve consecutive positions. A miss or manual skip resets the current chain.";
+      if (realPuzzleMode === "Battle") return "Solo Battle · a wrong guess costs 10 local practice-rating points. No online opponent or bonus reward.";
+      return "Trainer · no time pressure. Study the full line; the solved explanation stays until you choose another position.";
+    }
+
+    function renderRealPuzzleModeStatus() {
+      const description = document.getElementById("realPuzzleModeDescription");
+      if (description) {
+        const nextDescription = getRealPuzzleModeDescription();
+        if (description.textContent !== nextDescription) description.textContent = nextDescription;
+      }
+      const restart = document.getElementById("realPuzzleBoardRestart");
+      if (restart) {
+        const label = realPuzzleMode === "Rush" && realPuzzleRushFinished ? "New Rush" : "Restart position";
+        if (restart.textContent !== label) restart.textContent = label;
+      }
+      const timer = document.getElementById("realPuzzleTimer");
+      if (timer) {
+        const label = realPuzzleMode === "Rush" ? "Rush time remaining" : "Time spent on this position";
+        if (timer.getAttribute("aria-label") !== label) timer.setAttribute("aria-label", label);
+      }
+    }
+
+    function getRealPuzzleRushRemainingMs() {
+      return Math.max(0, realPuzzleRushRemainingMs - (realPuzzleRushSegmentStartedAt ? Date.now() - realPuzzleRushSegmentStartedAt : 0));
+    }
+
+    function pauseRealPuzzleRushClock() {
+      if (realPuzzleRushSegmentStartedAt) {
+        realPuzzleRushRemainingMs = getRealPuzzleRushRemainingMs();
+        realPuzzleRushSegmentStartedAt = 0;
+      }
+      window.clearInterval(realPuzzleRushTimerId);
+      realPuzzleRushTimerId = 0;
+      renderRealPuzzleModeStatus();
+      updateRealPuzzleClock();
+    }
+
+    function resumeRealPuzzleRushClock() {
+      if (realPuzzleMode !== "Rush" || !realPuzzleRushStarted || realPuzzleRushFinished || realPuzzleRushTimerId) return;
+      if (realPuzzleRushRemainingMs <= 0) {
+        finishRealPuzzleRush();
+        return;
+      }
+      realPuzzleRushSegmentStartedAt = Date.now();
+      realPuzzleRushTimerId = window.setInterval(updateRealPuzzleClock, 250);
+      updateRealPuzzleClock();
+    }
+
+    function resetRealPuzzleRushSession() {
+      window.clearInterval(realPuzzleRushTimerId);
+      realPuzzleRushTimerId = 0;
+      realPuzzleRushSegmentStartedAt = 0;
+      realPuzzleRushRemainingMs = realPuzzleRushDurationMs;
+      realPuzzleRushScore = 0;
+      realPuzzleRushStarted = false;
+      realPuzzleRushFinished = false;
+      updateRealPuzzleProgressStats();
+      renderRealPuzzleModeStatus();
+      updateRealPuzzleClock();
+      syncRealPuzzleInterface();
+    }
+
+    function finishRealPuzzleRush() {
+      if (realPuzzleMode !== "Rush" || realPuzzleRushFinished) return;
+      realPuzzleRushRemainingMs = 0;
+      realPuzzleRushSegmentStartedAt = 0;
+      realPuzzleRushFinished = true;
+      window.clearInterval(realPuzzleRushTimerId);
+      realPuzzleRushTimerId = 0;
+      window.clearTimeout(realPuzzleAutoNextTimer);
+      realPuzzleAutoNextTimer = 0;
+      cancelPendingRealPuzzleReply();
+      clearPromotionPicker({ cancel: false });
+      boardInteractionEngine.cancel(document.getElementById("realPuzzleBoard"), { type: "rush-timeout" });
+      realPuzzleSelected = "";
+      realPuzzleLegalMoves = [];
+      stopRealPuzzleTimer({ pauseRush: false });
+      renderRealPuzzleModeStatus();
+      updateRealPuzzleProgressStats();
+      const feedback = document.getElementById("realPuzzleFeedback");
+      if (feedback) feedback.textContent = `Time. Rush complete — ${realPuzzleRushScore} puzzle${realPuzzleRushScore === 1 ? "" : "s"} solved. Start a new Rush to play again.`;
+      syncRealPuzzleInterface();
+      renderRealPuzzleBoard();
+      saveRealPuzzleState();
     }
 
     function updateRealPuzzleRating(delta) {
@@ -28435,12 +28567,13 @@
 
     function autoAdvanceRealPuzzleIfNeeded() {
       window.clearTimeout(realPuzzleAutoNextTimer);
-      // Daily deliberately stays on its one daily position. Every other mode
-      // advances after a short celebration without a manual Next click.
-      if (realPuzzleMode === "Daily" || getRealPuzzleIndexes().length < 2) return;
+      // Trainer and Solo Battle preserve the solved line for study; Rush and
+      // Streak are the only modes that advance automatically.
+      if (!["Rush", "Streak"].includes(realPuzzleMode) || realPuzzleRushFinished || getRealPuzzleIndexes().length < 2) return;
       realPuzzleAutoNextTimer = window.setTimeout(() => {
+        if (realPuzzleMode === "Rush" && realPuzzleRushFinished) return;
         realPuzzleManager.advance();
-      }, 900);
+      }, realPuzzleMode === "Rush" ? 700 : 1100);
     }
 
     function getRealAchievementDefs() {
@@ -28473,31 +28606,47 @@
         return badge;
       });
       row.replaceChildren(...badges);
-      if (newlyUnlocked.length) showCelebration("Achievement unlocked!", "+3 coins", newlyUnlocked[0], { subtle: true });
+      if (newlyUnlocked.length) showCelebration("Practice milestone", "Saved on this device", newlyUnlocked[0], { subtle: true });
     }
 
     function updateRealPuzzleClock() {
       const timer = document.getElementById("realPuzzleTimer");
-      if (timer) timer.textContent = formatPuzzleTime(realPuzzleStartedAt ? Date.now() - realPuzzleStartedAt : 0);
+      const rushMode = realPuzzleMode === "Rush";
+      const elapsed = realPuzzleElapsedMs + (realPuzzleStartedAt ? Date.now() - realPuzzleStartedAt : 0);
+      const remaining = rushMode ? getRealPuzzleRushRemainingMs() : 0;
+      if (timer) {
+        timer.textContent = formatPuzzleTime(rushMode ? remaining : elapsed);
+      }
+      if (rushMode && realPuzzleRushStarted && remaining <= 0 && !realPuzzleRushFinished) finishRealPuzzleRush();
+      if (rushMode) renderRealPuzzleModeStatus();
     }
 
     function startRealPuzzleTimer() {
       if (!realPuzzleStartedAt) realPuzzleStartedAt = Date.now();
       window.clearInterval(realPuzzleTimerId);
       realPuzzleTimerId = window.setInterval(updateRealPuzzleClock, 500);
+      if (realPuzzleMode === "Rush") {
+        realPuzzleRushStarted = true;
+        resumeRealPuzzleRushClock();
+      }
       updateRealPuzzleClock();
     }
 
-    function stopRealPuzzleTimer() {
+    function stopRealPuzzleTimer({ pauseRush = true } = {}) {
       window.clearInterval(realPuzzleTimerId);
       realPuzzleTimerId = 0;
+      if (realPuzzleStartedAt) {
+        realPuzzleElapsedMs += Math.max(0, Date.now() - realPuzzleStartedAt);
+        realPuzzleStartedAt = 0;
+      }
+      if (pauseRush) pauseRealPuzzleRushClock();
       updateRealPuzzleClock();
     }
 
     function syncRealPuzzleInterface() {
       const root = document.getElementById("realPuzzles");
       const board = document.getElementById("realPuzzleBoard");
-      const acceptingMove = realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying;
+      const acceptingMove = realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying && !realPuzzleRushFinished;
       if (root) root.dataset.puzzlePhase = realPuzzlePhase;
       if (board) {
         board.setAttribute("aria-busy", String(!acceptingMove));
@@ -28506,10 +28655,13 @@
           if (!acceptingMove) square.draggable = false;
         });
       }
-      ["realPuzzleHintButton", "realPuzzleReplay"].forEach((id) => {
-        const button = document.getElementById(id);
-        if (button) button.disabled = !acceptingMove;
-      });
+      const hint = document.getElementById("realPuzzleHintButton");
+      if (hint) hint.disabled = !acceptingMove;
+      const replay = document.getElementById("realPuzzleReplay");
+      if (replay) replay.disabled = !realPuzzleGame || realPuzzleReplaying || realPuzzleRushFinished
+        || !["PlayerTurn", "Completed"].includes(realPuzzlePhase);
+      const next = document.getElementById("realPuzzleBoardNext");
+      if (next) next.disabled = realPuzzleRushFinished;
     }
 
     function setRealPuzzlePhase(phase) {
@@ -28535,10 +28687,11 @@
       realPuzzleStep = 0;
       realPuzzleHintStep = 0;
       realPuzzleStartedAt = 0;
+      realPuzzleElapsedMs = 0;
       realPuzzleMistakes = 0;
       realPuzzleMoveSans = [];
       realPuzzleReplaying = false;
-      stopRealPuzzleTimer();
+      stopRealPuzzleTimer({ pauseRush: false });
       try {
         realPuzzleEngine = loadRealPuzzleEngine(puzzle);
         realPuzzleGame = realPuzzleEngine.game;
@@ -28567,11 +28720,13 @@
       for (let offset = 1; offset < indexes.length; offset += 1) {
         const candidate = indexes[(position + delta * offset + indexes.length) % indexes.length];
         if (candidates.has(candidate) && getRealPuzzleTacticalKey(realPuzzleBank[candidate]) !== currentTactic) {
+          if (realPuzzleMode === "Streak") realPuzzleStreak = 0;
           realPuzzleIndex = candidate;
           renderRealPuzzle();
           return;
         }
       }
+      if (realPuzzleMode === "Streak") realPuzzleStreak = 0;
       realPuzzleIndex = indexes.find((index) => candidates.has(index) && index !== realPuzzleIndex)
         ?? indexes[(position + delta + indexes.length) % indexes.length];
       renderRealPuzzle();
@@ -28630,16 +28785,11 @@
     }
 
     const realPuzzleManager = Object.freeze({
-      restart() { renderRealPuzzle(); },
+      restart() {
+        if (realPuzzleMode === "Rush" && realPuzzleRushFinished) resetRealPuzzleRushSession();
+        renderRealPuzzle();
+      },
       next(delta = 1) { stepRealPuzzle(delta); },
-      random() {
-        realPuzzleIndex = chooseRandomRealPuzzle();
-        renderRealPuzzle();
-      },
-      nextUnsolved() {
-        realPuzzleIndex = chooseNextUnsolvedRealPuzzle();
-        renderRealPuzzle();
-      },
       advance() {
         realPuzzleIndex = realPuzzleMode === "Streak" ? chooseNextUnsolvedRealPuzzle() : chooseRandomRealPuzzle();
         renderRealPuzzle();
@@ -28649,8 +28799,7 @@
 
     function renderRealPuzzleSelectors(indexes = getRealPuzzleIndexes()) {
       const select = document.getElementById("realPuzzleSelect");
-      const list = document.getElementById("realPuzzleNameList");
-      if (!select || !list) return;
+      if (!select) return;
       const position = Math.max(0, indexes.indexOf(realPuzzleIndex));
       const selectorIndexes = indexes.slice(Math.max(0, position - 16), position + 17);
       select.replaceChildren(...selectorIndexes.map((index) => {
@@ -28661,19 +28810,6 @@
         return option;
       }));
       select.value = String(realPuzzleIndex);
-      list.replaceChildren(...selectorIndexes.slice(0, 12).map((index) => {
-        const puzzle = realPuzzleBank[index];
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = puzzle.title;
-        button.setAttribute("aria-pressed", String(index === realPuzzleIndex));
-        button.title = `${getRealPuzzleDifficulty(puzzle)} ${puzzle.rating} - ${getRealPuzzleThemes(puzzle).join(", ")}`;
-        button.addEventListener("click", () => {
-          realPuzzleIndex = index;
-          renderRealPuzzle();
-        });
-        return button;
-      }));
     }
 
     function syncRealPuzzleAnalysisControls() {
@@ -28713,7 +28849,7 @@
         },
         canDrag(from) { return Boolean(board.querySelector(`[data-square="${from}"]`)?.draggable); },
         onDragStart(from, event) {
-          if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
+          if (!realPuzzleGame || realPuzzleReplaying || realPuzzleRushFinished || realPuzzlePhase !== "PlayerTurn") return;
           realPuzzleSelected = from;
           realPuzzleLegalMoves = realPuzzleGame.moves({ square: from, verbose: true });
           board.querySelector(`[data-square="${from}"]`)?.classList.add("dragging");
@@ -28817,7 +28953,7 @@
           lastSquares.includes(squareNameValue) ? "last move" : "",
           squareNameValue === checkedKing ? "in check" : ""
         ]));
-        square.disabled = realPuzzlePhase !== "PlayerTurn" || realPuzzleReplaying;
+        square.disabled = realPuzzlePhase !== "PlayerTurn" || realPuzzleReplaying || realPuzzleRushFinished;
         square.draggable = Boolean(piece && piece.color === realPuzzleGame?.turn() && !square.disabled);
       });
       if (animateEffect && realPuzzleLastMove) animateBoardPieceTransition(board, realPuzzleLastMove, { fade: false });
@@ -28872,27 +29008,14 @@
       document.getElementById("realPuzzleDifficulty").textContent = `${getRealPuzzleDifficulty(puzzle)} ${puzzle.rating}`;
       document.getElementById("realPuzzleSide").textContent = `${realPuzzleSide === "w" ? "White" : "Black"} to move`;
       document.getElementById("realPuzzleTheme").textContent = getRealPuzzleThemes(puzzle).join(" / ");
-      document.getElementById("realPuzzleCounter").textContent = getRealPuzzlePositionLabel();
-      const progress = realPuzzleManager.progress();
-      document.getElementById("realPuzzleSolved").textContent = `${progress.solved}/${progress.total}`;
-      document.getElementById("realPuzzleCoins").textContent = String(realPuzzleCoinsEarned);
-      document.getElementById("realPuzzleBest").textContent = realPuzzleBestSeconds ? formatPuzzleTime(realPuzzleBestSeconds * 1000) : "--";
-      document.getElementById("realPuzzleAccuracy").textContent = `${getRealPuzzleAccuracy()}%`;
-      document.getElementById("realPuzzleStreak").textContent = `${realPuzzleStreak}/${realPuzzleBestStreak}`;
+      updateRealPuzzleProgressStats();
       document.getElementById("realPuzzleRating").textContent = String(realPuzzleRating);
-      document.getElementById("realPuzzleRecommend").textContent = getRealPuzzleRecommendation();
       document.getElementById("realPuzzleTitle").textContent = puzzle.title;
       document.getElementById("realPuzzlePrompt").textContent = puzzle.prompt;
       document.getElementById("realPuzzleHint").textContent = puzzle.note || "Use a hint when you want a gentle nudge.";
       scheduleRealPuzzlePrefetch();
-      const modeNote = {
-        Daily: "Daily puzzle: one focused win today.",
-        Trainer: "Trainer: learn the full line at your pace.",
-        Rush: "Rush: solve and the next puzzle starts automatically.",
-        Streak: "Streak: keep the chain alive with clean solves.",
-        Battle: "Battle: mistakes cost more rating, rewards hit harder."
-      }[realPuzzleMode] || "Choose a piece.";
-      document.getElementById("realPuzzleFeedback").textContent = `${modeNote} Take a breath, then make your move.`;
+      renderRealPuzzleModeStatus();
+      document.getElementById("realPuzzleFeedback").textContent = `${realPuzzleMode} ready. Choose a piece to begin.`;
       document.getElementById("realPuzzleMoves").textContent = "";
       document.getElementById("realPuzzles")?.setAttribute("data-loading", "false");
       updateRealPuzzleClock();
@@ -28941,21 +29064,27 @@
       const puzzle = realPuzzleBank[realPuzzleIndex];
       const completionId = realPuzzleTransitionId;
       if (!puzzle || realPuzzleCompletionTransitionId === completionId || realPuzzlePhase === "Completed") return;
+      if (realPuzzleMode === "Rush" && realPuzzleRushStarted && getRealPuzzleRushRemainingMs() <= 0) {
+        finishRealPuzzleRush();
+        return;
+      }
       realPuzzleCompletionTransitionId = completionId;
       cancelPendingRealPuzzleReply();
       clearRealPuzzleAnalysisArrows();
-      const startedAt = realPuzzleStartedAt || Date.now();
-      const seconds = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
+      const elapsedMs = realPuzzleElapsedMs + (realPuzzleStartedAt ? Date.now() - realPuzzleStartedAt : 0);
+      const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
       const firstSolve = !realPuzzleSolved.has(puzzle.id);
-      stopRealPuzzleTimer();
+      const repeatedStreakPosition = realPuzzleMode === "Streak" && !firstSolve;
+      stopRealPuzzleTimer({ pauseRush: false });
       realPuzzleSelected = "";
       realPuzzleLegalMoves = [];
       let completionMessage = "Puzzle complete.";
       try {
         realPuzzleAttempts += 1;
         realPuzzleCorrect += 1;
-        realPuzzleStreak += 1;
+        if (!repeatedStreakPosition) realPuzzleStreak += 1;
         realPuzzleBestStreak = Math.max(realPuzzleBestStreak, realPuzzleStreak);
+        if (realPuzzleMode === "Rush") realPuzzleRushScore += 1;
         updateRealPuzzleRating(Math.max(4, Math.round((puzzle.rating - realPuzzleRating) / 24) + (realPuzzleMistakes ? 3 : 10)));
         if (firstSolve) {
           realPuzzleSolved.add(puzzle.id);
@@ -28970,9 +29099,12 @@
           renderPlayerProfile();
           playPuzzleTone("milestone");
           publishLearningActivity("puzzle_solved", `real-puzzle:${puzzle.id}`, { puzzleId: puzzle.id, theme: puzzle.theme || "", rating: puzzle.rating || null });
-          showCelebration("Real puzzle solved!", formatRewardText(reward), xpResult.levelUp ? "New level!" : puzzle.theme);
+          const rewardMessage = isApplicationAuthenticated()
+            ? "Practice saved on this device. No account XP, coins, or rating were awarded."
+            : `Device-local ${formatRewardText(reward)}`;
+          showCelebration("Puzzle solved", rewardMessage, xpResult.levelUp ? "Practice level up" : puzzle.theme);
         }
-        completionMessage = `Solved in ${formatPuzzleTime(seconds * 1000)}. Line: ${realPuzzleMoveSans.join(" ")}. ${puzzle.note}`;
+        completionMessage = `Solved in ${formatPuzzleTime(seconds * 1000)}.${repeatedStreakPosition ? " This position was already solved, so it did not extend your Streak." : ""} Line: ${realPuzzleMoveSans.join(" ")}. ${puzzle.note}`;
       } catch (error) {
         console.warn("[Nschess Puzzles] Completion side effect failed.", error);
         completionMessage = "Puzzle solved. Your progress has been saved; choose the next challenge when ready.";
@@ -28989,6 +29121,8 @@
         const moves = document.getElementById("realPuzzleMoves");
         if (feedback) feedback.textContent = completionMessage;
         if (moves) moves.textContent = realPuzzleMoveSans.join(" ");
+        updateRealPuzzleProgressStats();
+        renderRealPuzzleModeStatus();
         try {
           renderRealPuzzleAchievements();
           renderRealPuzzleBoard();
@@ -29000,13 +29134,14 @@
     }
 
     async function finishRealPuzzleMove(move) {
-      if (!realPuzzleGame || realPuzzlePhase !== "PlayerTurn") return;
+      if (!realPuzzleGame || realPuzzlePhase !== "PlayerTurn" || realPuzzleRushFinished) return;
       const transitionId = realPuzzleTransitionId;
       setRealPuzzlePhase("Validate");
       const playedUci = moveToUci(move).toLowerCase();
       const expected = String(realPuzzleEngine?.line?.[realPuzzleEngine?.step] || "").trim().toLowerCase();
       const expectedMove = getRealPuzzleEngineMove();
       if (playedUci !== expected || !expectedMove) {
+        const brokenStreak = realPuzzleStreak;
         realPuzzleMistakes += 1;
         realPuzzleAttempts += 1;
         realPuzzleFailed += 1;
@@ -29014,7 +29149,16 @@
         updateRealPuzzleRating(realPuzzleMode === "Battle" ? -10 : -6);
         realPuzzleSelected = "";
         realPuzzleLegalMoves = [];
-        document.getElementById("realPuzzleFeedback").textContent = "Nice try. Look for a forcing check, capture, or threat, then try again.";
+        const message = realPuzzleMode === "Streak"
+          ? `Streak broken${brokenStreak ? ` at ${brokenStreak}` : ""}. Solve this position to start a new chain.`
+          : realPuzzleMode === "Rush"
+            ? "Not quite. Rush is still live—look for a forcing move and try again before time runs out."
+            : realPuzzleMode === "Battle"
+              ? "Wrong move. Your local practice rating lost 10 points; try another forcing idea."
+              : "Nice try. Find a forcing move and try again; the full line stays here when you solve it.";
+        document.getElementById("realPuzzleFeedback").textContent = message;
+        updateRealPuzzleProgressStats();
+        renderRealPuzzleModeStatus();
         playPuzzleTone("wrong");
         flashPuzzleBoard("is-wrong", "realPuzzleBoard");
         setRealPuzzlePhase("PlayerTurn");
@@ -29070,12 +29214,12 @@
     }
 
     function handleRealPuzzleSquare(square) {
-      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return false;
-      startRealPuzzleTimer();
+      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn" || realPuzzleRushFinished) return false;
       const piece = realPuzzleGame.get(square);
       if (realPuzzleSelected && square !== realPuzzleSelected) {
         const legalMoves = realPuzzleGame.moves({ square: realPuzzleSelected, verbose: true }).filter((move) => move.to === square);
         if (legalMoves.length) {
+          startRealPuzzleTimer();
           const expected = String(realPuzzleEngine?.line?.[realPuzzleEngine?.step] || "").trim().toLowerCase();
           const selectedMove = legalMoves.find((candidate) => moveToUci(candidate).toLowerCase() === expected)
             || legalMoves.find((move) => move.promotion === "q")
@@ -29107,6 +29251,7 @@
         }
       }
       if (piece && piece.color === realPuzzleGame.turn()) {
+        startRealPuzzleTimer();
         realPuzzleSelected = square;
         realPuzzleLegalMoves = realPuzzleGame.moves({ square, verbose: true });
         document.getElementById("realPuzzleFeedback").textContent = `${realPuzzleLegalMoves.length} legal move${realPuzzleLegalMoves.length === 1 ? "" : "s"} highlighted.`;
@@ -29126,12 +29271,14 @@
       const puzzle = realPuzzleBank[realPuzzleIndex];
       realPuzzleHintStep = Math.min(realPuzzleHintStep + 1, puzzle.hints.length);
       document.getElementById("realPuzzleHint").textContent = puzzle.hints[realPuzzleHintStep - 1] || puzzle.note;
-      document.getElementById("realPuzzleFeedback").textContent = realPuzzleHintStep >= 3 ? `Full line: ${puzzle.moves.join(" ")}` : "Hint opened. Reward is a little smaller, but learning still counts.";
+      document.getElementById("realPuzzleFeedback").textContent = realPuzzleHintStep >= 3
+        ? `Full line: ${puzzle.moves.join(" ")}`
+        : "Hint opened. It may reduce the device-local practice bonus; account rewards are never affected.";
       playAudioCue("hint");
     }
 
     async function replayRealPuzzleSolution() {
-      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
+      if (!realPuzzleGame || realPuzzleReplaying || realPuzzleRushFinished || !["PlayerTurn", "Completed"].includes(realPuzzlePhase)) return;
       resetRealPuzzleGame();
       const transitionId = realPuzzleTransitionId;
       setRealPuzzlePhase("Loading");
@@ -29217,27 +29364,35 @@
         button.addEventListener("click", () => {
           const requestedMode = button.dataset.realMode || "Trainer";
           if (!realPuzzleModes.includes(requestedMode)) return;
+          if (requestedMode === realPuzzleMode) return;
+          resetRealPuzzleRushSession();
           realPuzzleMode = requestedMode;
-          realPuzzleIndex = getRealPuzzleIndexes()[0] || 0;
+          if (requestedMode === "Streak") realPuzzleStreak = 0;
+          realPuzzleIndex = requestedMode === "Streak"
+            ? chooseNextUnsolvedRealPuzzle()
+            : (getRealPuzzleIndexes()[0] || 0);
           renderRealPuzzle();
         });
       });
       document.querySelectorAll("[data-real-difficulty]").forEach((button) => {
         button.addEventListener("click", () => {
-          realPuzzleDifficulty = button.dataset.realDifficulty || "All";
-          realPuzzleIndex = getRealPuzzleIndexes()[0] || 0;
+          const requestedDifficulty = button.dataset.realDifficulty || "All";
+          if (requestedDifficulty === realPuzzleDifficulty) return;
+          if (realPuzzleMode === "Rush") resetRealPuzzleRushSession();
+          realPuzzleDifficulty = requestedDifficulty;
+          if (realPuzzleMode === "Streak") realPuzzleStreak = 0;
+          realPuzzleIndex = realPuzzleMode === "Streak"
+            ? chooseNextUnsolvedRealPuzzle()
+            : (getRealPuzzleIndexes()[0] || 0);
           renderRealPuzzle();
         });
       });
       document.getElementById("realPuzzleSelect")?.addEventListener("change", (event) => {
+        if (realPuzzleMode === "Streak" && Number(event.target.value) !== realPuzzleIndex) realPuzzleStreak = 0;
         realPuzzleIndex = Number(event.target.value) || 0;
         renderRealPuzzle();
       });
-      document.getElementById("realPuzzlePrev")?.addEventListener("click", () => realPuzzleManager.next(-1));
-      document.getElementById("realPuzzleNext")?.addEventListener("click", () => realPuzzleManager.next(1));
       document.getElementById("realPuzzleBoardNext")?.addEventListener("click", () => realPuzzleManager.next(1));
-      document.getElementById("realPuzzleRandom")?.addEventListener("click", () => realPuzzleManager.random());
-      document.getElementById("realPuzzleRestart")?.addEventListener("click", () => realPuzzleManager.restart());
       document.getElementById("realPuzzleBoardRestart")?.addEventListener("click", () => realPuzzleManager.restart());
       document.getElementById("realPuzzleHintButton")?.addEventListener("click", showRealPuzzleHint);
       document.getElementById("realPuzzleReplay")?.addEventListener("click", replayRealPuzzleSolution);
@@ -29249,7 +29404,6 @@
         realPuzzleFlipped = !realPuzzleFlipped;
         renderRealPuzzleBoard();
       });
-      document.getElementById("realPuzzleNextUnsolved")?.addEventListener("click", () => realPuzzleManager.nextUnsolved());
       renderRealPuzzle();
     }
 
@@ -36510,7 +36664,8 @@
           if (activePanel === "play" || activePanel === "gameReview") startMatchPlayerTimer();
           if (activePanel === "puzzles") {
             resumePuzzleTimer();
-            if (realPuzzleStartedAt && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+            if ((realPuzzleStartedAt || realPuzzleElapsedMs > 0) && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+            else if (realPuzzleMode === "Rush" && realPuzzleRushStarted) resumeRealPuzzleRushClock();
           }
         }
       });
@@ -36530,6 +36685,7 @@
         stopMatchPlayerTimer();
         window.clearInterval(puzzleTimerId);
         window.clearInterval(realPuzzleTimerId);
+        window.clearInterval(realPuzzleRushTimerId);
       }, { once: true });
     }
 
