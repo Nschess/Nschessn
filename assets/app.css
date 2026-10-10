@@ -12452,6 +12452,12 @@
 
     .review-graph span[data-review-side="white"]::before { bottom: 50%; }
     .review-graph span[data-review-side="black"]::before { top: 50%; }
+    .review-graph span[data-evaluation-available="false"] {
+      background: transparent;
+    }
+    .review-graph span[data-evaluation-available="false"]::before {
+      display: none;
+    }
 
     .review-graph span[aria-current="true"] {
       outline: 2px solid var(--review-marker, #ffd36b);
@@ -12559,6 +12565,18 @@
     .review-eval-rail[data-orientation="black"] .review-eval-black {
       top: auto;
       bottom: 8px;
+    }
+
+    .review-eval-rail[data-evaluation-available="false"] .review-eval-fill {
+      inset: 0 !important;
+      height: auto !important;
+      background: repeating-linear-gradient(135deg, rgba(169, 180, 198, 0.28) 0 4px, transparent 4px 8px) !important;
+      box-shadow: none !important;
+      transition: none !important;
+    }
+
+    .review-eval-rail[data-evaluation-available="false"] .review-eval-mid {
+      display: none;
     }
 
     .review-controls {
@@ -43122,7 +43140,7 @@ html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .
    collapse a perfectly sized board into a narrow column. */
 :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto;
   align-items: start;
   justify-items: stretch;
@@ -43141,7 +43159,7 @@ html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .
 
 :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot > .play-board-wrap {
   grid-area: auto !important;
-  grid-column: 2 !important;
+  grid-column: 1 !important;
   grid-row: 1 !important;
   justify-self: center;
   align-self: start;
@@ -43195,8 +43213,8 @@ html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .
 
 @media (max-width: 520px) {
   :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot {
-    grid-template-columns: 22px minmax(0, 1fr);
-    gap: 0 5px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
 
   :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page #reviewBoardSlot > .review-eval-rail {

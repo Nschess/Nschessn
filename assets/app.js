@@ -1176,6 +1176,10 @@
           );
           const stageRect = stage.getBoundingClientRect?.();
           const boardRect = board.getBoundingClientRect?.();
+          const reviewRail = reviewHost ? stage.querySelector(":scope > .review-eval-rail") : null;
+          const stageGridStyle = reviewHost ? getComputedStyle(stage) : null;
+          const reviewRailAndGap = (reviewRail?.getBoundingClientRect?.().width || 0)
+            + (Number.parseFloat(stageGridStyle?.columnGap || "") || 0);
           const playUtility = !reviewHost
             ? stage.querySelector(":scope > .play-lobby-board-actions")
             : null;
@@ -1183,17 +1187,24 @@
           // The shared stage keeps a framed wrapper around the square board.
           // Fullscreen fitting must reserve that frame, otherwise the rows
           // can exceed the viewport even when the square itself fits exactly.
-          const measuredFrame = reviewHost
-            ? Number(stageRect?.height) - Number(boardRect?.height)
-            : Number(stageRect?.width) - Number(boardRect?.width);
-          // In fullscreen the stage itself expands to the viewport. Its width
-          // minus the board is therefore not the board's presentation frame;
-          // using that value makes a previously clamped board collapse to 1px.
-          // Keep the measured frame when it is plausible, otherwise use the
-          // stable shared frame allowance.
-          const boardFrameReserve = Number.isFinite(measuredFrame) && measuredFrame > 0
-            ? Math.min(measuredFrame, 96)
+          const measuredHorizontalFrame = Number(stageRect?.width) - Number(boardRect?.width);
+          const measuredVerticalFrame = Number(stageRect?.height) - Number(boardRect?.height);
+          // Review wraps the square board beside its evaluation rail. Measure
+          // that horizontal frame from width, not height: on narrow phones the
+          // analysis track is deliberately taller than the square, and using
+          // its vertical slack as a width reserve needlessly shrinks the board.
+          // Keep Play's existing width-based reserve unchanged.
+          const horizontalFrame = reviewHost
+            ? Math.max(measuredHorizontalFrame, reviewRailAndGap)
+            : measuredHorizontalFrame;
+          const horizontalFrameReserve = Number.isFinite(horizontalFrame) && horizontalFrame > 0
+            ? Math.min(horizontalFrame, 96)
             : 20;
+          const verticalFrameReserve = reviewHost
+            && Number.isFinite(measuredVerticalFrame)
+            && measuredVerticalFrame > 0
+            ? Math.min(measuredVerticalFrame, 96)
+            : horizontalFrameReserve;
           // Active Play keeps the fullscreen action as a small edge overlay on
           // wider fullscreen viewports, so it does not consume a permanent
           // board-width column. Narrow desktop/tablet layouts retain the
@@ -1210,9 +1221,9 @@
             : 1;
           const gridGapReserve = rowGap * Math.max(0, fullscreenRows - 1);
           const widthBudget = reviewAnalysisWidth || hostWidth;
-          const widthFitWithoutUtility = widthBudget - paddingInline - boardFrameReserve;
+          const widthFitWithoutUtility = widthBudget - paddingInline - horizontalFrameReserve;
           const heightFitWithoutUtility = hostHeight - paddingBlock
-            - cardsHeight - controlsHeight - gridGapReserve - boardFrameReserve - mobileStageActionsReserve;
+            - cardsHeight - controlsHeight - gridGapReserve - verticalFrameReserve - mobileStageActionsReserve;
           // The wider edge overlay needs only the amount that prevents it
           // touching a width-limited board. Height-limited compositions do
           // not reserve any horizontal space at all.
@@ -1239,10 +1250,10 @@
           // intentionally reserved for evaluation context. Fit the square to
           // the actual analysis track instead of the whole command-center
           // border box, otherwise the board can intrude into that context.
-          const widthFit = widthBudget - paddingInline - utilityRailReserve - boardFrameReserve;
+          const widthFit = widthBudget - paddingInline - utilityRailReserve - horizontalFrameReserve;
           const verticalReserve = reviewHost
-            ? paddingBlock + controlsHeight + boardFrameReserve + mobileStageActionsReserve + 8
-            : paddingBlock + cardsHeight + controlsHeight + gridGapReserve + boardFrameReserve + mobileStageActionsReserve;
+            ? paddingBlock + controlsHeight + verticalFrameReserve + mobileStageActionsReserve + 8
+            : paddingBlock + cardsHeight + controlsHeight + gridGapReserve + verticalFrameReserve + mobileStageActionsReserve;
           // The measured fit is authoritative in focus mode. Do not raise it
           // back to the shared minimum: on a short viewport that would make
           // the board overflow the very player cards and controls we just
@@ -5677,6 +5688,7 @@
     const friendRecentPlayersStorageKey = "checkmateQuest.friendRecent.v1";
     const tournamentStorageKey = "checkmateQuest.tournaments.v1";
     const reviewAnalysisCacheStorageKey = "checkmateQuest.reviewAnalysis.v1";
+    const reviewAnalysisSchemaVersion = 2;
     flexBadgeState = normalizeFlexBadgeState(savedPuzzleState.flexBadges, savedPuzzleState.store, readJsonStorage(learnerPrefsStorageKey, {}));
     let storyState = readJsonStorage(storyStorageKey, { completed: [], stars: 0 });
     let activeBookLevel = "all";
@@ -8265,14 +8277,19 @@
       const meta = document.getElementById("matchHistoryAccuracyMeta");
       if (!card || !chart || !meta) return;
       const history = matchReviews
-        .map((review) => ({ white: Number(review?.whiteAccuracy), black: Number(review?.blackAccuracy) }))
-        .filter((entry) => Number.isFinite(entry.white) && Number.isFinite(entry.black))
+        .filter((review) => Number(review?.analysis?.reviewModelVersion) === reviewAnalysisSchemaVersion)
+        .map((review) => ({
+          white: review?.whiteAverageCentipawnLoss,
+          black: review?.blackAverageCentipawnLoss
+        }))
+        .filter((entry) => typeof entry.white === "number" && Number.isFinite(entry.white)
+          && typeof entry.black === "number" && Number.isFinite(entry.black))
         .slice(0, 8)
         .reverse();
       card.hidden = !history.length;
       if (!history.length) return;
       const latest = history[history.length - 1];
-      meta.textContent = `${history.length} reviewed ${history.length === 1 ? "game" : "games"} · White ${Math.round(latest.white)}% · Black ${Math.round(latest.black)}%`;
+      meta.textContent = `${history.length} reviewed ${history.length === 1 ? "game" : "games"} · White ${Math.round(latest.white)} cp · Black ${Math.round(latest.black)} cp`;
       const namespace = "http://www.w3.org/2000/svg";
       const width = 320;
       const height = 96;
@@ -8287,20 +8304,20 @@
       };
       const points = (key) => history.map((entry, index) => {
         const x = history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth;
-        const y = paddingY + ((100 - Math.max(0, Math.min(100, entry[key]))) / 100) * plotHeight;
+        const y = paddingY + (Math.max(0, Math.min(300, entry[key])) / 300) * plotHeight;
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       }).join(" ");
-      const grid = [25, 50, 75].map((value) => createSvg("line", {
-        x1: paddingX, x2: width - paddingX, y1: paddingY + ((100 - value) / 100) * plotHeight, y2: paddingY + ((100 - value) / 100) * plotHeight, class: "match-history-chart-grid"
+      const grid = [75, 150, 225].map((value) => createSvg("line", {
+        x1: paddingX, x2: width - paddingX, y1: paddingY + (value / 300) * plotHeight, y2: paddingY + (value / 300) * plotHeight, class: "match-history-chart-grid"
       }));
       const whiteLine = createSvg("polyline", { points: points("white"), class: "match-history-chart-line is-white" });
       const blackLine = createSvg("polyline", { points: points("black"), class: "match-history-chart-line is-black" });
       const dots = history.flatMap((entry, index) => [
-        createSvg("circle", { cx: history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth, cy: paddingY + ((100 - entry.white) / 100) * plotHeight, r: 2.8, class: "match-history-chart-dot is-white" }),
-        createSvg("circle", { cx: history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth, cy: paddingY + ((100 - entry.black) / 100) * plotHeight, r: 2.8, class: "match-history-chart-dot is-black" })
+        createSvg("circle", { cx: history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth, cy: paddingY + (Math.max(0, Math.min(300, entry.white)) / 300) * plotHeight, r: 2.8, class: "match-history-chart-dot is-white" }),
+        createSvg("circle", { cx: history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth, cy: paddingY + (Math.max(0, Math.min(300, entry.black)) / 300) * plotHeight, r: 2.8, class: "match-history-chart-dot is-black" })
       ]);
       const title = createSvg("title");
-      title.textContent = `Accuracy by side across ${history.length} reviewed ${history.length === 1 ? "game" : "games"}. Latest: White ${Math.round(latest.white)}%, Black ${Math.round(latest.black)}%.`;
+      title.textContent = `Average centipawn loss by side across ${history.length} reviewed ${history.length === 1 ? "game" : "games"}; lower is better. Latest: White ${Math.round(latest.white)} cp, Black ${Math.round(latest.black)} cp.`;
       chart.replaceChildren(title, ...grid, whiteLine, blackLine, ...dots);
       chart.setAttribute("aria-label", title.textContent);
     }
@@ -17017,13 +17034,10 @@
         ? activeMatchReview
         : (Array.isArray(matchReviews) ? matchReviews.find((item) => item?.pgn === pgn) : null);
       const playerColor = coachPlayerColor === "b" ? "b" : "w";
-      const accuracy = playerColor === "b" ? review?.blackAccuracy : review?.whiteAccuracy;
-      const losses = (review?.moves || [])
-        .filter((move) => move?.color === playerColor && move?.engineVerified && Number.isFinite(Number(move.cpLoss)))
-        .map((move) => Number(move.cpLoss));
+      const metrics = getReviewMetricSummary(review, playerColor);
       return {
-        accuracy: Number.isFinite(Number(accuracy)) ? Math.round(Number(accuracy) * 10) / 10 : null,
-        averageCentipawnLoss: losses.length ? Math.round(losses.reduce((total, loss) => total + loss, 0) / losses.length) : null
+        engineCoverage: metrics ? `${metrics.checkedMoves}/${metrics.totalMoves}` : null,
+        averageCentipawnLoss: metrics?.averageCentipawnLoss ?? null
       };
     }
 
@@ -17062,7 +17076,7 @@
         rematch.textContent = "Rematch";
       }
       if (summary) summary.textContent = reasonText;
-      if (accuracy) accuracy.textContent = metrics.accuracy === null ? "Pending" : `${metrics.accuracy}%`;
+      if (accuracy) accuracy.textContent = metrics.engineCoverage === null ? "Not analyzed" : `${metrics.engineCoverage} moves`;
       if (movesStat) movesStat.textContent = String(moves);
       if (duration) duration.textContent = formatPostGameDuration(matchEndedElapsedMs);
       if (acplStat) acplStat.hidden = metrics.averageCentipawnLoss === null;
@@ -18977,6 +18991,7 @@
         stockfishPending.analysis.scoreCp = whiteCp;
         stockfishPending.analysis.evalText = stockfishInfo.evalText;
         stockfishPending.analysis.mate = null;
+        stockfishPending.analysis.hasScore = true;
       } else if (mateMatch) {
         const rawMate = Number(mateMatch[1]) || 0;
         const whiteMate = stockfishPending.side === "w" ? rawMate : -rawMate;
@@ -18985,6 +19000,7 @@
         stockfishPending.analysis.scoreCp = stockfishInfo.scoreCp;
         stockfishPending.analysis.evalText = stockfishInfo.evalText;
         stockfishPending.analysis.mate = whiteMate;
+        stockfishPending.analysis.hasScore = true;
       }
       stockfishInfo.status = "Thinking...";
       scheduleEnginePanelUpdate();
@@ -19359,7 +19375,8 @@
       return { ...config, reviewMode: deep ? "deep" : "quick" };
     }
     async function analyzeFenWithStockfish(fen, config = getReviewAnalysisConfig("quick")) {
-      const cacheKey = `${fen}|d${config.depth}|t${config.movetime}|n${config.nodes}`;
+      const reviewCacheVersion = config.reviewMode ? `|review-v${reviewAnalysisSchemaVersion}:${config.reviewMode}` : "";
+      const cacheKey = `${fen}|d${config.depth}|t${config.movetime}|n${config.nodes}${reviewCacheVersion}`;
       const cache = readReviewAnalysisCache();
       if (cache[cacheKey]) return cache[cacheKey];
       cancelStockfishSearch("Review analysis started");
@@ -19379,13 +19396,13 @@
           }, 260);
         }, config.movetime + 700);
         stockfishInfo.status = "Review analysis...";
-        stockfishPending = { id: searchId, purpose: "review", stage: "config", fen, side, config, resolve, timeout, stopTimeout: 0, analysis: { fen, scoreCp: 0, evalText: "0.00", pv: "", bestMove: "", depth: 0 } };
+        stockfishPending = { id: searchId, purpose: "review", stage: "config", fen, side, config, resolve, timeout, stopTimeout: 0, analysis: { fen, scoreCp: 0, evalText: "0.00", pv: "", bestMove: "", depth: 0, hasScore: false } };
         configureStockfish(worker, config);
         sendStockfishCommand(worker, "isready");
       });
       // Do not persist an interrupted/no-result search. Caching it would make
       // a later retry return the same empty result without asking Stockfish.
-      if (analysis?.bestMove && Number(analysis.depth) > 0) {
+      if (analysis?.bestMove && Number(analysis.depth) > 0 && analysis.hasScore === true) {
         cache[cacheKey] = analysis;
         writeReviewAnalysisCache(cache);
       }
@@ -20179,6 +20196,7 @@
     const reviewQualityMeta = {
       "Opening Book": { icon: "OB", color: "#82c9ff", cue: "menu" },
       Brilliant: { icon: "!!", color: "#ffd36b", cue: "brilliant" },
+      Checkmate: { icon: "#", color: "#ffd36b", cue: "check" },
       Best: { icon: "1", color: "#8be28b", cue: "correct" },
       Excellent: { icon: "!", color: "#9fe870", cue: "correct" },
       Great: { icon: "+", color: "#74d6ff", cue: "notification" },
@@ -20187,7 +20205,9 @@
       Mistake: { icon: "?", color: "#ff7d6a", cue: "illegal" },
       Blunder: { icon: "??", color: "#ff4f68", cue: "defeat" },
       "Missed Win": { icon: "MW", color: "#c58cff", cue: "puzzle-wrong" },
-      Forced: { icon: "F", color: "#d9d9d9", cue: "ui" }
+      Forced: { icon: "F", color: "#d9d9d9", cue: "ui" },
+      Unverified: { icon: "—", color: "#a9b4c6", cue: "ui" },
+      Unrated: { icon: "?", color: "#a9b4c6", cue: "ui" }
     };
 
     function getReviewQualityMeta(label = "Good") {
@@ -20250,10 +20270,30 @@
       }
     }
 
-    function getReviewCpLoss(move, beforeCp = 0, afterCp = 0) {
-      const before = Number(beforeCp) || 0;
-      const after = Number(afterCp) || 0;
-      return Math.round(Math.max(0, move.color === "w" ? before - after : after - before));
+    function getReviewCpLoss(move, before = null, after = null) {
+      if (!before?.hasScore || !after?.hasScore || before.mate != null || after.mate != null) return null;
+      if (!Number.isFinite(before.scoreCp) || !Number.isFinite(after.scoreCp)) return null;
+      const beforeCp = before.scoreCp;
+      const afterCp = after.scoreCp;
+      return Math.round(Math.max(0, move.color === "w" ? beforeCp - afterCp : afterCp - beforeCp));
+    }
+
+    function getReviewMetricSummary(review, color = null) {
+      if (Number(review?.analysis?.reviewModelVersion) !== reviewAnalysisSchemaVersion) return null;
+      const allMoves = Array.isArray(review?.moves) ? review.moves : [];
+      const moves = color ? allMoves.filter((move) => move?.color === color) : allMoves;
+      const checked = moves.filter((move) => move?.engineVerified);
+      const centipawnLosses = checked
+        .filter((move) => typeof move.cpLoss === "number" && Number.isFinite(move.cpLoss))
+        .map((move) => move.cpLoss);
+      return {
+        checkedMoves: checked.length,
+        totalMoves: moves.length,
+        centipawnScoredMoves: centipawnLosses.length,
+        averageCentipawnLoss: centipawnLosses.length
+          ? Math.round(centipawnLosses.reduce((sum, loss) => sum + loss, 0) / centipawnLosses.length)
+          : null
+      };
     }
 
     function getReviewPhase(fen = "", ply = 0) {
@@ -20312,32 +20352,33 @@
 
     function getReviewBestMoment(review = activeMatchReview) {
       const moves = Array.isArray(review?.moves) ? review.moves : [];
-      const labels = { Brilliant: 4, Best: 3, Excellent: 2, Great: 1 };
+      const labels = { Checkmate: 5, Brilliant: 4, Best: 3, Excellent: 2, Great: 1 };
       const ranked = moves
         .map((move, index) => ({ move, index }))
         .filter(({ move }) => move.color === getReviewPlayerColor())
         .sort((left, right) => (labels[right.move.label] || 0) - (labels[left.move.label] || 0) || (left.move.cpLoss || 0) - (right.move.cpLoss || 0));
-      return ranked.find(({ move }) => labels[move.label]) || ranked[0] || { index: -1, move: null };
+      return ranked.find(({ move }) => move.label === "Checkmate"
+        || (move.engineVerified && labels[move.label])) || { index: -1, move: null };
     }
 
     function getReviewEngineConfidence(review = activeMatchReview) {
       const analysis = review?.analysis || {};
       const depth = Math.max(0, Math.round(Number(analysis.averageDepth || analysis.requestedDepth) || 0));
       const mode = analysis.mode || "Quick engine";
-      if (!analysis.verifiedMoves) return `${mode} coverage limited`;
-      return `${mode} - depth ${depth || "--"}`;
+      const verified = Math.max(0, Number(analysis.verifiedMoves) || 0);
+      const total = Math.max(0, Number(analysis.totalMoves) || 0);
+      if (!verified) return `${mode} · no moves fully engine-verified`;
+      return `${mode} · ${verified}/${total} moves verified · depth ${depth || "--"}`;
     }
 
-    function classifyReviewMove({ move = {}, index = 0, cpLoss = 0, bestMove = null, legalCount = 0, opening = "Opening started", engineVerified = false, tactic = "" } = {}) {
+    function classifyReviewMove({ move = {}, cpLoss = null, bestMove = null, legalCount = 0, engineVerified = false } = {}) {
       const actualUci = moveToReviewUci(move);
       const bestUci = moveToReviewUci(bestMove || {});
+      if (move.san?.includes("#")) return "Checkmate";
       if (legalCount <= 1) return "Forced";
-      if (move.san?.includes("#")) return "Brilliant";
-      if (index < 8 && opening !== "Opening started" && (!engineVerified || cpLoss < 55)) return "Opening Book";
-      if (!engineVerified) return "Good";
-      if (engineVerified && bestUci && actualUci === bestUci) {
-        return /fork|skewer|discovered attack|sacrifice|mate threat/.test(tactic) ? "Brilliant" : move.captured || move.san?.includes("+") || move.promotion ? "Best" : "Excellent";
-      }
+      if (!engineVerified) return "Unverified";
+      if (bestUci && actualUci === bestUci) return "Best";
+      if (!Number.isFinite(cpLoss)) return "Unrated";
       if (move.captured && move.san?.includes("+") && cpLoss < 45) return "Great";
       if (cpLoss <= 15) return "Excellent";
       if (cpLoss <= 35) return "Great";
@@ -20451,6 +20492,9 @@
     }
 
     function buildReviewExplanation(move = {}, label = "Good", cpLoss = 0, best = "", pv = "", tactic = "safe improvement") {
+      if (label === "Checkmate") return "The chess rules confirm this move ends the game by checkmate.";
+      if (label === "Unverified") return "This is a legal move, but Stockfish did not return enough complete score data to rate it.";
+      if (label === "Unrated") return "Stockfish found a line, but mate scores cannot be compared as centipawn loss, so this move is not graded.";
       if (label === "Opening Book") return `Known opening idea. You followed the plan: center, development, and king safety.`;
       if (label === "Brilliant") return `Power move. This creates a forcing ${tactic} and leaves the opponent with no easy escape.`;
       if (label === "Best") return `Best move. It matches the engine's first choice and keeps the pressure.`;
@@ -20458,7 +20502,7 @@
       if (/Mistake|Blunder|Inaccuracy|Missed Win/.test(label)) {
         return `Nice try. The position changed by about ${cpLoss} centipawns. ${best ? `A stronger idea was ${best}.` : "Look for checks, captures, and threats first."}`;
       }
-      return `Solid move. Theme: ${tactic}. ${pv ? "The continuation confirms the idea." : "Keep asking what your opponent threatens."}`;
+      return `Solid move. Theme: ${tactic}. ${pv ? "The engine line supports the idea." : "Keep asking what your opponent threatens."}`;
     }
 
     function getReviewMoveText(move = {}) {
@@ -20495,19 +20539,44 @@
       const fill = document.getElementById("reviewEvalFill");
       const score = document.getElementById("reviewEvalScore");
       if (!rail || !fill) return;
-      const whitePercent = clampNumber(Number(move.eval) || 50, 5, 95);
-      const evalText = move.evalText || "0.00";
+      const evalText = String(move.evalText || "");
+      const hasEngineScore = Boolean(move.engineVerified && /^[+-](?:M\d+|\d+(?:\.\d+)?)$/i.test(evalText));
       rail.hidden = !activeMatchReview;
+      rail.dataset.evaluationAvailable = String(hasEngineScore);
+      if (!hasEngineScore) {
+        rail.style.setProperty("--review-white", "50%");
+        rail.dataset.advantage = "unavailable";
+        rail.dataset.orientation = coachFlipped ? "black" : "white";
+        rail.setAttribute("aria-label", "Engine evaluation unavailable; no position balance is inferred.");
+        if (score) score.textContent = "—";
+        return;
+      }
+      const whitePercent = clampNumber(Number(move.eval) || 50, 5, 95);
       rail.style.setProperty("--review-white", `${whitePercent}%`);
       rail.dataset.advantage = whitePercent > 54 ? "white" : whitePercent < 46 ? "black" : "equal";
       rail.dataset.orientation = coachFlipped ? "black" : "white";
-      rail.setAttribute("aria-label", `Evaluation ${evalText}. ${whitePercent > 54 ? "White is better" : whitePercent < 46 ? "Black is better" : "Position is balanced"}.`);
+      const mateScore = /M\d+/i.test(evalText);
+      rail.setAttribute("aria-label", mateScore
+        ? `Engine mate score ${evalText}. ${evalText.startsWith("+") ? "White" : "Black"} has a forced mate.`
+        : `Engine evaluation ${evalText}. ${whitePercent > 54 ? "White is better" : whitePercent < 46 ? "Black is better" : "Position is balanced"}.`);
       if (score) score.textContent = evalText;
     }
 
     function formatReviewAnalysisRemaining(milliseconds = 0) {
       const seconds = Math.max(1, Math.ceil(Number(milliseconds) / 1000));
       return seconds >= 60 ? `about ${Math.ceil(seconds / 60)} min left` : `about ${seconds}s left`;
+    }
+
+    function syncReviewNavigationControls(review = activeMatchReview) {
+      const moves = Array.isArray(review?.moves) ? review.moves : [];
+      const previous = document.getElementById("reviewPrev");
+      const next = document.getElementById("reviewNext");
+      const play = document.getElementById("reviewPlay");
+      const auto = document.getElementById("reviewAuto");
+      if (previous) previous.disabled = moves.length < 2 || reviewReplayIndex <= 0;
+      if (next) next.disabled = moves.length < 2 || reviewReplayIndex >= moves.length - 1;
+      if (play) play.disabled = moves.length < 2;
+      if (auto) auto.disabled = moves.length < 2;
     }
 
     function getReviewAnalysisTimeoutMs(config, moveCount) {
@@ -20536,12 +20605,12 @@
       if (summary) summary.textContent = message;
     }
 
-    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}, sourceGame = coachGame, provenance = { source: "local", authority: "client" }) {
+    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}, sourceGame = coachGame, provenance = { source: "local", authority: "client" }, pgnOverride = "") {
       if (!sourceGame || !CoachChess) return null;
       const moves = sourceGame.history({ verbose: true });
       if (!moves.length) return null;
       const finalFen = sourceGame.fen();
-      const finalPgn = sourceGame.pgn();
+      const finalPgn = String(pgnOverride || sourceGame.pgn());
       const opening = getReviewOpeningName(moves.map((move) => move.san));
       const whiteLosses = [];
       const blackLosses = [];
@@ -20578,25 +20647,30 @@
           reportProgress(index, "before");
         }
         if (!isCurrent()) return null;
-        try { replay.move(move.san); } catch {}
+        let replayed;
+        try { replayed = replay.move(move.san); } catch { return null; }
+        if (!replayed || moveToReviewUci(replayed) !== moveToReviewUci(move)) return null;
         const fenAfter = replay.fen();
         const after = await analyzeFenWithStockfish(fenAfter, analysisConfig);
         completedSearches += 1;
         reportProgress(index, "after");
         if (!isCurrent()) return null;
         previousAfter = after;
-        const engineDataReady = Boolean(before?.bestMove && Number(before?.depth) > 0 && Number(after?.depth) > 0);
+        const engineDataReady = Boolean(before?.bestMove && Number(before?.depth) > 0 && Number(after?.depth) > 0 && before?.hasScore === true && after?.hasScore === true);
         if (engineDataReady) analysisDepths.push(Number(before.depth) || 0, Number(after.depth) || 0);
         const bestMove = engineDataReady ? getMoveFromFenUci(fenBefore, before.bestMove) : null;
         const engineVerified = Boolean(engineDataReady && bestMove);
         const pv = engineVerified ? pvUciToSan(fenBefore, before.pv || before.bestMove) : "";
-        const cpLoss = engineVerified ? getReviewCpLoss(move, before?.scoreCp, after?.scoreCp) : 0;
-        const tactic = detectReviewTactic(move, fenBefore, bestMove);
-        const label = classifyReviewMove({ move, index, cpLoss, bestMove, legalCount, opening, engineVerified, tactic });
+        const cpLoss = engineVerified ? getReviewCpLoss(move, before, after) : null;
+        const label = classifyReviewMove({ move, cpLoss, bestMove, legalCount, engineVerified });
+        const detectedTactic = detectReviewTactic(move, fenBefore, bestMove);
+        const tactic = engineVerified || label === "Checkmate"
+          ? detectedTactic
+          : detectedTactic === "safe improvement" ? "position awareness" : `possible ${detectedTactic}`;
         const bestSan = bestMove?.san || "";
         const explanation = buildReviewExplanation(move, label, cpLoss, bestSan, pv, tactic);
-        if (engineVerified && move.color === "w") whiteLosses.push(cpLoss);
-        else if (engineVerified) blackLosses.push(cpLoss);
+        if (engineVerified && cpLoss !== null && move.color === "w") whiteLosses.push(cpLoss);
+        else if (engineVerified && cpLoss !== null) blackLosses.push(cpLoss);
         reviewed.push({
           ply: index + 1,
           moveNumber: Math.ceil((index + 1) / 2),
@@ -20628,19 +20702,21 @@
           await new Promise((resolve) => window.requestAnimationFrame(resolve));
         }
       }
-      const accuracyFromLosses = (losses) => {
+      if (replay.history().length !== moves.length || replay.fen() !== finalFen) return null;
+      const averageCentipawnLoss = (losses) => {
         if (!losses.length) return null;
-        const avg = losses.reduce((sum, loss) => sum + clampNumber(loss / 3, 0, 95), 0) / losses.length;
-        return Math.round(clampNumber(100 - avg, 0, 100));
+        return Math.round(losses.reduce((sum, loss) => sum + loss, 0) / losses.length);
       };
       const playerMoves = reviewed.filter((move) => move.color === getReviewPlayerColor());
       const mistakes = playerMoves.filter(isReviewLearningMove).sort((left, right) => getReviewMomentScore(right) - getReviewMomentScore(left));
-      const mvp = playerMoves.find((move) => /Brilliant|Great|Best|Excellent/.test(move.label)) || playerMoves[0] || reviewed[0];
+      const verifiedMoves = reviewed.filter((move) => move.engineVerified).length;
+      const mvp = playerMoves.find((move) => move.label === "Checkmate")
+        || playerMoves.find((move) => move.engineVerified && /Brilliant|Great|Best|Excellent/.test(move.label))
+        || null;
       const turning = mistakes[0] || mvp || reviewed[0];
       const criticalMoments = [...new Map([turning, mistakes[0], mvp]
         .filter(Boolean)
         .map((move) => [move.ply, move])).values()].slice(0, 3);
-      const verifiedMoves = reviewed.filter((move) => move.engineVerified).length;
       const averageDepth = analysisDepths.length
         ? Math.round(analysisDepths.reduce((sum, depth) => sum + depth, 0) / analysisDepths.length)
         : 0;
@@ -20653,9 +20729,10 @@
         fen: finalFen,
         pgn: finalPgn,
         moves: reviewed,
-        whiteAccuracy: accuracyFromLosses(whiteLosses),
-        blackAccuracy: accuracyFromLosses(blackLosses),
+        whiteAverageCentipawnLoss: averageCentipawnLoss(whiteLosses),
+        blackAverageCentipawnLoss: averageCentipawnLoss(blackLosses),
         analysis: {
+          reviewModelVersion: reviewAnalysisSchemaVersion,
           requestedDepth: analysisConfig.depth,
           averageDepth,
           verifiedMoves,
@@ -20667,11 +20744,25 @@
         summary: {
           opening,
           turning: `${turning.ply}. ${turning.san} (${turning.label})`,
-          mvp: `${mvp.san} - ${mvp.tactic}`,
-          mistake: mistakes[0] ? `${mistakes[0].san}: ${mistakes[0].explanation}` : "No major mistake found.",
-          chances: mistakes.length ? `${mistakes.length} moment${mistakes.length > 1 ? "s" : ""} to review.` : "You kept the game steady.",
+          mvp: mvp
+            ? `${mvp.san} - ${mvp.label === "Checkmate" ? "rules-confirmed checkmate" : mvp.tactic}`
+            : "No engine-verified best move is available.",
+          mistake: mistakes[0]
+            ? `${mistakes[0].san}: ${mistakes[0].explanation}`
+            : verifiedMoves
+              ? "No engine-identified mistake in the checked moves."
+              : "Stockfish was unavailable; move quality was not rated.",
+          chances: mistakes.length
+            ? `${mistakes.length} engine-identified moment${mistakes.length > 1 ? "s" : ""} to review.`
+            : verifiedMoves
+              ? "No engine-identified missed chance in the checked moves."
+              : "No engine-verified missed-chance assessment is available.",
           result,
-          tip: mistakes[0] ? "Next game: check loose pieces before every capture." : "Keep using center, development, and king safety."
+          tip: mistakes[0]
+            ? "Next game: check loose pieces before every capture."
+            : verifiedMoves
+              ? "Keep using center, development, and king safety."
+              : "Try again when Stockfish is available for engine-backed move guidance."
         }
       };
     }
@@ -20709,15 +20800,19 @@
       graph.replaceChildren(...review.moves.map((move, index) => {
         const markerMeta = getReviewQualityMeta(move.label);
         const bar = document.createElement("span");
-        const evalDelta = (Number(move.eval) || 50) - 50;
+        const hasEvaluation = Boolean(move.engineVerified && Number.isFinite(move.eval) && move.evalText);
+        const evalDelta = hasEvaluation ? move.eval - 50 : 0;
         bar.style.setProperty("--review-marker", markerMeta.color);
-        bar.style.setProperty("--review-eval-height", `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%`);
+        bar.style.setProperty("--review-eval-height", hasEvaluation ? `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%` : "0%");
+        bar.dataset.evaluationAvailable = String(hasEvaluation);
         bar.dataset.reviewSide = evalDelta >= 0 ? "white" : "black";
         bar.title = `${move.ply}. ${move.san} ${move.label} ${move.evalText || ""}`;
         bar.setAttribute("role", "button");
         bar.tabIndex = 0;
         bar.setAttribute("aria-current", String(index === reviewReplayIndex));
-        bar.setAttribute("aria-label", `Jump to ${move.ply}. ${move.san}, ${move.label}`);
+        bar.setAttribute("aria-label", hasEvaluation
+          ? `Jump to ${move.ply}. ${move.san}, ${move.label}, engine evaluation ${move.evalText}`
+          : `Jump to ${move.ply}. ${move.san}, ${move.label}, engine evaluation unavailable`);
         bar.addEventListener("click", () => showReviewPly(index));
         bar.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -20738,10 +20833,10 @@
       const playerRating = Math.max(400, Number(getLearnerGameRating()) || 400);
       const opponentRating = Math.max(400, Number(opponent?.rating || getCoachConfig()?.elo) || 400);
       const playerIsWhite = coachPlayerColor !== "b";
-      const playerAccuracy = playerIsWhite ? review.whiteAccuracy : review.blackAccuracy;
-      const opponentAccuracy = playerIsWhite ? review.blackAccuracy : review.whiteAccuracy;
-      const playerAccuracyText = Number.isFinite(playerAccuracy) ? `${playerAccuracy}%` : "--";
-      const opponentAccuracyText = Number.isFinite(opponentAccuracy) ? `${opponentAccuracy}%` : "--";
+      const playerMetrics = getReviewMetricSummary(review, playerIsWhite ? "w" : "b");
+      const opponentMetrics = getReviewMetricSummary(review, playerIsWhite ? "b" : "w");
+      const playerLossText = Number.isFinite(playerMetrics?.averageCentipawnLoss) ? `${playerMetrics.averageCentipawnLoss} cp` : "—";
+      const opponentLossText = Number.isFinite(opponentMetrics?.averageCentipawnLoss) ? `${opponentMetrics.averageCentipawnLoss} cp` : "—";
       const result = String(review.summary?.result || "Game complete.");
       const won = /^You won/i.test(result);
       const drew = /peacefully|draw/i.test(result);
@@ -20753,11 +20848,11 @@
       setReviewDashboardText("reviewOutcomeKicker", outcomeKicker);
       setReviewDashboardText("reviewOutcomeTitle", outcomeTitle);
       setReviewDashboardText("reviewOutcomeCopy", review.summary?.tip || result);
-      setReviewDashboardText("reviewPlayerAccuracy", playerAccuracyText);
+      setReviewDashboardText("reviewPlayerAccuracy", playerLossText);
       setReviewDashboardText("reviewPlayerName", playerName);
-      setReviewDashboardText("reviewOpponentAccuracy", opponentAccuracyText);
+      setReviewDashboardText("reviewOpponentAccuracy", opponentLossText);
       setReviewDashboardText("reviewOpeningName", review.summary?.opening || "Opening started");
-      setReviewDashboardText("reviewCenterEval", active?.evalText || "0.00");
+      setReviewDashboardText("reviewCenterEval", active?.engineVerified && active.evalText ? active.evalText : "—");
       setReviewDashboardText("reviewPlayerIdentity", playerName);
       setReviewDashboardText("reviewOpponentName", opponentName);
       setReviewDashboardText("reviewPlayerRating", `${playerRating} Elo`);
@@ -20775,9 +20870,11 @@
 
       const scoreRing = document.getElementById("reviewPlayerScoreRing");
       if (scoreRing) {
-        const score = Number.isFinite(playerAccuracy) ? clampNumber(playerAccuracy, 0, 100) : 0;
-        scoreRing.style.setProperty("--review-score", `${score}%`);
-        scoreRing.setAttribute("aria-label", Number.isFinite(playerAccuracy) ? `Your accuracy: ${playerAccuracy}%` : "Your accuracy is unavailable");
+        // This card displays CP loss, not a percentage score. Keep its
+        // decorative progress track neutral; engine coverage has its own
+        // explicitly labeled metric below.
+        scoreRing.style.setProperty("--review-score", "0%");
+        scoreRing.setAttribute("aria-label", `Average centipawn loss ${Number.isFinite(playerMetrics?.averageCentipawnLoss) ? `${playerMetrics.averageCentipawnLoss} centipawns` : "unavailable"}; engine checked ${playerMetrics?.checkedMoves || 0} of ${playerMetrics?.totalMoves || 0} moves.`);
       }
 
       const playerMoves = review.moves.filter((move) => move.color === (playerIsWhite ? "w" : "b"));
@@ -20786,49 +20883,41 @@
         ["Middlegame", playerMoves.filter((move) => move.phase === "Middlegame")],
         ["Endgame", playerMoves.filter((move) => move.phase === "Endgame")]
       ];
-      const phaseScore = (moves) => {
+      const phaseLoss = (moves) => {
         const verified = moves.filter((move) => move.engineVerified);
         if (!verified.length) return null;
-        const averageLoss = verified.reduce((sum, move) => sum + clampNumber(Number(move.cpLoss) || 0, 0, 300), 0) / verified.length;
-        return Math.round(clampNumber(100 - averageLoss / 3, 0, 100));
+        const losses = verified.filter((move) => typeof move.cpLoss === "number" && Number.isFinite(move.cpLoss));
+        if (!losses.length) return null;
+        return Math.round(losses.reduce((sum, move) => sum + move.cpLoss, 0) / losses.length);
       };
-      const phaseScores = phaseGroups.map(([, moves]) => phaseScore(moves));
+      const phaseLosses = phaseGroups.map(([, moves]) => phaseLoss(moves));
       const verifiedPlayerMoves = playerMoves.filter((move) => move.engineVerified);
       const tacticalErrors = verifiedPlayerMoves.filter((move) => /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label)).length;
-      const tacticsScore = verifiedPlayerMoves.length
-        ? Math.round(clampNumber(100 - (tacticalErrors / verifiedPlayerMoves.length) * 60, 0, 100))
-        : null;
-      const knownPhaseScores = phaseScores.filter(Number.isFinite);
-      const bestPhaseIndex = knownPhaseScores.length ? phaseScores.indexOf(Math.max(...knownPhaseScores)) : -1;
-      const performanceScore = Number.isFinite(playerAccuracy)
-        ? playerAccuracy
-        : knownPhaseScores.length
-          ? Math.round(knownPhaseScores.reduce((sum, score) => sum + score, 0) / knownPhaseScores.length)
-          : null;
-      const performanceLabel = !Number.isFinite(performanceScore)
-        ? "Analysis pending"
-        : performanceScore >= 90 ? "Excellent control"
-          : performanceScore >= 75 ? "Strong performance"
-            : performanceScore >= 60 ? "Solid foundation"
-              : "Useful lessons found";
-      const performanceNote = Number.isFinite(performanceScore)
-        ? bestPhaseIndex >= 0
-          ? `Quick estimate. Your best phase: ${phaseGroups[bestPhaseIndex][0]}.`
-          : "Quick estimate based on the moves the engine could evaluate."
-        : "The engine did not return enough data for phase scores.";
-      setReviewDashboardText("reviewPerformanceScore", Number.isFinite(performanceScore) ? String(performanceScore) : "--");
+      const coverage = getReviewMetricSummary(review);
+      const knownPhaseLosses = phaseLosses.filter(Number.isFinite);
+      const bestPhaseIndex = knownPhaseLosses.length ? phaseLosses.indexOf(Math.min(...knownPhaseLosses)) : -1;
+      const coverageText = coverage ? `${coverage.checkedMoves}/${coverage.totalMoves}` : "—";
+      const coveragePercent = coverage?.totalMoves ? Math.round((coverage.checkedMoves / coverage.totalMoves) * 100) : 0;
+      const performanceLabel = coverage
+        ? `${coverage.checkedMoves} of ${coverage.totalMoves} moves have engine scores`
+        : "Engine evidence unavailable";
+      const performanceNote = bestPhaseIndex >= 0
+        ? `Lowest average CP loss: ${phaseGroups[bestPhaseIndex][0]}. This is not a standardized accuracy rating.`
+        : "Centipawn loss is shown only where the engine returned comparable scores; mate lines are excluded.";
+      setReviewDashboardText("reviewPerformanceScore", coverageText);
       setReviewDashboardText("reviewPerformanceLabel", performanceLabel);
       setReviewDashboardText("reviewPerformanceNote", performanceNote);
       ["reviewOpeningPhase", "reviewMiddlegamePhase", "reviewEndgamePhase"].forEach((id, index) => {
-        const score = phaseScores[index];
-        setReviewDashboardText(id, Number.isFinite(score) ? String(score) : "--");
+        const loss = phaseLosses[index];
+        setReviewDashboardText(id, Number.isFinite(loss) ? `${loss} cp` : "—");
       });
-      setReviewDashboardText("reviewTacticsPhase", Number.isFinite(tacticsScore) ? String(tacticsScore) : "--");
+      setReviewDashboardText("reviewTacticsPhase", verifiedPlayerMoves.length ? `${tacticalErrors} / ${verifiedPlayerMoves.length}` : "—");
       const performanceRing = document.getElementById("reviewPerformanceRing");
       if (performanceRing) {
-        const score = Number.isFinite(performanceScore) ? clampNumber(performanceScore, 0, 100) : 0;
-        performanceRing.style.setProperty("--review-performance", `${score}%`);
-        performanceRing.setAttribute("aria-label", Number.isFinite(performanceScore) ? `Overall performance: ${performanceScore} out of 100` : "Overall performance is unavailable");
+        performanceRing.style.setProperty("--review-performance", `${coveragePercent}%`);
+        performanceRing.setAttribute("aria-label", coverage
+          ? `Engine evaluated ${coverage.checkedMoves} of ${coverage.totalMoves} moves`
+          : "Engine analysis coverage is unavailable");
       }
 
       const totalMoves = playerMoves.length;
@@ -20837,8 +20926,10 @@
       if (qualityBreakdown) {
         const groups = [
           ["Brilliant", ["Brilliant"]],
+          ["Checkmates", ["Checkmate"]],
           ["Best moves", ["Best", "Excellent", "Great", "Forced", "Opening Book"]],
           ["Good moves", ["Good"]],
+          ["Not rated", ["Unverified", "Unrated"]],
           ["Inaccuracies", ["Inaccuracy"]],
           ["Mistakes", ["Mistake", "Missed Win"]],
           ["Blunders", ["Blunder"]]
@@ -20896,17 +20987,25 @@
         .filter((move) => ["Brilliant", "Best", "Excellent", "Great", "Good", "Opening Book"].includes(move.label))
         .sort((left, right) => (Number(right.eval) || 50) - (Number(left.eval) || 50))[0];
       const primary = getReviewPrimaryMoment(review).move;
-      const habitTheme = strongest?.tactic || (strongest ? "steady decision-making" : "checking loose pieces");
+      const habitTheme = strongest?.tactic || (strongest ? "steady decision-making" : "");
       const repairTheme = primary?.tactic || "piece safety";
-      const recurring = [review, ...matchReviews.filter((item) => item?.pgn !== review?.pgn)]
+      const recurring = [review, ...matchReviews.filter((item) => item?.pgn !== review?.pgn
+        && Number(item?.analysis?.reviewModelVersion) === reviewAnalysisSchemaVersion)]
         .flatMap((item) => item?.moves || [])
         .filter((move) => move.tactic === repairTheme && /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label)).length;
       const reliableMoves = playerMoves.filter((move) => move.engineVerified && ["Brilliant", "Best", "Excellent", "Great", "Good", "Opening Book"].includes(move.label)).length;
-      habit.textContent = `Best habit: ${habitTheme}.`;
-      repair.textContent = `Repair next: ${repairTheme}.`;
+      const engineCheckedMoves = playerMoves.filter((move) => move.engineVerified).length;
+      habit.textContent = strongest
+        ? `Engine-checked strength: ${habitTheme}.`
+        : engineCheckedMoves ? "No clear strength pattern in the engine-checked moves." : "Engine analysis unavailable; no move-quality pattern is claimed.";
+      repair.textContent = primary?.engineVerified || ["Checkmate", "Forced"].includes(primary?.label)
+        ? `Review next: ${repairTheme}.`
+        : primary ? `Practice candidate: ${repairTheme} · not engine-rated.` : "No review pattern is available.";
       progress.textContent = recurring > 1
         ? `${recurring} ${provenance.source === "server-authoritative" ? "server-synced" : "local"} review moments point to this pattern. Retry it once, then train it.`
-        : `${reliableMoves}/${playerMoves.length || 0} of your moves were reliable in this ${provenance.source === "server-authoritative" ? "server-synced game" : "local game"}. Turn this clue into a habit.`;
+        : engineCheckedMoves
+          ? `${reliableMoves}/${engineCheckedMoves} engine-checked moves were rated reliable in this ${provenance.source === "server-authoritative" ? "server-synced game" : "local game"}.`
+          : "No engine-scored moves are available, so move reliability cannot be estimated.";
     }
 
     function cancelActiveReviewAnalysis(reason = "Review closed") {
@@ -21122,21 +21221,32 @@
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
       mountGameReviewWorkspace();
       const active = review.moves[reviewReplayIndex] || review.moves[0];
+      syncReviewNavigationControls(review);
       const provenance = normalizeReviewProvenance(review);
       const learningSignal = getReviewLearningSignal(review);
       const oneMoment = getReviewOneMoment(review);
       const oneMomentMove = oneMoment.move;
       const oneMomentTitle = document.getElementById("reviewOneMomentTitle");
       const oneMomentCopy = document.getElementById("reviewOneMomentCopy");
+      const oneMomentHeading = document.querySelector("#reviewOneMoment .review-one-moment-copy > span");
       const reviewTone = getCoachTone();
       const reviewPattern = oneMomentMove?.tactic || "piece safety";
       const reviewExplanation = oneMomentMove?.explanation || "Understand the idea, then train the pattern once."
+      const oneMomentEngineVerified = Boolean(oneMomentMove?.engineVerified);
+      const oneMomentRuleVerified = ["Checkmate", "Forced"].includes(oneMomentMove?.label);
+      if (oneMomentHeading) oneMomentHeading.textContent = oneMomentEngineVerified
+        ? "Engine-verified moment"
+        : oneMomentRuleVerified ? "Rules-confirmed moment" : "Practice candidate · not engine-rated";
       if (oneMomentTitle) oneMomentTitle.textContent = oneMomentMove ? `Move ${oneMomentMove.ply}: ${oneMomentMove.san}` : "One useful pattern";
       if (oneMomentCopy) {
-        const defaultCopy = oneMomentMove ? reviewExplanation + " Practice: " + reviewPattern + "." : "Understand one idea, then train it once.";
-        oneMomentCopy.textContent = reviewTone === "quiet"
+        const defaultCopy = oneMomentMove
+          ? oneMomentEngineVerified || oneMomentRuleVerified
+            ? `${reviewExplanation} Practice: ${reviewPattern}.`
+            : `Stockfish did not return complete scores. ${reviewExplanation} The pattern note is a practice prompt, not an engine verdict.`
+          : "Understand one idea, then train it once.";
+        oneMomentCopy.textContent = reviewTone === "quiet" && (oneMomentEngineVerified || oneMomentRuleVerified)
           ? "Pattern: " + reviewPattern + ". Practice it once."
-          : reviewTone === "hype"
+          : reviewTone === "hype" && (oneMomentEngineVerified || oneMomentRuleVerified)
             ? defaultCopy + " You found a real training clue - carry it into your next game."
             : defaultCopy;
       }
@@ -21179,13 +21289,11 @@
       }
       updateReviewEvalRail(active);
       document.getElementById("reviewSummaryLine").textContent = `${provenance.label} · ${review.summary.opening} - one move at a time.`;
-      const playerIsWhite = coachPlayerColor !== "b";
-      const playerAccuracy = playerIsWhite ? review.whiteAccuracy : review.blackAccuracy;
-      const opponentAccuracy = playerIsWhite ? review.blackAccuracy : review.whiteAccuracy;
-      const accuracyText = Number.isFinite(playerAccuracy) && Number.isFinite(opponentAccuracy)
-        ? "You " + playerAccuracy + "% · Opponent " + opponentAccuracy + "%"
-        : "Accuracy pending";
-      document.getElementById("reviewAccuracyBadge").textContent = `Move ${reviewReplayIndex + 1}/${review.moves.length} - ${accuracyText}`;
+      const coverage = getReviewMetricSummary(review);
+      const coverageText = coverage
+        ? `Engine checks ${coverage.checkedMoves}/${coverage.totalMoves}`
+        : "Engine coverage unavailable";
+      document.getElementById("reviewAccuracyBadge").textContent = `Move ${reviewReplayIndex + 1}/${review.moves.length} · ${coverageText}`;
       setReviewDashboardText("reviewCurrentMoveStatus", active ? `Move ${active.ply}: ${active.san}, ${active.label}. ${getReviewMoveText(active)}` : "Review ready.");
       const deepButton = document.getElementById("reviewDeepAnalysis");
       const reviewIsDeep = review.analysis?.mode === "Deep engine";
@@ -21199,7 +21307,13 @@
       setReviewDashboardText("reviewEngineConfidence", `${confidence} · ${provenance.note}`);
       if (qualityBadge && active) qualityBadge.textContent = `${meta.icon} ${active.label}`;
       const evalBadge = document.getElementById("reviewEvalBadge");
-      if (evalBadge && active) evalBadge.textContent = active.cpLoss ? `Eval change: -${active.cpLoss} cp` : "Eval steady";
+      if (evalBadge && active) {
+        evalBadge.textContent = typeof active.cpLoss === "number" && Number.isFinite(active.cpLoss)
+          ? `CP loss: ${active.cpLoss} cp`
+          : active.engineVerified && (String(active.evalBeforeText || "") + String(active.evalText || "")).includes("M")
+            ? "Mate score · CP loss n/a"
+            : "Engine score unavailable";
+      }
       const focusMove = document.getElementById("reviewFocusMove");
       if (focusMove && active) focusMove.textContent = `${active.ply}. ${active.san}`;
       const focusSummary = document.getElementById("reviewFocusSummary");
@@ -21261,15 +21375,19 @@
       graph.replaceChildren(...review.moves.map((move, index) => {
         const markerMeta = getReviewQualityMeta(move.label);
         const bar = document.createElement("span");
-        const evalDelta = (Number(move.eval) || 50) - 50;
+        const hasEvaluation = Boolean(move.engineVerified && Number.isFinite(move.eval) && move.evalText);
+        const evalDelta = hasEvaluation ? move.eval - 50 : 0;
         bar.style.setProperty("--review-marker", markerMeta.color);
-        bar.style.setProperty("--review-eval-height", `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%`);
+        bar.style.setProperty("--review-eval-height", hasEvaluation ? `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%` : "0%");
+        bar.dataset.evaluationAvailable = String(hasEvaluation);
         bar.dataset.reviewSide = evalDelta >= 0 ? "white" : "black";
-        bar.title = `${move.ply}. ${move.san} ${move.label} ${move.evalText || ""}`;
+        bar.title = `${move.ply}. ${move.san} ${move.label} · ${hasEvaluation ? `Engine evaluation ${move.evalText}` : "Engine evaluation unavailable"}`;
         bar.setAttribute("role", "button");
         bar.tabIndex = 0;
         bar.setAttribute("aria-current", String(index === reviewReplayIndex));
-        bar.setAttribute("aria-label", `Jump to ${move.ply}. ${move.san}, ${move.label}`);
+        bar.setAttribute("aria-label", hasEvaluation
+          ? `Jump to ${move.ply}. ${move.san}, ${move.label}, engine evaluation ${move.evalText}`
+          : `Jump to ${move.ply}. ${move.san}, ${move.label}, engine evaluation unavailable`);
         bar.addEventListener("click", () => showReviewPly(index));
         bar.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -21483,7 +21601,9 @@
 
     function stepReview(delta) {
       if (!activeMatchReview) return;
-      showReviewPly(reviewReplayIndex + delta);
+      const nextIndex = reviewReplayIndex + delta;
+      if (nextIndex < 0 || nextIndex >= activeMatchReview.moves.length) return;
+      showReviewPly(nextIndex);
     }
 
     function toggleReviewPlayback() {
@@ -21497,6 +21617,8 @@
         if (autoButton) autoButton.textContent = "Auto Review";
         return;
       }
+      if (!activeMatchReview || activeMatchReview.moves.length < 2) return;
+      if (reviewReplayIndex >= activeMatchReview.moves.length - 1) showReviewPly(0);
       if (button) button.textContent = "Pause";
       if (autoButton) autoButton.textContent = "Pause";
       reviewReplayTimer = window.setInterval(() => {
@@ -22156,8 +22278,48 @@
     function renderPostGameFlow() {
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
     }
+    function createValidatedReviewGame(review) {
+      if (!CoachChess || !Array.isArray(review?.moves) || !review.moves.length) return null;
+      try {
+        const game = new CoachChess();
+        for (const move of review.moves) {
+          if (!move?.from || !move?.to || (move.fenBefore && move.fenBefore !== game.fen())) return null;
+          const applied = game.move({ from: move.from, to: move.to, ...(move.promotion ? { promotion: move.promotion } : {}) });
+          if (!applied || (move.san && applied.san !== move.san) || (move.fenAfter && move.fenAfter !== game.fen())) return null;
+        }
+        if (game.history().length !== review.moves.length || (review.fen && review.fen !== game.fen())) return null;
+        const pgn = String(review.pgn || "").trim();
+        if (pgn) {
+          const pgnGame = new CoachChess();
+          const loaded = typeof pgnGame.loadPgn === "function" ? pgnGame.loadPgn(pgn) : pgnGame.load_pgn?.(pgn);
+          const pgnMoves = pgnGame.history({ verbose: true });
+          const replayMoves = game.history({ verbose: true });
+          if (loaded === false || pgnMoves.length !== replayMoves.length
+            || pgnMoves.some((move, index) => moveToReviewUci(move) !== moveToReviewUci(replayMoves[index]) || move.san !== replayMoves[index].san)
+            || pgnGame.fen() !== game.fen()) return null;
+        }
+        return game;
+      } catch {
+        return null;
+      }
+    }
+
     function openSavedMatchReview(review) {
       if (!review?.moves?.length || !CoachChess) return;
+      const game = createValidatedReviewGame(review);
+      if (!game) return;
+      if (Number(review.analysis?.reviewModelVersion) !== reviewAnalysisSchemaVersion) {
+        openPostGameReview({
+          force: true,
+          mode: review.analysis?.mode === "Deep engine" ? "deep" : "quick",
+          analysisSnapshot: {
+            game,
+            pgn: String(review.pgn || game.pgn()),
+            provenance: normalizeReviewProvenance(review)
+          }
+        });
+        return;
+      }
       reviewRequestedPgn = review.pgn || "";
       reviewAnalysisMode = review.analysis?.mode === "Deep engine" ? "deep" : "quick";
       activeMatchReview = review;
@@ -22211,13 +22373,10 @@
       const opponentName = friendGame
         ? String(friendChallengeState?.targetName || "a friend")
         : String(getAiHeaderProfile().name || "the Nschess coach");
-      const review = activeMatchReview?.pgn === coachGame.pgn() ? activeMatchReview : matchReviews.find((item) => item.pgn === coachGame.pgn());
-      const accuracy = Number(review?.summary?.accuracy ?? review?.accuracy);
       const result = draw ? "drew" : playerWon ? "won" : "finished";
-      const accuracyText = Number.isFinite(accuracy) ? ` Accuracy: ${Math.round(accuracy)}%.` : "";
       const payload = {
         title: "My Nschess game",
-        text: `I ${result} a ${friendGame ? "friend" : "coach"} game against ${opponentName} in ${Math.ceil(history.length / 2)} moves on Nschess.${accuracyText}`,
+        text: `I ${result} a ${friendGame ? "friend" : "coach"} game against ${opponentName} in ${Math.ceil(history.length / 2)} moves on Nschess.`,
         url: `${window.location.href.split("#")[0]}#play`
       };
       const original = button?.textContent || "Share Game";
@@ -22265,15 +22424,8 @@
       const pgn = String(savedReview?.pgn || "").trim();
       if (!pgn || !CoachChess) return null;
       try {
-        const moves = Array.isArray(savedReview?.moves) ? savedReview.moves : [];
-        if (moves.length) {
-          const game = new CoachChess();
-          for (const move of moves) {
-            const applied = game.move({ from: move.from, to: move.to, ...(move.promotion ? { promotion: move.promotion } : {}) });
-            if (!applied) return null;
-          }
-          if (game.history().length === moves.length) return { game, pgn, provenance: { source: "local", authority: "client" } };
-        }
+        const savedGame = createValidatedReviewGame(savedReview);
+        if (savedGame) return { game: savedGame, pgn, provenance: normalizeReviewProvenance(savedReview) };
         const game = new CoachChess();
         const loaded = typeof game.loadPgn === "function" ? game.loadPgn(pgn) : game.load_pgn?.(pgn);
         if (loaded === false || !game.history().length) return null;
@@ -22284,7 +22436,7 @@
     }
 
     function openPostGameReview(options = {}) {
-      const analysisSnapshot = getReviewAnalysisSnapshot();
+      const analysisSnapshot = options?.analysisSnapshot || getReviewAnalysisSnapshot();
       if (!analysisSnapshot) return;
       const mode = options?.mode === "deep" ? "deep" : "quick";
       const force = Boolean(options?.force);
@@ -22295,7 +22447,7 @@
       reviewRequestedPgn = pgn;
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
       const requestedLabel = getReviewAnalysisModeLabel(mode);
-      if (cached && !force && (cached.analysis?.mode || "Quick engine") === requestedLabel) return openSavedMatchReview(cached);
+      if (cached && !force && Number(cached.analysis?.reviewModelVersion) === reviewAnalysisSchemaVersion && (cached.analysis?.mode || "Quick engine") === requestedLabel) return openSavedMatchReview(cached);
       const panel = document.getElementById("premiumReview");
       if (panel) {
         mountGameReviewWorkspace();
@@ -22330,7 +22482,7 @@
       const requestedLabel = getReviewAnalysisModeLabel(mode);
       const pgn = analysisSnapshot.pgn;
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
-      if (cached && !force && (cached.analysis?.mode || "Quick engine") === requestedLabel) {
+      if (cached && !force && Number(cached.analysis?.reviewModelVersion) === reviewAnalysisSchemaVersion && (cached.analysis?.mode || "Quick engine") === requestedLabel) {
         if (reviewRequestedPgn === pgn) openSavedMatchReview(cached);
         return;
       }
@@ -22359,7 +22511,7 @@
         const label = mode === "deep" ? "Deep Review" : "Game Review";
         showReviewAnalysisError(token, `${label} stopped waiting for Stockfish. Try again to restart the engine.`);
       }, analysisTimeoutMs);
-      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && reviewRequestedPgn === pgn, updateAnalysisProgress, gameAtAnalysis, analysisSnapshot.provenance)
+      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && reviewRequestedPgn === pgn, updateAnalysisProgress, gameAtAnalysis, analysisSnapshot.provenance, pgn)
         .then((review) => {
           window.clearTimeout(reviewWatchdog);
           if (!review || reviewAnalysisToken !== token || review.pgn !== pgn) return;

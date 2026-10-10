@@ -3188,12 +3188,12 @@
               </div>
             </article>
             <article class="review-accuracy-card">
-              <div class="review-score-ring" id="reviewPlayerScoreRing" aria-label="Your accuracy">
-                <strong id="reviewPlayerAccuracy">--</strong><small>Quick accuracy</small>
+              <div class="review-score-ring" id="reviewPlayerScoreRing" aria-label="Your average centipawn loss">
+                <strong id="reviewPlayerAccuracy">--</strong><small>Avg. CP loss</small>
               </div>
               <div class="review-accuracy-compare">
                 <span><small>You</small><strong id="reviewPlayerName">Player</strong></span>
-                <span><small>Opponent</small><strong id="reviewOpponentAccuracy">--</strong></span>
+                <span><small>Opponent · avg. CP loss</small><strong id="reviewOpponentAccuracy">--</strong></span>
               </div>
             </article>
             <article class="review-quality-card">
@@ -3569,22 +3569,22 @@
                     <small id="reviewSummaryLine">Your clean replay and best lessons appear here after the game.</small>
                   </div>
                 </div>
-                <span class="badge" id="reviewAccuracyBadge">Quick score --</span>
+                <span class="badge" id="reviewAccuracyBadge">Engine checks --</span>
               </div>
-              <article class="review-performance-card" aria-label="Performance by game phase">
-                <div class="review-performance-ring" id="reviewPerformanceRing" aria-label="Overall performance score">
-                  <strong id="reviewPerformanceScore">--</strong><small>Performance</small>
+            <article class="review-performance-card" aria-label="Engine analysis coverage and centipawn loss">
+                <div class="review-performance-ring" id="reviewPerformanceRing" aria-label="Engine analysis coverage">
+                  <strong id="reviewPerformanceScore">--</strong><small>Engine checks</small>
                 </div>
                 <div class="review-performance-copy">
-                  <span>Performance score</span>
+                  <span>Engine evidence</span>
                   <strong id="reviewPerformanceLabel">Reviewing your game</strong>
-                  <small id="reviewPerformanceNote">Your phase scores appear after analysis.</small>
+                  <small id="reviewPerformanceNote">Only returned engine scores are shown.</small>
                 </div>
                 <div class="review-phase-grid">
-                  <span><small>Opening</small><strong id="reviewOpeningPhase">--</strong></span>
-                  <span><small>Middlegame</small><strong id="reviewMiddlegamePhase">--</strong></span>
-                  <span><small>Endgame</small><strong id="reviewEndgamePhase">--</strong></span>
-                  <span><small>Tactics</small><strong id="reviewTacticsPhase">--</strong></span>
+                  <span><small>Opening · avg CP loss</small><strong id="reviewOpeningPhase">--</strong></span>
+                  <span><small>Middlegame · avg CP loss</small><strong id="reviewMiddlegamePhase">--</strong></span>
+                  <span><small>Endgame · avg CP loss</small><strong id="reviewEndgamePhase">--</strong></span>
+                  <span><small>Tactical errors / checked</small><strong id="reviewTacticsPhase">--</strong></span>
                 </div>
               </article>
               <article class="review-focus-card" id="reviewFocusCard">
@@ -3817,7 +3817,7 @@
         </div>
         <dl class="post-game-decision-stats" aria-label="Game statistics">
           <div>
-            <dt>Accuracy</dt>
+            <dt>Engine checks</dt>
             <dd id="postGameDecisionAccuracy">Pending</dd>
           </div>
           <div>
@@ -3985,8 +3985,8 @@
         <h2 id="matchHistoryTitle">Match History</h2>
         <p class="quick-match-status" id="matchHistorySummary" role="status" aria-live="polite">Loading saved games…</p>
         <section class="match-history-accuracy" id="matchHistoryAccuracy" aria-labelledby="matchHistoryAccuracyTitle" hidden>
-          <div><strong id="matchHistoryAccuracyTitle">Accuracy by side</strong><span id="matchHistoryAccuracyMeta"></span></div>
-          <svg class="match-history-chart" id="matchHistoryAccuracyChart" viewBox="0 0 320 96" role="img" aria-label="Accuracy trend by side"></svg>
+          <div><strong id="matchHistoryAccuracyTitle">Average CP loss by side</strong><span id="matchHistoryAccuracyMeta"></span></div>
+          <svg class="match-history-chart" id="matchHistoryAccuracyChart" viewBox="0 0 320 96" role="img" aria-label="Average centipawn loss trend by side; lower is better"></svg>
         </section>
         <div class="match-history-list" id="matchHistoryList"></div>
       </section>
