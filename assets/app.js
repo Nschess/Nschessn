@@ -4370,11 +4370,11 @@
       ...boardBorderStoreItems,
       { id: "title-tactician", type: "title", value: "Puzzle Tactician", name: "Puzzle Tactician Title", cost: 25, tag: "Title", description: "A profile title for learners who love patterns.", previewText: "Puzzle Tactician" },
       { id: "title-guardian", type: "title", value: "Castle Guardian", name: "Castle Guardian Title", cost: 50, tag: "Title", description: "A calm defender title for safer games.", previewText: "Castle Guardian" },
-      { id: "title-cm", type: "title", value: "CM Chess Master", name: "CM Chess Master Title", cost: 2000, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2000 Elo AI.", previewText: "CM Chess Master" },
-      { id: "title-nm", type: "title", value: "NM National Master", name: "NM National Master Title", cost: 2100, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2100 Elo AI.", previewText: "NM National Master" },
-      { id: "title-fm", type: "title", value: "FM FIDE Master", name: "FM FIDE Master Title", cost: 2200, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2200 Elo AI.", previewText: "FM FIDE Master" },
-      { id: "title-im", type: "title", value: "IM International Master", name: "IM International Master Title", cost: 2300, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2300 Elo AI.", previewText: "IM International Master" },
-      { id: "title-gm", type: "title", value: "GM Grandmaster", name: "GM Grandmaster Title", cost: 2500, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2500 Elo AI.", previewText: "GM Grandmaster" },
+      { id: "title-cm", type: "title", value: "CM Chess Master", name: "CM Chess Master Title", cost: 2000, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2000.", previewText: "CM Chess Master" },
+      { id: "title-nm", type: "title", value: "NM National Master", name: "NM National Master Title", cost: 2100, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2100.", previewText: "NM National Master" },
+      { id: "title-fm", type: "title", value: "FM FIDE Master", name: "FM FIDE Master Title", cost: 2200, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2200.", previewText: "FM FIDE Master" },
+      { id: "title-im", type: "title", value: "IM International Master", name: "IM International Master Title", cost: 2300, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2300.", previewText: "IM International Master" },
+      { id: "title-gm", type: "title", value: "GM Grandmaster", name: "GM Grandmaster Title", cost: 2500, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2500.", previewText: "GM Grandmaster" },
       { id: "title-champion-trophy", type: "title", value: "Champion Trophy", name: "Champion Trophy", cost: 980, rarity: "Legendary", tag: "Title", description: "A trophy title for players who keep showing up, learning, and finishing strong.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Champion Trophy" fill="none" stroke="#ffd36b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H6v7a6 6 0 0 0 12 0z"/><path d="M6 5H4.5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1H6M18 5h1.5a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H18M10 17v1.3a3 3 0 0 1-2 2.7L4 22M14 17v1.3a3 3 0 0 0 2 2.7l4 1M4 22h16"/></svg>' },
       { id: "title-champion", type: "title", value: "Champion", name: "Champion Title", cost: 5000, tag: "Legendary title", description: "Awarded for clearing the full Stockfish campaign.", previewText: "Champion" },
       { id: "trail-stars", type: "trail", value: "stars", name: "Star Confetti Trail", cost: 30, tag: "Celebration", description: "Make lesson and puzzle celebrations sparkle.", previewText: "Star burst" },
@@ -4415,11 +4415,11 @@
       }
     ]);
     const storeUnlockMetadata = Object.freeze({
-      "title-cm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2000 Elo AI", awardOnly: true },
-      "title-nm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2100 Elo AI", awardOnly: true },
-      "title-fm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2200 Elo AI", awardOnly: true },
-      "title-im": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2300 Elo AI", awardOnly: true },
-      "title-gm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2500 Elo AI", awardOnly: true },
+      "title-cm": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2000", awardOnly: true },
+      "title-nm": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2100", awardOnly: true },
+      "title-fm": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2200", awardOnly: true },
+      "title-im": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2300", awardOnly: true },
+      "title-gm": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2500", awardOnly: true },
       "avatar-legendary": { unlockMethod: "Achievement", unlockLabel: "Clear the Chess Master campaign", awardOnly: true },
       "border-legendary": { unlockMethod: "Achievement", unlockLabel: "Clear the Chess Master campaign", awardOnly: true },
       "title-champion": { unlockMethod: "Achievement", unlockLabel: "Clear the full Stockfish campaign", awardOnly: true },
@@ -4994,10 +4994,10 @@
         "Good effort. Try one puzzle, then rematch me."
       ]
     }));
-    function getAiBotCategory(elo) {
-      if (elo <= 800) return "Beginner";
-      if (elo <= 1500) return "Intermediate";
-      if (elo <= 2200) return "Advanced";
+    function getAiBotCategory(index) {
+      if (index < 10) return "Beginner";
+      if (index < 20) return "Intermediate";
+      if (index < 29) return "Advanced";
       return "Master";
     }
     const aiBotRosterAdditions = [["bot-cedar","Cedar Vale",1260,"Steady","Colle System","I build a compact position and improve one piece at a time."],["bot-nia","Nia Tempo",1320,"Active","Scandinavian Defense","I like active pieces and simple tempo gains."],["bot-juno","Juno File",1380,"Resourceful","English Opening","I make space on one wing, then switch sides."],["bot-dante","Dante Watch",1450,"Alert","Pirc Defense","I defend carefully, then look for a tactical reply."],["bot-lyra","Lyra Spark",1550,"Dynamic","King's Indian Attack","I keep pieces active and create practical problems."],["bot-cassian","Cassian Quiet",1620,"Restrained","Queen's Indian","I improve my worst piece and limit counterplay."],["bot-emma","Emma Endgame",1700,"Precise","Exchange Slav","I trade into endings where every pawn matters."],["bot-vik","Vik Storm",1780,"Forceful","Yugoslav Attack","I coordinate my pieces around the enemy king."],["bot-soren","Soren Clamp",1850,"Methodical","Hedgehog","I squeeze small weaknesses until the position opens."],["bot-iris","Iris Gambit",1930,"Creative","Smith-Morra Gambit","I value initiative and find surprising attacking resources."],["bot-kellan","Kellan Hold",2020,"Resilient","Petroff Defense","I make tough positions hard to win and save difficult games."],["bot-freya","Freya File",2110,"Direct","Open Sicilian","I claim open files and bring rooks into the game quickly."],["bot-roman","Roman Line",2200,"Calculated","Grunfeld Defense","I calculate forcing lines before committing my pieces."],["bot-ansel","Ansel Classic",2300,"Disciplined","Queen's Gambit Declined","I follow sound principles and punish slow moves."],["bot-selene","Selene Silk",2380,"Subtle","Nimzo-Indian","I create long-term pressure that is hard to notice early."],["bot-torben","Torben Table",2460,"Technical","Berlin Defense","I simplify accurately and convert small endgame edges."],["bot-zenith","Zenith Prep",2540,"Sharp","Najdorf Sicilian","I know the critical ideas and strike when a line opens."],["bot-maeve","Maeve Counter",2620,"Fearless","Modern Defense","I invite space, then counterattack from a flexible setup."],["bot-cyra","Cyra Crown",2700,"Universal","Catalan Opening","I adapt to the position and keep every piece coordinated."],["bot-auric","Auric Prime",2800,"Relentless","Ruy Lopez","I turn small inaccuracies into lasting pressure."]].map(([id, name, elo, personality, opening, bio]) => ({
@@ -5011,14 +5011,18 @@
     beginnerBots.push(...aiBotRosterAdditions);
     const aiBotAvatars = ["PP","SS","MM","PC","NK","LB","RR","IG","KT","ZC","OC","MP","FF","SH","AA","TT","OL","RM","CV","NT","JF","DW","LS","CQ","EE","VS","SC","IG2","KH","FF2","RL","AC","SS2","TT2","ZP","MC","CC","AP"];
     const aiBotStyles = ["Safe pawn moves","Happy development","Check hunting","Castle first","Knight forks","Bishop pressure","Bold attacks","King safety","Capture first","Center control","Solid structure","Pin play","Fork spotting","Patient counterplay","Fast development","Pattern tactics","Club pressure","Balanced mentoring","Positional building","Active pieces","Queenside space","Tactical defense","Dynamic initiative","Prophylaxis","Endgame conversion","Attacking pairs","Strategic squeeze","Sacrificial pressure","Technical defense","Open-file attack","Concrete calculation","Classical precision","Positional mastery","Endgame technique","Sharp preparation","Counterattacking resources","Universal mastery","Relentless accuracy"];
+    const localPracticeBotCount = 14;
     beginnerBots.forEach((bot, index) => {
       bot.avatar = aiBotAvatars[index] || bot.avatar;
       bot.style = aiBotStyles[index] || bot.opening;
-      bot.category = getAiBotCategory(bot.elo);
-      bot.skill = Math.max(0, Math.min(20, Math.round((bot.elo - 200) / 130)));
-      bot.depth = Math.max(1, Math.min(15, Math.ceil((bot.elo - 100) / 200)));
-      bot.movetime = Math.max(45, Math.min(3000, 45 + Math.round((bot.elo - 200) * 1.1)));
-      bot.blunder = Math.max(.015, .42 - (bot.elo - 200) * .00016);
+      bot.difficultyIndex = index + 1;
+      bot.category = getAiBotCategory(index);
+      bot.engineRequired = index >= localPracticeBotCount;
+      bot.skill = Math.round((index / Math.max(1, beginnerBots.length - 1)) * 20);
+      bot.depth = 1 + Math.floor((index / Math.max(1, beginnerBots.length - 1)) * 14);
+      bot.movetime = 45 + Math.round((index / Math.max(1, beginnerBots.length - 1)) * 2955);
+      bot.practicePool = Math.max(1, 5 - Math.floor(index / 3));
+      bot.blunder = Math.max(.08, .36 - (index / Math.max(1, localPracticeBotCount - 1)) * .28);
     });
     let savedPuzzleState = readPuzzleState();
     let puzzleStateMatchesBank = savedPuzzleState.bankVersion === puzzleBankVersion;
@@ -5257,7 +5261,7 @@
       { id: "dragon-realm", icon: "\uD83D\uDC09", name: "Dragon Realm", chapter: 6, aiCount: 3, levels: ["dragon1", "dragon2", "dragon3"], names: ["Dragon Scout", "Scale Guardian", "Crystal Dragon"], boss: "Chess Master", bossLevel: "dragonBoss", finalBoss: true, rewardItems: ["avatar-legendary", "border-legendary", "title-champion", "flex-master"], coinBase: 320, xpBase: 120, bossReward: { xp: 500, coins: 5000, stars: 5, keys: 5 } }
     ];
     const levelNames = {
-      beginner: "Beginner", easy: "Easy", medium: "Medium", hard: "Hard", expert: "Expert", master: "Master", strong: "2000 Bot",
+      beginner: "Beginner", easy: "Easy", medium: "Medium", hard: "Hard", expert: "Expert", master: "Master", strong: "Stockfish challenge",
       village1: "Starter 1", village2: "Starter 2", village3: "Starter 3", villageBoss: "Village Boss",
       forest1: "Easy 1", forest2: "Easy 2", forest3: "Easy 3", forestBoss: "Forest Boss",
       castle1: "Medium 1", castle2: "Medium 2", castle3: "Medium 3", castleBoss: "Castle Boss",
@@ -5938,7 +5942,7 @@
       const meta = document.createElement("div");
       meta.className = "boss-meta";
       meta.append(
-        createBookText("span", "game-unlock", `${config.elo} Elo`),
+        createBookText("span", "game-unlock", `Engine preset · skill ${config.skill}/20`),
         createBookText("span", "game-unlock", `Depth ${config.depth}`),
         createBookText("span", "game-unlock", `Skill ${config.skill}`),
         createBookText("span", "game-unlock", boss.difficulty || "AI")
@@ -5994,7 +5998,7 @@
           createBookText("span", "", `${boss.label} - ${boss.difficulty}`),
           createBookText("strong", "", `${getBossAvatar(boss)} ${boss.name}`),
           createBookText("small", "", `Depth ${config.depth} | Skill ${config.skill}`),
-          createBookText("small", "", `${config.elo} Elo | +${boss.reward.coins} coins`)
+          createBookText("small", "", `Engine preset · skill ${config.skill}/20 | +${boss.reward.coins} coins`)
         );
         return button;
       }));
@@ -16697,7 +16701,7 @@
       hard: { skill: 11, depth: 8, elo: 1750, uciElo: 1750, movetime: 360, nodes: 9000, label: "Hard engine" },
       expert: { skill: 15, depth: 10, elo: 1900, uciElo: 1900, movetime: 650, nodes: 22000, label: "Expert engine" },
       master: { skill: 20, depth: 13, elo: 2300, uciElo: 2300, movetime: 1600, nodes: 70000, label: "Master engine" },
-      strong: { skill: 20, depth: 13, elo: 2000, uciElo: 2000, movetime: 2200, nodes: 0, label: "2000 Elo engine" },
+      strong: { skill: 20, depth: 13, elo: 2000, uciElo: 2000, movetime: 2200, nodes: 0, label: "Stockfish challenge preset" },
       village1: { skill: 0, depth: 1, elo: 850, uciElo: 1320, movetime: 90, nodes: 220, label: "Village Guard" },
       village2: { skill: 1, depth: 2, elo: 950, uciElo: 1320, movetime: 130, nodes: 450, label: "Market Defender" },
       village3: { skill: 2, depth: 3, elo: 1050, uciElo: 1320, movetime: 180, nodes: 850, label: "Mayor's Helper" },
@@ -16726,7 +16730,7 @@
         elo: bot.elo,
         uciElo: 1320,
         movetime: bot.movetime,
-        nodes: 80 + bot.elo,
+        nodes: 0,
         label: bot.name,
         beginnerBot: true,
         blunder: bot.blunder
@@ -17160,7 +17164,7 @@
 
     function setCoachDifficulty(level) {
       coachDifficulty = level && (stockfishLevels[level] || getBeginnerBot(level)) ? level : "";
-      cancelStockfishSearch("Difficulty changed");
+      cancelStockfishSearch("Difficulty changed", true);
       if (coachThinking) {
         coachMoveToken += 1;
         coachThinking = false;
@@ -17171,11 +17175,16 @@
       document.querySelectorAll("[data-beginner-bot]").forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.beginnerBot === coachDifficulty));
       });
-      const labels = { beginner: "Beginner engine", easy: "Easy engine", medium: "Medium engine", hard: "Hard engine", expert: "Expert engine", master: "Master engine", strong: "2000 Elo bot" };
       const config = getCoachConfig();
-      document.getElementById("gameDifficultyBadge").textContent = coachDifficulty ? (labels[coachDifficulty] || config.label) : "No bot selected";
-      const gameEloBadge = document.getElementById("gameEloBadge");
-      if (gameEloBadge) gameEloBadge.textContent = coachDifficulty ? `${config.elo} Elo` : "— Elo";
+      const difficultyBadge = document.getElementById("gameDifficultyBadge");
+      if (difficultyBadge) difficultyBadge.textContent = coachDifficulty ? getCoachDifficultyDisplay() : "No bot selected";
+      const strengthBadge = document.getElementById("gameStrengthBadge");
+      if (strengthBadge) strengthBadge.textContent = coachDifficulty
+        ? config.beginnerBot ? "Practice model · no Elo rating" : `Skill setting ${config.skill}/20 · not rating-calibrated`
+        : "No calibrated rating";
+      const engineBadge = document.getElementById("playEngineBadge");
+      if (engineBadge) engineBadge.textContent = coachDifficulty ? getCoachEngineDisplay(config) : "Choose a bot";
+      stockfishInfo.lastMoveSource = "";
       stockfishInfo.depth = config.depth || stockfishInfo.depth;
       updateAiPlayerHeader();
       updateEnginePanel();
@@ -17287,9 +17296,11 @@
       updateAiPlayerHeader();
       updateCoachPanel();
       anchorActivePlayWorkspace();
-      window.requestAnimationFrame(() => {
-        if (document.getElementById("play")?.classList.contains("is-active-panel")) void initializeCoachEngine();
-      });
+      if (!getCoachConfig().beginnerBot) {
+        window.requestAnimationFrame(() => {
+          if (coachSessionActive && document.getElementById("play")?.classList.contains("is-active-panel")) void initializeCoachEngine();
+        });
+      }
     }
 
     function getCoachSkill() {
@@ -17299,13 +17310,14 @@
     function getCoachConfig(level = coachDifficulty) {
       const bot = getBeginnerBot(level);
       if (bot) {
-        const elo = Math.max(200, Number(bot.elo) || 1000);
         return normalizeStockfishConfig({
           ...bot,
-          label: bot.name + " engine",
-          uciElo: elo,
+          label: `${bot.name} · ${bot.engineRequired ? "Stockfish 16" : "local practice"}`,
+          uciElo: 1320,
           nodes: 0,
-          limitStrength: true
+          limitStrength: false,
+          beginnerBot: !bot.engineRequired,
+          engineRequired: bot.engineRequired
         });
       }
       return normalizeStockfishConfig(stockfishLevels[level] || stockfishLevels.easy);
@@ -17313,6 +17325,25 @@
 
     function getBeginnerBot(id = coachDifficulty) {
       return beginnerBots.find((bot) => bot.id === id) || null;
+    }
+
+    function getCoachDifficultyDisplay(level = coachDifficulty) {
+      const bot = getBeginnerBot(level);
+      if (bot) return `Level ${bot.difficultyIndex} · ${bot.category}`;
+      const labels = {
+        beginner: "Beginner engine",
+        easy: "Easy engine",
+        medium: "Medium engine",
+        hard: "Hard engine",
+        expert: "Expert engine",
+        master: "Master engine",
+        strong: "Stockfish challenge preset"
+      };
+      return labels[level] || getCoachConfig(level).label || "Choose a level";
+    }
+
+    function getCoachEngineDisplay(config = getCoachConfig()) {
+      return config.beginnerBot ? "Local practice model" : "Stockfish 16 Lite · WASM";
     }
 
     function pickBotLine(type, bot = getBeginnerBot()) {
@@ -17398,13 +17429,13 @@
         button.setAttribute("aria-pressed", String(coachDifficulty === bot.id));
         button.title = unlocked ? `${bot.bio} Favorite opening: ${bot.opening}.` : `Defeat ${beginnerBots[index - 1]?.name || "the previous bot"} to unlock.`;
         const copy = createBookText("span", "beginner-bot-copy", "");
-        const botName = createBookText("strong", "", `${bot.name} · ${bot.elo}`);
+        const botName = createBookText("strong", "", `${bot.name} · Level ${bot.difficultyIndex}`);
         copy.append(
           botName,
-          createBookText("small", "", unlocked ? `${bot.personality} · ${bot.opening}` : "Locked"),
+          createBookText("small", "", unlocked ? `${bot.category} · ${getCoachEngineDisplay(getCoachConfig(bot.id))}` : "Locked"),
           createBookText("small", "", unlocked ? `${bot.bio} · ${wins} win${wins === 1 ? "" : "s"} · +${bot.reward} coins` : "Beat the bot before this one")
         );
-        const botIdentity = getPlayerIdentityModel({ name: `${bot.name} · ${bot.elo}`, title: bot.personality, avatar: unlocked ? bot.avatar : "🔒", isPlayer: false }, { isPlayer: false, variant: "compact" });
+        const botIdentity = getPlayerIdentityModel({ name: `${bot.name} · Level ${bot.difficultyIndex}`, title: bot.personality, avatar: unlocked ? bot.avatar : "🔒", isPlayer: false }, { isPlayer: false, variant: "compact" });
         renderSharedIdentityLine(copy, botIdentity, { nameSelector: "strong", variant: "compact" });
         const botAvatar = createBookText("span", "beginner-bot-avatar player-identity-avatar", unlocked ? bot.avatar : "🔒");
         applySharedAvatarElement(botAvatar, botIdentity, { variant: "compact" });
@@ -17527,10 +17558,10 @@
         const query = search.value.trim().toLowerCase();
         const queryTerms = query.split(/\s+/).filter(Boolean);
         const matches = beginnerBots.filter((bot) => {
-          const words = [bot.name, bot.elo, bot.personality, bot.opening, bot.bio, bot.style, bot.category].join(" ").toLowerCase();
+          const words = [bot.name, bot.personality, bot.opening, bot.bio, bot.style, bot.category, bot.difficultyIndex].join(" ").toLowerCase();
           return (filter.value === "All" || bot.category === filter.value) && queryTerms.every((term) => words.includes(term));
         });
-        const hasCustomView = Boolean(query) || filter.value !== "All" || sort.value !== "rating-asc";
+        const hasCustomView = Boolean(query) || filter.value !== "All" || sort.value !== "difficulty-asc";
         if (results) {
           const levelCopy = filter.value === "All" ? "" : ` · ${filter.value}`;
           results.textContent = `${matches.length} of ${beginnerBots.length} opponents${levelCopy}`;
@@ -17543,9 +17574,9 @@
         }
         const groups = categories.map((category) => {
           const bots = matches.filter((bot) => bot.category === category).sort((a, b) => {
-            if (sort.value === "rating-desc") return b.elo - a.elo;
+            if (sort.value === "difficulty-desc") return b.difficultyIndex - a.difficultyIndex;
             if (sort.value === "name") return a.name.localeCompare(b.name);
-            return a.elo - b.elo;
+            return a.difficultyIndex - b.difficultyIndex;
           });
           if (!bots.length) return null;
           const section = document.createElement("section");
@@ -17571,9 +17602,9 @@
             copy.className = "ai-bot-card-copy";
             const meta = document.createElement("div");
             meta.className = "ai-bot-card-meta";
-            const elo = createBookText("span", "ai-bot-rating", `${bot.elo} Elo`);
+            const difficulty = createBookText("span", "ai-bot-rating", `Level ${bot.difficultyIndex} · ${bot.category}`);
             const identity = createBookText("span", "ai-bot-identity", `${bot.personality} · ${bot.opening}`);
-            meta.append(elo, identity);
+            meta.append(difficulty, identity);
             const nameLine = createBookText("span", "ai-bot-card-name-line", "");
             const botName = createBookText("strong", "", bot.name);
             nameLine.append(botName);
@@ -17593,7 +17624,7 @@
             const play = createBookText("button", "button", "Play");
             play.type = "button";
             play.dataset.aiBotPlay = bot.id;
-            play.setAttribute("aria-label", `Play ${bot.name}, ${bot.elo} Elo`);
+            play.setAttribute("aria-label", `Play ${bot.name}, practice level ${bot.difficultyIndex} of ${beginnerBots.length}, ${bot.category}`);
             card.append(avatar, copy, details, play);
             grid.append(card);
           });
@@ -17606,7 +17637,7 @@
       filter.addEventListener("change", render);
       sort.addEventListener("change", render);
       clear?.addEventListener("click", () => { search.value = ""; search.focus(); render(); });
-      reset?.addEventListener("click", () => { search.value = ""; filter.value = "All"; sort.value = "rating-asc"; search.focus(); render(); });
+      reset?.addEventListener("click", () => { search.value = ""; filter.value = "All"; sort.value = "difficulty-asc"; search.focus(); render(); });
       roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => openAiGameReady(button.dataset.aiBotPlay, { trigger: button })); });
       const featuredPlay = document.getElementById("aiFeaturedCoachPlay");
       featuredPlay?.addEventListener("click", () => {
@@ -17631,10 +17662,10 @@
         .map((move) => ({ move, score: rankResponsiveCoachMove(move, earlyGame) }))
         .sort((a, b) => b.score - a.score);
       if (Math.random() < (config.blunder || 0.16) && scored.length > 2) {
-        const maxIndex = bot?.elo < 500 ? 5 : bot?.elo < 850 ? 3 : 2;
-        return scored[Math.min(scored.length - 1, 1 + Math.floor(Math.random() * maxIndex))].move;
+        const errorPool = Math.min(scored.length, Math.max(2, (bot?.practicePool || 1) + 2));
+        return scored[1 + Math.floor(Math.random() * Math.max(1, errorPool - 1))].move;
       }
-      const poolSize = bot?.elo < 500 ? 3 : bot?.elo < 850 ? 2 : 1;
+      const poolSize = Math.max(1, Number(bot?.practicePool) || 1);
       return scored[Math.floor(Math.random() * Math.min(poolSize, scored.length))].move;
     }
 
@@ -17739,7 +17770,7 @@
       updateMatchSeatLayout();
       const config = getCoachConfig();
       const ai = getAiHeaderProfile();
-      const displayRating = ai.isPlaceholder ? 0 : Math.max(400, Number(ai.rating) || Number(config.elo) || 450);
+      const displayRating = ai.isFriend ? Math.max(0, Number(ai.rating) || 0) : null;
       const isGameOver = coachGame && isCoachGameOver();
       const isMate = coachGame && callCoachRule(coachGame, "isCheckmate", "in_checkmate");
       const botColor = getCoachBotColor();
@@ -17760,23 +17791,29 @@
         renderSharedIdentityLine(aiLine, aiModel, { nameSelector: "#aiPlayerName", variant: "compact" });
       }
       document.getElementById("aiPlayerTitle").textContent = ai.title;
-      document.getElementById("aiPlayerRating").textContent = ai.isPlaceholder ? "—" : `${displayRating} Elo`;
+      document.getElementById("aiPlayerRating").textContent = ai.isPlaceholder
+        ? "Choose a difficulty"
+        : ai.isFriend
+          ? displayRating ? `${displayRating} Elo` : "Rating unavailable"
+          : getCoachDifficultyDisplay();
       const aiSide = card.querySelector("[data-ai-frame-side]");
       if (aiSide) aiSide.textContent = getCoachColorName(botColor);
       const selectedBot = getBeginnerBot();
       const botGames = selectedBot
         ? Math.max(0, Number(beginnerBotState.wins[selectedBot.id]) || 0) + Math.max(0, Number(beginnerBotState.losses[selectedBot.id]) || 0)
         : 0;
-      const botWins = selectedBot ? Math.max(0, Number(beginnerBotState.losses[selectedBot.id]) || 0) : 0;
+      const botWins = selectedBot ? Math.max(0, Number(beginnerBotState.wins[selectedBot.id]) || 0) : 0;
       const setFrameStat = (key, value) => {
         const field = card.querySelector(`[data-ai-stat="${key}"]`);
         if (field) field.textContent = value;
       };
-      setFrameStat("engine", ai.isPlaceholder ? "—" : ai.isFriend ? "Realtime match" : "Stockfish 16");
+      setFrameStat("engine", ai.isPlaceholder ? "—" : ai.isFriend ? "Realtime match" : getCoachEngineDisplay(config));
       setFrameStat("difficulty", ai.isPlaceholder ? "Choose a bot" : ai.isFriend ? (friendChallengeState?.gameType || "Casual") : config.label);
-      setFrameStat("rating", ai.isPlaceholder ? "—" : `${displayRating} Elo`);
+      setFrameStat("rating", ai.isPlaceholder ? "Choose a level" : ai.isFriend ? (displayRating ? `${displayRating} Elo` : "Rating unavailable") : getCoachDifficultyDisplay());
+      const ratingLabel = card.querySelector('[data-ai-stat="rating"]')?.previousElementSibling;
+      if (ratingLabel) ratingLabel.textContent = ai.isFriend ? "Rating" : "Practice level";
       setFrameStat("style", ai.isPlaceholder ? "Choose a bot" : ai.isFriend ? "Live player" : selectedBot?.style || selectedBot?.opening || "Balanced engine");
-      setFrameStat("strength", ai.isPlaceholder ? "—" : ai.isFriend ? "Player" : `Skill ${config.skill}/20`);
+      setFrameStat("strength", ai.isPlaceholder ? "—" : ai.isFriend ? "Player" : config.beginnerBot ? "Local practice profile" : `Skill setting ${config.skill}/20 · not Elo-calibrated`);
       setFrameStat("level", ai.isPlaceholder ? "Setup" : ai.title || "Opponent");
       const description = card.querySelector("[data-ai-description]");
       if (description) description.textContent = ai.isFriend
@@ -17795,12 +17832,12 @@
       document.getElementById("aiMoveIndicator").textContent = ai.isPlaceholder ? "—" : getCoachColorName(botColor);
       document.getElementById("aiPlayerStatus").textContent = ai.isFriend
         ? (!navigator.onLine || !ai.online ? "Offline" : isGameOver ? "Review" : coachGame?.turn() === botColor ? "Their turn" : "Online")
-        : ai.isPlaceholder ? "Waiting" : coachThinking ? "Thinking..." : isGameOver ? "Review" : "Online";
+        : ai.isPlaceholder ? "Waiting" : coachThinking ? "Thinking..." : isGameOver ? "Review" : stockfishInfo.lastMoveSource === "legal fallback" ? "Local fallback" : stockfishFailed && !config.beginnerBot ? "Engine unavailable" : config.beginnerBot ? "Local practice" : stockfishReady ? "Ready" : "Loading engine";
       document.getElementById("aiLastMove").textContent = `Last: ${coachLastMove?.san || "--"}`;
       card.title = ai.isFriend
         ? `${ai.name} - ${ai.title}. ${displayRating} Elo.`
         : ai.isPlaceholder ? "Choose an AI bot to start a game."
-          : `${ai.name}: ${ai.title}. Plays ${config.label}, depth ${config.depth}. Favorite openings: Italian, Queen's Gambit, Sicilian setups.`;
+          : `${ai.name}: ${ai.title}. ${getCoachEngineDisplay(config)} · ${getCoachDifficultyDisplay()}. Engine presets are not calibrated Elo ratings.`;
     }
 
     function getCoachStrengthProfile() {
@@ -18074,7 +18111,7 @@
       const selection = document.getElementById("aiGameReadySelection");
       const saved = document.getElementById("aiGameReadySaved");
       if (title) title.textContent = bot?.name || "your bot";
-      if (meta) meta.textContent = bot ? `${bot.name} · ${bot.elo} Elo` : "Bot selected";
+      if (meta) meta.textContent = bot ? `${bot.name} · ${getCoachDifficultyDisplay()}` : "Bot selected";
       if (avatar) avatar.textContent = bot?.avatar || "♞";
       if (colorSummary) colorSummary.textContent = `You play ${getCoachColorName(coachPlayerColor)}`;
       if (selection) selection.textContent = `${time.label} · ${time.detail}`;
@@ -18793,6 +18830,10 @@
       return (Number(config.skill) || 0) >= 7 || (Number(config.elo) || 0) >= 1450;
     }
 
+    function requiresStockfishCoachMove(config = getCoachConfig()) {
+      return Boolean(config.engineRequired || isStrictStockfishLevel(config));
+    }
+
     function isStrongStockfishBot(config = getCoachConfig()) {
       return coachDifficulty === "strong";
     }
@@ -18880,7 +18921,7 @@
       const panel = document.getElementById("enginePanel");
       if (panel) panel.hidden = true;
       if (panel) panel.classList.toggle("is-thinking", coachThinking);
-      rating.textContent = String(config.elo);
+      rating.textContent = String(config.skill);
       depth.textContent = String(stockfishInfo.depth || config.depth);
       thinking.textContent = coachThinking ? "Coach thinking" : stockfishInfo.status;
       evalText.textContent = stockfishInfo.evalText || "0.00";
@@ -18944,9 +18985,29 @@
         return;
       }
       if (line === "readyok" && stockfishPending?.stage === "config") {
-        stockfishPending.stage = "search";
-        sendStockfishCommand(stockfishWorker, `position fen ${stockfishPending.fen}`);
-        sendStockfishCommand(stockfishWorker, getStockfishGoCommand(stockfishPending.config));
+        const pending = stockfishPending;
+        pending.stage = "search";
+        if (Number.isFinite(pending.searchTimeoutMs)) {
+          window.clearTimeout(pending.timeout);
+          pending.timeout = window.setTimeout(() => {
+            if (stockfishPending !== pending) return;
+            try { sendStockfishCommand(stockfishWorker, "stop"); } catch {}
+            stockfishInfo.status = "Stopping search...";
+            scheduleEnginePanelUpdate();
+            pending.stopTimeout = window.setTimeout(() => {
+              if (stockfishPending !== pending) return;
+              stockfishPending = null;
+              stockfishFailed = true;
+              stockfishFailAt = Date.now();
+              stockfishInfo.status = "Engine restarted";
+              scheduleEnginePanelUpdate();
+              pending.resolve("");
+              releaseStockfishWorker();
+            }, 1200);
+          }, pending.searchTimeoutMs);
+        }
+        sendStockfishCommand(stockfishWorker, `position fen ${pending.fen}`);
+        sendStockfishCommand(stockfishWorker, getStockfishGoCommand(pending.config));
         return;
       }
       if (line.startsWith("bestmove ") && stockfishPending) {
@@ -19071,14 +19132,17 @@
         const boot = () => {
           try {
             stockfishWorker = createStockfishWorker(stockfishSources[stockfishSourceIndex]);
-            stockfishWorker.onmessage = (event) => {
+            const workerInstance = stockfishWorker;
+            workerInstance.onmessage = (event) => {
+              if (stockfishWorker !== workerInstance) return;
               String(event.data || "")
                 .split(/\r?\n/)
                 .map((line) => line.trim())
                 .filter(Boolean)
                 .forEach(handleStockfishLine);
             };
-            stockfishWorker.onerror = () => {
+            workerInstance.onerror = () => {
+              if (stockfishWorker !== workerInstance) return;
               if (!stockfishReady) {
                 failBoot();
                 return;
@@ -19087,6 +19151,7 @@
               stockfishFailAt = Date.now();
               stockfishInfo.status = "Engine failed";
               scheduleEnginePanelUpdate();
+              updateAiPlayerHeader();
               releaseStockfishWorker();
               if (stockfishPending) {
                 window.clearTimeout(stockfishPending.timeout);
@@ -19133,9 +19198,11 @@
       if (stockfishReady) return Promise.resolve(stockfishWorker);
       stockfishInfo.status = "Engine loading";
       scheduleEnginePanelUpdate();
+      updateAiPlayerHeader();
       return loadStockfishWorker().then((worker) => {
         stockfishInfo.status = worker ? "Engine ready" : "Engine failed";
         scheduleEnginePanelUpdate();
+        updateAiPlayerHeader();
         return worker;
       });
     }
@@ -19150,27 +19217,55 @@
       const fen = coachGame.fen();
       const searchId = ++stockfishSearchId;
       const uci = await new Promise((resolve) => {
+        const pending = {
+          id: searchId,
+          stage: "config",
+          fen,
+          side: coachGame.turn(),
+          config,
+          resolve,
+          timeout: 0,
+          stopTimeout: 0,
+          // The advertised move budget begins once the engine acknowledges
+          // its ready handshake and the search command is sent, not while
+          // WASM/engine configuration is still settling.
+          searchTimeoutMs: config.movetime + (isStrongStockfishBot(config) ? 1800 : 650)
+        };
         const timeout = window.setTimeout(() => {
           if (!stockfishPending || stockfishPending.id !== searchId) return;
+          if (stockfishPending.stage === "config") {
+            const stale = stockfishPending;
+            stockfishPending = null;
+            stockfishFailed = true;
+            stockfishFailAt = Date.now();
+            stockfishInfo.status = "Engine configuration timed out";
+            scheduleEnginePanelUpdate();
+            stale.resolve("");
+            releaseStockfishWorker();
+            return;
+          }
           try { sendStockfishCommand(worker, "stop"); } catch {}
           stockfishInfo.status = "Stopping search...";
           scheduleEnginePanelUpdate();
           stockfishPending.stopTimeout = window.setTimeout(() => {
             if (!stockfishPending || stockfishPending.id !== searchId) return;
-            const pending = stockfishPending;
+            const expired = stockfishPending;
             stockfishPending = null;
+            stockfishFailed = true;
+            stockfishFailAt = Date.now();
             stockfishInfo.status = "Engine restarted";
             scheduleEnginePanelUpdate();
-            pending.resolve("");
+            expired.resolve("");
             releaseStockfishWorker();
-          }, 320);
-        }, config.movetime + (isStrongStockfishBot(config) ? 1800 : 650));
+          }, 1200);
+        }, 10000);
+        pending.timeout = timeout;
         stockfishInfo.status = "Thinking...";
         stockfishInfo.depth = 0;
         stockfishInfo.bestMove = "--";
         stockfishInfo.lastConfig = `skill=${config.skill};depth=${config.depth};movetime=${config.movetime};nodes=${config.nodes};elo=${config.uciElo}`;
         scheduleEnginePanelUpdate();
-        stockfishPending = { id: searchId, stage: "config", fen, side: coachGame.turn(), config, resolve, timeout, stopTimeout: 0 };
+        stockfishPending = pending;
         configureStockfish(worker, config);
         if (!stockfishGamePrepared) {
           sendStockfishCommand(worker, "ucinewgame");
@@ -19630,9 +19725,9 @@
       } catch {
         stockfishInfo.status = "Engine retrying";
       }
-      if (isStrongStockfishBot(config)) {
-        // A strong game must never silently downgrade to the lightweight
-        // material picker when Stockfish is unavailable.
+      if (requiresStockfishCoachMove(config)) {
+        // Engine-required levels must never silently downgrade to the local
+        // heuristic when Stockfish is unavailable or times out.
         stockfishInfo.status = stockfishFailed ? "Engine failed" : "Waiting for Stockfish";
         stockfishInfo.lastMoveSource = "";
         scheduleEnginePanelUpdate();
@@ -22617,7 +22712,9 @@
       const description = document.getElementById("playLobbyBotDescription");
       if (difficulty) difficulty.textContent = selectedBot ? config.label : "Choose a bot";
       if (style) style.textContent = selectedBot?.style || selectedBot?.personality || "—";
-      if (strength) strength.textContent = selectedBot ? `${Math.max(400, Number(config.elo) || 0)} Elo` : "—";
+      if (strength) strength.textContent = selectedBot
+        ? config.beginnerBot ? "Local practice profile · not rating-calibrated" : `Stockfish skill ${config.skill}/20 · not Elo-calibrated`
+        : "—";
       if (description) description.textContent = selectedBot?.bio || "Choose an AI opponent to see their play style and challenge.";
       const ratingNote = document.getElementById("playLobbyRatingNote");
       if (ratingNote) ratingNote.hidden = true;
@@ -24226,7 +24323,7 @@
 
     function queueCoachReply() {
       const botColor = getCoachBotColor();
-      if (!coachSessionActive || coachBotPaused || isCoachGameOver() || coachGame.turn() !== botColor) return;
+      if (!coachSessionActive || coachThinking || coachBotPaused || isCoachGameOver() || coachGame.turn() !== botColor) return;
       const token = ++coachMoveToken;
       coachThinking = true;
       coachLearnerMoveScores = { fen: "", scored: [], pending: false };
@@ -24247,17 +24344,20 @@
           const replyUci = reply && `${reply.from}${reply.to}${reply.promotion || ""}`;
           const config = getCoachConfig();
             const safeReply = legalReplies.find((move) => `${move.from}${move.to}${move.promotion || ""}` === replyUci)
-              || (isStrongStockfishBot(config) ? null : getReliableCoachFallback(legalReplies));
+              || (requiresStockfishCoachMove(config) ? null : getReliableCoachFallback(legalReplies));
           const move = safeReply && coachGame.move(toCoachMoveInput(safeReply));
           if (move) {
             clearCoachTemporaryAnalysis();
             coachLastMove = move;
             advanceMatchClock(move.color);
             playCoachMoveSound(move, "bot");
-            coachMessage = `${explainCoachMove(move)}${getBeginnerBot() ? ` ${pickBotLine("inGame")}` : ""}`;
+            const fallbackNote = stockfishInfo.lastMoveSource === "legal fallback"
+              ? " Stockfish was unavailable, so this reply used a lighter local fallback."
+              : "";
+            coachMessage = `${explainCoachMove(move)}${getBeginnerBot() ? ` ${pickBotLine("inGame")}` : ""}${fallbackNote}`;
           } else {
-            coachMessage = isStrictStockfishLevel(config)
-              ? `${config.label} needs Stockfish before moving. Refresh or switch to Beginner/Easy while the engine reloads.`
+            coachMessage = requiresStockfishCoachMove(config)
+              ? `${config.label} is unavailable. No weaker move was substituted; choose a lower level, then retry the reply.`
               : "Stockfish did not return a move. Beginner backup is available, or try Free Play while the engine reloads.";
       reviewRetryState = null;
             stockfishInfo.status = stockfishFailed ? "Engine failed" : "No best move";
@@ -24269,6 +24369,7 @@
           scheduleEnginePanelUpdate();
         }
         coachThinking = false;
+        updateAiPlayerHeader();
         if (completeCoachGame()) return;
         scheduleCoachBoardRender();
         scheduleEnginePanelUpdate();
@@ -24312,6 +24413,7 @@
       const gameShouldRun = coachSessionActive || Boolean(friendChallengeState?.active) || Boolean(reviewSelfAnalysisState) || Boolean(reviewRetryState);
       clearAnalysisArrows("game-restart", document.getElementById("coachBoard"));
       coachMoveToken += 1;
+      cancelStockfishSearch("Starting a new game", true);
       cancelActiveReviewAnalysis("Starting a new game");
       window.clearInterval(reviewReplayTimer);
       reviewSelfAnalysisState = null;
@@ -27363,6 +27465,19 @@
       const friendsVisible = activePanel === "friends";
       const reviewVisible = activePanel === "gameReview";
       const tournamentVisible = playVisible && activeTab === "tournaments";
+      if (!playVisible && coachSessionActive && !friendChallengeState?.active && coachThinking) {
+        coachMoveToken += 1;
+        coachThinking = false;
+        cancelStockfishSearch("AI game paused while Play is closed", true);
+        stockfishInfo.status = "Reply paused";
+        coachMessage = "Game paused while you were away. Return to Play to continue.";
+        scheduleCoachBoardRender();
+        scheduleCoachPanelUpdate();
+        scheduleEnginePanelUpdate();
+      } else if (playVisible && coachSessionActive && !friendChallengeState?.active && !coachBotPaused
+        && coachGame && coachGame.turn() === getCoachBotColor() && !coachThinking && !isCoachGameOver()) {
+        queueCoachReply();
+      }
       if (playVisible || friendsVisible) {
         startFriendNetworkSync();
         if (playVisible && isRealtimeMatchActive()) startRealtimeMatchLifecycle();
@@ -29222,12 +29337,13 @@
           const wasRealtimeMatch = isRealtimeMatchActive();
           setCoachDifficulty(button.dataset.gameDifficulty);
           if (wasRealtimeMatch) startSoloCoachGame();
-          const label = getCoachConfig().label || coachDifficulty;
+          const label = getCoachDifficultyDisplay();
           coachMessage = getCoachSkill() >= 15
             ? `${label} ready. No pressure: try to survive, ask Why, and learn one idea.`
             : `Difficulty set to ${label}. Keep it friendly and focus on one idea.`;
           renderCoachBoard();
           updateCoachPanel();
+          if (!wasRealtimeMatch && coachSessionActive && !coachBotPaused && coachGame?.turn() === getCoachBotColor() && !coachThinking) queueCoachReply();
         });
       });
       document.querySelectorAll("[data-coach-side]").forEach((button) => {
@@ -29289,13 +29405,17 @@
       document.getElementById("aiPlayerCard")?.addEventListener("click", () => {
         const ai = getAiHeaderProfile();
         const config = getCoachConfig();
-        coachMessage = `${ai.name}, ${ai.title}. Playstyle: ${config.elo >= 2000 ? "deep calculation, opening discipline, and counterattack pressure" : config.elo >= 1500 ? "active pieces, tactics, and king safety" : "simple development and safe captures"}. Strength: depth ${config.depth}. Weakness: lower levels still miss long plans.`;
+        coachMessage = config.beginnerBot
+          ? `${ai.name}, ${ai.title}. This level uses the local practice model, with a distinct candidate pool and mistake rate. It is not an Elo-calibrated opponent.`
+          : `${ai.name}, ${ai.title}. This level uses Stockfish 16 Lite with skill setting ${config.skill}/20 and a bounded search time. It is not Elo-calibrated.`;
         renderCoachBoard();
+        updateCoachPanel();
       });
       document.getElementById("undoGame").addEventListener("click", undoCoachMove);
       document.getElementById("toggleBot").addEventListener("click", () => {
         coachBotPaused = !coachBotPaused;
         coachMoveToken += 1;
+        cancelStockfishSearch(coachBotPaused ? "Bot paused" : "Bot resumed", true);
         coachThinking = false;
         coachSelected = "";
         coachLegalMoves = [];

@@ -2802,8 +2802,8 @@
           <div class="ai-featured-coach-copy">
             <p class="ai-featured-coach-kicker">Featured coach</p>
             <h3>KingNorbert <span aria-hidden="true">♛</span></h3>
-            <p>Calm pressure, clear plans, and practical calculation for your next serious game.</p>
-            <div class="ai-featured-coach-meta"><strong>2000 Elo</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Balanced</span><span>Tactical</span></div>
+            <p>A strong local Stockfish preset for practical calculation. Bot strength is not tournament-calibrated.</p>
+            <div class="ai-featured-coach-meta"><strong>Stockfish challenge</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Balanced</span><span>Tactical</span></div>
           </div>
           <button class="button" type="button" id="aiFeaturedCoachPlay">Play KingNorbert</button>
         </article>
@@ -2811,7 +2811,7 @@
           <div class="ai-bot-controls" role="search">
             <div class="ai-bot-search-field"><label for="aiBotSearch">Search roster</label><span class="ai-bot-search-input"><input id="aiBotSearch" type="search" placeholder="Name, style, or opening" autocomplete="off" aria-describedby="aiBotResults" /><button class="ai-bot-clear" id="aiBotClear" type="button" aria-label="Clear bot search" hidden>&times;</button></span></div>
             <label><span>Level</span><select id="aiBotFilter"><option value="All">All levels</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option><option value="Master">Master</option></select></label>
-            <label><span>Sort</span><select id="aiBotSort"><option value="rating-asc">Rating: low to high</option><option value="rating-desc">Rating: high to low</option><option value="name">Name: A to Z</option></select></label>
+            <label><span>Sort</span><select id="aiBotSort"><option value="difficulty-asc">Difficulty: low to high</option><option value="difficulty-desc">Difficulty: high to low</option><option value="name">Name: A to Z</option></select></label>
           </div>
           <div class="ai-bot-browser-meta"><p id="aiBotResults" role="status" aria-live="polite"></p><button class="ai-bot-reset" id="aiBotReset" type="button" hidden>Reset filters</button></div>
           <div class="ai-bot-roster" id="aiBotRoster" aria-live="polite"></div>
@@ -3221,9 +3221,9 @@
                 <button class="mission-button" type="button" data-coach-side="b" aria-pressed="false">Black</button>
               </div>
               <span class="play-setup-chip">Casual</span>
-              <span class="play-setup-chip">Stockfish WASM</span>
+              <span class="play-setup-chip" id="playEngineBadge">Choose a bot</span>
               <span class="badge" id="gameDifficultyBadge">No bot selected</span>
-              <span class="play-setup-chip" id="gameEloBadge">— Elo</span>
+              <span class="play-setup-chip" id="gameStrengthBadge">Choose a level</span>
               <span class="badge status-skeleton" id="gameStatusBadge" role="status" aria-live="polite" aria-atomic="true"><span class="sr-only">Loading chess rules.</span></span>
               <span class="badge" id="gameTurnBadge">Waiting to start</span>
               <span class="badge" id="gameBossBadge" hidden>Boss battle</span>
@@ -3236,7 +3236,7 @@
                   <button class="mission-button" type="button" data-game-difficulty="hard" aria-pressed="false">Hard</button>
                   <button class="mission-button" type="button" data-game-difficulty="expert" aria-pressed="false">Expert</button>
                   <button class="mission-button" type="button" data-game-difficulty="master" aria-pressed="false">Master</button>
-                  <button class="mission-button" type="button" data-game-difficulty="strong" aria-pressed="false">2000 Bot</button>
+                  <button class="mission-button" type="button" data-game-difficulty="strong" aria-pressed="false">Stockfish challenge</button>
                 </div>
               </details>
               </div>
@@ -3265,7 +3265,7 @@
                 <dl class="player-frame-stats player-frame-stats--opponent" aria-label="Opponent details">
                   <div><dt>Engine</dt><dd data-ai-stat="engine">Stockfish 16</dd></div>
                   <div><dt>Difficulty</dt><dd data-ai-stat="difficulty">Easy engine</dd></div>
-                  <div><dt>Elo</dt><dd data-ai-stat="rating">1050 Elo</dd></div>
+                  <div><dt>Practice level</dt><dd data-ai-stat="rating">Choose a level</dd></div>
                   <div><dt>Style</dt><dd data-ai-stat="style">Balanced</dd></div>
                   <div><dt>Strength</dt><dd data-ai-stat="strength">Skill 3/20</dd></div>
                   <div><dt>Level</dt><dd data-ai-stat="level">Novice</dd></div>
@@ -3499,7 +3499,7 @@
                   <svg viewBox="0 0 240 70" role="img" aria-label="Evaluation trend"><path d="M1 47 L18 52 L34 44 L52 48 L69 37 L85 31 L102 35 L118 20 L136 28 L153 17 L170 25 L188 18 L206 30 L223 23 L239 28" fill="none" pathLength="1"/><path d="M1 47 L18 52 L34 44 L52 48 L69 37 L85 31 L102 35 L118 20 L136 28 L153 17 L170 25 L188 18 L206 30 L223 23 L239 28 L239 70 L1 70 Z" aria-hidden="true"/></svg>
                 </div>
                 <div class="engine-row">
-                  <span>Rating <strong id="engineRating">1100</strong></span>
+                  <span>Skill setting <strong id="engineRating">3</strong>/20</span>
                   <span>Depth <strong id="engineDepth">4</strong></span>
                   <span id="engineThinking">Engine idle</span>
                 </div>
@@ -3515,8 +3515,8 @@
               <div class="featured-coach-copy">
                 <span>Featured coach bot</span>
                 <h4>KingNorbert <span aria-hidden="true">♛</span></h4>
-                <div class="featured-coach-meta"><strong>2000 Elo</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Balanced · Tactical</span></div>
-                <p>Calm, analytical coaching for middlegame plans, endgames, and practical calculation.</p>
+                <div class="featured-coach-meta"><strong>Stockfish challenge</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Skill setting 20/20</span></div>
+                <p>Local Stockfish 16 Lite, configured for a longer search. Bot strength is not tournament-calibrated.</p>
               </div>
               <button class="button" type="button" id="playKingNorbert">Play Coach</button>
             </article>

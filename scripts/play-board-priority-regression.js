@@ -413,7 +413,7 @@ async function runActiveContextAndFullscreenRegression(browser) {
       const name = document.getElementById("aiPlayerName")?.textContent?.trim();
       return document.getElementById("play")?.classList.contains("is-active-game")
         && name && name !== previous
-        && document.getElementById("aiPlayerRating")?.textContent?.includes("2000");
+        && document.getElementById("aiPlayerRating")?.textContent?.includes("Stockfish challenge preset");
     }, firstBot, { timeout: 10000 });
     assert.notEqual((await page.locator("#aiPlayerName").textContent()).trim(), firstBot,
       "Selecting the second AI did not replace the previous opponent metadata.");

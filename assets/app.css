@@ -25252,7 +25252,7 @@
       line-height: 1;
     }
 
-    :is(body:not(.theme-light), body.theme-light) #play .coach-setup > :is(.play-setup-chip, #gameDifficultyBadge, #gameEloBadge) {
+    :is(body:not(.theme-light), body.theme-light) #play .coach-setup > :is(.play-setup-chip, #gameDifficultyBadge, #gameStrengthBadge) {
       display: none;
     }
 
