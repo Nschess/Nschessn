@@ -13713,14 +13713,22 @@
       (tournamentRuntime?.events || []).filter(isTournamentWithinLeaderboardPeriod).forEach((event) => {
         (event.standings || []).forEach((entry) => {
           if (!isTournamentEntryInScope(entry)) return;
-          const wins = Math.max(0, Number(entry.wins) || 0);
-          const draws = Math.max(0, Number(entry.draws) || 0);
-          const losses = Math.max(0, Number(entry.losses) || 0);
-          const games = Math.max(0, Number(entry.gamesPlayed ?? entry.games_played) || wins + draws + losses);
-          const scoreValue = Math.max(0, Number(entry.score) || 0);
+          const username = normalizeAuthUsername(entry.username);
+          const wins = readLeaderboardMetric(entry.wins);
+          const draws = readLeaderboardMetric(entry.draws);
+          const losses = readLeaderboardMetric(entry.losses);
+          let games = readLeaderboardMetric(entry.gamesPlayed ?? entry.games_played);
+          if (games === null && wins !== null && draws !== null && losses !== null) {
+            const total = wins + draws + losses;
+            if (Number.isSafeInteger(total)) games = total;
+          }
+          const scoreValue = readLeaderboardMetric(entry.score, { integer: false });
+          if (!username || scoreValue === null) return;
+          const displayMetric = (value) => value === null ? "—" : formatProfileNumber(value);
+          const rating = readLeaderboardMetric(entry.rating, { min: 400, max: 3000 });
           rows.push({
-            id: String(entry.id || entry.publicId || entry.public_id || `${event.code}-${entry.username || rows.length}`).toLowerCase(),
-            name: normalizeAuthUsername(entry.username || "Player"),
+            id: String(entry.id || entry.publicId || entry.public_id || `${event.code}-${username}`).toLowerCase(),
+            name: username,
             title: entry.title || "",
             nameStyle: entry.nameStyle || entry.name_style || "",
             avatarFrame: entry.avatarFrame || entry.avatar_frame || "",
@@ -13730,12 +13738,12 @@
             flag: formatCountryFlag(entry.countryFlag || entry.country_flag || ""),
             countryCode: entry.countryFlag || entry.country_flag || "",
             icons: event.status === "completed" && Number(entry.playerRank || entry.player_rank) === 1 ? [{ icon: "T", label: "Tournament winner" }] : [],
-            score: Math.round(scoreValue * 100 + wins * 25 + draws * 8 + games),
-            tieRating: Math.max(400, Number(entry.rating) || 400),
-            tieWins: wins,
-            tieGames: games,
+            score: Math.round(scoreValue * 100 + (wins ?? 0) * 25 + (draws ?? 0) * 8 + (games ?? 0)),
+            tieRating: rating ?? 0,
+            tieWins: wins ?? -1,
+            tieGames: games ?? -1,
             primary: `${scoreValue.toFixed(scoreValue % 1 ? 1 : 0)} pts`,
-            meta: [`${event.title}`, `${wins}W ${draws}D ${losses}L`, `${games} games`],
+            meta: [`${event.title}`, `${displayMetric(wins)}W ${displayMetric(draws)}D ${displayMetric(losses)}L`, `${displayMetric(games)} games`],
             isPlayer: Boolean(currentId && String(entry.id || entry.publicId || entry.public_id || "").toLowerCase() === currentId)
           });
         });
@@ -13749,6 +13757,39 @@
       );
     }
 
+    function readLeaderboardMetric(value, { integer = true, min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+      if (value === null || value === undefined || typeof value === "boolean" || (typeof value === "string" && !value.trim())) return null;
+      const number = Number(value);
+      if (!Number.isFinite(number) || number < min || number > max || (integer && !Number.isSafeInteger(number))) return null;
+      return number;
+    }
+
+    function getLeaderboardMetrics(account = {}) {
+      const stats = account.statistics && typeof account.statistics === "object" ? account.statistics : {};
+      const firstPresent = (...values) => values.find((value) => value !== undefined && value !== null);
+      const rating = (value) => readLeaderboardMetric(value, { min: 400, max: 3000 });
+      const count = (value) => readLeaderboardMetric(value);
+      const wins = count(firstPresent(stats.wins, account.wins));
+      const losses = count(firstPresent(stats.losses, account.losses));
+      const draws = count(firstPresent(stats.draws, account.draws));
+      let gamesPlayed = count(firstPresent(stats.gamesPlayed, stats.games_played, account.gamesPlayed, account.games_played));
+      if (gamesPlayed === null && wins !== null && losses !== null && draws !== null) {
+        const total = wins + losses + draws;
+        if (Number.isSafeInteger(total)) gamesPlayed = total;
+      }
+      const puzzlesSolved = count(firstPresent(stats.puzzlesSolved, stats.puzzles_solved, account.puzzlesSolved, account.puzzles_solved));
+      const puzzleAccuracy = readLeaderboardMetric(firstPresent(stats.puzzleAccuracy, stats.puzzle_accuracy, account.puzzleAccuracy, account.puzzle_accuracy), { integer: false, min: 0, max: 100 });
+      const lessonsCompleted = count(firstPresent(stats.lessonsCompleted, stats.lessons_completed, account.lessonsCompleted, account.lessons_completed));
+      const cleanGames = count(firstPresent(stats.cleanGames, stats.clean_games, account.cleanGames, account.clean_games));
+      const bossClears = count(firstPresent(stats.bossClears, stats.boss_clears, account.bossClears, account.boss_clears));
+      return {
+        gameRating: rating(firstPresent(account.gameRating, account.game_rating, account.rating)),
+        puzzleRating: rating(firstPresent(account.puzzleRating, account.puzzle_rating)),
+        wins, losses, draws, gamesPlayed, puzzlesSolved, puzzleAccuracy, lessonsCompleted, cleanGames, bossClears,
+        winRate: gamesPlayed > 0 && wins !== null ? Math.round((wins / gamesPlayed) * 100) : null
+      };
+    }
+
     function buildLeaderboardEntries(type = "puzzles") {
       const authenticated = isApplicationAuthenticated();
       const currentName = authenticated ? normalizeAuthUsername(readLearnerProfile().name).toLowerCase() : "";
@@ -13760,20 +13801,22 @@
         .map((account) => {
           const id = getLeaderboardAccountId(account);
           if (seen.has(id)) return null;
+          const metrics = getLeaderboardMetrics(account);
+          const { gamesPlayed: games, wins, puzzleRating, gameRating } = metrics;
+          // A game rating is not a puzzle rating. Keep incomplete records out
+          // of a board instead of manufacturing a 400 rating or zero stats.
+          if (type === "puzzles" && puzzleRating === null && (metrics.puzzlesSolved === null || metrics.puzzleAccuracy === null)) return null;
+          if (type !== "puzzles" && gameRating === null) return null;
           seen.add(id);
-          const stats = account.statistics && typeof account.statistics === "object" ? account.statistics : {};
-          const games = Math.max(0, Number(stats.gamesPlayed) || 0);
-          const wins = Math.max(0, Number(stats.wins) || 0);
-          const solved = Math.max(0, Number(stats.puzzlesSolved) || 0);
-          const accuracy = Math.max(0, Math.min(100, Number(stats.puzzleAccuracy) || 0));
-          const winRate = games ? Math.round((wins / games) * 100) : 0;
-          const puzzleRating = Math.max(400, Number(account.puzzleRating) || 400);
-          const gameRating = Math.max(400, Number(account.gameRating) || 400);
-          const cleanGames = Math.max(0, Number(stats.cleanGames) || 0);
-          const bossClears = Math.max(0, Number(stats.bossClears) || 0);
+          const solved = metrics.puzzlesSolved;
+          const accuracy = metrics.puzzleAccuracy;
+          const winRate = metrics.winRate;
+          const cleanGames = metrics.cleanGames;
+          const bossClears = metrics.bossClears;
+          const displayMetric = (value) => value === null ? "—" : formatProfileNumber(value);
           const score = type === "puzzles"
-            ? puzzleRating + solved * 8 + accuracy * 3
-            : gameRating + wins * 30 + winRate * 2 + cleanGames * 10 + bossClears * 35;
+            ? (puzzleRating ?? 0) + (solved ?? 0) * 8 + (accuracy ?? 0) * 3
+            : gameRating + (wins ?? 0) * 30 + (winRate ?? 0) * 2 + (cleanGames ?? 0) * 10 + (bossClears ?? 0) * 35;
           return {
             id,
             name: normalizeAuthUsername(account.username),
@@ -13788,12 +13831,12 @@
             icons: Array.isArray(account.achievements) && account.achievements.length ? [{ icon: "🏆", label: account.achievements[0] }] : [],
             score,
             tieRating: type === "puzzles" ? puzzleRating : gameRating,
-            tieWins: wins,
-            tieGames: games,
-            primary: type === "puzzles" ? `${formatProfileNumber(puzzleRating)} rating` : `${formatProfileNumber(gameRating)} Elo`,
+            tieWins: wins ?? -1,
+            tieGames: games ?? -1,
+            primary: type === "puzzles" ? (puzzleRating === null ? "Practice stats" : `${formatProfileNumber(puzzleRating)} rating`) : `${formatProfileNumber(gameRating)} Elo`,
             meta: type === "puzzles"
-              ? [`${solved} solved`, `${accuracy}% accuracy`, `${formatProfileNumber(stats.lessonsCompleted || 0)} lessons`]
-              : [`${wins} wins`, `${games} games`, `${winRate}% win rate`],
+              ? [`${displayMetric(solved)} solved`, `${accuracy === null ? "—" : `${displayMetric(accuracy)}%`} accuracy`, `${displayMetric(metrics.lessonsCompleted)} lessons`]
+              : [`${displayMetric(wins)} wins`, `${displayMetric(games)} games`, `${winRate === null ? "—" : `${displayMetric(winRate)}%`} win rate`],
             isPlayer: normalizeAuthUsername(account.username).toLowerCase() === currentName
           };
         })
@@ -31859,10 +31902,7 @@
       // Both paths use Supabase's shared data; profiles are a read-only recovery source.
       let leaderboardApiAvailable = typeof baseProvider?.getLeaderboard === "function";
       const toLeaderboardEntry = (row = {}) => {
-        const wins = Math.max(0, Number(row.wins) || 0);
-        const losses = Math.max(0, Number(row.losses) || 0);
-        const draws = Math.max(0, Number(row.draws) || 0);
-        const rating = Math.max(400, Math.min(3000, Number(row.rating || row.game_rating || row.puzzle_rating) || 400));
+        const metrics = getLeaderboardMetrics(row);
         return {
           publicId: String(row.public_id || row.publicId || row.id || ""),
           username: normalizeAuthUsername(row.username),
@@ -31873,17 +31913,20 @@
           avatar: String(row.avatar || "auto"),
           countryFlag: normalizeCountryFlagValue(row.country_flag || row.countryFlag || ""),
           title: String(row.title || ""),
-          puzzleRating: Math.max(400, Number(row.puzzle_rating || row.puzzleRating) || rating),
-          gameRating: Math.max(400, Number(row.game_rating || row.gameRating) || rating),
+          puzzleRating: metrics.puzzleRating,
+          gameRating: metrics.gameRating,
           achievements: Array.isArray(row.achievements) ? row.achievements : [],
-          statistics: row.statistics && typeof row.statistics === "object" ? row.statistics : {
-            gamesPlayed: wins + losses + draws,
-            wins,
-            puzzlesSolved: 0,
-            puzzleAccuracy: 0,
-            lessonsCompleted: 0,
-            cleanGames: 0,
-            bossClears: 0
+          statistics: {
+            ...(row.statistics && typeof row.statistics === "object" ? row.statistics : {}),
+            gamesPlayed: metrics.gamesPlayed,
+            wins: metrics.wins,
+            losses: metrics.losses,
+            draws: metrics.draws,
+            puzzlesSolved: metrics.puzzlesSolved,
+            puzzleAccuracy: metrics.puzzleAccuracy,
+            lessonsCompleted: metrics.lessonsCompleted,
+            cleanGames: metrics.cleanGames,
+            bossClears: metrics.bossClears
           },
           updatedAt: row.updated_at || row.updatedAt || ""
         };
@@ -34061,14 +34104,48 @@
       if (!shell || setupSettingsPage.ready) return;
       setupSettingsPage.ready = true;
 
-      shell.querySelectorAll("[data-settings-tab]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const tab = button.dataset.settingsTab;
-          shell.querySelectorAll("[data-settings-tab]").forEach((item) => item.setAttribute("aria-selected", String(item === button)));
-          shell.querySelectorAll("[data-settings-page]").forEach((page) => page.classList.toggle("is-active", page.dataset.settingsPage === tab));
-          playAudioCue("menu");
+      const tablist = shell.querySelector("[role='tablist']");
+      const tabs = [...shell.querySelectorAll("[role='tab'][data-settings-tab]")];
+      const pages = [...shell.querySelectorAll("[role='tabpanel'][data-settings-page]")];
+      const orientationQuery = window.matchMedia?.("(max-width: 980px)");
+      const syncTabOrientation = () => tablist?.setAttribute("aria-orientation", orientationQuery?.matches ? "horizontal" : "vertical");
+      const activateTab = (button, { focus = false, playSound = true } = {}) => {
+        const tab = button?.dataset?.settingsTab;
+        if (!tabs.includes(button) || !tab) return;
+        tabs.forEach((item) => {
+          const selected = item === button;
+          item.setAttribute("aria-selected", String(selected));
+          item.tabIndex = selected ? 0 : -1;
         });
+        pages.forEach((page) => {
+          const active = page.dataset.settingsPage === tab;
+          page.classList.toggle("is-active", active);
+          page.hidden = !active;
+        });
+        if (focus) button.focus({ preventScroll: true });
+        if (playSound) playAudioCue("menu");
+      };
+      syncTabOrientation();
+      window.addEventListener("resize", syncTabOrientation, { passive: true });
+      tabs.forEach((button) => {
+        button.addEventListener("click", () => activateTab(button));
       });
+      tablist?.addEventListener("keydown", (event) => {
+        const current = tabs.indexOf(event.target.closest?.("[role='tab']"));
+        if (current < 0) return;
+        const vertical = tablist.getAttribute("aria-orientation") === "vertical";
+        let next = current;
+        if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = tabs.length - 1;
+        else if (vertical && event.key === "ArrowDown") next = (current + 1) % tabs.length;
+        else if (vertical && event.key === "ArrowUp") next = (current - 1 + tabs.length) % tabs.length;
+        else if (!vertical && event.key === "ArrowRight") next = (current + 1) % tabs.length;
+        else if (!vertical && event.key === "ArrowLeft") next = (current - 1 + tabs.length) % tabs.length;
+        else return;
+        event.preventDefault();
+        activateTab(tabs[next], { focus: true });
+      });
+      activateTab(tabs.find((button) => button.getAttribute("aria-selected") === "true") || tabs[0], { playSound: false });
 
       shell.addEventListener("input", (event) => {
         const field = event.target instanceof HTMLElement ? event.target : null;
@@ -37384,6 +37461,51 @@
       render();
     }
 
+    function getSocialNotificationDestination(notification = {}) {
+      const type = String(notification.type || "");
+      const entityCode = String(notification.entityCode || notification.entity_code || "").trim();
+      if (type === "friend_request") return { tab: "friends", href: "#friends", friendView: "requests" };
+      if (type === "friend_accepted" || type === "friend_declined") return { tab: "friends", href: "#friends", friendView: "all" };
+      if (type === "message_received" && !entityCode) return { tab: "friends", href: "#friends", friendView: "messages", entityId: String(notification.entityId || notification.entity_id || "") };
+      if (type === "gift_received") return { tab: "store", href: "#store", action: "giftInbox" };
+      if (type === "achievement_earned") return { tab: "login", href: "#login" };
+      if (["challenge_received", "challenge_accepted", "challenge_declined", "message_received", "game_invite", "spectator_joined"].includes(type)) {
+        return { tab: "friendChallenge", href: "#play?mode=friend" };
+      }
+      return { tab: "friends", href: "#friends", friendView: "notifications" };
+    }
+
+    function getDistinctUnreadSocialCount(notifications = [], incomingRequests = 0, unreadMessages = 0) {
+      const nonMessageUpdates = (Array.isArray(notifications) ? notifications : [])
+        // Friend requests and direct messages already have authoritative
+        // unread counters of their own; don't count their notification copies
+        // a second time in the combined navigation badge.
+        .filter((note) => !note?.readAt && !["friend_request", "message_received"].includes(note?.type)).length;
+      const safeCount = (value) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+      return nonMessageUpdates + safeCount(incomingRequests) + safeCount(unreadMessages);
+    }
+
+    function routeToSocialNotification(notification, route = (tab, href) => {
+      const link = [...document.querySelectorAll("[data-site-tab]")].find((item) => item.dataset.siteTab === tab && item.getAttribute("href") === href)
+        || [...document.querySelectorAll("[data-site-tab]")].find((item) => item.dataset.siteTab === tab);
+      if (link) link.click();
+      else window.location.hash = href;
+    }) {
+      const destination = getSocialNotificationDestination(notification);
+      if (destination.friendView) saveFriendHubState({ view: destination.friendView, search: "" });
+      route(destination.tab, destination.href);
+      if (destination.friendView === "messages" && destination.entityId) {
+        window.setTimeout(() => {
+          void refreshMessaging().then(() => {
+            const conversation = messagingHubState.conversations.find((item) => item.id === destination.entityId);
+            if (conversation) void selectMessagingConversation(conversation, { open: false });
+          });
+        }, 120);
+      }
+      if (destination.action === "giftInbox") window.setTimeout(() => document.getElementById("storeGiftOpen")?.click(), 120);
+      return destination;
+    }
+
     function socialNotificationLabel(notification = {}) {
       const isDirectMessage = notification.type === "message_received" && !String(notification.entityCode || notification.entity_code || "").trim();
       const labels = {
@@ -37643,11 +37765,35 @@
     }
 
     async function markSocialNotificationsRead(ids = null) {
-      const normalized = Array.isArray(ids) ? ids.map((id) => String(id || "")).filter(Boolean) : null;
-      socialNotificationState = socialNotificationState.map((row) => (!normalized || normalized.includes(row.id) ? { ...row, readAt: row.readAt || new Date().toISOString() } : row));
+      const normalized = Array.isArray(ids) ? [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))] : null;
+      if (Array.isArray(ids) && !normalized.length) return false;
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
+      if (!expectedUserId || !isApplicationAuthenticated()) return false;
+      const requestGeneration = socialNotificationGeneration;
       const provider = getFriendProvider();
-      try { await provider?.markSocialNotificationsRead?.(normalized); } catch {}
-      window.refreshSiteNotifications?.({ skipServer: true });
+      if (typeof provider?.markSocialNotificationsRead !== "function") return false;
+      try {
+        await provider.markSocialNotificationsRead(normalized);
+        if (requestGeneration !== socialNotificationGeneration
+          || !isApplicationAuthenticated()
+          || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return false;
+        const readAt = new Date().toISOString();
+        socialNotificationState = socialNotificationState.map((row) => (!normalized || normalized.includes(row.id) ? { ...row, readAt: row.readAt || readAt } : row));
+        window.refreshSiteNotifications?.({ skipServer: true });
+        if (!document.getElementById("friends")?.hidden) renderFriendsHub();
+        return true;
+      } catch {
+        if (requestGeneration === socialNotificationGeneration
+          && isApplicationAuthenticated()
+          && String(getFriendCurrentUserId?.() || "") === expectedUserId) {
+          const message = "Could not update notification. It remains unread; try again.";
+          const status = document.getElementById("friendsHubStatus");
+          if (status && !document.getElementById("friends")?.hidden) status.textContent = message;
+          const dialogStatus = document.getElementById("siteNotificationsStatus");
+          if (dialogStatus && !document.getElementById("siteNotificationsDialog")?.hidden) dialogStatus.textContent = message;
+        }
+        return false;
+      }
     }
 
     async function ensureSocialNotificationRealtime() {
@@ -38596,7 +38742,7 @@
       [["friendsHubRequestsBadge", incoming.length], ["friendsHubSentBadge", outgoing.length], ["friendsHubNotificationsBadge", socialNotificationState.filter((note) => !note.readAt).length], ["friendsHubActivityBadge", socialActivityState.length], ["friendsHubMessagesBadge", unreadMessages]].forEach(([id, count]) => { const el = document.getElementById(id); if (el) { el.textContent = count; el.hidden = !count; } });
       const navBadge = document.getElementById("friendsNavBadge");
       const mobileBadge = document.getElementById("friendsMobileBadge");
-      const unread = incoming.length + socialNotificationState.filter((note) => !note.readAt).length + unreadMessages;
+      const unread = getDistinctUnreadSocialCount(socialNotificationState, incoming.length, unreadMessages);
       [navBadge, mobileBadge].forEach((el) => { if (el) { el.textContent = unread; el.hidden = !unread; } });
       root.querySelectorAll("[data-friend-hub-view]").forEach((button) => { const selected = button.dataset.friendHubView === friendHubState.view; button.classList.toggle("is-active", selected); button.setAttribute("aria-selected", String(selected)); });
       const status = document.getElementById("friendsHubStatus");
@@ -38614,7 +38760,7 @@
         list.replaceChildren(...(socialActivityState.length ? socialActivityState.map(createSocialActivityCard) : [createBookText("div", "friends-hub-empty", "No activity yet. Solve a puzzle, complete a lesson, or start a game to build your feed.")]));
       } else if (friendHubState.view === "notifications" && !query) {
         const notes = socialNotificationState;
-          list.replaceChildren(...(notes.length ? notes.map((note) => { const copy = socialNotificationLabel(note); const button = createBookText("button", `friends-hub-notification${note.readAt ? " is-read" : ""}`, ""); button.type = "button"; button.append(createBookText("strong", "", copy.title), createBookText("small", "", copy.detail)); button.addEventListener("click", () => { void markSocialNotificationsRead([note.id]); if (note.type === "message_received" && !String(note.entityCode || "").trim()) { saveFriendHubState({ view: "messages", search: "" }); void refreshMessaging().then(() => { const conversation = messagingHubState.conversations.find((item) => item.id === note.entityId); if (conversation) void selectMessagingConversation(conversation, { open: false }); }); } else if (note.type === "message_received") { openTab("friendChallenge", "#play?mode=friend"); } }); return button; }) : [createBookText("div", "friends-hub-empty", "No notifications yet.")]));
+          list.replaceChildren(...(notes.length ? notes.map((note) => { const copy = socialNotificationLabel(note); const button = createBookText("button", `friends-hub-notification${note.readAt ? " is-read" : ""}`, ""); button.type = "button"; button.append(createBookText("strong", "", copy.title), createBookText("small", "", copy.detail)); button.addEventListener("click", () => { void markSocialNotificationsRead([note.id]); routeToSocialNotification(note); }); return button; }) : [createBookText("div", "friends-hub-empty", "No notifications yet.")]));
       } else {
         if (records.length) {
           patchKeyedChildren(
@@ -38794,12 +38940,7 @@
             detail: copy.detail,
             run: () => {
               void markSocialNotificationsRead([notification.id]);
-              if (notification.type === "gift_received") openTab("store", "#store");
-              else if (notification.type === "message_received" && !String(notification.entityCode || "").trim()) {
-                openTab("friends", "#friends");
-                window.setTimeout(() => { saveFriendHubState({ view: "messages", search: "" }); void refreshMessaging().then(() => { const conversation = messagingHubState.conversations.find((item) => item.id === notification.entityId); if (conversation) void selectMessagingConversation(conversation, { open: false }); }); }, 120);
-              } else if (notification.type === "message_received") openTab("friendChallenge", "#play?mode=friend");
-              else openTab("friendChallenge", "#play?mode=friend");
+              routeToSocialNotification(notification, openTab);
             }
           });
         });

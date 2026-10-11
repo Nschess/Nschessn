@@ -767,16 +767,16 @@
           <p class="section-intro">Tune sound, profile, gameplay, appearance, privacy, and notifications in one clean place. Changes save automatically.</p>
         </div>
         <div class="settings-shell" id="settingsShell">
-          <nav class="settings-sidebar" aria-label="Settings sections">
-            <button class="settings-tab" type="button" data-settings-tab="audio" aria-selected="true">Audio</button>
-            <button class="settings-tab" type="button" data-settings-tab="profile" aria-selected="false">Profile</button>
-            <button class="settings-tab" type="button" data-settings-tab="gameplay" aria-selected="false">Gameplay</button>
-            <button class="settings-tab" type="button" data-settings-tab="appearance" aria-selected="false">Appearance</button>
-            <button class="settings-tab" type="button" data-settings-tab="privacy" aria-selected="false">Privacy</button>
-            <button class="settings-tab" type="button" data-settings-tab="notifications" aria-selected="false">Notifications</button>
+          <nav class="settings-sidebar" id="settingsTablist" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+            <button class="settings-tab" id="settingsTabAudio" type="button" role="tab" aria-controls="settingsPageAudio" tabindex="0" data-settings-tab="audio" aria-selected="true">Audio</button>
+            <button class="settings-tab" id="settingsTabProfile" type="button" role="tab" aria-controls="settingsPageProfile" tabindex="-1" data-settings-tab="profile" aria-selected="false">Profile</button>
+            <button class="settings-tab" id="settingsTabGameplay" type="button" role="tab" aria-controls="settingsPageGameplay" tabindex="-1" data-settings-tab="gameplay" aria-selected="false">Gameplay</button>
+            <button class="settings-tab" id="settingsTabAppearance" type="button" role="tab" aria-controls="settingsPageAppearance" tabindex="-1" data-settings-tab="appearance" aria-selected="false">Appearance</button>
+            <button class="settings-tab" id="settingsTabPrivacy" type="button" role="tab" aria-controls="settingsPagePrivacy" tabindex="-1" data-settings-tab="privacy" aria-selected="false">Privacy</button>
+            <button class="settings-tab" id="settingsTabNotifications" type="button" role="tab" aria-controls="settingsPageNotifications" tabindex="-1" data-settings-tab="notifications" aria-selected="false">Notifications</button>
           </nav>
           <div class="settings-content">
-            <article class="settings-page is-active" data-settings-page="audio">
+            <article class="settings-page is-active" id="settingsPageAudio" role="tabpanel" aria-labelledby="settingsTabAudio" tabindex="0" data-settings-page="audio">
               <div class="settings-page-head">
                 <div><h3>Audio</h3><p>Fine-tune ambient, game, UI, puzzle, coach, and notification mixes.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -830,7 +830,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="profile">
+            <article class="settings-page" id="settingsPageProfile" role="tabpanel" aria-labelledby="settingsTabProfile" tabindex="0" data-settings-page="profile" hidden>
               <div class="settings-page-head">
                 <div><h3>Profile</h3><p>Customize how your player card, name, and account details appear.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -864,7 +864,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="gameplay">
+            <article class="settings-page" id="settingsPageGameplay" role="tabpanel" aria-labelledby="settingsTabGameplay" tabindex="0" data-settings-page="gameplay" hidden>
               <div class="settings-page-head">
                 <div><h3>Gameplay</h3><p>Keep the board readable, responsive, and beginner-friendly.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -888,7 +888,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="appearance">
+            <article class="settings-page" id="settingsPageAppearance" role="tabpanel" aria-labelledby="settingsTabAppearance" tabindex="0" data-settings-page="appearance" hidden>
               <div class="settings-page-head">
                 <div><h3>Appearance</h3><p>Make the whole site feel like your own training room.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -910,7 +910,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="privacy">
+            <article class="settings-page" id="settingsPagePrivacy" role="tabpanel" aria-labelledby="settingsTabPrivacy" tabindex="0" data-settings-page="privacy" hidden>
               <div class="settings-page-head">
                 <div><h3>Privacy</h3><p>Control what other players could see when community features are added.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -940,7 +940,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="notifications">
+            <article class="settings-page" id="settingsPageNotifications" role="tabpanel" aria-labelledby="settingsTabNotifications" tabindex="0" data-settings-page="notifications" hidden>
               <div class="settings-page-head">
                 <div><h3>Notifications</h3><p>Choose reminders that help without pressure.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
