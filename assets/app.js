@@ -16960,6 +16960,9 @@
     let messagingRealtimeUnsubscribe = null;
     let messagingRealtimeSubscribing = false;
     let messagingRefreshPromise = null;
+    let messagingRefreshAccountId = "";
+    let messagingRequestGeneration = 0;
+    let messagingConversationRequest = 0;
     let messagingTypingTimer = 0;
     let messagingTypingStopTimer = 0;
     let messagingRemoteTypingTimer = 0;
@@ -16995,10 +16998,14 @@
     let publicProfileRequest = 0;
     let socialNotificationState = [];
     let socialNotificationRefreshPromise = null;
+    let socialNotificationRefreshAccountId = "";
+    let socialNotificationGeneration = 0;
     let socialNotificationUnsubscribe = null;
     let socialNotificationSubscribing = false;
     let socialActivityState = [];
     let socialActivityRefreshPromise = null;
+    let socialActivityRefreshAccountId = "";
+    let socialActivityGeneration = 0;
     let socialActivityUnsubscribe = null;
     let socialActivitySubscribing = false;
     let serverPrivacyHydratedFor = "";
@@ -17028,6 +17035,7 @@
     let friendIncomingNoticeCode = "";
     let friendUiAbortController = null;
     const friendActionLocks = new Map();
+    const friendRequestActionLocks = new Map();
     let coachPremove = null;
     let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, subscriptionGeneration: 0, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0, renderSignature: "", lastPresencePulse: 0, lastPresenceConnected: null };
     let chessRulesPromise = null;
@@ -17360,7 +17368,41 @@
 
     function setFriendConnectionState(state = "idle", message = "") {
       friendConnectionState = { state, message };
+      updateFriendsHubRealtimeBadge();
       renderFriendConnectionStatus();
+    }
+
+    function updateFriendsHubRealtimeBadge() {
+      const badge = document.getElementById("friendsHubLiveStatus");
+      if (!badge) return;
+      const label = !isApplicationAuthenticated()
+        ? "Sign in for live presence"
+        : friendRealtimeReady
+          ? "Live updates connected"
+          : friendConnectionState.state === "reconnecting"
+            ? "Reconnecting"
+            : friendNetworkSubscribing
+              ? "Connecting"
+              : "Live updates unavailable";
+      const dot = badge.querySelector(".friend-status-dot");
+      if (dot) dot.classList.toggle("is-offline", !friendRealtimeReady);
+      badge.classList.toggle("is-offline", !friendRealtimeReady);
+      const text = badge.querySelector("[data-friends-live-label]");
+      if (text) text.textContent = label;
+      badge.setAttribute("aria-label", label);
+      badge.title = label;
+      const status = document.getElementById("friendsHubStatus");
+      if (status) {
+        status.textContent = !isApplicationAuthenticated()
+          ? "Sign in to connect your Friends network."
+          : friendRealtimeReady
+            ? `${friendNetworkState.directory.filter((friend) => friend.requestStatus === "accepted" && friend.online).length} online · live updates connected.`
+            : friendConnectionState.state === "reconnecting"
+              ? "Reconnecting to live presence."
+              : friendNetworkSubscribing
+                ? "Connecting to live presence."
+                : "Live presence unavailable.";
+      }
     }
 
     function getFriendConnectionStatus(state = friendChallengeState || readFriendChallengeState()) {
@@ -25772,6 +25814,7 @@
       if (!friendNetworkSubscriptionUserId) return;
       friendNetworkSubscribing = true;
       friendRealtimeReady = false;
+      updateFriendsHubRealtimeBadge();
       Promise.resolve(provider.subscribeFriendChallenges((event) => handleFriendRealtimeEvent(event, generation)))
         .then((unsubscribe) => {
           if (generation !== friendNetworkSubscriptionGeneration) {
@@ -25816,21 +25859,59 @@
 
     async function setFriendRequest(friend, action) {
       const provider = getFriendProvider();
-      if (!provider || !friend?.id) {
+      const accountId = String(getFriendCurrentUserId() || "");
+      if (!provider || !friend?.id || !isApplicationAuthenticated() || !accountId) {
         setFriendChallengeStatus("Sign in to manage friends.");
         return;
       }
-      try {
-        if (action === "send") await provider.sendFriendRequest(friend.id);
-        if (action === "accept") await provider.respondFriendRequest(friend.requestId, true);
-        if (action === "decline") await provider.respondFriendRequest(friend.requestId, false);
-        if (action === "cancel") await provider.cancelFriendRequest(friend.requestId);
-        if (action === "remove") await provider.removeFriend(friend.id);
-        await refreshFriendNetwork();
-        if (action === "send") setFriendChallengeStatus(`Friend request sent to ${friend.name}.`);
-      } catch (error) {
-        setFriendChallengeStatus(error?.message || "That friend action did not finish.");
-      }
+      const targetId = String(friend.requestId || friend.id);
+      const lockKey = `friendship:${accountId}:${targetId}`;
+      return runFriendRequestAction(lockKey, async () => {
+        try {
+          if (action === "send") await provider.sendFriendRequest(friend.id);
+          if (action === "accept") await provider.respondFriendRequest(friend.requestId, true);
+          if (action === "decline") await provider.respondFriendRequest(friend.requestId, false);
+          if (action === "cancel") await provider.cancelFriendRequest(friend.requestId);
+          if (action === "remove") await provider.removeFriend(friend.id);
+          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId() || "") !== accountId) return;
+          await refreshFriendNetwork();
+          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId() || "") !== accountId) return;
+          const messages = {
+            send: `Friend request sent to ${friend.name}.`,
+            accept: `You and ${friend.name} are now friends.`,
+            decline: `Friend request from ${friend.name} declined.`,
+            cancel: `Friend request to ${friend.name} cancelled.`,
+            remove: `${friend.name} removed from your friends.`
+          };
+          if (messages[action]) setFriendChallengeStatus(messages[action]);
+        } catch (error) {
+          if (isApplicationAuthenticated() && String(getFriendCurrentUserId() || "") === accountId) {
+            setFriendChallengeStatus(error?.message || "That friend action did not finish.");
+          }
+        }
+      });
+    }
+
+    function runFriendRequestAction(key, task) {
+      const active = friendRequestActionLocks.get(key);
+      if (active) return active;
+      const request = Promise.resolve().then(task);
+      friendRequestActionLocks.set(key, request);
+      request.finally(() => {
+        if (friendRequestActionLocks.get(key) === request) friendRequestActionLocks.delete(key);
+      }).catch(() => {});
+      return request;
+    }
+
+    function invokeFriendRequestAction(button, friend, action) {
+      if (!button || button.disabled) return;
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      void setFriendRequest(friend, action).finally(() => {
+        if (!button.isConnected) return;
+        button.removeAttribute("aria-busy");
+        button.disabled = action === "send" && friend.requestDirection === "outgoing";
+      });
     }
 
     function createFriendCard(friend, mode = "search") {
@@ -25858,22 +25939,22 @@
         const challenge = createBookText("button", "button", "Challenge");
         add.type = "button";
         challenge.type = "button";
-        add.addEventListener("click", () => void setFriendRequest(friend, "send"));
+        add.addEventListener("click", () => invokeFriendRequestAction(add, friend, "send"));
         challenge.addEventListener("click", () => void sendFriendChallenge(friend));
         actions.append(challenge, add);
       } else if (mode === "outgoing") {
         actions.append(createBookText("span", "badge", "Pending"));
         const cancel = createBookText("button", "button secondary", "Cancel");
         cancel.type = "button";
-        cancel.addEventListener("click", () => void setFriendRequest(friend, "cancel"));
+        cancel.addEventListener("click", () => invokeFriendRequestAction(cancel, friend, "cancel"));
         actions.append(cancel);
       } else if (mode === "incoming") {
         const accept = createBookText("button", "button", "Accept");
         const decline = createBookText("button", "button secondary", "Decline");
         accept.type = "button";
         decline.type = "button";
-        accept.addEventListener("click", () => void setFriendRequest(friend, "accept"));
-        decline.addEventListener("click", () => void setFriendRequest(friend, "decline"));
+        accept.addEventListener("click", () => invokeFriendRequestAction(accept, friend, "accept"));
+        decline.addEventListener("click", () => invokeFriendRequestAction(decline, friend, "decline"));
         actions.append(accept, decline);
       } else {
         const challenge = createBookText("button", "button", "Challenge");
@@ -25881,7 +25962,7 @@
         challenge.type = "button";
         remove.type = "button";
         challenge.addEventListener("click", () => void sendFriendChallenge(friend));
-        remove.addEventListener("click", () => void setFriendRequest(friend, "remove"));
+        remove.addEventListener("click", () => invokeFriendRequestAction(remove, friend, "remove"));
         actions.append(challenge, remove);
       }
       card.append(avatar, main, dot, actions);
@@ -25909,7 +25990,7 @@
           patchKeyedChildren(results, matches, (friend) => friend.id, (friend) => createFriendCard(friend, "search"), (friend) => JSON.stringify([friend.id, friend.name, friend.title, friend.rating, friend.online, friend.requestStatus, friend.requestDirection]));
         } else {
           const emptyKey = "friend-search-empty";
-          const empty = results.firstElementChild?.dataset?.renderKey === emptyKey ? results.firstElementChild : (() => { const node = createBookText("p", "", !provider ? "Sign in to search registered players." : query ? "No registered player matched that search." : "Type a registered username to find players."); node.dataset.renderKey = emptyKey; return node; })();
+          const empty = results.firstElementChild?.dataset?.renderKey === emptyKey ? results.firstElementChild : (() => { const node = createBookText("p", "", !provider ? "Sign in to search registered players." : query.length === 1 ? "Enter at least 2 characters to search." : query ? "No registered player matched that search." : "Type a registered username to find players."); node.dataset.renderKey = emptyKey; return node; })();
           results.replaceChildren(empty);
         }
       }
@@ -27485,6 +27566,7 @@
       window.clearTimeout(friendNetworkRefreshTimer);
       window.clearTimeout(friendRealtimeReconnectTimer);
       window.clearTimeout(friendSearchTimer);
+      window.clearTimeout(friendHubSearchTimer);
       friendNetworkTimer = 0;
       friendChallengeSyncTimer = 0;
       friendNetworkRefreshTimer = 0;
@@ -27492,6 +27574,7 @@
       friendRealtimeReconnectTimer = 0;
       friendRealtimeReconnectAttempts = 0;
       friendSearchTimer = 0;
+      friendHubSearchTimer = 0;
       friendSearchRequest += 1;
       friendNetworkState.search = [];
       friendHubRenderSignature = "";
@@ -27512,6 +27595,7 @@
       friendNetworkUnsubscribe = null;
       friendNetworkSubscribing = false;
       friendRealtimeReady = false;
+      updateFriendsHubRealtimeBadge();
       stopSocialPresenceRealtime();
       try { void getFriendProvider()?.stopSocialPresence?.(); } catch {}
       stopMessagingRealtime();
@@ -27893,6 +27977,9 @@
         const query = String(event.target?.value || "");
         writeJsonStorage(friendDirectoryStorageKey, { ...state, lastSearch: query });
         window.clearTimeout(friendSearchTimer);
+        friendSearchRequest += 1;
+        friendNetworkState.search = [];
+        renderFriendDirectory();
         friendSearchTimer = window.setTimeout(() => void searchFriendPlayers(query), 220);
       });
       listen("friendStart", "click", () => {
@@ -37227,7 +37314,7 @@
           return `Last seen ${minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`}`;
         }
       }
-      return labels[friend.presenceStatus] || (friend.online ? "Online" : "Offline");
+      return labels[friend.presenceStatus] || (friend.presenceConfirmed ? (friend.online ? "Online" : "Offline") : labels.unknown);
     }
 
     function friendPresenceClass(friend = {}) {
@@ -37359,19 +37446,29 @@
     async function refreshSocialActivity({ rerender = true } = {}) {
       const provider = getFriendProvider();
       if (!provider?.getSocialActivityFeed) return [];
-      if (socialActivityRefreshPromise) return socialActivityRefreshPromise;
       const expectedUserId = String(getFriendCurrentUserId?.() || "");
-      socialActivityRefreshPromise = provider.getSocialActivityFeed(40)
+      if (!isApplicationAuthenticated() || !expectedUserId) return [];
+      if (socialActivityRefreshPromise && socialActivityRefreshAccountId === expectedUserId) return socialActivityRefreshPromise;
+      const requestGeneration = socialActivityGeneration;
+      let request;
+      request = Promise.resolve().then(() => provider.getSocialActivityFeed(40))
         .then((rows) => {
-          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialActivityState;
+          if (requestGeneration !== socialActivityGeneration || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialActivityState;
           socialActivityState = (Array.isArray(rows) ? rows : []).map(normalizeSocialActivity).filter((row) => row.id && row.type);
           if (rerender) window.refreshSiteNotifications?.({ skipServer: true });
           if (friendHubState.view !== "messages") renderFriendsHub();
           return socialActivityState;
         })
         .catch(() => [])
-        .finally(() => { socialActivityRefreshPromise = null; });
-      return socialActivityRefreshPromise;
+        .finally(() => {
+          if (socialActivityRefreshPromise === request) {
+            socialActivityRefreshPromise = null;
+            socialActivityRefreshAccountId = "";
+          }
+        });
+      socialActivityRefreshAccountId = expectedUserId;
+      socialActivityRefreshPromise = request;
+      return request;
     }
 
     function publishLearningActivity(activityType, dedupeKey, payload = {}) {
@@ -37384,25 +37481,37 @@
 
     async function ensureSocialActivityRealtime() {
       const provider = getFriendProvider();
-      if (!provider?.subscribeSocialActivity || socialActivityUnsubscribe || socialActivitySubscribing) return;
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
+      if (!provider?.subscribeSocialActivity || !isApplicationAuthenticated() || !expectedUserId || socialActivityUnsubscribe || socialActivitySubscribing) return;
+      const requestGeneration = socialActivityGeneration;
       socialActivitySubscribing = true;
       try {
-        socialActivityUnsubscribe = await provider.subscribeSocialActivity(() => { void refreshSocialActivity(); });
+        const unsubscribe = await provider.subscribeSocialActivity(() => {
+          if (requestGeneration === socialActivityGeneration && isApplicationAuthenticated() && String(getFriendCurrentUserId?.() || "") === expectedUserId) void refreshSocialActivity();
+        });
+        if (requestGeneration !== socialActivityGeneration || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) {
+          try { unsubscribe?.(); } catch {}
+          return;
+        }
+        socialActivityUnsubscribe = typeof unsubscribe === "function" ? unsubscribe : null;
       } catch {
-        socialActivityUnsubscribe = null;
+        if (requestGeneration === socialActivityGeneration) socialActivityUnsubscribe = null;
       } finally {
-        socialActivitySubscribing = false;
+        if (requestGeneration === socialActivityGeneration) socialActivitySubscribing = false;
       }
     }
 
     async function refreshSocialNotifications({ rerender = true } = {}) {
       const provider = getFriendProvider();
       if (!provider?.getSocialNotifications) return [];
-      if (socialNotificationRefreshPromise) return socialNotificationRefreshPromise;
       const expectedUserId = String(getFriendCurrentUserId?.() || "");
-      socialNotificationRefreshPromise = provider.getSocialNotifications(40)
+      if (!isApplicationAuthenticated() || !expectedUserId) return [];
+      if (socialNotificationRefreshPromise && socialNotificationRefreshAccountId === expectedUserId) return socialNotificationRefreshPromise;
+      const requestGeneration = socialNotificationGeneration;
+      let request;
+      request = Promise.resolve().then(() => provider.getSocialNotifications(40))
         .then((rows) => {
-          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialNotificationState;
+          if (requestGeneration !== socialNotificationGeneration || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialNotificationState;
           socialNotificationState = (Array.isArray(rows) ? rows : []).map((row) => ({
             id: String(row?.id || ""),
             type: String(row?.type || ""),
@@ -37421,8 +37530,15 @@
           return socialNotificationState;
         })
         .catch(() => [])
-        .finally(() => { socialNotificationRefreshPromise = null; });
-      return socialNotificationRefreshPromise;
+        .finally(() => {
+          if (socialNotificationRefreshPromise === request) {
+            socialNotificationRefreshPromise = null;
+            socialNotificationRefreshAccountId = "";
+          }
+        });
+      socialNotificationRefreshAccountId = expectedUserId;
+      socialNotificationRefreshPromise = request;
+      return request;
     }
 
     async function markSocialNotificationsRead(ids = null) {
@@ -37435,14 +37551,23 @@
 
     async function ensureSocialNotificationRealtime() {
       const provider = getFriendProvider();
-      if (!provider?.subscribeSocialNotifications || socialNotificationUnsubscribe || socialNotificationSubscribing) return;
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
+      if (!provider?.subscribeSocialNotifications || !isApplicationAuthenticated() || !expectedUserId || socialNotificationUnsubscribe || socialNotificationSubscribing) return;
+      const requestGeneration = socialNotificationGeneration;
       socialNotificationSubscribing = true;
       try {
-        socialNotificationUnsubscribe = await provider.subscribeSocialNotifications(() => { void refreshSocialNotifications(); });
+        const unsubscribe = await provider.subscribeSocialNotifications(() => {
+          if (requestGeneration === socialNotificationGeneration && isApplicationAuthenticated() && String(getFriendCurrentUserId?.() || "") === expectedUserId) void refreshSocialNotifications();
+        });
+        if (requestGeneration !== socialNotificationGeneration || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) {
+          try { unsubscribe?.(); } catch {}
+          return;
+        }
+        socialNotificationUnsubscribe = typeof unsubscribe === "function" ? unsubscribe : null;
       } catch {
-        socialNotificationUnsubscribe = null;
+        if (requestGeneration === socialNotificationGeneration) socialNotificationUnsubscribe = null;
       } finally {
-        socialNotificationSubscribing = false;
+        if (requestGeneration === socialNotificationGeneration) socialNotificationSubscribing = false;
       }
     }
 
@@ -37568,8 +37693,8 @@
       const block = document.getElementById("friendsHubProfileBlock");
       const report = document.getElementById("friendsHubProfileReport");
       const isFriend = friend.requestStatus === "accepted";
-      if (add) { add.hidden = isOwner || isFriend || friend.requestDirection === "outgoing"; add.textContent = friend.requestDirection === "outgoing" ? "Request pending" : "Add Friend"; add.disabled = friend.requestDirection === "outgoing"; add.onclick = () => void setFriendRequest(friend, "send"); }
-      if (remove) { remove.hidden = !isFriend; remove.onclick = () => void setFriendRequest(friend, "remove"); }
+      if (add) { add.hidden = isOwner || isFriend || friend.requestDirection === "outgoing"; add.textContent = friend.requestDirection === "outgoing" ? "Request pending" : "Add Friend"; add.disabled = friend.requestDirection === "outgoing"; add.onclick = () => invokeFriendRequestAction(add, friend, "send"); }
+      if (remove) { remove.hidden = !isFriend; remove.onclick = () => invokeFriendRequestAction(remove, friend, "remove"); }
       if (watch) { watch.hidden = !friend.inGame; watch.onclick = async () => { try { const code = await getFriendProvider()?.getActiveFriendGame?.(friend.id); if (code) await openFriendSpectator(code); else document.getElementById("friendsHubStatus").textContent = "That game is no longer available to watch."; } catch (error) { document.getElementById("friendsHubStatus").textContent = error?.message || "Spectating is unavailable."; } }; }
       if (block) { block.hidden = isOwner; block.onclick = () => { blockNschessUser({ id: friend.id, name: friend.name }); setFriendHubProfile(null); renderFriendsHub(); }; }
       if (report) { report.hidden = isOwner; report.onclick = () => openSafetyReport({ userId: friend.id, username: friend.name, contextType: "profile", contextId: friend.id }); }
@@ -37694,16 +37819,16 @@
       if (mode === "incoming") {
         const accept = createBookText("button", "button", "Accept");
         accept.type = "button";
-        accept.addEventListener("click", () => void setFriendRequest(friend, "accept"));
+        accept.addEventListener("click", () => invokeFriendRequestAction(accept, friend, "accept"));
         const decline = createBookText("button", "button secondary", "Decline");
         decline.type = "button";
-        decline.addEventListener("click", () => void setFriendRequest(friend, "decline"));
+        decline.addEventListener("click", () => invokeFriendRequestAction(decline, friend, "decline"));
         actions.append(accept, decline);
       } else if (mode === "outgoing") {
         actions.append(createBookText("span", "badge", "Pending"));
         const cancel = createBookText("button", "button secondary", "Cancel");
         cancel.type = "button";
-        cancel.addEventListener("click", () => void setFriendRequest(friend, "cancel"));
+        cancel.addEventListener("click", () => invokeFriendRequestAction(cancel, friend, "cancel"));
         actions.append(cancel);
       } else if (mode === "search" || mode === "friend") {
         const challenge = createBookText("button", "button", "Challenge");
@@ -37862,13 +37987,18 @@
 
     async function retryMessagingMessage(message) {
       const provider = getFriendProvider();
-      if (!provider?.sendDirectMessage) return;
+      const accountId = String(getFriendCurrentUserId() || "");
+      if (!provider?.sendDirectMessage || !isApplicationAuthenticated() || !accountId) return;
+      const requestGeneration = messagingRequestGeneration;
+      const conversationId = String(message?.conversation_id || "");
+      if (!conversationId || conversationId !== messagingHubState.conversationId) return;
       const pending = normalizeDirectMessage({ ...message, status: "sending" });
       pending.localId = message.localId || message.id;
       messagingHubState.pending.set(pending.localId, pending);
       patchMessagingMessageNode(pending);
       try {
         const saved = normalizeDirectMessage(await provider.sendDirectMessage(pending.conversation_id, pending.body));
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
         if (!saved.id) throw new Error("Message acknowledgement was incomplete. Try again.");
         saved.status = "sent";
         const settled = { ...saved, localId: pending.localId };
@@ -37876,6 +38006,7 @@
         patchMessagingMessageNode(settled);
         messagingHubState.pending.delete(pending.localId);
       } catch {
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
         pending.status = "failed";
         messagingHubState.pending.set(pending.localId, pending);
         messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === pending.localId ? pending : item);
@@ -37883,24 +38014,47 @@
       }
     }
 
+    function isCurrentMessagingContext(requestGeneration, expectedUserId, conversationId = "") {
+      return requestGeneration === messagingRequestGeneration
+        && isApplicationAuthenticated()
+        && String(getFriendCurrentUserId() || "") === String(expectedUserId || "")
+        && (!conversationId || String(messagingHubState.conversationId || "") === String(conversationId));
+    }
+
     async function refreshMessaging({ selectFirst = false } = {}) {
       const provider = getFriendProvider();
       if (!provider?.listConversations) return [];
-      if (messagingRefreshPromise) return messagingRefreshPromise;
-      messagingRefreshPromise = provider.listConversations(40).then(async (rows) => {
+      const expectedUserId = String(getFriendCurrentUserId() || "");
+      if (!isApplicationAuthenticated() || !expectedUserId) return [];
+      if (messagingRefreshPromise && messagingRefreshAccountId === expectedUserId) return messagingRefreshPromise;
+      const requestGeneration = messagingRequestGeneration;
+      let request;
+      request = Promise.resolve().then(() => provider.listConversations(40)).then(async (rows) => {
+        if (!isCurrentMessagingContext(requestGeneration, expectedUserId)) return messagingHubState.conversations;
         messagingHubState.conversations = (Array.isArray(rows) ? rows : []).map(normalizeConversation).filter((item) => item.id && item.participantId);
         if (selectFirst && !messagingHubState.conversationId) messagingHubState.conversationId = messagingHubState.conversations[0]?.id || "";
         renderFriendsHub();
         const selected = messagingHubState.conversations.find((item) => item.id === messagingHubState.conversationId);
-        if (selectFirst && selected) await selectMessagingConversation(selected, { open: false });
+        if (selectFirst && friendHubState.view === "messages" && selected) await selectMessagingConversation(selected, { open: false });
         return messagingHubState.conversations;
-      }).catch(() => []).finally(() => { messagingRefreshPromise = null; });
-      return messagingRefreshPromise;
+      }).catch(() => []).finally(() => {
+        if (messagingRefreshPromise === request) {
+          messagingRefreshPromise = null;
+          messagingRefreshAccountId = "";
+        }
+      });
+      messagingRefreshAccountId = expectedUserId;
+      messagingRefreshPromise = request;
+      return request;
     }
 
     async function selectMessagingConversation(conversation, { open = true } = {}) {
       if (!conversation?.id) return;
       const provider = getFriendProvider();
+      const accountId = String(getFriendCurrentUserId() || "");
+      if (!isApplicationAuthenticated() || !accountId) return;
+      const requestGeneration = messagingRequestGeneration;
+      const conversationRequest = ++messagingConversationRequest;
       const previousConversationId = messagingHubState.conversationId;
       if (previousConversationId && previousConversationId !== conversation.id) {
         const stopPreviousTyping = provider?.setConversationTyping?.(previousConversationId, false);
@@ -37917,20 +38071,26 @@
       if (!provider?.getConversationMessages) return renderFriendsHub();
       try {
         const rows = await provider.getConversationMessages(conversation.id, null, 80);
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.messages = (Array.isArray(rows) ? rows : []).reverse();
         messagingHubState.olderCursor = messagingHubState.messages[0]?.created_at || messagingHubState.messages[0]?.createdAt || null;
         messagingHubState.hasOlder = Array.isArray(rows) && rows.length >= 80;
         await provider.markConversationRead?.(conversation.id);
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.conversations = messagingHubState.conversations.map((item) => item.id === conversation.id ? { ...item, unread: 0 } : item);
       } catch {
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.messages = [];
       }
       try {
         const typingRows = await provider.getConversationTyping?.(conversation.id);
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.typing = (Array.isArray(typingRows) ? typingRows : []).filter((row) => row?.is_typing && Date.now() - Date.parse(row.updated_at || "") < 12000);
       } catch {
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.typing = [];
       }
+      if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
       renderFriendsHub();
     }
 
@@ -38024,11 +38184,17 @@
         older.hidden = !active || !messagingHubState.hasOlder;
         older.onclick = async () => {
           if (!active || !messagingHubState.olderCursor) return;
+          const accountId = String(getFriendCurrentUserId() || "");
+          const requestGeneration = messagingRequestGeneration;
+          const conversationId = String(active.id);
+          const cursor = messagingHubState.olderCursor;
+          if (!isApplicationAuthenticated() || !accountId) return;
           older.disabled = true;
           try {
             const previousHeight = messageList?.scrollHeight || 0;
             const previousTop = messageList?.scrollTop || 0;
-            const rows = await getFriendProvider()?.getConversationMessages?.(active.id, messagingHubState.olderCursor, 80);
+            const rows = await getFriendProvider()?.getConversationMessages?.(conversationId, cursor, 80);
+            if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
             const next = (Array.isArray(rows) ? rows : []).reverse();
             messagingHubState.messages = [...next, ...messagingHubState.messages];
             messagingHubState.olderCursor = next[0]?.created_at || next[0]?.createdAt || messagingHubState.olderCursor;
@@ -38036,7 +38202,7 @@
             renderMessagingPanel();
             if (messageList) messageList.scrollTop = messageList.scrollHeight - previousHeight + previousTop;
           } catch {}
-          finally { older.disabled = false; }
+          finally { if (older.isConnected) older.disabled = false; }
         };
       }
       const newMessages = document.getElementById("friendsHubNewMessages");
@@ -38073,11 +38239,14 @@
     async function recoverMessagingConversation() {
       const provider = getFriendProvider();
       const conversationId = messagingHubState.conversationId;
-      if (!provider?.getConversationMessagesSince || !conversationId) return;
+      const accountId = String(getFriendCurrentUserId() || "");
+      const requestGeneration = messagingRequestGeneration;
+      if (!provider?.getConversationMessagesSince || !conversationId || !isApplicationAuthenticated() || !accountId) return;
       const persisted = messagingHubState.messages.filter((message) => message.id && message.id !== message.localId);
       const latest = persisted[persisted.length - 1]?.created_at || null;
       try {
         const rows = await provider.getConversationMessagesSince(conversationId, latest, 200);
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
         (Array.isArray(rows) ? rows : []).forEach((row) => {
           const message = normalizeDirectMessage(row);
           const isOpen = message.conversation_id === messagingHubState.conversationId && !document.getElementById("friendsHubConversation")?.hidden;
@@ -38091,7 +38260,8 @@
       }
     }
 
-    async function handleMessagingRealtimeEvent(event = {}) {
+    async function handleMessagingRealtimeEvent(event = {}, requestGeneration = messagingRequestGeneration, expectedUserId = getFriendCurrentUserId()) {
+      if (!isCurrentMessagingContext(requestGeneration, expectedUserId)) return;
       if (event.type === "status") {
         if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(event.status)) {
           messagingHubState.reconnecting = true;
@@ -38105,7 +38275,7 @@
             try { messagingRealtimeUnsubscribe?.(); } catch {}
             messagingRealtimeUnsubscribe = null;
             messagingRealtimeSubscribing = false;
-            void ensureMessagingRealtime();
+            if (isCurrentMessagingContext(requestGeneration, expectedUserId)) void ensureMessagingRealtime();
           }, 1200);
         } else if (event.status === "SUBSCRIBED") {
           messagingHubState.reconnecting = false;
@@ -38169,18 +38339,35 @@
 
     async function ensureMessagingRealtime() {
       const provider = getFriendProvider();
-      if (!provider?.subscribeMessaging || messagingRealtimeUnsubscribe || messagingRealtimeSubscribing) return;
+      const accountId = String(getFriendCurrentUserId() || "");
+      if (!provider?.subscribeMessaging || !isApplicationAuthenticated() || !accountId || messagingRealtimeUnsubscribe || messagingRealtimeSubscribing) return;
+      const requestGeneration = messagingRequestGeneration;
       messagingRealtimeSubscribing = true;
-      try { messagingRealtimeUnsubscribe = await provider.subscribeMessaging(handleMessagingRealtimeEvent); }
+      try {
+        const unsubscribe = await provider.subscribeMessaging((event) => {
+          if (isCurrentMessagingContext(requestGeneration, accountId)) void handleMessagingRealtimeEvent(event, requestGeneration, accountId);
+        });
+        if (!isCurrentMessagingContext(requestGeneration, accountId)) {
+          try { unsubscribe?.(); } catch {}
+          return;
+        }
+        messagingRealtimeUnsubscribe = typeof unsubscribe === "function" ? unsubscribe : null;
+      }
       catch {
+        if (!isCurrentMessagingContext(requestGeneration, accountId)) return;
         messagingRealtimeUnsubscribe = null;
         window.clearTimeout(messagingReconnectTimer);
-        messagingReconnectTimer = window.setTimeout(() => { messagingReconnectTimer = 0; void ensureMessagingRealtime(); }, 1500);
+        messagingReconnectTimer = window.setTimeout(() => {
+          messagingReconnectTimer = 0;
+          if (isCurrentMessagingContext(requestGeneration, accountId)) void ensureMessagingRealtime();
+        }, 1500);
       }
-      finally { messagingRealtimeSubscribing = false; }
+      finally { if (requestGeneration === messagingRequestGeneration) messagingRealtimeSubscribing = false; }
     }
 
     function stopMessagingRealtime() {
+      messagingRequestGeneration += 1;
+      messagingConversationRequest += 1;
       try { messagingRealtimeUnsubscribe?.(); } catch {}
       window.clearTimeout(messagingReconnectTimer);
       window.clearTimeout(messagingTypingTimer);
@@ -38189,6 +38376,8 @@
       messagingLastTypingSentAt = 0;
       messagingRealtimeUnsubscribe = null;
       messagingRealtimeSubscribing = false;
+      messagingRefreshPromise = null;
+      messagingRefreshAccountId = "";
       messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false, readAtByConversation: {}, pending: new Map(), reconnecting: false };
     }
 
@@ -38201,6 +38390,9 @@
         event.preventDefault();
         const text = String(input?.value || "").trim();
         if (!text || !messagingHubState.conversationId) return;
+        const accountId = String(getFriendCurrentUserId() || "");
+        const requestGeneration = messagingRequestGeneration;
+        if (!isApplicationAuthenticated() || !accountId) return;
         const conversationId = messagingHubState.conversationId;
         const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const optimistic = normalizeDirectMessage({ localId, id: localId, conversation_id: conversationId, sender_id: getFriendCurrentUserId(), sender_username: getFriendProvider()?.getCachedAccount?.()?.username || "You", body: text, created_at: new Date().toISOString(), status: "sending" });
@@ -38210,12 +38402,14 @@
         input.value = "";
         try {
           const saved = normalizeDirectMessage(await getFriendProvider()?.sendDirectMessage?.(conversationId, text));
+          if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
           if (!saved.id) throw new Error("Message acknowledgement was incomplete. Try again.");
           saved.status = "sent";
           messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === localId || item.id === localId ? { ...saved, localId } : item);
           messagingHubState.pending.delete(localId);
           patchMessagingMessageNode({ ...saved, localId });
         } catch (error) {
+          if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
           optimistic.status = "failed";
           messagingHubState.pending.set(localId, optimistic);
           messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === localId ? optimistic : item);
@@ -38249,6 +38443,7 @@
       const root = document.getElementById("friends");
       const list = document.getElementById("friendsHubList");
       if (!root || !list) return;
+      updateFriendsHubRealtimeBadge();
       const conversationPanel = document.getElementById("friendsHubConversation");
       if (conversationPanel) conversationPanel.hidden = friendHubState.view !== "messages";
       const directory = (friendNetworkState.directory || []).filter((friend) => !isNschessUserBlocked(friend.id, friend.name));
@@ -38304,7 +38499,12 @@
       [navBadge, mobileBadge].forEach((el) => { if (el) { el.textContent = unread; el.hidden = !unread; } });
       root.querySelectorAll("[data-friend-hub-view]").forEach((button) => { const selected = button.dataset.friendHubView === friendHubState.view; button.classList.toggle("is-active", selected); button.setAttribute("aria-selected", String(selected)); });
       const status = document.getElementById("friendsHubStatus");
-      if (status) status.textContent = getFriendProvider() ? `${accepted.filter((friend) => friend.online).length} online · updates arrive live` : "Sign in to connect your Friends network.";
+      if (status) {
+        const onlineCount = accepted.filter((friend) => friend.online).length;
+        status.textContent = !isApplicationAuthenticated()
+          ? "Sign in to connect your Friends network."
+          : `${onlineCount} online · ${friendRealtimeReady ? "live updates connected" : friendConnectionState.state === "reconnecting" ? "reconnecting to live updates" : "live updates unavailable"}.`;
+      }
       if (friendHubState.view === "messages") {
         renderMessagingPanel();
         return;
@@ -38335,7 +38535,7 @@
             node.className = "friends-hub-empty";
             node.append(
               createBookText("strong", "", guest ? "Connect to find players" : query ? "No players found" : friendHubState.view === "online" ? "No friends are online" : "Nothing here yet"),
-              createBookText("span", "", guest ? "Sign in to search, message, and challenge players." : query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")
+              createBookText("span", "", guest ? "Sign in to search, message, and challenge players." : query.length === 1 ? "Enter at least 2 characters to search." : query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")
             );
             if (guest) {
               const signIn = document.createElement("a");
@@ -38357,9 +38557,24 @@
       if (selected) setFriendHubProfile(selected);
     }
 
+    function ensureFriendsHubViewServices() {
+      if (friendHubState.view === "messages") {
+        void refreshMessaging({ selectFirst: true });
+        ensureMessagingRealtime();
+      } else if (friendHubState.view === "activity") {
+        void refreshSocialActivity();
+        ensureSocialActivityRealtime();
+      }
+    }
+
     function setupFriendsHub() {
       const root = document.getElementById("friends");
-      if (!root || friendHubReady) { renderFriendsHub(); return; }
+      if (!root) return;
+      if (friendHubReady) {
+        renderFriendsHub();
+        ensureFriendsHubViewServices();
+        return;
+      }
       friendHubReady = true;
       friendHubState = readFriendHubState();
       setupFriendsHubMessaging();
@@ -38369,8 +38584,25 @@
       const maxRating = document.getElementById("friendHubMaxRating");
       if (minRating) minRating.value = friendHubState.minRating;
       if (maxRating) maxRating.value = friendHubState.maxRating;
-      root.querySelectorAll("[data-friend-hub-view]").forEach((button) => button.addEventListener("click", () => { saveFriendHubState({ view: button.dataset.friendHubView, search: "" }); if (input) input.value = ""; renderFriendsHub(); if (button.dataset.friendHubView === "messages") { void refreshMessaging({ selectFirst: true }); ensureMessagingRealtime(); } if (button.dataset.friendHubView === "activity") { void refreshSocialActivity(); ensureSocialActivityRealtime(); } }));
-      input?.addEventListener("input", () => { window.clearTimeout(friendHubSearchTimer); saveFriendHubState({ search: input.value }); if (friendHubState.view === "messages") { renderFriendsHub(); return; } friendHubSearchTimer = window.setTimeout(() => void searchFriendPlayers(input.value).then(renderFriendsHub), 220); renderFriendsHub(); });
+      root.querySelectorAll("[data-friend-hub-view]").forEach((button) => button.addEventListener("click", () => {
+        window.clearTimeout(friendHubSearchTimer);
+        friendSearchRequest += 1;
+        friendNetworkState.search = [];
+        saveFriendHubState({ view: button.dataset.friendHubView, search: "" });
+        if (input) input.value = "";
+        renderFriendsHub();
+        if (button.dataset.friendHubView === "messages") { void refreshMessaging({ selectFirst: true }); ensureMessagingRealtime(); }
+        if (button.dataset.friendHubView === "activity") { void refreshSocialActivity(); ensureSocialActivityRealtime(); }
+      }));
+      input?.addEventListener("input", () => {
+        window.clearTimeout(friendHubSearchTimer);
+        friendSearchRequest += 1;
+        friendNetworkState.search = [];
+        saveFriendHubState({ search: input.value });
+        if (friendHubState.view === "messages") { renderFriendsHub(); return; }
+        friendHubSearchTimer = window.setTimeout(() => { friendHubSearchTimer = 0; void searchFriendPlayers(input.value).then(renderFriendsHub); }, 220);
+        renderFriendsHub();
+      });
       const runPlayerSearch = () => { saveFriendHubState({ minRating: minRating?.value || "", maxRating: maxRating?.value || "" }); return searchFriendPlayers(input?.value || "", { minRating: minRating?.value, maxRating: maxRating?.value }).then(renderFriendsHub); };
       document.getElementById("friendHubSearchButton")?.addEventListener("click", () => friendHubState.view === "messages" ? renderFriendsHub() : void runPlayerSearch());
       [minRating, maxRating].forEach((field) => field?.addEventListener("change", () => { if (friendHubState.view !== "messages") void runPlayerSearch(); }));
@@ -38381,25 +38613,28 @@
       renderFriendsHub();
       void refreshFriendNetwork(true).then(renderFriendsHub);
       void refreshSocialNotifications().then(renderFriendsHub);
-      void refreshSocialActivity().then(renderFriendsHub);
-      void refreshMessaging({ selectFirst: true });
       ensureFriendRealtime();
       ensureSocialNotificationRealtime();
-      ensureSocialActivityRealtime();
-      ensureMessagingRealtime();
+      ensureFriendsHubViewServices();
     }
 
     function stopSocialNotificationRealtime() {
+      socialNotificationGeneration += 1;
       try { socialNotificationUnsubscribe?.(); } catch {}
       socialNotificationUnsubscribe = null;
       socialNotificationSubscribing = false;
+      socialNotificationRefreshPromise = null;
+      socialNotificationRefreshAccountId = "";
       socialNotificationState = [];
     }
 
     function stopSocialActivityRealtime() {
+      socialActivityGeneration += 1;
       try { socialActivityUnsubscribe?.(); } catch {}
       socialActivityUnsubscribe = null;
       socialActivitySubscribing = false;
+      socialActivityRefreshPromise = null;
+      socialActivityRefreshAccountId = "";
       socialActivityState = [];
     }
 
