@@ -44105,3 +44105,73 @@ body.friend-challenge-mode #play :is(
     min-height: 44px;
   }
 }
+
+/* Phase 6: make the actual guided course scannable without changing other routes. */
+#tutorial .tutorial-rail-heading {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+#tutorial .tutorial-rail-heading strong { font-size: .92rem; }
+#tutorial .tutorial-rail-heading span,
+#tutorial .tutorial-filter-label { color: var(--muted); font-size: .76rem; }
+#tutorial .tutorial-filter-label { margin-bottom: -6px; }
+
+#tutorial #tutorialTopicFilter {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--panel);
+  font: inherit;
+}
+
+#tutorial .tutorial-lesson-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+#tutorial .tutorial-settings {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+}
+
+#tutorial .tutorial-settings summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--soft);
+  font-size: .82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+#tutorial .tutorial-settings summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--blue) 72%, white);
+  outline-offset: 2px;
+}
+
+#tutorial .tutorial-settings-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 8px;
+  padding: 0 9px 9px;
+}
+
+#tutorial .tutorial-settings-actions .button { min-height: 44px; }
+
+@media (max-width: 360px) {
+  #tutorial .tutorial-rail,
+  #tutorial .tutorial-stage,
+  #tutorial .tutorial-coach { padding: 10px; }
+  #tutorial .tutorial-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #tutorial .tutorial-settings-actions { grid-template-columns: minmax(0, 1fr); }
+}

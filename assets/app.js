@@ -4850,8 +4850,8 @@
       { id: "knight", badge: "Piece moves", title: "Knight = Trickster Jumper", text: "Knights jump in an L shape and can leap over pieces.", coach: "Jump the knight from g1 to f3. Knights do not need a clear path.", fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR", from: "g1", targets: ["f3", "h3", "e2"], correct: "f3", quiz: ["What makes a knight special?", "It jumps over pieces", "It moves like a rook", "It moves only one square"], answer: 1, reward: { xp: 12, coins: 6 }, achievement: "Knight Jumper" },
       { id: "queen", badge: "Piece moves", title: "Queen = Superhero", text: "The queen combines rook and bishop power: straight lines and diagonals.", coach: "Send the queen from d1 to h5 along a diagonal.", fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR", from: "d1", targets: ["e2", "f3", "g4", "h5", "d2", "d3"], correct: "h5", quiz: ["The queen moves like...", "Rook + bishop", "Knight + pawn", "Only the king"], answer: 1, reward: { xp: 12, coins: 6 }, achievement: "Queen Hero" },
       { id: "king", badge: "King safety", title: "King = Nervous Boss", text: "The king moves one square and must never move into danger.", coach: "Move the king from e1 to f1, one safe square away.", fen: "8/8/8/8/8/8/8/4K2k", from: "e1", targets: ["d1", "d2", "e2", "f2", "f1"], correct: "f1", quiz: ["What happens if your king is attacked?", "You can ignore it", "You must answer the check", "You win"], answer: 2, reward: { xp: 12, coins: 6 }, achievement: "King Safety" },
-      { id: "capture", badge: "Captures", title: "Capture The Attacker", text: "You capture by moving onto an enemy piece's square, if your piece moves that way.", coach: "Use the bishop on c4 to capture the pawn on f7.", fen: "rnbqkbnr/pppp1ppp/8/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR", from: "c4", targets: ["b5", "a6", "d5", "e6", "f7", "b3", "a2", "d3"], correct: "f7", quiz: ["Capturing means...", "Landing on an enemy piece", "Jumping off the board", "Moving twice"], answer: 1, reward: { xp: 12, coins: 6 }, achievement: "Clean Capture" },
-      { id: "check", badge: "Check", title: "Give A Check", text: "Check means the king is under attack and must respond.", coach: "Move the queen from e2 to e7 to check the king on e8.", fen: "4k3/8/8/8/8/8/4Q3/4K3", from: "e2", targets: ["e3", "e4", "e5", "e6", "e7", "a2", "b2", "c2", "d2"], correct: "e7", quiz: ["When in check, the player must...", "Make any move", "Answer the attack", "Skip the turn"], answer: 2, reward: { xp: 14, coins: 7 }, achievement: "First Check" },
+      { id: "capture", badge: "Captures", title: "Capture A Pawn With Check", text: "A capture lands on an enemy piece. Here the bishop takes the f7 pawn and checks the king.", coach: "Capture the pawn on f7 with the bishop; the rook on f1 protects the checking bishop.", fen: "rnbqkbnr/pppp1ppp/8/4p3/2B1P3/8/PPPP3P/RNBQKR1R", from: "c4", targets: ["b5", "a6", "d5", "e6", "f7", "b3", "a2", "d3"], correct: "f7", quiz: ["Capturing means...", "Landing on an enemy piece", "Jumping off the board", "Moving twice"], answer: 1, reward: { xp: 12, coins: 6 }, achievement: "Clean Capture" },
+      { id: "check", badge: "Check", title: "Give A Safe Check", text: "A check attacks the king and must be answered. Look for a check that cannot simply be captured.", coach: "Move the queen from e2 to b5; the diagonal check reaches the king on e8.", fen: "4k3/8/8/8/4P3/8/4Q3/K7", from: "e2", targets: ["e3", "e5", "d3", "c4", "b5", "f3", "g4", "h5"], correct: "b5", quiz: ["When in check, the player must...", "Make any move", "Answer the attack", "Skip the turn"], answer: 2, reward: { xp: 14, coins: 7 }, achievement: "First Check" },
       { id: "mate", badge: "Checkmate", title: "Finish With Checkmate", text: "Checkmate means the king is in check and has no safe escape.", coach: "Move the rook from f1 to f8. The king is trapped by the rook and your king.", fen: "7k/8/6K1/8/8/8/8/5R2", from: "f1", targets: ["f2", "f3", "f4", "f5", "f6", "f7", "f8", "a1", "b1", "c1", "d1", "e1"], correct: "f8", quiz: ["Checkmate means...", "The king is captured", "No legal answer to check", "A pawn promotes"], answer: 2, reward: { xp: 16, coins: 8 }, achievement: "Mate Maker" },
       { id: "castle", badge: "Special rule", title: "Castle The King", text: "Castling moves the king two squares and the rook jumps beside it. It helps king safety.", coach: "Castle short: move the king from e1 to g1.", fen: "r3k2r/8/8/8/8/8/8/R3K2R", from: "e1", targets: ["g1", "c1", "d1", "e2", "f1"], correct: "g1", special: "castle", quiz: ["Why castle?", "To protect the king and connect rooks", "To promote a pawn", "To capture the king"], answer: 1, reward: { xp: 16, coins: 8 }, achievement: "Castle Ready" },
       { id: "en-passant", badge: "Special rule", title: "En Passant Surprise", text: "If a pawn moves two squares beside your pawn, you may capture it as if it moved one square.", coach: "Capture en passant: move the pawn from e5 to d6.", fen: "8/8/8/3pP3/8/8/8/4K2k", from: "e5", targets: ["e6", "d6"], correct: "d6", special: "enpassant", quiz: ["En passant is...", "A special pawn capture", "A rook move", "A draw rule"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Rule Explorer" },
@@ -4859,29 +4859,24 @@
       { id: "opening", badge: "Openings", title: "Opening Principles", text: "Control the center, develop knights and bishops, castle early, and avoid moving the queen too soon.", coach: "Develop the knight from g1 to f3. That helps the center and prepares castling.", fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR", from: "g1", targets: ["f3", "h3", "e2"], correct: "f3", quiz: ["A good opening habit is...", "Move only the queen", "Develop pieces and castle", "Ignore the center"], answer: 2, reward: { xp: 16, coins: 8 }, achievement: "Opening Starter" },
       { id: "fork", badge: "Tactics", title: "Fork Trick", text: "A fork attacks two targets at once. Knights are famous for this trick.", coach: "Jump the knight from f5 to e7. It attacks the king and queen.", fen: "2q3k1/8/8/5N2/8/8/8/4K3", from: "f5", targets: ["e7", "g7", "d6", "d4", "e3", "g3", "h4", "h6"], correct: "e7", quiz: ["A fork attacks...", "Two or more targets", "Only pawns", "Only your own king"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Fork Finder" },
       { id: "pin", badge: "Tactics", title: "Pin Rescue", text: "A pin freezes a piece because moving it would expose something more valuable behind it.", coach: "Move the bishop from c4 to b5. The knight on c6 is pinned to the king.", fen: "4k3/8/2n5/8/2B5/8/8/4K3", from: "c4", targets: ["b5", "a6", "d5", "e6", "f7", "g8"], correct: "b5", quiz: ["In a pin, the front piece...", "Cannot move safely", "Always promotes", "Moves like a knight"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Pin Spotter" },
-      { id: "skewer", badge: "Tactics", title: "Skewer Line", text: "A skewer attacks a valuable piece first. When it moves, something behind it falls.", coach: "Move the bishop from b5 to e8 to start the skewer idea.", fen: "4r1k1/8/8/1B6/8/8/8/4K3", from: "b5", targets: ["c6", "d7", "e8", "a6", "a4", "c4", "d3", "e2"], correct: "e8", quiz: ["A skewer attacks...", "The valuable piece first", "Only empty squares", "Only your pieces"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Skewer Scout" },
-      { id: "discovered", badge: "Tactics", title: "Discovered Attack", text: "A discovered attack happens when one piece moves away and opens an attack from another piece.", coach: "Move the knight from d3 to f4. The bishop's diagonal wakes up.", fen: "4k3/8/8/8/2B5/3N4/8/4K3", from: "d3", targets: ["f4", "f2", "e5", "c5", "b4", "b2"], correct: "f4", quiz: ["A discovered attack is opened by...", "Moving the blocking piece", "Resigning", "Changing the board color"], answer: 1, reward: { xp: 20, coins: 10 }, achievement: "Tactic Starter" }
+      { id: "skewer", badge: "Captures", title: "Bishop Captures A Rook", text: "A bishop can capture an undefended piece along a clear diagonal.", coach: "Move the bishop from b5 to e8 and capture the rook along the open diagonal.", fen: "4r1k1/8/8/1B6/8/8/8/4K3", from: "b5", targets: ["c6", "d7", "e8", "a6", "a4", "c4", "d3", "e2"], correct: "e8", quiz: ["A bishop moves along...", "Clear diagonals", "Straight files only", "An L shape"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Diagonal Capture" },
+      { id: "discovered", badge: "Tactics", title: "Discovered Attack", text: "A discovered attack happens when one piece moves away and opens an attack from another piece.", coach: "Move the knight from e6 to f4. It uncovers the bishop's diagonal toward the king.", fen: "6k1/8/4N3/8/2B5/8/8/4K3", from: "e6", targets: ["c5", "c7", "d4", "d8", "f4", "f8", "g5", "g7"], correct: "f4", quiz: ["A discovered attack is opened by...", "Moving a blocking piece", "Resigning", "Changing the board color"], answer: 1, reward: { xp: 20, coins: 10 }, achievement: "Tactic Starter" }
     ];
     function expandCoreBeginnerTutorialMoves() {
       const followUps = {
         setup: [["g1", "f3"], ["f1", "c4"]],
         pawn: [["e4", "e5"]],
         rook: [["a8", "h8"]],
-        bishop: [["b5", "e8"]],
         knight: [["f3", "e5"]],
         queen: [["h5", "e2"]],
         king: [["f1", "e2"]],
         capture: [["f7", "g8"]],
-        check: [["e7", "a7"]],
-        mate: [["f8", "a8"]],
         castle: [["f1", "e1"], ["g1", "g2"]],
         "en-passant": [["d6", "d7"]],
         promotion: [["a8", "a7"]],
         opening: [["f1", "c4"], ["e1", "g1", ["g1"], "Castle after developing.", "castle"]],
         fork: [["e7", "c8"], ["c8", "b6"]],
         pin: [["b5", "c6"], ["c6", "d7"]],
-        skewer: [["e8", "d7"]],
-        discovered: [["c4", "e6"]]
       };
       beginnerTutorialLessons.forEach((lesson) => {
         if (lesson.moves) return;
@@ -4914,43 +4909,43 @@
         ["pawn-march", "Pawn Power", "Rookie March", "Move a pawn forward and notice how it gains space.", "8/8/8/8/8/8/4P3/4K2k", [["e2", "e4"], ["e4", "e5"]], "Pawns move mainly...", "Forward", "Sideways", "Like knights"],
         ["queen-pawn-march", "Pawn Power", "Queen Pawn March", "A queen pawn can also take center space.", "8/8/8/8/8/8/3P4/4K2k", [["d2", "d4"], ["d4", "d5"]], "A pawn from its start can move...", "Two squares", "Five squares", "Like a rook"],
         ["rook-lift", "Rook", "Rook Elevator", "Lift the rook, then slide across the rank.", "8/8/8/8/8/8/8/R3K2k", [["a1", "a4"], ["a4", "h4"]], "Rooks move on...", "Ranks and files", "Diagonals", "L shapes"],
-        ["rook-patrol", "Rook", "Castle Wall Patrol", "Practice long rook lines without jumping.", "8/8/8/8/8/8/8/4K1Rk", [["g1", "g4"], ["g4", "b4"]], "Rooks need the path to be...", "Clear", "Blocked", "Diagonal"],
+        ["rook-patrol", "Rook", "Castle Wall Patrol", "Practice long rook lines without jumping.", "k7/8/8/8/8/8/8/4K1R1", [["g1", "g4"], ["g4", "b4"]], "Rooks need the path to be...", "Clear", "Blocked", "Diagonal"],
         ["bishop-trail", "Bishop", "Diagonal Trail", "Follow one diagonal, then keep the bishop active.", "8/8/8/8/2B5/8/8/4K2k", [["c4", "b5"], ["b5", "e8"]], "Bishops stay on...", "One color", "Every file", "Only ranks"],
         ["bishop-switchback", "Bishop", "Sniper Switchback", "A bishop can travel far and return on another diagonal.", "8/8/8/8/2B5/8/8/4K2k", [["c4", "g8"], ["g8", "b3"]], "A bishop is strongest with...", "Long diagonals", "Tiny corners", "Blocked pawns"],
         ["knight-hop", "Knight", "Two-Hop Knight", "Jump to a safe square, then improve the knight again.", "8/8/8/8/8/8/8/2N1K2k", [["c1", "b3"], ["b3", "d4"]], "Knights move in...", "An L shape", "Straight lines", "Diagonals only"],
         ["knight-outpost", "Knight", "Knight Outpost Climb", "Move the knight toward squares where it attacks more.", "8/8/8/8/8/8/8/4K1Nk", [["g1", "f3"], ["f3", "e5"]], "Knights are happy near...", "The center", "The edge only", "Their king"],
         ["queen-line", "Queen", "Queen Road Test", "Use the queen's straight road, then diagonal power.", "8/8/8/8/8/8/8/3QK2k", [["d1", "d5"], ["d5", "h5"]], "Queens combine...", "Rook and bishop", "Pawn and knight", "King and pawn"],
         ["queen-diagonal", "Queen", "Superhero Diagonal", "The queen can sweep along a diagonal quickly.", "8/8/8/8/8/8/8/3QK2k", [["d1", "h5"], ["h5", "e8"]], "The queen is powerful because she moves...", "Many directions", "Only one square", "Only forward"],
-        ["defend-knight", "Safety", "Defend The Jumper", "Support a knight before sending it forward.", "8/8/8/8/8/5N2/4P3/4K2k", [["e2", "e3"], ["f3", "g5"]], "Before moving, ask if pieces are...", "Protected", "Invisible", "Always safe"],
-        ["save-bishop", "Safety", "Save The Bishop", "Move the bishop to an active square instead of leaving it loose.", "8/8/8/8/2B5/8/8/4K2k", [["c4", "b5"], ["b5", "d7"]], "A hanging piece is...", "Undefended", "Promoted", "Castled"],
-        ["queen-escape", "Safety", "Queen Escape Route", "When a queen is attacked, move her with purpose.", "8/8/8/8/8/8/8/3QK2k", [["d1", "h5"], ["h5", "e2"]], "A safe move should avoid...", "Free captures", "Good squares", "Development"],
+        ["defend-knight", "Safety", "Move An Attacked Knight", "A rook attacks the knight on f3. Move the knight off the rook's file.", "5r1k/8/8/8/8/5N2/8/4K3", [["f3", "g5"]], "Before moving, ask if a piece is...", "Under attack", "Invisible", "Always safe"],
+        ["save-bishop", "Safety", "Save The Attacked Bishop", "The rook attacks the bishop on c4; move it off the open file.", "2r5/8/8/8/2B5/8/8/4K2k", [["c4", "b5"], ["b5", "d7"]], "A hanging piece is...", "Undefended", "Promoted", "Castled"],
+        ["queen-escape", "Safety", "Queen Escape Route", "The rook attacks the queen on d1. Move her to a safe square.", "3r4/8/8/8/8/8/8/3QK2k", [["d1", "h5"], ["h5", "e2"]], "A safe move should avoid...", "Free captures", "Good squares", "Development"],
         ["rook-swing", "Safety", "Rook Swing Guard", "Lift a rook and guard the middle rank.", "8/8/8/8/8/8/8/R3K2k", [["a1", "a3"], ["a3", "e3"]], "Rooks can defend from...", "Open lines", "Closed boxes", "Only corners"],
-        ["knight-retreat", "Safety", "Knight Retreat Trick", "Retreating can be strong when it saves a piece.", "8/8/8/8/8/5N2/8/4K2k", [["f3", "g1"], ["g1", "e2"]], "A retreat can be...", "A smart save", "Always bad", "Illegal"],
-        ["pawn-shield", "King Safety", "Build A Shield", "Small pawn moves can give the king breathing room.", start, [["g2", "g3"], ["h2", "h3"], ["f2", "f3"]], "A king shield uses...", "Nearby pawns", "Only queens", "Enemy pieces"],
+        ["knight-retreat", "Safety", "Knight Retreat Route", "A knight can step back to g1, then take a new route to e2.", "8/8/8/8/8/5N2/8/4K2k", [["f3", "g1"], ["g1", "e2"]], "A retreat can be...", "A useful route", "Always bad", "Illegal"],
+        ["pawn-shield", "King Safety", "Shape The King-Side Pawns", "After castling, nearby pawn moves reshape the king's cover; advancing them can create space but also open lines.", "4k3/8/8/8/8/8/5PPP/5RK1", [["g2", "g3"], ["h2", "h3"], ["f2", "f3"]], "A king-side pawn move can...", "Create space but loosen lines", "Only help the queen", "Never change king safety"],
         ["center-protect", "Safety", "Protect The Center Pawn", "Support your center so it does not become free material.", start, [["e2", "e4"], ["d2", "d3"], ["g1", "f3"]], "A protected pawn is harder to...", "Win for free", "See", "Promote instantly"],
         ["castle-shelter", "King Safety", "Castle Shelter", "Castle, then keep developing calmly.", "r3k2r/8/8/8/8/5N2/PPPPBPPP/RNBQK2R", [["e1", "g1", ["g1"], "Castle to safety.", "castle"], ["b1", "c3"], ["d2", "d3"]], "Castling helps...", "King safety", "Pawn promotion", "Taking the king"],
         ["clear-back-rank", "Development", "Clear The Back Rank", "Move pieces out so the rooks can breathe later.", start, [["g1", "f3"], ["e2", "e4"], ["f1", "e2"]], "Development means...", "Bring pieces out", "Hide all pieces", "Repeat one piece"],
         ["safe-capture-scan", "Capture", "Safe Capture Scan", "Capture, then push only after the square is safe.", "8/8/8/5p2/4P3/8/8/4K2k", [["e4", "f5"], ["f5", "f6"]], "Before a capture, check...", "What recaptures", "The board color", "The clock only"],
         ["knight-fork-mini", "Tactics", "Mini Fork Finder", "A knight jump can attack two important targets.", "2q3k1/8/8/5N2/8/8/8/4K3", [["f5", "e7"], ["e7", "c8"]], "A fork attacks...", "Two targets", "One empty square", "Only pawns"],
         ["pin-mini", "Tactics", "Pin And Win", "Pin a piece, then collect it when it cannot move safely.", "4k3/8/2n5/8/2B5/8/8/4K3", [["c4", "b5"], ["b5", "c6"]], "A pin makes a piece...", "Hard to move", "A queen", "Invisible"],
-        ["skewer-mini", "Tactics", "Skewer Starter", "Attack the valuable piece first, then take what is behind.", "4r1k1/8/8/1B6/8/8/8/4K3", [["b5", "e8"], ["e8", "d7"]], "A skewer attacks...", "The valuable piece first", "Only pawns", "Your own king"],
-        ["discovered-mini", "Tactics", "Wake The Bishop", "Move one piece away and open another piece's line.", "4k3/8/8/8/2B5/3N4/8/4K3", [["d3", "f4"], ["c4", "e6"]], "A discovered attack opens a...", "Hidden line", "New board", "Draw offer"],
-        ["double-attack-mini", "Tactics", "Two Threats At Once", "Create one move that makes the opponent answer two problems.", "6k1/8/8/8/8/2N5/8/3QK3", [["d1", "h5"], ["c3", "d5"]], "Double attacks work because...", "One side cannot answer both", "They are random", "They hide kings"],
+        ["skewer-mini", "Captures", "Bishop Captures A Rook", "Use a clear diagonal to capture the undefended rook.", "4r1k1/8/8/1B6/8/8/8/4K3", [["b5", "e8"]], "A bishop moves along...", "Clear diagonals", "Straight files only", "An L shape"],
+        ["discovered-mini", "Tactics", "Discovered Check", "Move a blocking knight to reveal your bishop's line to the king.", "6k1/8/4N3/8/2B5/8/8/4K3", [["e6", "f4"]], "A discovered attack opens when...", "A blocking piece moves aside", "A new board appears", "The clock stops"],
+        ["double-attack-mini", "Tactics", "Knight Fork: Two Targets", "Move the knight to d7+: it checks the king and attacks the queen, while the rook protects the knight.", "1q3k2/8/5N2/8/8/8/8/3RK3", [["f6", "d7"]], "A knight fork can...", "Check a king and attack a queen", "Only attack one square", "Move in a straight line"],
         ["back-rank-door", "Mate Pattern", "Back Rank Door", "Use the rook line to pressure the back rank.", "6k1/5ppp/8/8/8/8/8/4K2R", [["h1", "h7"], ["h7", "h8"]], "Back-rank ideas use...", "Trapped kings", "Only knights", "Pawn races"],
-        ["remove-defender", "Tactics", "Remove The Guard", "First remove a defender, then use the open file.", "6k1/5ppp/8/8/8/8/5B2/4K2R", [["f2", "h4"], ["h1", "h8"]], "Removing a defender makes...", "A target weaker", "Your king vanish", "Pieces illegal"],
-        ["queen-rook-team", "Attack", "Queen And Rook Team", "Line up heavy pieces so they help each other.", "6k1/6pp/8/8/8/8/5Q2/4K2R", [["f2", "a7"], ["h1", "h8"]], "A battery means pieces...", "Work on one line", "Refuse to move", "Trade randomly"],
+        ["remove-defender", "Rook", "Open-File Rook Check", "The bishop protects h8, so the rook can safely use the clear h-file to check.", "6k1/5p2/8/4B3/8/8/8/4K2R", [["h1", "h8"]], "Why is the rook safe on h8?", "The bishop protects that square", "The king cannot capture any rook", "Rooks cannot be captured"],
+        ["queen-rook-team", "Queen", "Long Queen Diagonal", "Use an open diagonal to carry the queen across the board.", "6k1/6pp/8/8/8/8/5Q2/4K2R", [["f2", "a7"]], "What makes this queen route possible?", "The diagonal is clear", "Queens jump over pawns", "The king moves first"],
         ["knight-route", "Tactics", "Knight Route Map", "Plan two knight jumps instead of one random hop.", "8/8/8/3N4/8/8/8/4K2k", [["d5", "f6"], ["f6", "h5"]], "Knights improve by finding...", "Useful squares", "Only edge squares", "Straight roads"],
-        ["pressure-pin", "Tactics", "Add Pin Pressure", "Use a bishop line, then improve the attack.", "4k3/4r3/8/8/2B5/8/8/4K3", [["c4", "f7"], ["f7", "g8"]], "Pressure means adding...", "More attackers", "More mistakes", "Less vision"],
+        ["pressure-pin", "Check", "Give A Protected Check", "The bishop can check the king from f7, and your king protects the bishop on that square.", "4k3/8/6K1/8/2B5/8/8/8", [["c4", "f7"]], "Why can the bishop safely check on f7?", "The king protects the bishop", "Bishops cannot be captured", "The opposing king is not on the board"],
         ["rook-box", "Endgame", "Rook Box", "Use the rook to limit the king's space.", "7k/8/8/8/8/8/8/R3K3", [["a1", "a7"], ["a7", "g7"]], "Rooks in endgames should...", "Cut the king off", "Hide forever", "Move like bishops"],
         ["king-activity", "Endgame", "Active King Walk", "In endgames, the king becomes a strong helper.", "8/8/8/8/8/8/4K3/7k", [["e2", "e3"], ["e3", "d4"], ["d4", "c5"]], "In endgames, the king should be...", "Active", "Afraid forever", "Off the board"],
-        ["passed-pawn", "Endgame", "Passed Pawn Runner", "A passed pawn is powerful when the king helps.", "8/P7/8/8/8/8/4K3/7k", [["e2", "d3"], ["a7", "a8", ["a8"], "Promote the runner.", "promotion"]], "A passed pawn wants to...", "Promote", "Castle", "Move backward"],
-        ["opposition-intro", "Endgame", "Opposition Intro", "Kings fight for key squares one step at a time.", "8/8/8/8/3K4/8/8/7k", [["d4", "e4"], ["e4", "e5"]], "Opposition is about...", "King squares", "Queen tricks", "Opening traps"],
-        ["promotion-choice", "Endgame", "Promotion Choice", "Push the pawn and choose a queen when it reaches the end.", "7k/P7/8/8/8/8/4K3/8", [["e2", "e3"], ["a7", "a8", ["a8"], "Promote to a queen.", "promotion"]], "Most beginner promotions become...", "Queens", "Kings", "Pawns"],
-        ["save-the-king", "Defense", "Save The King", "When danger appears, move the king to safety first.", "8/8/8/8/8/8/8/4K2k", [["e1", "f1"], ["f1", "g1"]], "In check, you must...", "Answer the threat", "Ignore it", "Move any pawn"],
-        ["block-line", "Defense", "Block The Line", "Sometimes defense means stepping into the attacking line.", "4k3/8/8/8/8/8/3B4/4K3", [["d2", "e3"], ["e3", "f4"]], "Blocking works against...", "Line attacks", "Knight jumps", "Promotion only"],
-        ["capture-attacker", "Defense", "Capture The Attacker", "If an enemy piece attacks you, taking it can be the cleanest answer.", "8/8/8/4p3/2B1P3/8/8/4K2k", [["c4", "e6"], ["e6", "g8"]], "One defense is to...", "Capture the attacker", "Forget the king", "Move randomly"],
-        ["create-luft", "Defense", "Make Breathing Room", "A small pawn move can stop back-rank trouble.", start, [["h2", "h3"], ["g2", "g3"]], "Breathing room helps the...", "King", "Enemy queen", "Captured pieces"],
-        ["final-beginner-flow", "Review", "Beginner Flow Combo", "Center, develop, and castle: the calm beginner formula.", start, [["e2", "e4"], ["g1", "f3"], ["f1", "c4"]], "The beginner flow is...", "Center, develop, castle", "Queen, queen, queen", "Only pawns"]
+        ["passed-pawn", "Endgame", "Passed Pawn Runner", "Bring the king beside the passed pawn before promoting it.", "8/P7/1K6/8/8/8/8/7k", [["b6", "b7"], ["a7", "a8", ["a8"], "Promote the supported runner.", "promotion"]], "A passed pawn wants to...", "Promote", "Castle", "Move backward"],
+        ["opposition-intro", "Endgame", "Step Aside From Opposition", "When kings face with one square between them, a safe side-step avoids walking into the opposing king.", "8/8/4k3/8/4K3/8/8/8", [["e4", "d4"]], "When kings are directly opposed, the side with opposition is...", "The side not to move", "Always White", "Always the stronger side"],
+        ["promotion-choice", "Endgame", "Promotion Choice", "Push the pawn to the back rank and choose a queen.", "7k/P7/8/8/8/8/4K3/8", [["a7", "a8", ["a8"], "Promote to a queen.", "promotion"]], "Most beginner promotions become...", "Queens", "Kings", "Pawns"],
+        ["save-the-king", "King safety", "Escape The Rook Check", "The rook checks along the e-file. Move the king to f1, off the attacked line.", "k3r3/8/8/8/8/8/8/4K3", [["e1", "f1"]], "When in check, you must...", "Answer the threat with a legal move", "Ignore it", "Move any pawn"],
+        ["block-line", "Defense", "Block The Rook Check", "The rook checks along the e-file. Interpose the bishop on e3 to stop the line.", "k3r3/8/8/8/8/8/3B4/4K3", [["d2", "e3"]], "Blocking works against...", "Line attacks", "Knight jumps", "Promotion only"],
+        ["capture-attacker", "Defense", "Capture The Attacking Pawn", "The black pawn on d5 attacks your pawn on e4. Capture that pawn to remove the threat.", "8/8/8/3p4/4P3/8/8/4K2k", [["e4", "d5"], ["d5", "d6"]], "One defense is to...", "Capture the attacker", "Forget the king", "Move randomly"],
+        ["create-luft", "Defense", "Make A King Escape Square", "After castling, push the h-pawn to leave h2 open as a flight square.", "k7/8/8/8/8/8/5PPP/5RK1", [["h2", "h3"]], "Breathing room helps the...", "King", "Enemy queen", "Captured pieces"],
+        ["final-beginner-flow", "Review", "Beginner Flow Combo", "Center, develop, then castle: the calm beginner formula.", start, [["e2", "e4"], ["g1", "f3"], ["f1", "c4"], ["e1", "g1", ["g1"], "Castle after developing.", "castle"]], "The beginner flow is...", "Center, develop, castle", "Queen, queen, queen", "Only pawns"]
       ];
       return seed.map(([id, badge, title, text, fen, moves, question, right, wrongA, wrongB], index) => ({
         id: `beginner-quest-${id}`,
@@ -5243,6 +5238,8 @@
     let tutorialBoardState = [];
     let tutorialLastMove = null;
     let tutorialMoveStep = 0;
+    let tutorialTopicFilter = "all";
+    let tutorialLineFailure = "";
     let tutorialVoiceOn = Boolean(beginnerTutorialState.voice);
     let tutorialCoordinatesOn = beginnerTutorialState.coords !== false;
     let tutorialFlipped = Boolean(beginnerTutorialState.flipped);
@@ -6284,7 +6281,29 @@
     function readBeginnerTutorialState() {
       const fallback = { current: 0, completed: [], achievements: [], rewarded: [], voice: false, coords: true, flipped: false };
       const saved = readJsonStorage(beginnerTutorialStorageKey, fallback);
-      return saved && typeof saved === "object" ? { ...fallback, ...saved } : fallback;
+      const source = saved && typeof saved === "object" && !Array.isArray(saved) ? saved : fallback;
+      const supportedIds = new Set(beginnerTutorialLessons.map((lesson) => lesson.id));
+      const savedIds = (value) => Array.isArray(value)
+        ? [...new Set(value.filter((id) => typeof id === "string" && supportedIds.has(id)))]
+        : [];
+      const supportedAchievements = new Set(beginnerTutorialLessons.map((lesson) => lesson.achievement).filter(Boolean));
+      supportedAchievements.add("Rules Ready");
+      supportedAchievements.add("Tactic Starter");
+      supportedAchievements.add("Beginner Graduate");
+      const achievements = Array.isArray(source.achievements)
+        ? [...new Set(source.achievements.filter((item) => typeof item === "string" && supportedAchievements.has(item)))]
+        : [];
+      const currentValue = Number(source.current);
+      return {
+        ...fallback,
+        current: Number.isFinite(currentValue) ? Math.max(0, Math.min(beginnerTutorialLessons.length - 1, Math.trunc(currentValue))) : 0,
+        completed: savedIds(source.completed),
+        achievements,
+        rewarded: savedIds(source.rewarded),
+        voice: source.voice === true,
+        coords: source.coords !== false,
+        flipped: source.flipped === true
+      };
     }
 
     function saveBeginnerTutorialState(patch = {}) {
@@ -6400,42 +6419,78 @@
     }
 
     function chooseTutorialAutoReply(nextMove) {
-      if (!tutorialGame) return null;
-      const avoid = new Set([nextMove?.from, nextMove?.correct].filter(Boolean));
+      if (!tutorialGame || !nextMove) return null;
+      const avoid = new Set([nextMove.from, nextMove.correct].filter(Boolean));
       const legal = tutorialGame.moves({ verbose: true });
-      return legal.find((move) => !avoid.has(move.to) && !avoid.has(move.from) && !move.captured && !move.promotion)
-        || legal.find((move) => !avoid.has(move.to))
-        || legal[0]
-        || null;
+      const preferred = legal.filter((move) => !avoid.has(move.to) && !avoid.has(move.from) && !move.captured && !move.promotion);
+      const alternate = legal.filter((move) => !avoid.has(move.to));
+      const seen = new Set();
+      const candidates = [...preferred, ...alternate, ...legal].filter((move) => {
+        const key = `${move.from}:${move.to}:${move.promotion || ""}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      for (const candidate of candidates) {
+        const played = tutorialGame.move(toCoachMoveInput(candidate));
+        if (!played) continue;
+        const preservesNextStep = tutorialGame.get(nextMove.from)?.color === tutorialGame.turn()
+          && Boolean(getTutorialLegalMove(nextMove));
+        tutorialGame.undo();
+        if (preservesNextStep) return candidate;
+      }
+      return null;
     }
 
-    function skipIllegalTutorialSteps(lesson) {
-      let safety = 0;
-      const moves = getTutorialMoves(lesson);
-      while (tutorialGame && tutorialMoveStep < moves.length && safety < moves.length) {
-        const move = getActiveTutorialMove(lesson);
-        const piece = tutorialGame.get(move.from);
-        if (piece && piece.color !== tutorialGame.turn()) break;
-        if (piece && getTutorialLegalMove(move)) break;
-        tutorialMoveStep += 1;
-        safety += 1;
+    function validateActiveTutorialStep(lesson) {
+      const move = getActiveTutorialMove(lesson);
+      if (!move) {
+        tutorialLineFailure = "";
+        return true;
       }
+      const piece = tutorialGame?.get(move.from);
+      if (!piece) {
+        tutorialLineFailure = `The guided piece is no longer on ${move.from}. Restart this lesson to reset the position.`;
+        return false;
+      }
+      if (piece.color !== tutorialGame.turn()) {
+        tutorialLineFailure = "";
+        return true;
+      }
+      if (!getTutorialLegalMove(move)) {
+        tutorialLineFailure = "This lesson step is not legal in the current position. Restart this lesson to reset the board.";
+        return false;
+      }
+      tutorialLineFailure = "";
+      return true;
     }
 
     function syncTutorialTurn(lesson) {
-      if (!tutorialGame) return;
+      if (!tutorialGame) return false;
+      const finish = (ready) => {
+        tutorialBoardState = fenToSquares(tutorialGame.fen().split(/\s+/)[0]);
+        return ready;
+      };
       let safety = 0;
       while (safety < 6) {
-        skipIllegalTutorialSteps(lesson);
+        if (!validateActiveTutorialStep(lesson)) return finish(false);
         const move = getActiveTutorialMove(lesson);
-        if (!move || tutorialGame.get(move.from)?.color === tutorialGame.turn()) break;
+        if (!move || tutorialGame.get(move.from)?.color === tutorialGame.turn()) return finish(true);
         const reply = chooseTutorialAutoReply(move);
-        if (!reply) break;
+        if (!reply) {
+          tutorialLineFailure = "No legal practice reply keeps the next lesson step available. Restart this lesson to reset the board.";
+          return finish(false);
+        }
         const played = tutorialGame.move(toCoachMoveInput(reply));
-        if (played) tutorialLastMove = [played.from, played.to];
+        if (!played) {
+          tutorialLineFailure = "The practice reply could not be played. Restart this lesson to reset the board.";
+          return finish(false);
+        }
+        tutorialLastMove = [played.from, played.to];
         safety += 1;
       }
-      tutorialBoardState = fenToSquares(tutorialGame.fen().split(/\s+/)[0]);
+      tutorialLineFailure = "This lesson line could not reach its next guided move. Restart this lesson to reset the board.";
+      return finish(false);
     }
 
     function speakTutorial(text) {
@@ -6448,20 +6503,44 @@
       window.speechSynthesis.speak(utterance);
     }
 
+    function renderTutorialTopicFilter() {
+      const filter = document.getElementById("tutorialTopicFilter");
+      if (!filter) return;
+      const completed = new Set(beginnerTutorialState.completed || []);
+      const topics = [...new Set(beginnerTutorialLessons.map((lesson) => lesson.badge || "Guided practice"))];
+      const options = [
+        { value: "all", label: `All topics (${beginnerTutorialLessons.length})` },
+        ...topics.map((topic) => {
+          const lessons = beginnerTutorialLessons.filter((lesson) => (lesson.badge || "Guided practice") === topic);
+          const done = lessons.filter((lesson) => completed.has(lesson.id)).length;
+          return { value: topic, label: `${topic} (${done}/${lessons.length})` };
+        })
+      ];
+      filter.replaceChildren(...options.map(({ value, label }) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        return option;
+      }));
+      if (!options.some((option) => option.value === tutorialTopicFilter)) tutorialTopicFilter = "all";
+      filter.value = tutorialTopicFilter;
+    }
+
     function renderTutorialLessonList() {
       const list = document.getElementById("tutorialLessonList");
       if (!list) return;
       const completed = new Set(beginnerTutorialState.completed || []);
-      list.replaceChildren(...beginnerTutorialLessons.map((lesson, index) => {
+      const visibleLessons = beginnerTutorialLessons
+        .map((lesson, index) => ({ lesson, index }))
+        .filter(({ lesson }) => tutorialTopicFilter === "all" || (lesson.badge || "Guided practice") === tutorialTopicFilter);
+      list.replaceChildren(...visibleLessons.map(({ lesson, index }) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = `tutorial-step${completed.has(lesson.id) ? " is-complete" : ""}`;
         button.setAttribute("aria-current", index === currentTutorialLesson ? "step" : "false");
-        button.textContent = `${index + 1}. ${lesson.title}`;
-        button.addEventListener("click", () => {
-          currentTutorialLesson = index;
-          renderBeginnerTutorial(true);
-        });
+        button.dataset.tutorialLessonIndex = String(index);
+        button.setAttribute("aria-label", `${index + 1}. ${lesson.title}, ${lesson.badge}${completed.has(lesson.id) ? ", completed on this device" : ""}`);
+        button.textContent = `${index + 1}. ${lesson.title}${completed.has(lesson.id) ? " · Done" : ""}`;
         return button;
       }));
     }
@@ -6470,6 +6549,7 @@
       const board = document.getElementById("tutorialBoard");
       const lesson = getTutorialLesson();
       if (tutorialGame) syncTutorialTurn(lesson);
+      if (tutorialLineFailure) setTutorialCoach(tutorialLineFailure);
       const move = getActiveTutorialMove(lesson);
       if (!board) return;
       sharedInteractiveBoardWorkspace.scheduleSync();
@@ -6599,6 +6679,11 @@
         playAudioCue("hint");
         return;
       }
+      if (tutorialLineFailure) {
+        setTutorialCoach(`${tutorialLineFailure} Use Replay lesson to start again.`);
+        playAudioCue("illegal");
+        return;
+      }
       if (!move) {
         setTutorialCoach("Practice moves complete. Answer the mini quiz to finish this lesson.");
         return;
@@ -6677,6 +6762,13 @@
     function renderTutorialQuiz(lesson) {
       const quiz = document.getElementById("tutorialQuiz");
       if (!quiz) return;
+      if (tutorialLineFailure) {
+        quiz.replaceChildren(
+          createBookText("strong", "game-unlock", "Lesson paused"),
+          createBookText("span", "", `${tutorialLineFailure} Use Replay lesson to start again.`)
+        );
+        return;
+      }
       const moves = getTutorialMoves(lesson);
       if (tutorialMoveStep < moves.length) {
         const move = getActiveTutorialMove(lesson);
@@ -6720,6 +6812,7 @@
       if (!lesson) return;
       if (resetBoard) {
         tutorialGame = null;
+        tutorialLineFailure = "";
         if (CoachChess) {
           try {
             tutorialGame = new CoachChess(getTutorialFen(lesson));
@@ -6736,11 +6829,15 @@
       const completed = new Set(beginnerTutorialState.completed || []);
       const moves = getTutorialMoves(lesson);
       const progress = Math.round((completed.size / beginnerTutorialLessons.length) * 100);
+      const topicLessons = tutorialTopicFilter === "all"
+        ? beginnerTutorialLessons
+        : beginnerTutorialLessons.filter((item) => (item.badge || "Guided practice") === tutorialTopicFilter);
+      const topicCompleted = topicLessons.filter((item) => completed.has(item.id)).length;
       document.getElementById("tutorialBadge").textContent = lesson.badge;
       document.getElementById("tutorialLessonTitle").textContent = lesson.title;
       document.getElementById("tutorialLessonText").textContent = `${lesson.text} Guided moves: ${moves.length}.`;
       document.getElementById("tutorialReward").textContent = `Reward: +${lesson.reward.xp} XP, +${lesson.reward.coins} coins`;
-      document.getElementById("tutorialProgressText").textContent = `${completed.size}/${beginnerTutorialLessons.length} lessons complete`;
+      document.getElementById("tutorialProgressText").textContent = `${completed.size}/${beginnerTutorialLessons.length} complete · ${tutorialTopicFilter === "all" ? "All topics" : `${tutorialTopicFilter} ${topicCompleted}/${topicLessons.length}`}`;
       document.getElementById("tutorialProgressFill").style.setProperty("--tutorial-progress", `${progress}%`);
       document.getElementById("tutorialCoordinates").textContent = tutorialCoordinatesOn ? "Coords On" : "Coords Off";
       document.getElementById("tutorialCoordinates").setAttribute("aria-pressed", String(tutorialCoordinatesOn));
@@ -6750,7 +6847,8 @@
       document.getElementById("tutorialVoice").setAttribute("aria-pressed", String(tutorialVoiceOn));
       document.getElementById("tutorialNext").textContent = currentTutorialLesson >= beginnerTutorialLessons.length - 1 ? "Finish path" : "Next lesson";
       const move = getActiveTutorialMove(lesson);
-      setTutorialCoach(move ? `${lesson.coach} ${getTutorialStatusLine()} Step ${tutorialMoveStep + 1} of ${moves.length}: ${move.from} to ${move.correct}.` : lesson.coach);
+      setTutorialCoach(tutorialLineFailure || (move ? `${lesson.coach} ${getTutorialStatusLine()} Step ${tutorialMoveStep + 1} of ${moves.length}: ${move.from} to ${move.correct}.` : lesson.coach));
+      renderTutorialTopicFilter();
       renderTutorialLessonList();
       renderTutorialBoard();
       renderTutorialQuiz(lesson);
@@ -6760,6 +6858,27 @@
 
     function setupBeginnerTutorial() {
       if (!document.getElementById("tutorialBoard")) return;
+      const lessonList = document.getElementById("tutorialLessonList");
+      lessonList?.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-tutorial-lesson-index]");
+        if (!button || !lessonList.contains(button)) return;
+        const index = Number(button.dataset.tutorialLessonIndex);
+        if (!Number.isInteger(index) || !beginnerTutorialLessons[index]) return;
+        currentTutorialLesson = index;
+        renderBeginnerTutorial(true);
+      });
+      document.getElementById("tutorialTopicFilter")?.addEventListener("change", (event) => {
+        const selectedTopic = String(event.currentTarget.value || "all");
+        tutorialTopicFilter = selectedTopic;
+        const completed = new Set(beginnerTutorialState.completed || []);
+        const visible = beginnerTutorialLessons
+          .map((lesson, index) => ({ lesson, index }))
+          .filter(({ lesson }) => selectedTopic === "all" || (lesson.badge || "Guided practice") === selectedTopic);
+        if (!visible.some(({ index }) => index === currentTutorialLesson)) {
+          currentTutorialLesson = visible.find(({ lesson }) => !completed.has(lesson.id))?.index ?? visible[0]?.index ?? 0;
+        }
+        renderBeginnerTutorial(true);
+      });
       document.getElementById("tutorialHint")?.addEventListener("click", () => {
         const lesson = getTutorialLesson();
         const move = getActiveTutorialMove(lesson);
@@ -6794,6 +6913,7 @@
       });
       document.getElementById("tutorialNext")?.addEventListener("click", () => {
         currentTutorialLesson = Math.min(beginnerTutorialLessons.length - 1, currentTutorialLesson + 1);
+        if (tutorialTopicFilter !== "all" && beginnerTutorialLessons[currentTutorialLesson]?.badge !== tutorialTopicFilter) tutorialTopicFilter = "all";
         renderBeginnerTutorial(true);
       });
       renderBeginnerTutorial(true);

@@ -237,16 +237,26 @@
       <div class="wrap">
         <div class="section-head cq-section-header">
           <div>
-            <p class="section-kicker">Beginner tutorial</p>
+            <p class="section-kicker">Guided lessons · beginner foundations</p>
             <h2 id="tutorial-title">Learn chess one move at a time</h2>
           </div>
-          <p class="section-intro">A replayable guided path for brand-new players: setup, pieces, rules, tactics, quizzes, rewards, and gentle hints.</p>
+          <p class="section-intro">68 short board lessons cover piece rules, safe moves, tactics, openings, and endgames. The lesson checklist is saved in this browser; it is not a synced course record.</p>
         </div>
         <div class="tutorial-shell">
-          <aside class="tutorial-rail" aria-label="Tutorial lessons" id="tutorialLessonList"></aside>
+          <aside class="tutorial-rail" aria-label="Guided lesson library">
+            <div class="tutorial-rail-heading">
+              <strong>Choose a lesson</strong>
+              <span>Filter by topic</span>
+            </div>
+            <label class="tutorial-filter-label" for="tutorialTopicFilter">Topic</label>
+            <select id="tutorialTopicFilter" aria-label="Filter guided lessons by topic">
+              <option value="all">All topics (68)</option>
+            </select>
+            <div class="tutorial-lesson-list" id="tutorialLessonList" role="group" aria-label="Guided lessons"></div>
+          </aside>
           <div class="tutorial-stage">
             <div class="tutorial-progress" aria-live="polite">
-              <span id="tutorialProgressText">0/0 lessons complete</span>
+              <span id="tutorialProgressText">0/68 complete · All topics</span>
               <span class="tutorial-progress-bar" aria-hidden="true"><span id="tutorialProgressFill"></span></span>
             </div>
             <div class="tutorial-info">
@@ -265,12 +275,17 @@
             </div>
             <div class="tutorial-actions">
               <button class="button secondary" type="button" id="tutorialHint">Hint</button>
-              <button class="button secondary" type="button" id="tutorialCoordinates" aria-pressed="true">Coords On</button>
-              <button class="button secondary" type="button" id="tutorialFlip" aria-pressed="false">View: White</button>
-              <button class="button secondary" type="button" id="tutorialVoice" aria-pressed="false">Voice Off</button>
               <button class="button secondary" type="button" id="tutorialReplay">Replay lesson</button>
               <button class="button" type="button" id="tutorialNext">Next lesson</button>
             </div>
+            <details class="tutorial-settings">
+              <summary>Board settings</summary>
+              <div class="tutorial-settings-actions">
+                <button class="button secondary" type="button" id="tutorialCoordinates" aria-pressed="true">Coords On</button>
+                <button class="button secondary" type="button" id="tutorialFlip" aria-pressed="false">View: White</button>
+                <button class="button secondary" type="button" id="tutorialVoice" aria-pressed="false">Voice Off</button>
+              </div>
+            </details>
             <div class="tutorial-quiz" id="tutorialQuiz" aria-label="Mini quiz"></div>
           </div>
           <aside class="tutorial-coach" aria-live="polite">
@@ -1289,7 +1304,7 @@
             <p class="section-kicker">Learning paths</p>
             <h2 id="paths-title">Complete beginner missions</h2>
           </div>
-          <p class="section-intro">No ratings, no heavy analysis. Finish one tiny mission, celebrate it, and remember: you're getting better every day.</p>
+          <p class="section-intro">Beginner missions link to existing puzzle practice. Intermediate, Advanced, and Master are topic roadmaps—not interactive courses yet. For board-based lessons with legal-move feedback, open <a href="#tutorial">Guided Lessons</a>.</p>
         </div>
 
         <aside class="gentle-start" id="gentleStart" aria-labelledby="gentleStartTitle">
