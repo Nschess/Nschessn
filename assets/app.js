@@ -14048,39 +14048,44 @@
       setProfileText("[data-match-avatar]", profile.avatar);
       setProfileText(".player-profile-kicker", profile.avatarLabel);
       setProfileText("#loginAvatar", profile.avatar);
-      setProfileText('[data-profile-field="level"]', profile.level);
-      setProfileText('[data-profile-field="streak"]', formatProfileNumber(profile.streak));
-      setProfileText('[data-profile-field="xp"]', formatProfileNumber(profile.xp));
-      setProfileText('[data-profile-field="tokens"]', formatProfileNumber(profile.tokens));
-      setProfileText('[data-profile-field="rank"]', `Rank: ${profile.rank}`);
-      setProfileText('[data-profile-field="title"]', profile.rank || "Chess player");
       const authenticated = isApplicationAuthenticated();
-      const gameRating = authenticated ? getLearnerGameRating() : 450;
-      const puzzleRating = authenticated ? getLearnerPuzzleRating() : 400;
-      const gamesPlayed = authenticated ? Math.max(0, Number(gameStats.played) || 0) : 0;
-      const wins = authenticated ? Math.max(0, Number(gameStats.wins) || 0) : 0;
-      const winRate = gamesPlayed ? Math.round((wins / gamesPlayed) * 100) : 0;
-      const puzzleAttemptsTotal = authenticated ? puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts) : 0;
+      const serverStats = getProfileServerStatistics();
+      const practiceStats = getProfileLocalPracticeStatistics(authenticated);
+      const gameRatingLabel = serverStats.gameRating === null ? "—" : `${formatProfileNumber(serverStats.gameRating)} Elo`;
+      setProfileText('[data-profile-field="level"]', authenticated ? profile.level : "Sign in to save progress");
+      setProfileText('[data-profile-field="streak"]', authenticated ? formatProfileNumber(profile.streak) : "—");
+      setProfileText('[data-profile-field="xp"]', serverStats.xp === null ? "—" : formatProfileNumber(serverStats.xp));
+      setProfileText('[data-profile-field="tokens"]', serverStats.coins === null ? "—" : formatProfileNumber(serverStats.coins));
+      setProfileText('[data-profile-field="rank"]', authenticated ? `Rank: ${profile.rank}` : "Guest profile");
+      setProfileText('[data-profile-field="title"]', authenticated ? (profile.rank || "Chess player") : "Progress is not saved");
       const unlockedAchievements = profile.achievements.filter((achievement) => achievement.unlocked).length;
-      setProfileText('[data-profile-field="gameRating"]', `${formatProfileNumber(gameRating)} Elo`);
-      setProfileText('[data-profile-field="puzzleRating"]', formatProfileNumber(puzzleRating));
-      setProfileText('[data-profile-field="gamesPlayed"]', `${formatProfileNumber(gamesPlayed)} ${gamesPlayed === 1 ? "game" : "games"}`);
-      setProfileText('[data-profile-field="winRate"]', gamesPlayed ? `${winRate}% wins` : "No games yet");
-      setProfileText('[data-profile-field="puzzleAccuracy"]', puzzleAttemptsTotal ? `${getPuzzleAccuracy(0)}% accuracy` : "Solve a puzzle to begin");
-      setProfileText('[data-profile-achievement-summary]', `${unlockedAchievements}/${profile.achievements.length} unlocked`);
+      setProfileText('[data-profile-field="gameRating"]', gameRatingLabel);
+      setProfileText('[data-profile-field="puzzleRating"]', practiceStats.score === null ? "—" : formatProfileNumber(practiceStats.score));
+      setProfileText('[data-profile-field="gamesPlayed"]', serverStats.gamesPlayed === null
+        ? "— games"
+        : `${formatProfileNumber(serverStats.gamesPlayed)} ${serverStats.gamesPlayed === 1 ? "game" : "games"}`);
+      setProfileText('[data-profile-field="winRate"]', serverStats.winRate === null ? "—" : `${serverStats.winRate}% wins`);
+      setProfileText('[data-profile-field="puzzleAccuracy"]', practiceStats.accuracy === null
+        ? "No local attempts"
+        : `${practiceStats.accuracy}% accuracy · this device`);
+      setProfileText('[data-profile-achievement-summary]', `${unlockedAchievements}/${profile.achievements.length} on this device`);
       document.querySelectorAll(".player-flex-chip [data-profile-field='rank']").forEach((rank) => {
-        const compact = getCompactPlayerTitle(profile.rank);
-        rank.textContent = compact ? `Rank: ${compact.short}` : `Rank: ${String(profile.rank || "Explorer").replace(/\s+Avatar$/i, "").slice(0, 18)}`;
+        const compact = authenticated ? getCompactPlayerTitle(profile.rank) : null;
+        rank.textContent = !authenticated ? "Guest profile" : compact ? `Rank: ${compact.short}` : `Rank: ${String(profile.rank || "Explorer").replace(/\s+Avatar$/i, "").slice(0, 18)}`;
       });
       document.querySelectorAll(".player-flex-chip").forEach((chip) => {
-        chip.setAttribute("aria-label", `Open profile for ${profile.name}, ${formatProfileNumber(gameRating)} Elo and ${formatProfileNumber(profile.tokens)} coins`);
+        const ratingDescription = serverStats.gameRating === null ? "game rating unavailable" : `${formatProfileNumber(serverStats.gameRating)} Elo`;
+        const coinsDescription = serverStats.coins === null ? "account coins unavailable" : `${formatProfileNumber(serverStats.coins)} coins`;
+        chip.setAttribute("aria-label", `Open profile for ${profile.name}, ${ratingDescription} and ${coinsDescription}`);
       });
-      setProfileText('[data-profile-field="progress"]', `${profile.progress}%`);
-      setProfileText('[data-profile-field="next"]', profile.nextLevelXp ? `Next Level: ${formatProfileNumber(profile.nextLevelXp)} XP` : "Legend path complete");
-      setProfileText("[data-profile-save-state]", "Saved");
+      setProfileText('[data-profile-field="progress"]', authenticated ? `${profile.progress}%` : "—");
+      setProfileText('[data-profile-field="next"]', authenticated
+        ? profile.nextLevelXp ? `Next Level: ${formatProfileNumber(profile.nextLevelXp)} XP` : "Legend path complete"
+        : "Sign in to track progress");
+      setProfileText("[data-profile-save-state]", authenticated ? "Saved on this device" : "Guest profile");
       applyAvatarRankBadges(profile);
       document.querySelectorAll("[data-profile-progress-fill]").forEach((fill) => {
-        fill.style.width = `${profile.progress}%`;
+        fill.style.width = `${authenticated ? profile.progress : 0}%`;
       });
       document.querySelectorAll(".player-profile-avatar").forEach((avatar) => {
         if (avatar.dataset.profileLevel === profile.level) return;
@@ -14107,13 +14112,13 @@
           badge.className = `player-profile-achievement${achievement.unlocked ? "" : " is-locked"}`;
           badge.dataset.achievementTier = achievement.tier || "";
           const progress = achievement.progress || { current: 0, target: 1, label: "progress" };
-          badge.title = `${achievement.label}: ${achievement.unlocked ? "unlocked" : `${progress.current}/${progress.target} ${progress.label}`}. Reward: ${achievement.reward || "badge"}`;
+          badge.title = `${achievement.label}: ${achievement.unlocked ? "milestone reached" : `${progress.current}/${progress.target} ${progress.label}`}. Calculated from activity on this device; no server reward is recorded.`;
           badge.setAttribute("aria-label", badge.title);
           badge.dataset.profileAchievementLabel = achievement.label;
           badge.append(
             createBookText("strong", "profile-achievement-icon", achievement.icon),
             createBookText("small", "profile-achievement-label", achievement.secret && !achievement.unlocked ? "Secret" : achievement.label),
-            createBookText("small", "profile-achievement-meta", achievement.unlocked ? "Unlocked" : `${Math.round(progress.current * 10) / 10}/${progress.target}`)
+            createBookText("small", "profile-achievement-meta", achievement.unlocked ? "Reached · this device" : `${Math.round(progress.current * 10) / 10}/${progress.target}`)
           );
           return badge;
         }));
@@ -14131,7 +14136,8 @@
 
     function renderProfileRatingHistory() {
       const authenticated = isApplicationAuthenticated();
-      const currentRating = authenticated ? getLearnerPuzzleRating() : 400;
+      const practiceStats = getProfileLocalPracticeStatistics(authenticated);
+      const currentRating = practiceStats.score;
       const recorded = authenticated && Array.isArray(puzzleRatingHistory)
         ? puzzleRatingHistory
           .map((entry) => ({ rating: Number(entry?.rating), at: entry?.at || "" }))
@@ -14139,9 +14145,26 @@
           .slice(-11)
         : [];
       const latest = recorded.at(-1);
-      const points = latest?.rating === currentRating
+      const points = currentRating === null || latest?.rating === currentRating
         ? recorded
         : [...recorded, { rating: currentRating, at: "" }].slice(-12);
+      if (!points.length) {
+        document.querySelectorAll("[data-profile-history-status]").forEach((status) => {
+          status.textContent = authenticated ? "No local puzzle practice yet" : "Sign in to view saved practice";
+        });
+        document.querySelectorAll("[data-profile-rating-history]").forEach((chart) => {
+          const emptySignature = authenticated ? "empty-local-practice" : "guest-practice-unavailable";
+          chart.setAttribute("aria-label", authenticated
+            ? "No device-local puzzle practice estimate history is saved yet; this is not an Elo rating."
+            : "Puzzle practice history is unavailable for a guest profile.");
+          if (chart.dataset.profileRatingSignature === emptySignature) return;
+          chart.dataset.profileRatingSignature = emptySignature;
+          chart.replaceChildren(createBookText("span", "profile-rating-empty", authenticated
+            ? "Solve a puzzle to start a device-only trend."
+            : "Sign in to see locally saved practice."));
+        });
+        return;
+      }
       const ratings = points.map((point) => point.rating);
       const low = Math.min(400, ...ratings);
       const high = Math.max(...ratings, low + 40);
@@ -14150,8 +14173,9 @@
       const chartCeiling = high + (spread * 0.12);
       const historyCount = recorded.length;
       const historyLabel = historyCount
-        ? `${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"} tracked`
-        : "First puzzle starts your trend";
+        ? `${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"} · this device`
+        : "Local practice · this device";
+      const latestPracticeScore = currentRating ?? points.at(-1)?.rating ?? null;
       const historySignature = points.map((point) => `${point.rating}:${point.at || "current"}`).join("|");
 
       document.querySelectorAll("[data-profile-history-status]").forEach((status) => {
@@ -14159,8 +14183,8 @@
       });
       document.querySelectorAll("[data-profile-rating-history]").forEach((chart) => {
         const label = historyCount
-          ? `Puzzle rating trend across ${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"}. Current rating ${formatProfileNumber(currentRating)}.`
-          : `Current puzzle rating ${formatProfileNumber(currentRating)}. Complete puzzles to build a rating trend.`;
+          ? `Device-local puzzle practice estimate history across ${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"}; this is not an Elo rating. Latest estimate ${formatProfileNumber(currentRating ?? points.at(-1)?.rating)}.`
+          : `Device-local puzzle practice estimate ${formatProfileNumber(currentRating)}; this is not an Elo rating. Complete puzzles to build a local trend.`;
         chart.setAttribute("aria-label", label);
         if (chart.dataset.profileRatingSignature === historySignature) return;
         chart.dataset.profileRatingSignature = historySignature;
@@ -14198,11 +14222,11 @@
           marker.setAttribute("tabindex", "0");
           marker.setAttribute("role", "img");
           marker.setAttribute("aria-label", point.at
-            ? `${formatProfileNumber(point.rating)} puzzle rating - ${new Date(point.at).toLocaleDateString()}`
-            : `Current puzzle rating: ${formatProfileNumber(point.rating)}`);
+            ? `${formatProfileNumber(point.rating)} device-local practice estimate, not Elo - ${new Date(point.at).toLocaleDateString()}`
+            : `Current device-local practice estimate, not Elo: ${formatProfileNumber(point.rating)}`);
           svg.append(marker);
         });
-        const footer = createBookText("div", "profile-rating-axis", `${formatProfileNumber(points[0]?.rating || currentRating)}  ·  ${formatProfileNumber(currentRating)} current`);
+        const footer = createBookText("div", "profile-rating-axis", `${formatProfileNumber(points[0]?.rating ?? latestPracticeScore)}  ·  ${formatProfileNumber(latestPracticeScore)} latest estimate`);
         chart.replaceChildren(svg, footer);
       });
     }
@@ -14210,27 +14234,23 @@
     function renderProfileShowcase(profile = getDragonProfileSnapshot()) {
       const authenticated = isApplicationAuthenticated();
       const records = authenticated ? getCompletedGamesWithReviews() : [];
-      const recordedWins = records.filter((game) => game.result === "win").length;
-      const recordedDraws = records.filter((game) => game.result === "draw").length;
-      const recordedLosses = records.filter((game) => game.result === "loss").length;
-      const played = authenticated ? Math.max(0, Number(gameStats.played) || 0, recordedWins + recordedDraws + recordedLosses) : 0;
-      const wins = authenticated ? Math.min(played, Math.max(0, Number(gameStats.wins) || 0, recordedWins)) : 0;
-      const draws = authenticated ? Math.min(Math.max(0, played - wins), Math.max(0, Number(gameStats.draws) || 0, recordedDraws)) : 0;
-      const losses = authenticated ? Math.max(0, played - wins - draws, recordedLosses) : 0;
-      const puzzleAttemptsTotal = authenticated ? puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts) : 0;
-      const puzzleAccuracy = puzzleAttemptsTotal ? getPuzzleAccuracy(0) : 0;
+      const serverStats = getProfileServerStatistics();
+      const practiceStats = getProfileLocalPracticeStatistics(authenticated);
       const setContent = (selector, nodes) => document.querySelectorAll(selector).forEach((target) => target.replaceChildren(...nodes));
       const metric = (value, label, tone = "") => {
         const node = createBookText("span", `profile-mini-stat${tone ? ` is-${tone}` : ""}`, "");
-        node.append(createBookText("strong", "", formatProfileNumber(value)), createBookText("small", "", label));
+        node.append(createBookText("strong", "", value === null ? "—" : formatProfileNumber(value)), createBookText("small", "", label));
         return node;
       };
 
-      setContent("[data-profile-record]", [metric(wins, "Wins", "positive"), metric(losses, "Losses", "negative"), metric(draws, "Draws")]);
-      setContent("[data-profile-puzzle-stats]", [metric(authenticated ? solvedPuzzles.size : 0, "Solved", "positive"), metric(puzzleAccuracy, "Accuracy"), metric(authenticated ? bestPuzzleStreak : 0, "Best streak")]);
+      setContent("[data-profile-record]", [metric(serverStats.wins, "Account wins", "positive"), metric(serverStats.losses, "Account losses", "negative"), metric(serverStats.draws, "Account draws")]);
+      setContent("[data-profile-puzzle-stats]", [
+        metric(practiceStats.solved, "Solved · device", "positive"),
+        metric(practiceStats.accuracy, "Accuracy · device"),
+        metric(practiceStats.bestStreak, "Best streak · device")
+      ]);
 
       const openingCounts = new Map();
-      if (authenticated && favoriteOpening) openingCounts.set(favoriteOpening, 1);
       if (authenticated) matchReviews.forEach((review) => {
         const opening = String(review?.summary?.opening || "").trim();
         if (opening) openingCounts.set(opening, (openingCounts.get(opening) || 0) + 1);
@@ -14239,10 +14259,10 @@
       setContent("[data-profile-openings]", openings.length
         ? openings.map(([name, count], index) => {
           const row = createBookText("div", "profile-favorite-row", "");
-          row.append(createBookText("span", "profile-favorite-rank", `${index + 1}`), createBookText("strong", "", name), createBookText("small", "", `${count} ${count === 1 ? "game" : "games"}`));
+          row.append(createBookText("span", "profile-favorite-rank", `${index + 1}`), createBookText("strong", "", name), createBookText("small", "", `${count} saved ${count === 1 ? "review" : "reviews"}`));
           return row;
         })
-        : [createBookText("p", "profile-empty-note", "Play or review a game to reveal your openings.")]);
+        : [createBookText("p", "profile-empty-note", "Save a game review with opening details to see patterns here.")]);
 
       const prefs = authenticated ? readLearnerPrefs() : { board: "wood", pieceSkin: "chessnut", backgroundTheme: "classic" };
       const cosmetics = [
@@ -14261,12 +14281,11 @@
         const progress = achievement.progress || { current: 0, target: 1, label: "progress" };
         card.append(
           createBookText("span", "profile-showcase-icon", achievement.icon),
-          createBookText("strong", "", achievement.secret && !achievement.unlocked ? "Secret achievement" : achievement.label),
-          createBookText("small", "", `${achievement.tier || "Milestone"} · ${achievement.unlocked ? "Unlocked" : `${Math.round(progress.current * 10) / 10}/${progress.target} ${progress.label}`}`),
-          createBookText("small", "profile-showcase-reward", `Reward: ${achievement.reward || "badge"}`)
+          createBookText("strong", "", achievement.secret && !achievement.unlocked ? "Secret milestone" : achievement.label),
+          createBookText("small", "", `${achievement.tier || "Milestone"} · ${achievement.unlocked ? "Reached on this device" : `${Math.round(progress.current * 10) / 10}/${progress.target} ${progress.label}`}`)
         );
-        card.title = achievement.condition || achievement.note || "Achievement";
-        card.setAttribute("aria-label", `${achievement.label}: ${achievement.unlocked ? "unlocked" : "locked"}. ${achievement.condition || "Hidden condition"}. Reward: ${achievement.reward || "badge"}`);
+        card.title = `${achievement.condition || achievement.note || "Activity milestone"}. Calculated on this device; no server achievement or reward is recorded.`;
+        card.setAttribute("aria-label", `${achievement.label}: ${achievement.unlocked ? "reached on this device" : "in progress"}. ${achievement.condition || "Hidden condition"}. No server reward is recorded.`);
         return card;
       }));
 
@@ -14280,7 +14299,7 @@
         const fill = createBookText("span", "", "");
         fill.style.width = `${progress.percent}%`;
         bar.append(fill);
-        card.append(head, bar, createBookText("small", "", progress.percent === 100 ? `${collection.reward?.label || "Collection reward"} unlocked` : `${progress.remaining} item${progress.remaining === 1 ? "" : "s"} remaining`));
+        card.append(head, bar, createBookText("small", "", progress.percent === 100 ? "Collection complete" : `${progress.remaining} item${progress.remaining === 1 ? "" : "s"} remaining`));
         return card;
       }));
 
@@ -14306,15 +14325,15 @@
         row.append(createBookText("span", "profile-match-result", resultLabel), opponent, createBookText("time", "", formatAccountDate(game.completedAt)));
         return row;
       }));
-      document.querySelectorAll("[data-profile-history-count]").forEach((target) => { target.textContent = records.length ? `${formatProfileNumber(records.length)} completed` : "No completed games"; });
+      document.querySelectorAll("[data-profile-history-count]").forEach((target) => { target.textContent = records.length ? `${formatProfileNumber(records.length)} saved locally` : "No saved reviews"; });
 
-      const seasonTarget = 1000;
-      const seasonXp = Math.max(0, Number(profile.xp) || 0);
-      const seasonPercent = Math.min(100, Math.round((seasonXp / seasonTarget) * 100));
-      document.querySelectorAll("[data-profile-season-xp]").forEach((target) => { target.textContent = `${formatProfileNumber(Math.min(seasonXp, seasonTarget))} / ${formatProfileNumber(seasonTarget)} XP`; });
-      document.querySelectorAll("[data-profile-season-fill]").forEach((target) => { target.style.width = `${seasonPercent}%`; });
-      document.querySelectorAll("[data-profile-season-label]").forEach((target) => { target.textContent = seasonXp >= seasonTarget ? "Season complete" : `${seasonPercent}% complete`; });
-      document.querySelectorAll("[data-profile-season-note]").forEach((target) => { target.textContent = seasonXp >= seasonTarget ? "You reached the current season milestone. Keep building your next streak." : "Profile XP counts toward this season track across games, puzzles, and lessons."; });
+      const milestoneTarget = 1000;
+      const profileXp = authenticated ? Math.max(0, Number(profile.xp) || 0) : null;
+      const milestonePercent = profileXp === null ? 0 : Math.min(100, Math.round((profileXp / milestoneTarget) * 100));
+      document.querySelectorAll("[data-profile-season-xp]").forEach((target) => { target.textContent = profileXp === null ? `— / ${formatProfileNumber(milestoneTarget)} XP` : `${formatProfileNumber(Math.min(profileXp, milestoneTarget))} / ${formatProfileNumber(milestoneTarget)} XP`; });
+      document.querySelectorAll("[data-profile-season-fill]").forEach((target) => { target.style.width = `${milestonePercent}%`; });
+      document.querySelectorAll("[data-profile-season-label]").forEach((target) => { target.textContent = profileXp === null ? "Not available" : `${milestonePercent}% of milestone`; });
+      document.querySelectorAll("[data-profile-season-note]").forEach((target) => { target.textContent = "A profile XP guidance target shown on this device; it is not a timed season or server achievement."; });
     }
 
     function getLearnerPuzzleRating() {
@@ -14330,6 +14349,57 @@
       const played = Math.max(0, Number(gameStats.played) || 0);
       const losses = Math.max(0, played - wins);
       return Math.max(400, 450 + (wins * 24) + (gameStats.cleanGames * 12) + (gameStats.endgameWins * 16) - (losses * 5));
+    }
+
+    function getProfileServerStatistics(profileData = applicationAuthAccount?.profileData, authenticated = isApplicationAuthenticated()) {
+      const unavailable = { gameRating: null, coins: null, xp: null, wins: null, losses: null, draws: null, gamesPlayed: null, winRate: null };
+      if (!authenticated || !profileData || typeof profileData !== "object") return unavailable;
+      const availability = profileData.profileMetricAvailability && typeof profileData.profileMetricAvailability === "object"
+        ? profileData.profileMetricAvailability
+        : {};
+      const read = (key) => {
+        if (availability[key] === false) return null;
+        const raw = profileData[key];
+        if ((typeof raw !== "number" && typeof raw !== "string") || (typeof raw === "string" && !raw.trim())) return null;
+        const value = Number(raw);
+        return Number.isFinite(value) && value >= 0 ? value : null;
+      };
+      const readWhole = (key) => {
+        const value = read(key);
+        return value !== null && Number.isSafeInteger(value) ? value : null;
+      };
+      const ratingValue = read("rating");
+      const gameRating = ratingValue !== null && ratingValue >= 400 && ratingValue <= 3000
+        ? Math.max(400, Math.round(ratingValue))
+        : null;
+      const wins = readWhole("wins");
+      const losses = readWhole("losses");
+      const draws = readWhole("draws");
+      const hasCompleteRecord = wins !== null && losses !== null && draws !== null;
+      const totalGames = hasCompleteRecord ? wins + losses + draws : null;
+      const gamesPlayed = Number.isSafeInteger(totalGames) ? totalGames : null;
+      return {
+        gameRating,
+        coins: readWhole("coins"),
+        xp: readWhole("xp"),
+        wins,
+        losses,
+        draws,
+        gamesPlayed,
+        winRate: gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : null
+      };
+    }
+
+    function getProfileLocalPracticeStatistics(authenticated = isApplicationAuthenticated()) {
+      if (!authenticated) return { attempts: null, solved: null, accuracy: null, bestStreak: null, score: null };
+      const attempts = Math.max(0, Number(puzzleAttempts) || 0, (Number(puzzleCorrect) || 0) + (Number(puzzleFailed) || 0));
+      return {
+        attempts,
+        solved: solvedPuzzles.size,
+        accuracy: attempts > 0 ? getPuzzleAccuracy(0) : null,
+        bestStreak: attempts > 0 ? Math.max(0, Number(bestPuzzleStreak) || 0) : null,
+        score: attempts > 0 ? getLearnerPuzzleRating() : null
+      };
     }
 
     function formatAccountDate(value) {
@@ -14463,6 +14533,9 @@
 
     function renderAccountVault(profile) {
       const account = getUserProfileSnapshot(profile);
+      const authenticated = isApplicationAuthenticated();
+      const serverStats = getProfileServerStatistics();
+      const practiceStats = getProfileLocalPracticeStatistics(authenticated);
       const setAccountText = (name, value) => {
         document.querySelectorAll(`[data-account-field="${name}"]`).forEach((element) => {
           element.textContent = value;
@@ -14470,18 +14543,28 @@
       };
       setAccountText("username", account.username);
       setAccountText("avatar", `${account.avatar.icon} ${account.avatar.label}`);
-      setAccountText("level", account.level);
-      setAccountText("title", account.title);
-      setAccountText("xp", `${formatProfileNumber(account.xp)} XP`);
-      setAccountText("streak", `${formatProfileNumber(account.currentStreak)} days`);
-      setAccountText("puzzleRating", account.puzzleRating);
-      setAccountText("gameRating", account.gameRating);
-      setAccountText("achievements", `${account.achievements.length}/${profile.achievements.length}`);
-      setAccountText("story", `${account.storyProgress.completed}/${account.storyProgress.total}`);
+      setAccountText("level", authenticated ? account.level : "—");
+      setAccountText("title", authenticated ? account.title : "—");
+      setAccountText("xp", authenticated ? `${formatProfileNumber(account.xp)} XP · this device` : "—");
+      setAccountText("streak", authenticated ? `${formatProfileNumber(account.currentStreak)} days · this device` : "—");
+      setAccountText("puzzleRating", practiceStats.score === null ? "—" : `${formatProfileNumber(practiceStats.score)} · device estimate, not Elo`);
+      setAccountText("gameRating", serverStats.gameRating === null ? "—" : `${formatProfileNumber(serverStats.gameRating)} Elo`);
+      setAccountText("achievements", authenticated ? `${account.achievements.length} local milestones` : "—");
+      setAccountText("story", authenticated ? `${account.storyProgress.completed}/${account.storyProgress.total} · this device` : "—");
       setAccountText("settings", `${account.settings.theme} / ${account.settings.board}`);
-      setAccountText("stats", `${formatProfileNumber(account.statistics.gamesPlayed)} games - ${formatProfileNumber(account.statistics.puzzlesSolved)} puzzles`);
-      setAccountText("joinDate", formatAccountDate(account.joinDate));
-      setAccountText("lastLogin", formatAccountDate(account.lastLogin));
+      setAccountText("stats", `${serverStats.gamesPlayed === null ? "—" : `${formatProfileNumber(serverStats.gamesPlayed)} account games`} · ${practiceStats.solved === null ? "—" : `${formatProfileNumber(practiceStats.solved)} local puzzles`}`);
+      setAccountText("joinDate", authenticated ? formatAccountDate(account.joinDate) : "—");
+      setAccountText("lastLogin", authenticated ? formatAccountDate(account.lastLogin) : "—");
+      document.querySelectorAll("[data-account-source-note]").forEach((note) => {
+        note.textContent = authenticated
+          ? "Ratings, account XP, coins, and game totals come from the signed-in profile when present. The separate device XP estimate, level progress, practice, milestones, streak, and story progress are local, not synced achievements or rewards."
+          : "Guest activity is not presented as account progress. Sign in to load profile-backed ratings, XP, wallet, and game totals.";
+      });
+      document.querySelectorAll("[data-account-vault-description]").forEach((note) => {
+        note.textContent = authenticated
+          ? "Your signed-in identity and profile-backed ratings, XP, wallet, and game totals appear here; device-only progress is identified separately."
+          : "Local preferences stay in this browser. Account-backed ratings, XP, wallet, and game totals appear after sign-in.";
+      });
     }
 
     function getDailyChallengeName() {
@@ -31421,8 +31504,26 @@
     function normalizeSupabaseProfileData(profile = {}) {
       const source = profile && typeof profile === "object" ? profile : {};
       const friendSource = source.friends && typeof source.friends === "object" && !Array.isArray(source.friends) ? source.friends : {};
+      const existingAvailability = source.profileMetricAvailability && typeof source.profileMetricAvailability === "object"
+        ? source.profileMetricAvailability
+        : {};
+      const hasNumericValue = (key) => {
+        if (typeof existingAvailability[key] === "boolean") return existingAvailability[key];
+        const value = source[key];
+        return (typeof value === "number" || typeof value === "string")
+          && !(typeof value === "string" && !value.trim())
+          && Number.isFinite(Number(value)) && Number(value) >= 0;
+      };
       return {
         ...source,
+        profileMetricAvailability: {
+          rating: hasNumericValue("rating") && Number(source.rating) >= 400,
+          coins: hasNumericValue("coins"),
+          xp: hasNumericValue("xp"),
+          wins: hasNumericValue("wins"),
+          losses: hasNumericValue("losses"),
+          draws: hasNumericValue("draws")
+        },
         avatar: String(source.avatar || "auto"),
         countryFlag: normalizeCountryFlagValue(source.countryFlag || source.country_flag || ""),
         rating: Math.max(400, Number(source.rating) || 450),
@@ -32162,7 +32263,7 @@
           if (generation !== authGeneration) return null;
           cachedAccount = {
             ...account,
-            profileData: normalizeSupabaseProfileData(saved ? { ...row, ...saved } : row)
+            profileData: normalizeSupabaseProfileData({ ...(account.profileData || {}), ...row, ...(saved || {}) })
           };
           return cachedAccount;
         },

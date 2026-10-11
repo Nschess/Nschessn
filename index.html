@@ -67,7 +67,7 @@
         </button>
         <a class="nav-coin-chip" href="#store" data-site-tab="store" data-site-panel="store" aria-label="Open Store and view coins">
           <span class="nav-utility-icon" data-lucide="coins" aria-hidden="true">&#9670;</span>
-          <span data-profile-field="tokens">0</span>
+          <span data-profile-field="tokens">—</span>
         </a>
         <button class="nav-icon-button" type="button" id="siteNotificationsOpen" aria-label="Open activity updates" aria-haspopup="dialog" aria-controls="siteNotificationsDialog" title="Activity updates">
           <span class="nav-utility-icon" data-lucide="bell" aria-hidden="true">&#9673;</span><i id="siteNotificationsDot" aria-hidden="true" hidden></i>
@@ -78,11 +78,11 @@
             <span class="player-flex-name">
               <span data-profile-field="name">Guest Explorer</span>
             </span>
-            <span class="player-flex-title" data-profile-field="rank">Rank: Explorer</span>
-            <span class="player-flex-meta" aria-label="Player rating and coins">
-              <span data-profile-field="gameRating">450 Elo</span>
+            <span class="player-flex-title" data-profile-field="rank">Guest profile</span>
+            <span class="player-flex-meta" aria-label="Account rating and coins">
+              <span data-profile-field="gameRating">—</span>
               <span aria-hidden="true">&middot;</span>
-              <span class="player-flex-coin-label" title="Coins"><span aria-hidden="true">&#9670;</span> <span data-profile-field="tokens">0</span></span>
+              <span class="player-flex-coin-label" title="Account coins"><span aria-hidden="true">&#9670;</span> <span data-profile-field="tokens">—</span></span>
             </span>
             <span class="player-flex-progress" aria-hidden="true"><span data-profile-progress-fill></span></span>
           </span>
@@ -146,7 +146,7 @@
           <div class="home-command-player" aria-label="Your player identity">
             <span class="home-command-avatar">Y</span>
             <span><strong data-profile-field="name">You</strong><small data-profile-field="title">Ready to play</small></span>
-            <b><span data-profile-field="gameRating">600</span><small>Elo</small></b>
+            <b><span data-profile-field="gameRating">—</span></b>
           </div>
         </header>
 
@@ -393,9 +393,9 @@
                   <div class="player-profile-title">
                     <span class="player-profile-kicker">Rookie avatar</span>
                     <strong class="player-profile-name" data-profile-field="name">Guest Explorer</strong>
-                    <span class="player-profile-level" data-profile-field="level">Level 1 Explorer</span>
+                    <span class="player-profile-level" data-profile-field="level">—</span>
                   </div>
-                  <span class="profile-presence" title="Your player profile is ready"><i aria-hidden="true"></i>Ready</span>
+                  <span class="profile-presence"><i aria-hidden="true"></i>Profile</span>
                 </div>
                 <div class="profile-overview-actions">
                   <button class="player-profile-save" type="button" data-player-profile-save>
@@ -424,59 +424,59 @@
               </details>
 
               <details class="profile-performance profile-detail-section">
-                <summary class="profile-detail-summary"><span>Ratings</span><span data-profile-achievement-summary>0/18 unlocked</span></summary>
+                <summary class="profile-detail-summary"><span>Ratings & practice</span><span>Account + device</span></summary>
                 <div class="profile-detail-body">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Performance</span>
-                    <h4 id="profilePerformanceTitle">Ratings</h4>
+                    <span class="profile-section-kicker">Account rating · device practice</span>
+                    <h4 id="profilePerformanceTitle">Ratings & practice</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-achievement-summary>0/18 unlocked</span>
+                  <span class="profile-section-status">Ratings are account-backed when available</span>
                 </div>
                 <div class="profile-rating-grid">
                   <article class="profile-rating-card">
-                    <span>Game rating</span>
-                    <strong data-profile-field="gameRating">450 Elo</strong>
-                    <small><span data-profile-field="gamesPlayed">0 games</span><span aria-hidden="true">&middot;</span><span data-profile-field="winRate">0% wins</span></small>
+                    <span>Game rating · account</span>
+                    <strong data-profile-field="gameRating">—</strong>
+                    <small><span data-profile-field="gamesPlayed">— games</span><span aria-hidden="true">&middot;</span><span data-profile-field="winRate">—</span></small>
                   </article>
                   <article class="profile-rating-card">
-                    <span>Puzzle rating</span>
-                    <strong data-profile-field="puzzleRating">400</strong>
-                    <small data-profile-field="puzzleAccuracy">Solve a puzzle to begin</small>
+                    <span>Puzzle practice estimate · this device</span>
+                    <strong data-profile-field="puzzleRating">—</strong>
+                    <small data-profile-field="puzzleAccuracy">No local attempts</small>
                   </article>
                 </div>
                 <details class="profile-optional-detail">
-                  <summary>Rating history <small data-profile-history-status>First puzzle starts your trend</small></summary>
+                  <summary>Practice estimate history <small data-profile-history-status>No local puzzle practice yet</small></summary>
                   <div class="profile-rating-history">
                     <div class="profile-rating-history-head">
-                      <span>Puzzle rating trend</span>
-                      <small>Recent progress</small>
+                      <span>Local practice estimate trend</span>
+                      <small>Device-only · not Elo</small>
                     </div>
-                    <div class="profile-rating-chart" data-profile-rating-history role="img" aria-label="Puzzle rating history">
-                      <span class="profile-rating-empty">Current rating</span>
+                    <div class="profile-rating-chart" data-profile-rating-history role="img" aria-label="Device-local puzzle practice estimate history; not Elo">
+                      <span class="profile-rating-empty">Solve a puzzle to start a local trend.</span>
                     </div>
                   </div>
                 </details>
                 </div>
               </details>
 
-              <section class="profile-stat-section" aria-label="Profile stats">
+              <section class="profile-stat-section" aria-label="Player progress and account facts">
                 <div class="profile-stat-heading">
-                  <span>Player stats</span>
-                  <small>Overview</small>
+                  <span>Progress &amp; account facts</span>
+                  <small>Local streak · account XP and coins when available</small>
                 </div>
                 <div class="player-profile-stats">
                   <div class="player-profile-stat">
-                    <strong data-profile-field="streak">0</strong>
-                    <span>Day streak</span>
+                    <strong data-profile-field="streak">—</strong>
+                    <span>Day streak · device</span>
                   </div>
                   <div class="player-profile-stat">
-                    <strong data-profile-field="xp">0</strong>
-                    <span>Total XP</span>
+                    <strong data-profile-field="xp">—</strong>
+                    <span>Account XP</span>
                   </div>
                   <div class="player-profile-stat">
-                    <strong data-profile-field="tokens">0</strong>
-                    <span>Coins</span>
+                    <strong data-profile-field="tokens">—</strong>
+                    <span>Account coins</span>
                   </div>
                 </div>
               </section>
@@ -485,13 +485,13 @@
                 <div class="profile-section-heading">
                   <div>
                     <span class="profile-section-kicker">Progress</span>
-                    <h4 id="profileProgressTitle" class="player-profile-rank" data-profile-field="rank">Rank: Explorer</h4>
+                    <h4 id="profileProgressTitle" class="player-profile-rank" data-profile-field="rank">Guest profile</h4>
                   </div>
-                  <span data-profile-field="progress">0%</span>
+                  <span data-profile-field="progress">—</span>
                 </div>
                 <div class="player-profile-progress-labels">
                   <span>Level progress</span>
-                  <span data-profile-field="next">Next Level: 80 XP</span>
+                  <span data-profile-field="next">Sign in to track progress</span>
                 </div>
                 <div class="player-profile-progress" aria-hidden="true">
                   <span data-profile-progress-fill></span>
@@ -532,16 +532,16 @@
               </details>
 
               <details class="profile-achievement-section profile-detail-section">
-                <summary class="profile-detail-summary"><span>Achievements</span><span data-profile-achievement-summary>0/18 unlocked</span></summary>
+                <summary class="profile-detail-summary"><span>Activity milestones</span><span data-profile-achievement-summary>— on this device</span></summary>
                 <div class="profile-detail-body">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Milestones</span>
-                    <h4 id="profileAchievementsTitle">Achievements</h4>
+                    <span class="profile-section-kicker">On this device · no server rewards</span>
+                    <h4 id="profileAchievementsTitle">Activity milestones</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-achievement-summary>0/18 unlocked</span>
+                  <span class="profile-section-status" data-profile-achievement-summary>— on this device</span>
                 </div>
-                <div class="player-profile-achievements" data-profile-achievements aria-label="Achievements"></div>
+                <div class="player-profile-achievements" data-profile-achievements aria-label="On-device activity milestones"></div>
                 </div>
               </details>
 
@@ -553,16 +553,16 @@
                     <span class="profile-section-kicker">Player card</span>
                     <h4 id="profileCommandTitle">Stats</h4>
                   </div>
-                  <span class="profile-section-status">Live</span>
+                  <span class="profile-section-status">Account facts + local activity</span>
                 </div>
                 <div class="profile-command-grid">
                   <article class="profile-command-card">
-                    <span class="profile-command-label">Match record</span>
-                    <div class="profile-record-grid" data-profile-record aria-label="Win loss draw record"></div>
+                    <span class="profile-command-label">Account match record</span>
+                    <div class="profile-record-grid" data-profile-record aria-label="Account-backed win loss draw totals"></div>
                   </article>
                   <article class="profile-command-card">
-                    <span class="profile-command-label">Puzzle practice</span>
-                    <div class="profile-mini-stats" data-profile-puzzle-stats aria-label="Puzzle statistics"></div>
+                    <span class="profile-command-label">Puzzle practice · this device</span>
+                    <div class="profile-mini-stats" data-profile-puzzle-stats aria-label="Device-local puzzle practice statistics"></div>
                   </article>
                 </div>
               </div>
@@ -576,7 +576,7 @@
                 </div>
                 <div class="profile-favorites-grid">
                   <article class="profile-favorite-card">
-                    <span class="profile-command-label">Openings</span>
+                    <span class="profile-command-label">Saved review openings · this device</span>
                     <div data-profile-openings></div>
                   </article>
                   <article class="profile-favorite-card">
@@ -600,10 +600,10 @@
               <div class="profile-history-section" aria-labelledby="profileHistoryTitle">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Recent play</span>
-                    <h4 id="profileHistoryTitle">Match history</h4>
+                    <span class="profile-section-kicker">Local review notes</span>
+                    <h4 id="profileHistoryTitle">Saved review history</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-history-count>No completed games</span>
+                  <span class="profile-section-status" data-profile-history-count>—</span>
                 </div>
                 <div class="profile-match-history" data-profile-match-history aria-label="Recent match history"></div>
               </div>
@@ -611,40 +611,41 @@
               <div class="profile-season-section" aria-labelledby="profileSeasonTitle">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Season</span>
-                    <h4 id="profileSeasonTitle">Progress</h4>
+                    <span class="profile-section-kicker">Guidance · this device</span>
+                    <h4 id="profileSeasonTitle">XP milestone</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-season-label>Current season</span>
+                  <span class="profile-section-status" data-profile-season-label>Not available</span>
                 </div>
                 <div class="profile-season-card">
                   <div class="profile-season-row">
-                    <span>Season XP</span>
-                    <strong data-profile-season-xp>0 / 1,000 XP</strong>
+                    <span>Profile XP milestone</span>
+                    <strong data-profile-season-xp>— / 1,000 XP</strong>
                   </div>
                   <div class="profile-season-progress" aria-hidden="true"><span data-profile-season-fill></span></div>
-                  <p data-profile-season-note>Keep playing, solving, and learning to advance your season track.</p>
+                  <p data-profile-season-note>This is a device-visible guidance target, not a timed season or server achievement.</p>
                 </div>
               </div>
               </details>
             </aside>
             <details class="account-vault" aria-labelledby="accountVaultTitle">
               <summary id="accountVaultTitle">Account details <span>View</span></summary>
-              <p class="auth-note">Your saved profile details and preferences, ready to sync when you use a secure account.</p>
+              <p class="auth-note" data-account-vault-description>Local preferences stay in this browser. Account-backed ratings, XP, wallet, and game totals appear after sign-in.</p>
+              <p class="auth-note" data-account-source-note>Guest activity is not presented as account progress. Sign in to load profile-backed ratings, XP, wallet, and game totals.</p>
               <div class="account-vault-grid">
                 <span><strong data-account-field="username">Guest Explorer</strong>Username</span>
                 <span><strong data-account-field="avatar">Pawn Rookie</strong>Avatar</span>
-                <span><strong data-account-field="level">Level 1 Explorer</strong>Level</span>
-                <span><strong data-account-field="title">Explorer</strong>Title</span>
-                <span><strong data-account-field="xp">0 XP</strong>Total XP</span>
-                <span><strong data-account-field="streak">0 days</strong>Current streak</span>
-                <span><strong data-account-field="puzzleRating">400</strong>Puzzle rating</span>
-                <span><strong data-account-field="gameRating">400</strong>Game rating</span>
-                <span><strong data-account-field="achievements">0/18</strong>Achievements</span>
-                <span><strong data-account-field="story">0/8</strong>Story progress</span>
-                <span><strong data-account-field="settings">Dark / Wood</strong>Settings</span>
-                <span><strong data-account-field="stats">0 games</strong>Statistics</span>
-                <span><strong data-account-field="joinDate">Today</strong>Join date</span>
-                <span><strong data-account-field="lastLogin">Today</strong>Last login</span>
+                <span><strong data-account-field="level">—</strong>Level · this device</span>
+                <span><strong data-account-field="title">—</strong>Title · this device</span>
+                <span><strong data-account-field="xp">—</strong>XP · this device</span>
+                <span><strong data-account-field="streak">—</strong>Streak · this device</span>
+                <span><strong data-account-field="puzzleRating">—</strong>Practice estimate · this device, not Elo</span>
+                <span><strong data-account-field="gameRating">—</strong>Game rating · account</span>
+                <span><strong data-account-field="achievements">—</strong>Milestones · this device</span>
+                <span><strong data-account-field="story">—</strong>Story progress · this device</span>
+                <span><strong data-account-field="settings">Dark / Wood</strong>Settings · this device</span>
+                <span><strong data-account-field="stats">—</strong>Account games · local puzzles</span>
+                <span><strong data-account-field="joinDate">—</strong>Join date</span>
+                <span><strong data-account-field="lastLogin">—</strong>Last login</span>
               </div>
             </details>
             <form class="login-form" id="loginForm">
@@ -4098,7 +4099,7 @@
                 <strong data-profile-field="name">Guest Explorer</strong>
                 <small data-profile-field="title">Explorer</small>
               </span>
-              <span class="leaderboard-summary-rating"><strong data-profile-field="gameRating">450 Elo</strong><small>Game rating</small></span>
+              <span class="leaderboard-summary-rating"><strong data-profile-field="gameRating">—</strong><small>Account game rating</small></span>
             </article>
             <dl class="leaderboard-position-stats" aria-label="Your leaderboard positions">
               <div><dt data-leaderboard-puzzle-rank>--</dt><dd>Puzzle rank</dd></div>
