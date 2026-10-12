@@ -233,8 +233,9 @@ async function workerCache() {
   let badResponse = false;
   const context = vm.createContext({
     URL, Response, Request, Promise,
-    self: { location: { origin: "https://local.test" }, addEventListener: (name, fn) => { handlers[name] = fn; } },
-    caches: { open: async () => ({ put: async (request, value) => entries.set(request.url, value) }), match: async (request) => entries.get(request.url) },
+    self: { location: { origin: "https://local.test", href: "https://local.test/service-worker.js" }, addEventListener: (name, fn) => { handlers[name] = fn; } },
+    caches: { open: async () => ({ put: async (request, value) => entries.set(request.url, value),
+      keys: async () => [...entries.keys()].map((url) => new Request(url)), delete: async (request) => entries.delete(request.url) }), match: async (request) => entries.get(request.url) },
     fetch: async () => new Response(badResponse ? "bad gateway" : "good app", { status: badResponse ? 503 : 200 })
   });
   const source = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");

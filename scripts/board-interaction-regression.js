@@ -317,7 +317,7 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v194-home-accessibility";
+const cacheName = "nschess-shell-v195-pwa-release";
 const shellCssVersion = "daily-compact-v1";
 const shellAppVersion = "play-multiplayer-truth-v239";
 const routeModuleVersion = "review-v226-startup-performance";
@@ -330,7 +330,8 @@ assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 const installShell = worker.slice(worker.indexOf("const APP_SHELL"), worker.indexOf('self.addEventListener("install"'));
 assert.doesNotMatch(installShell, /assets\/vendor\/chess\.js-1\.0\.0\.mjs/, "Route-specific chess.js vendor module must not block first shell install");
 assert.match(worker, /caches\.match\(request\)\.then\(\(cached\) => cached \|\| fetch\(request\)/, "Route-specific assets must remain cacheable after first request");
-assert.match(worker, /isStoreAudioAsset[\s\S]*?assets\/audio[\s\S]*?cache\.put/, "Store piano recordings must be cacheable after first preview");
+assert.match(worker, /isStoreAudioAsset[\s\S]*?assets\/audio[\s\S]*?savePublicAsset\(request, copy\)/, "Store piano recordings must be cacheable after first preview");
+assert.match(worker, /function savePublicAsset[\s\S]*?cache\.put\(request, response\)/, "The bounded public cache writer must persist the response");
 assert.match(pianoMigration, /music-quiet-calculation[\s\S]*?music-rising-position[\s\S]*?music-midnight-strategy[\s\S]*?music-beyond-the-board[\s\S]*?music-subtle-triumph[\s\S]*?CC0 1\.0 Universal/);
 assert.match(pianoMigration, /set active = false[\s\S]*?music-calm[\s\S]*?sfx-classic/);
 assert.match(app, /const sourceNameStyle = source\.nameStyle \|\| source\.name_style \|\| source\.equippedNameStyle/, "Identity model must accept the authoritative remote Name Style payload");

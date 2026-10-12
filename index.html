@@ -14,6 +14,7 @@
   <meta name="twitter:card" content="summary" />
   <link rel="canonical" href="./" />
   <link rel="manifest" href="site.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -765,6 +766,12 @@
             <h2 id="settings-title">Settings</h2>
           </div>
           <p class="section-intro">Tune sound, profile, gameplay, appearance, privacy, and notifications in one clean place. Changes save automatically.</p>
+        </div>
+        <div class="settings-card pwa-install-card" aria-labelledby="pwaInstallTitle">
+          <h3 id="pwaInstallTitle">Nschess on your device</h3>
+          <button class="button secondary" id="pwaInstall" type="button" aria-describedby="pwaInstallStatus" style="min-height:44px">Install Nschess</button>
+          <p id="pwaInstallStatus" role="status" aria-live="polite">Install from your browser for an app-style window. No app store required.</p>
+          <p>Offline: previously opened local chess practice, lessons and Daily Puzzle assets. Sign-in, friends, multiplayer, purchases and cloud data require internet. Optional engines and content must finish loading online first.</p>
         </div>
         <div class="settings-shell" id="settingsShell">
           <nav class="settings-sidebar" id="settingsTablist" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
@@ -4755,5 +4762,6 @@
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
   <script defer src="assets/app.js?v=play-multiplayer-truth-v239"></script>
   <script type="module" src="assets/daily-puzzle-launcher.mjs?v=daily-compact-v1"></script>
+  <script type="module" src="assets/pwa-install.mjs?v=pwa-v1"></script>
 </body>
 </html>
