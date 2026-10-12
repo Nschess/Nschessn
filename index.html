@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=mobile-workspace-v1" />
+  <link rel="stylesheet" href="assets/app.css?v=mobile-board-focus-v1" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -241,7 +241,7 @@
             <p class="section-kicker">Guided lessons · beginner foundations</p>
             <h2 id="tutorial-title">Learn chess one move at a time</h2>
           </div>
-          <p class="section-intro">68 short board exercises. Your lesson checklist stays on this device, not a synced account record.</p>
+          <p class="section-intro">68 board exercises. Your lesson checklist stays on this device, not a synced account record.</p>
         </div>
         <div class="tutorial-shell">
           <aside class="tutorial-rail" aria-label="Guided lesson library">
@@ -1567,6 +1567,27 @@
           <p class="section-intro">Every piece becomes a character in Chess Kingdom, and every rule becomes a mission the player can picture before they move.</p>
         </div>
 
+        <div class="adventure-play" aria-labelledby="adventurePlayTitle">
+          <div class="adventure-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="adventure" aria-label="Playable adventure board">
+            <div class="adventure-board" id="adventureBoard" data-interactive-board></div>
+          </div>
+          <div class="adventure-panel">
+            <div class="mission-selector" id="adventureMissionList" aria-label="Adventure mission list"></div>
+            <div class="puzzle-meta">
+              <span class="badge" id="adventureRole">Knight mission</span>
+              <span class="badge" id="adventureMove">White to move</span>
+            </div>
+            <h3 id="adventurePlayTitle">Adventure mission</h3>
+            <p id="adventureTask">Choose a mission to begin.</p>
+            <p class="puzzle-hint" id="adventureTip">Select the glowing character, then click the target square.</p>
+            <p class="feedback" id="adventureFeedback">Start with the knight mission.</p>
+            <div class="puzzle-actions">
+              <button class="button" type="button" id="nextAdventure">Next Mission</button>
+              <button class="button secondary" type="button" id="restartAdventure">Restart Mission</button>
+            </div>
+          </div>
+        </div>
+
         <div class="story-mode-card" aria-labelledby="storyModeTitle">
           <div>
             <p class="section-kicker">Story mode</p>
@@ -1696,26 +1717,6 @@
           </article>
         </div>
 
-        <div class="adventure-play" aria-labelledby="adventurePlayTitle">
-            <div class="adventure-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="adventure" aria-label="Playable adventure board">
-            <div class="adventure-board" id="adventureBoard" data-interactive-board></div>
-          </div>
-          <div class="adventure-panel">
-            <div class="mission-selector" id="adventureMissionList" aria-label="Adventure mission list"></div>
-            <div class="puzzle-meta">
-              <span class="badge" id="adventureRole">Knight mission</span>
-              <span class="badge" id="adventureMove">White to move</span>
-            </div>
-            <h3 id="adventurePlayTitle">Adventure mission</h3>
-            <p id="adventureTask">Choose a mission to begin.</p>
-            <p class="puzzle-hint" id="adventureTip">Select the glowing character, then click the target square.</p>
-            <p class="feedback" id="adventureFeedback">Start with the knight mission.</p>
-            <div class="puzzle-actions">
-              <button class="button" type="button" id="nextAdventure">Next Mission</button>
-              <button class="button secondary" type="button" id="restartAdventure">Restart Mission</button>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -4455,7 +4456,7 @@
               <p id="realPuzzlePrompt">Find the strongest move and follow the idea.</p>
               <p class="real-puzzle-hint" id="realPuzzleHint">Hints appear here.</p>
               <p class="real-puzzle-feedback" id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose a piece to start.</p>
-              <p class="real-puzzle-local-note">Practice rating and streak are saved on this device. Puzzle practice does not award account XP, coins, or Elo.</p>
+              <p class="real-puzzle-local-note">Practice rating and streak are saved on this device. Puzzle practice does not award account XP, coins, or Elo. Practice positions: Lichess CC0; Daily: Nschess originals.</p>
               <div class="real-puzzle-moves" id="realPuzzleMoves" aria-label="Played solution line"></div>
               <div class="real-puzzle-actions">
                 <button class="button secondary" type="button" id="realPuzzleHintButton">Hint</button>
@@ -4770,7 +4771,7 @@
   </aside>
 
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
-  <script defer src="assets/app.js?v=play-multiplayer-truth-v240"></script>
+  <script defer src="assets/app.js?v=play-multiplayer-truth-v241"></script>
   <script type="module" src="assets/daily-puzzle-launcher.mjs?v=daily-compact-v1"></script>
   <script type="module" src="assets/pwa-install.mjs?v=pwa-v1"></script>
 </body>

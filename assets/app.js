@@ -1261,7 +1261,7 @@
           // rows. The remaining analysis row, not the full screen, bounds the
           // board. It has a zero-minimum track independent of our square size.
           const heightFit = reviewAnalysisHeight > 0
-            ? Math.min(hostHeight - verticalReserve, reviewAnalysisHeight - verticalFrameReserve - 8)
+            ? reviewAnalysisHeight - verticalFrameReserve - 8
             : hostHeight - verticalReserve;
           // The measured fit is authoritative in focus mode. Do not raise it
           // back to the shared minimum: on a short viewport that would make
@@ -1336,7 +1336,11 @@
         // board's current document offset (which would make a scrolled or
         // tall workspace shrink unexpectedly).
         const vertical = viewportHeight - (reservePlayerCards ? 264 : 170);
-        let widthLimit = width - (stage.classList.contains("tutorial-board-wrap") ? 52 : 20);
+        // Portrait lessons use a single rank/file rail; the four-rail desktop
+        // allowance otherwise leaves a needless gutter beside the phone board.
+        const tutorialRailReserve = viewportWidth <= 768 ? 20 : 52;
+        const puzzleFrameReserve = viewportWidth <= 768 && stage.classList.contains("real-puzzle-board-wrap") ? 10 : 20;
+        let widthLimit = width - (stage.classList.contains("tutorial-board-wrap") ? tutorialRailReserve : puzzleFrameReserve);
         if (stage.closest("#gameReview.is-review-page")) {
           // Review's frame has an independent CSS maximum inside its wider
           // analysis column. Reserve its rail and frame, not the outer track.
@@ -1350,6 +1354,12 @@
           const railWidth = rail?.getBoundingClientRect().width || 0;
           widthLimit = Math.min(width, Number.isFinite(maximum) ? maximum : width) - frame
             - (railWidth ? railWidth + (Number.parseFloat(style.columnGap) || 0) : 0);
+        }
+        // A short landscape phone cannot fit the portrait minimum. Keep its
+        // physical board within the usable height; manual preferences remain
+        // saved and regain their size when the viewport grows again.
+        if (viewportWidth > viewportHeight && viewportHeight < 600) {
+          return Math.max(1, Math.floor(Math.min(widthLimit, Math.max(1, vertical))));
         }
         const safeWidthMinimum = Math.min(viewportSafeMinimum, Math.max(1, widthLimit));
         return Math.max(safeWidthMinimum, Math.floor(Math.min(widthLimit, vertical > safeWidthMinimum ? vertical : widthLimit)));
@@ -6860,7 +6870,7 @@
       document.getElementById("tutorialBadge").textContent = lesson.badge;
       document.getElementById("tutorialLessonTitle").textContent = lesson.title;
       document.getElementById("tutorialLessonText").textContent = `${lesson.text} Guided moves: ${moves.length}.`;
-      document.getElementById("tutorialReward").textContent = `Reward: +${lesson.reward.xp} XP, +${lesson.reward.coins} coins`;
+      document.getElementById("tutorialReward").textContent = "Device-local practice · no account rewards";
       document.getElementById("tutorialProgressText").textContent = `${completed.size}/${beginnerTutorialLessons.length} complete · ${tutorialTopicFilter === "all" ? "All topics" : `${tutorialTopicFilter} ${topicCompleted}/${topicLessons.length}`}`;
       document.getElementById("tutorialProgressFill").style.setProperty("--tutorial-progress", `${progress}%`);
       document.getElementById("tutorialCoordinates").textContent = tutorialCoordinatesOn ? "Coords On" : "Coords Off";

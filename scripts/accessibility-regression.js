@@ -131,6 +131,9 @@ async function checkPlay(page) {
 
 async function checkBotPlayTouchTarget(page) {
   await waitForRoute(page, "bots");
+  // Route visibility precedes the lazy roster render. Measure the real
+  // mounted control, not the loading placeholder during concurrent QA runs.
+  await page.locator('#aiBotRoster [data-ai-bot-play]:not(:disabled)').first().waitFor({ state: 'visible' });
   const measurements = await page.evaluate(() => [...document.querySelectorAll("#aiBotRoster [data-ai-bot-play]:not(:disabled)")]
     .filter((element) => {
       const rect = element.getBoundingClientRect();

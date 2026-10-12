@@ -43,6 +43,13 @@ async function main() {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const browser = await chromium.launch({ headless: true });
   const report = { label, viewports: [], routes: [], states: [], errors: [] };
+  const sizes = process.env.MASTER_SIZES
+    ? process.env.MASTER_SIZES.split(',').map(raw => {
+      const [width,height] = raw.split('x').map(Number);
+      assert.ok(Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0, `Invalid MASTER_SIZES: ${raw}`);
+      return {width,height};
+    })
+    : (process.env.MASTER_WIDTHS?.split(',').map(Number) || [1366,980,768,390,375,320]).map(width=>({width,height:900}));
   try {
     if (process.env.MASTER_MEASURE) {
       const samples = [];
@@ -102,8 +109,8 @@ async function main() {
       if (route === "puzzles") await page.waitForFunction(() => document.querySelectorAll("#realPuzzleBoard [data-square]").length === 64);
       await page.waitForTimeout(350);
       report.routes.push({ route, ms: Date.now() - start });
-      for (const width of process.env.MASTER_WIDTHS?.split(",").map(Number) || [1366, 980, 768, 390, 375, 320]) {
-        await page.setViewportSize({ width, height: 900 });
+      for (const {width,height} of sizes) {
+        await page.setViewportSize({ width, height });
         await page.waitForTimeout(80);
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
         const sample = await page.evaluate((id) => {
@@ -111,7 +118,7 @@ async function main() {
           const r = p.getBoundingClientRect();
           const board = p.querySelector('#tutorialBoard, #realPuzzleBoard, #coachBoard');
           const boardRect = board?.getBoundingClientRect();
-          return { width: innerWidth, overflow: document.documentElement.scrollWidth - innerWidth, panelOverflow: p.scrollWidth - p.clientWidth,
+          return { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth, panelOverflow: p.scrollWidth - p.clientWidth,
             contentHeight: r.height, board: boardRect ? { top: boardRect.top, width: boardRect.width, height: boardRect.height } : null,
             clipped: [...p.querySelectorAll("*")].filter((n) => n.getBoundingClientRect().width && n.getBoundingClientRect().right > r.right + 2).slice(0, 10).map((n) => n.id || n.className),
             header: [...document.querySelectorAll(".nav > .brand, .nav-utilities > *, .nav-mobile-menu > summary")].filter((n) => n.getBoundingClientRect().width).map((n) => ({ name: n.id || n.className, left: n.getBoundingClientRect().left, right: n.getBoundingClientRect().right, height: n.getBoundingClientRect().height }))
@@ -119,28 +126,67 @@ async function main() {
         }, id);
         report.viewports.push({ route, ...sample });
         if (process.env.MASTER_ALL_SCREENSHOTS || ["top", "play", "bots", "puzzles", "tutorial", "game-review", "friends", "login", "store", "settings", "leaderboards", "plan"].includes(route)) {
-          await page.screenshot({ path: path.join(output, `${route}-${width}.png`), animations: "disabled" });
+          await page.screenshot({ path: path.join(output, `${route}-${width}${process.env.MASTER_SIZES ? `x${height}` : ''}.png`), animations: "disabled" });
         }
       }
     }
     if (process.env.MASTER_ACTIVITIES) {
-      const widths = process.env.MASTER_WIDTHS?.split(",").map(Number) || [320, 360, 375, 390, 430, 768, 1366];
       const capture = async (name, boardSelector) => {
-        for (const width of widths) {
-          await page.setViewportSize({ width, height: 900 });
+        if (process.env.MASTER_ACTIVITY_NAMES && !process.env.MASTER_ACTIVITY_NAMES.split(',').includes(name)) return;
+        for (const {width,height} of sizes) {
+          await page.setViewportSize({ width, height });
           await page.waitForTimeout(120);
           await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
           const state = await page.evaluate((selector) => {
-            const board = selector ? document.querySelector(selector)?.getBoundingClientRect() : null;
-            return { width: innerWidth, overflow: document.documentElement.scrollWidth - innerWidth,
+            const element = selector ? document.querySelector(selector) : null;
+            const board = element?.getBoundingClientRect();
+            const squares = element ? [...element.querySelectorAll('[data-square]')].map(square => square.getBoundingClientRect()) : [];
+            return { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth,
               nodes: document.querySelectorAll("*").length,
-              board: board ? { top: board.top, width: board.width, height: board.height } : null };
+              board: board ? { top: board.top, width: board.width, height: board.height, scrollForFullBoard: Math.max(0,board.bottom-innerHeight), percent:board.width/innerWidth*100,
+                usablePercent:board.width/(innerWidth-24)*100, squares:squares.length,
+                contained:squares.every(r=>r.width>0 && r.height>0 && r.left>=board.left-1 && r.right<=board.right+1 && r.top>=board.top-1 && r.bottom<=board.bottom+1) } : null };
           }, boardSelector);
           report.states.push({ name, ...state });
-          await page.screenshot({ path: path.join(output, `${name}-${width}.png`), animations: "disabled", fullPage: true });
+          // Full-page capture can temporarily expand the layout viewport and
+          // change vh/landscape sizing. Keep activity evidence at the tested
+          // viewport, then capture the board at a usable scroll position.
+          await page.screenshot({ path: path.join(output, `${name}-${width}${process.env.MASTER_SIZES ? `x${height}` : ''}.png`), animations: "disabled" });
           if (!label.startsWith("before")) {
             assert.ok(state.overflow <= 1, `${name} fits at ${width}`);
-            if (state.board) assert.ok(Math.abs(state.board.width - state.board.height) <= 1, `${name} board stays square`);
+            if (['notifications-dialog','search-dialog'].includes(name)) {
+              const close = page.locator(name === 'notifications-dialog' ? '#siteNotificationsClose' : '#siteSearchClose');
+              const target = await close.evaluate(el=>{
+                const r=el.getBoundingClientRect();
+                return {width:r.width,height:r.height,reachable:el.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))};
+              });
+              assert.ok(target.width>=44 && target.height>=44 && target.reachable,`${name} close is an unobstructed 44px target at ${width}x${height}: ${JSON.stringify(target)}`);
+            }
+            if (state.board) {
+              assert.ok(Math.abs(state.board.width - state.board.height) <= 1, `${name} board stays square`);
+              assert.equal(state.board.squares,64,`${name} contains 64 mounted squares`);
+              assert.equal(state.board.contained,true,`${name} squares are not clipped by the board`);
+              if (width<=430 && height>width && (['daily-active','lesson-active','play-active'].includes(name) || name.startsWith('puzzle-'))) {
+                assert.ok(state.board.usablePercent>=90,`${name} uses at least 90% of safe phone content width`);
+              }
+              await page.locator(boardSelector).evaluate(el=>{
+                const header=document.querySelector('.site-header')?.getBoundingClientRect();
+                window.scrollTo({top:scrollY+el.getBoundingClientRect().top-Math.max(8,(header?.bottom || 0)+8),behavior:'instant'});
+              });
+              const visibility = await page.locator(boardSelector).evaluate(el=>{
+                const hidden=[...el.querySelectorAll('[data-square]')].filter(square=>{
+                  const r=square.getBoundingClientRect(), x=(r.left+r.right)/2, y=(r.top+r.bottom)/2;
+                  const hit=document.elementFromPoint(x,y);
+                  return !(x>=0 && y>=0 && x<innerWidth && y<innerHeight && hit && square.contains(hit));
+                }).map(square=>{const r=square.getBoundingClientRect();return {square:square.dataset.square,top:r.top,hit:document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.className}});
+                const r=el.getBoundingClientRect();
+                return {visible:hidden.length===0,board:[r.top,r.width,r.height],viewport:[innerWidth,innerHeight],headerBottom:document.querySelector('.site-header')?.getBoundingClientRect().bottom,hidden:hidden.slice(0,4)};
+              });
+              state.visibility=visibility;
+              fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));
+              assert.equal(visibility.visible,true,`${name} all 64 square centers usable at ${width}x${height}: ${JSON.stringify(visibility)}`);
+              await page.screenshot({path:path.join(output,`${name}-${width}x${height}-board.png`),animations:'disabled'});
+            }
           }
         }
       };
@@ -156,6 +202,14 @@ async function main() {
       await page.goto(`${origin}/#tutorial`);
       await page.waitForFunction(() => document.querySelectorAll("#tutorialBoard [data-square]").length === 64);
       await capture("lesson-active", "#tutorialBoard");
+      // Additional real mounted training boards; no remote account operations.
+      await page.goto(`${origin}/#openings`);
+      await page.waitForFunction(() => document.querySelectorAll('#openingExplorerBoard [data-square]').length === 64);
+      await capture('opening-explorer', '#openingExplorerBoard');
+      await page.goto(`${origin}/#adventures`);
+      await page.waitForFunction(() => document.querySelectorAll('#adventureBoard [data-square]').length === 64);
+      await capture('adventure-active', '#adventureBoard');
+      await page.goto(`${origin}/#tutorial`);
       if (await page.locator('#tutorialLibrary').count()) {
         await page.setViewportSize({ width: 390, height: 900 });
         await page.waitForFunction(() => !document.getElementById('tutorialLibrary').open);
