@@ -1,7 +1,7 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v192-daily-puzzle-ux-perf";
+const CACHE_NAME = "nschess-shell-v193-master-recovery";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -38,8 +38,10 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate" || isReviewShellAsset || isPieceAsset || isStoreAudioAsset) {
     event.respondWith(fetch(request)
       .then((response) => {
+        // Do not replace a working offline shell with a CDN/server error page.
+        if (!response.ok) return caches.match(request).then((cached) => cached || response);
         const copy = response.clone();
-        void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {}));
         return response;
       })
       .catch(() => caches.match(request).then((cached) => cached || (request.mode === "navigate" ? caches.match("./offline.html") : Response.error()))));
@@ -50,7 +52,7 @@ self.addEventListener("fetch", (event) => {
     .then((response) => {
       if (!response || response.status !== 200 || response.type !== "basic") return response;
       const copy = response.clone();
-      void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+      event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {}));
       return response;
     })));
 });

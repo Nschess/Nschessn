@@ -13,7 +13,8 @@ const html = read("index.html");
 
 assert.match(app, /function showRouteFeatureFailure\(panel, featureName\)/, "Deferred route failures must have a visible recovery boundary.");
 assert.match(app, /This section could not load\. Your saved work is safe\./, "Route failures must explain the safe recovery state without leaking internals.");
-assert.match(app, /new URL\(\s*`\.\/assets\/routes\/\$\{encodeURIComponent\(name\)\}\.js\?v=\$\{encodeURIComponent\(routeModuleVersion\)\}`,\s*document\.baseURI\s*\)\.href/, "Lazy route imports must use a browser-resolvable URL, including repository sub-path deployments.");
+assert.match(app, /const routeUrl = new URL\(\s*`\.\/assets\/routes\/\$\{encodeURIComponent\(name\)\}\.js\?v=\$\{encodeURIComponent\(routeModuleVersion\)\}`,\s*document\.baseURI\s*\)/, "Lazy route imports must use a browser-resolvable URL, including repository sub-path deployments.");
+assert.match(app, /if \(retry\) routeUrl\.searchParams\.set\("retry", String\(retry\)\);\s*const href = routeUrl\.href;\s*const task = import\(href\)/, "Explicit retry must bypass the browser's failed-module cache while retaining the base URL.");
 assert.match(app, /Route module \$\{name\} failed to load\.[\s\S]*?routeError: true/, "Route-module import failures must become visible recovery state instead of null.");
 assert.match(app, /if \(module\?\.routeError\) showRouteFeatureFailure\(panelElement, `route:\$\{module\.routeName \|\| panel\}`\)/, "Route-module failures must render their retry boundary on the active panel.");
 assert.match(app, /if \(ok === false\) showRouteFeatureFailure\(panelElement, name\)/, "Deferred initializer failures must surface on the active route.");
@@ -21,7 +22,7 @@ assert.match(app, /function syncOptionalRouteStylesheets\(styles = \[\]\)/, "Rou
 assert.match(app, /const optionalRouteStylesheetVersion = "play-tournament-density-v238";/, "The tournament discovery release must request its current route stylesheet rather than a released-board cache key.");
 assert.match(app, /const currentHref = new URL\(current\.href, document\.baseURI\)\.href;[\s\S]*?if \(currentHref === requestedHref\)[\s\S]*?current\.remove\(\);/, "An already-injected released Play stylesheet must be replaced when the current entry stylesheet changes.");
 assert.match(html, /assets\/app\.js\?v=play-multiplayer-truth-v239/, "The shipped shell must request the current multiplayer-truth controller.");
-assert.match(serviceWorker, /nschess-shell-v192-daily-puzzle-ux-perf[\s\S]*?assets\/app\.js\?v=play-multiplayer-truth-v239/, "The offline shell must refresh with the current app and current 32-puzzle pack.");
+assert.match(serviceWorker, /nschess-shell-v193-master-recovery[\s\S]*?assets\/app\.js\?v=play-multiplayer-truth-v239/, "The offline shell must refresh with the current app and current 32-puzzle pack.");
 assert.match(app, /link\.remove\(\);\s*optionalRouteStylesheetPromises\.delete\(key\);/, "Inactive route CSS must be removed with its cached loader promise.");
 assert.match(app, /firstVisitSetupClose\?\.\(\{ restoreFocus: false \}\)/, "Home onboarding must close before changing routes.");
 assert.match(app, /document\.body\.classList\.toggle\("is-board-route", \["play", "puzzles", "gameReview"\]\.includes\(config\.panel\)\)/, "Board-centric routes must own compact navigation state.");

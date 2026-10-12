@@ -66,6 +66,13 @@ async function waitForRoute(page, route) {
 }
 
 async function measureVisibleControls(page, route, selectors) {
+  // A visible route shell is not proof its lazy controls have mounted. Wait
+  // for the same controls we measure; retain all size/count assertions below.
+  await page.waitForFunction((targets) => targets.some((selector) =>
+    [...document.querySelectorAll(selector)].some((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && getComputedStyle(element).visibility !== "hidden";
+    })), selectors, { timeout: 12000 });
   const measurements = await page.evaluate(({ route: routeName, selectors: targets }) => targets.flatMap((selector) => {
     return [...document.querySelectorAll(selector)]
       .filter((element) => {

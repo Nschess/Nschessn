@@ -102,9 +102,9 @@ function staticContract() {
     "The first-time resize discovery cue styling is missing.");
   assert.match(css, /\.interactive-board-stage-tools\s*\{[\s\S]*display:\s*none\s*!important/,
     "The legacy board control strip must remain globally hidden.");
-  assert.match(css, /Review board contract:[\s\S]*?#gameReview\.is-review-page #reviewBoardSlot\s*\{[\s\S]*?grid-template-columns:\s*28px minmax\(0, 1fr\);[\s\S]*?gap:\s*0 8px;/,
-    "Review must keep its evaluation rail and board in explicit layout tracks.");
-  assert.match(css, /Review board contract:[\s\S]*?#gameReview\.is-review-page #reviewBoardSlot > \.play-board-wrap\s*\{[\s\S]*?grid-area:\s*auto\s*!important;[\s\S]*?grid-column:\s*2\s*!important;/,
+  assert.match(css, /Review board contract:[\s\S]*?#gameReview\.is-review-page #reviewBoardSlot\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);[\s\S]*?gap:\s*0 8px;/,
+    "Review's slot must keep a single explicit wrapper track; the rail is inside that wrapper.");
+  assert.match(css, /Review board contract:[\s\S]*?#gameReview\.is-review-page #reviewBoardSlot > \.play-board-wrap\s*\{[\s\S]*?grid-area:\s*auto\s*!important;[\s\S]*?grid-column:\s*1\s*!important;/,
     "Review board placement must not fall back to an implicit grid area.");
   assert.equal((app.match(/new ResizeObserver\(/g) || []).length, 1,
     "The global board sizing controller must keep one shared ResizeObserver.");
@@ -255,6 +255,7 @@ async function waitForRouteStylesheet(page, name) {
 
 async function setBoardScale(page, value) {
   await openRoute(page, "#settings");
+  await page.locator('#settingsTablist[aria-orientation]').waitFor({ state: "visible" });
   await page.locator('[data-settings-tab="gameplay"]').click();
   await page.waitForFunction(() => document.querySelector('[data-settings-page="gameplay"]')?.classList.contains("is-active"), null, { timeout: 5000 });
   const slider = page.locator('input[data-pref-setting="boardScale"]');

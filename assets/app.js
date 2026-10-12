@@ -1158,6 +1158,9 @@
           const reviewAnalysisWidth = Number(reviewAnalysis?.clientWidth)
             || Number(reviewAnalysis?.getBoundingClientRect?.().width)
             || 0;
+          const reviewAnalysisHeight = Number(reviewAnalysis?.clientHeight)
+            || Number(reviewAnalysis?.getBoundingClientRect?.().height)
+            || 0;
           const paddingInline = (Number.parseFloat(hostStyle?.paddingInlineStart) || 0)
             + (Number.parseFloat(hostStyle?.paddingInlineEnd) || 0);
           const paddingBlock = (Number.parseFloat(hostStyle?.paddingBlockStart) || 0)
@@ -1215,7 +1218,7 @@
             && playUtilityRect.left >= stageRect.right
             ? playUtilityRect.width + Math.max(0, playUtilityRect.left - stageRect.right)
             : 0;
-          const mobileStageActionsReserve = viewportWidth < 900 ? 42 : 0;
+          const mobileStageActionsReserve = viewportWidth < 900 ? (reviewHost ? 54 : 42) : 0;
           const fullscreenRows = reservePlayerCards
             ? 1 + cards.length + (controlsHeight > 0 ? 1 : 0)
             : 1;
@@ -1254,11 +1257,17 @@
           const verticalReserve = reviewHost
             ? paddingBlock + controlsHeight + verticalFrameReserve + mobileStageActionsReserve + 8
             : paddingBlock + cardsHeight + controlsHeight + gridGapReserve + verticalFrameReserve + mobileStageActionsReserve;
+          // In stacked Review, evaluation and replay consume their own grid
+          // rows. The remaining analysis row, not the full screen, bounds the
+          // board. It has a zero-minimum track independent of our square size.
+          const heightFit = reviewAnalysisHeight > 0
+            ? Math.min(hostHeight - verticalReserve, reviewAnalysisHeight - verticalFrameReserve - 8)
+            : hostHeight - verticalReserve;
           // The measured fit is authoritative in focus mode. Do not raise it
           // back to the shared minimum: on a short viewport that would make
           // the board overflow the very player cards and controls we just
           // reserved space for.
-          return Math.max(1, Math.floor(Math.min(maxSize, widthFit, hostHeight - verticalReserve)));
+          return Math.max(1, Math.floor(Math.min(maxSize, widthFit, heightFit)));
         }
         const parentRect = stage.parentElement?.getBoundingClientRect?.();
         const stageRect = stage.getBoundingClientRect?.();
@@ -1327,7 +1336,21 @@
         // board's current document offset (which would make a scrolled or
         // tall workspace shrink unexpectedly).
         const vertical = viewportHeight - (reservePlayerCards ? 264 : 170);
-        const widthLimit = width - (stage.classList.contains("tutorial-board-wrap") ? 52 : 20);
+        let widthLimit = width - (stage.classList.contains("tutorial-board-wrap") ? 52 : 20);
+        if (stage.closest("#gameReview.is-review-page")) {
+          // Review's frame has an independent CSS maximum inside its wider
+          // analysis column. Reserve its rail and frame, not the outer track.
+          // Read the fixed max-width rather than feeding our own board width
+          // back into the sizing controller on each ResizeObserver pass.
+          const style = getComputedStyle(stage);
+          const maximum = Number.parseFloat(style.maxWidth);
+          const rail = stage.querySelector(":scope > .review-eval-rail");
+          const frame = [style.paddingLeft, style.paddingRight, style.borderLeftWidth, style.borderRightWidth]
+            .reduce((sum, value) => sum + (Number.parseFloat(value) || 0), 0);
+          const railWidth = rail?.getBoundingClientRect().width || 0;
+          widthLimit = Math.min(width, Number.isFinite(maximum) ? maximum : width) - frame
+            - (railWidth ? railWidth + (Number.parseFloat(style.columnGap) || 0) : 0);
+        }
         const safeWidthMinimum = Math.min(viewportSafeMinimum, Math.max(1, widthLimit));
         return Math.max(safeWidthMinimum, Math.floor(Math.min(widthLimit, vertical > safeWidthMinimum ? vertical : widthLimit)));
       }
@@ -5067,6 +5090,7 @@
     // explicit session state so an authenticated Supabase user can never be
     // downgraded to the guest/local wallet while auth is still resolving.
     let storeAuthState = { status: "unknown", userId: "" };
+    let storeSessionGeneration = 0;
     let storeAuthResolutionPromise = null;
     let giftInboxState = [];
     let selectedGiftItemId = "";
@@ -5080,8 +5104,8 @@
     // clicked control immediate feedback and prevents a rapid double click
     // from issuing two server purchases while the authoritative RPC is in
     // flight.
-    const storeActionLocks = new Set();
-    const storeBundleActionLocks = new Set();
+    const storeActionLocks = new Map();
+    const storeBundleActionLocks = new Map();
     let deferredCosmeticRefreshFrame = 0;
     let storeScrollPerfReady = false;
     let storeScrollPerfTimer = 0;
@@ -8763,6 +8787,7 @@
 
     function setStoreAuthState(status = "unknown", userId = "") {
       const nextStatus = ["unknown", "authenticated", "signed_out", "error"].includes(status) ? status : "error";
+      if (storeAuthState.status !== nextStatus || storeAuthState.userId !== (nextStatus === "authenticated" ? String(userId || "") : "")) storeSessionGeneration += 1;
       storeAuthState = { status: nextStatus, userId: nextStatus === "authenticated" ? String(userId || "") : "" };
       document.documentElement.dataset.storeSyncStatus = nextStatus === "authenticated" ? "syncing" : nextStatus;
       if (nextStatus !== "authenticated") {
@@ -8770,6 +8795,12 @@
         serverStoreState = null;
       }
       return storeAuthState;
+    }
+
+    function captureStoreSession() {
+      const generation = storeSessionGeneration;
+      // Generation also rejects A -> B -> A; matching the user ID alone does not.
+      return () => generation === storeSessionGeneration;
     }
 
     const storePurchaseDiagnosticMessages = Object.freeze({
@@ -8812,7 +8843,8 @@
       }
       if (storeAuthState.status === "signed_out") return null;
       if (storeAuthResolutionPromise) return storeAuthResolutionPromise;
-      storeAuthResolutionPromise = (async () => {
+      const isCurrent = captureStoreSession();
+      const resolution = (async () => {
         try {
           // An authenticated Store must never silently downgrade to the local
           // wallet because a provider method is missing or auth is still
@@ -8824,6 +8856,7 @@
             throw error;
           }
           const userId = String(await provider.getAuthenticatedUserId()).trim();
+          if (!isCurrent()) return null;
           if (userId) {
             setStoreAuthState("authenticated", userId);
             return { id: userId };
@@ -8832,12 +8865,14 @@
           error.code = "STORE_AUTH_PENDING";
           throw error;
         } catch (error) {
+          if (!isCurrent()) return null;
           setStoreAuthState(error?.code === "STORE_AUTH_PENDING" ? "unknown" : "error");
           throw error;
-        } finally {
-          storeAuthResolutionPromise = null;
         }
-      })();
+      })().finally(() => {
+        if (storeAuthResolutionPromise === resolution) storeAuthResolutionPromise = null;
+      });
+      storeAuthResolutionPromise = resolution;
       return storeAuthResolutionPromise;
     }
 
@@ -8985,10 +9020,11 @@
     }
 
     async function refreshServerStoreState({ rerender = true } = {}) {
+      const isCurrent = captureStoreSession();
       const provider = getAuthProvider();
       if (!provider?.getStoreState) return null;
       const user = await getAuthoritativeStoreUser();
-      if (!user) return null;
+      if (!user || !isCurrent()) return null;
       const expectedAccountId = normalizeAccountWorkspaceId(user.id || applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId);
       if (serverStoreRefreshPromise && serverStoreRefreshAccountId === expectedAccountId) return serverStoreRefreshPromise;
       serverStoreSyncStatus = "syncing";
@@ -8998,7 +9034,7 @@
       serverStoreRefreshAccountId = expectedAccountId;
       const refreshPromise = Promise.resolve().then(() => provider.getStoreState()).then((state) => {
         const currentAccountId = normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId);
-        if (!isApplicationAuthenticated() || currentAccountId !== expectedAccountId) return null;
+        if (!isCurrent() || !isApplicationAuthenticated() || currentAccountId !== expectedAccountId) return null;
         const source = state && typeof state === "object" ? state : {};
         const catalog = Array.isArray(source.catalog) ? source.catalog : [];
         const nextCatalog = new Map(catalog.map((item) => [String(item.item_id || item.itemId || ""), item]).filter(([id]) => id));
@@ -9061,7 +9097,7 @@
         }
         return serverStoreState;
       }).catch((error) => {
-        if (!isApplicationAuthenticated() || normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId) !== expectedAccountId) return null;
+        if (!isCurrent() || !isApplicationAuthenticated() || normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId) !== expectedAccountId) return null;
         serverStoreReady = false;
         serverStoreState = null;
         serverStoreSyncStatus = "error";
@@ -9078,7 +9114,7 @@
         if (rerender) renderStore();
         throw error;
       }).finally(() => {
-        if (serverStoreRefreshAccountId === expectedAccountId) {
+        if (serverStoreRefreshPromise === refreshPromise) {
           serverStoreRefreshPromise = null;
           serverStoreRefreshAccountId = "";
         }
@@ -9088,17 +9124,20 @@
     }
 
     async function ensureServerStoreReady() {
+      const isCurrent = captureStoreSession();
       const provider = getAuthProvider();
       if (!provider?.getStoreState) return true;
       let user = null;
       try {
         user = await getAuthoritativeStoreUser();
       } catch (error) {
+        if (!isCurrent()) return false;
         serverStoreSyncStatus = "error";
         serverStoreSyncError = error instanceof Error ? error : new Error(String(error?.message || error || "Authentication could not be verified."));
         renderStoreSyncFeedback();
         return false;
       }
+      if (!isCurrent()) return false;
       if (!user) {
         const status = document.getElementById("storeStatus");
         if (status) status.textContent = "Sign in to purchase Store cosmetics.";
@@ -9108,15 +9147,20 @@
       try {
         await refreshServerStoreState({ rerender: false });
       } catch (error) {
+        if (!isCurrent()) return false;
         serverStoreSyncStatus = "error";
         serverStoreSyncError = error instanceof Error ? error : new Error(String(error?.message || error || "Store sync failed."));
         renderStoreSyncFeedback();
         return false;
       }
-      return storeServerIsActive();
+      return isCurrent() && storeServerIsActive();
     }
 
     function clearServerStoreState() {
+      storeSessionGeneration += 1;
+      storeAuthResolutionPromise = null;
+      storeActionLocks.clear();
+      storeBundleActionLocks.clear();
       serverStoreState = null;
       serverStoreCatalog = new Map();
       serverStoreReady = false;
@@ -9144,6 +9188,7 @@
     }
 
     function renderStoreGiftInbox() {
+      const isCurrent = captureStoreSession();
       const inbox = document.getElementById("storeGiftInbox");
       if (!inbox) return;
       if (!giftInboxState.length) {
@@ -9161,12 +9206,32 @@
           const claim = createBookText("button", "button", "Claim");
           claim.type = "button";
           claim.addEventListener("click", async () => {
-            try { await getAuthProvider()?.claimCosmeticGift?.(gift.id); await refreshServerStoreState({ rerender: false }); await refreshStoreGiftInbox(); } catch (error) { const status = document.getElementById("storeGiftStatus"); if (status) status.textContent = error?.message || "Gift could not be claimed."; await refreshStoreGiftInbox(); }
+            if (!isCurrent() || claim.disabled) return;
+            claim.disabled = decline.disabled = true;
+            try {
+              await getAuthProvider().claimCosmeticGift(gift.id);
+              if (!isCurrent()) return;
+              await refreshServerStoreState({ rerender: false });
+              if (isCurrent()) await refreshStoreGiftInbox();
+            } catch (error) {
+              if (!isCurrent()) return;
+              const status = document.getElementById("storeGiftStatus");
+              if (status) status.textContent = error?.message || "Gift could not be claimed.";
+            } finally { if (isCurrent()) claim.disabled = decline.disabled = false; }
           });
           const decline = createBookText("button", "button secondary", "Decline");
           decline.type = "button";
           decline.addEventListener("click", async () => {
-            try { await getAuthProvider()?.declineCosmeticGift?.(gift.id); await refreshServerStoreState({ rerender: false }); await refreshStoreGiftInbox(); } catch (error) { const status = document.getElementById("storeGiftStatus"); if (status) status.textContent = error?.message || "Gift could not be declined."; await refreshStoreGiftInbox(); }
+            if (!isCurrent() || decline.disabled) return;
+            claim.disabled = decline.disabled = true;
+            try {
+              await getAuthProvider().declineCosmeticGift(gift.id);
+              if (isCurrent()) await refreshStoreGiftInbox();
+            } catch (error) {
+              if (!isCurrent()) return;
+              const status = document.getElementById("storeGiftStatus");
+              if (status) status.textContent = error?.message || "Gift could not be declined.";
+            } finally { if (isCurrent()) claim.disabled = decline.disabled = false; }
           });
           actions.append(claim, decline);
         } else actions.append(createBookText("small", "", gift.status));
@@ -9176,6 +9241,7 @@
     }
 
     async function refreshStoreGiftInbox() {
+      const isCurrent = captureStoreSession();
       const provider = getAuthProvider();
       const expectedUserId = String(getFriendCurrentUserId?.() || "");
       if (!provider?.listGiftInbox || !expectedUserId) {
@@ -9185,10 +9251,10 @@
       }
       try {
         const rows = await provider.listGiftInbox(40);
-        if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
+        if (!isCurrent() || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
         giftInboxState = Array.isArray(rows) ? rows : [];
       } catch {
-        if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
+        if (!isCurrent() || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
         giftInboxState = [];
       }
       renderStoreGiftInbox();
@@ -9203,25 +9269,31 @@
       document.getElementById("storeGiftRefresh")?.addEventListener("click", () => void refreshStoreGiftInbox());
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        const isCurrent = captureStoreSession();
         const recipient = String(document.getElementById("storeGiftRecipient")?.value || "").trim();
         const itemId = String(document.getElementById("storeGiftItem")?.value || selectedGiftItemId).trim();
         const message = String(document.getElementById("storeGiftMessage")?.value || "").trim();
         const status = document.getElementById("storeGiftStatus");
         if (!recipient || !itemId) { if (status) status.textContent = "Choose a recipient and a cosmetic first."; return; }
         if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+          if (!isCurrent()) return;
           renderStoreSyncFeedback();
           if (status) status.textContent = document.getElementById("storeStatus")?.textContent || "Store sync failed — Retry.";
           return;
         }
+        if (!isCurrent()) return;
         if (!storeServerIsActive()) { if (status) status.textContent = "Sign in to send a server-verified cosmetic gift."; return; }
         try {
           await getAuthProvider().createCosmeticGift(recipient, itemId, message, createStoreIdempotencyKey("gift"));
+          if (!isCurrent()) return;
           await refreshServerStoreState({ rerender: false });
+          if (!isCurrent()) return;
           form.reset();
           selectedGiftItemId = "";
           if (status) status.textContent = "Gift sent. The recipient has been notified.";
           renderStore();
         } catch (error) {
+          if (!isCurrent()) return;
           if (status) status.textContent = error?.message || "Gift could not be sent.";
         }
       });
@@ -9850,11 +9922,14 @@
     }
 
     async function equipStoreItem(item) {
+      const isCurrent = captureStoreSession();
       if (item?.type === "arrowSkin" && !isStoreItemOwned(item)) return false;
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        if (!isCurrent()) return false;
         renderStoreSyncFeedback();
         return false;
       }
+      if (!isCurrent()) return false;
       if (storeServerIsActive()) {
         const validation = validateServerStoreItem(item);
         if (!validation.ok) {
@@ -9864,8 +9939,11 @@
         }
         try {
           await getAuthProvider().equipCosmetic(item.id);
+          if (!isCurrent()) return false;
           await refreshServerStoreState({ rerender: false });
+          if (!isCurrent()) return false;
         } catch (error) {
+          if (!isCurrent()) return false;
           const status = document.getElementById("storeStatus");
           if (status) status.textContent = error?.message || "Cosmetic could not be equipped.";
           return false;
@@ -9930,6 +10008,7 @@
     }
 
     async function buyOrEquipStoreItem(itemId) {
+      const isCurrent = captureStoreSession();
       const item = getStoreItem(itemId);
       if (!item) {
         reportStorePurchaseDiagnostic("NO_ITEM", { itemId });
@@ -9937,6 +10016,7 @@
       }
       const previouslyEquippedId = getEquippedStoreId(item.type);
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        if (!isCurrent()) return;
         renderStoreSyncFeedback();
         reportStorePurchaseDiagnostic(getStoreReadinessDiagnostic(), {
           itemId: item.id,
@@ -9950,6 +10030,7 @@
         });
         return;
       }
+      if (!isCurrent()) return;
       const owned = new Set(storeState.owned);
       const status = document.getElementById("storeStatus");
       const isFlexBadge = item.type === "flexBadge";
@@ -9997,7 +10078,9 @@
           let purchaseResult;
           try {
             purchaseResult = await getAuthProvider().purchaseCosmetic(item.id, createStoreIdempotencyKey("purchase"));
+            if (!isCurrent()) return;
           } catch (error) {
+            if (!isCurrent()) return;
             reportStorePurchaseDiagnostic("RPC_FAILED", {
               itemId: item.id,
               code: error?.code || "",
@@ -10018,7 +10101,9 @@
           }
           try {
             await refreshServerStoreState({ rerender: false });
+            if (!isCurrent()) return;
           } catch (error) {
+            if (!isCurrent()) return;
             reportStorePurchaseDiagnostic("INVENTORY_REFRESH_FAILED", {
               itemId: item.id,
               code: error?.code || "",
@@ -10042,6 +10127,7 @@
         showCelebration("Reward unlocked!", `-${item.cost} coins`, item.name);
       }
       if (!await equipStoreItem(item)) return;
+      if (!isCurrent()) return;
       savePuzzleState();
       // The catalog, filters, search, and scroll container stay mounted. Only
       // the affected item(s), wallet, inventory summary, and featured action
@@ -10059,13 +10145,14 @@
     }
 
     async function runStoreItemAction(itemId) {
+      const actionGeneration = storeSessionGeneration;
       const item = getStoreItem(itemId);
       if (!item) return buyOrEquipStoreItem(itemId);
       const id = String(item.id);
       // A second click while the server-authoritative transaction is in flight
       // is ignored rather than becoming a second purchase request.
       if (storeActionLocks.has(id)) return;
-      storeActionLocks.add(id);
+      storeActionLocks.set(id, actionGeneration);
       setStoreItemPending(id, true);
       const status = document.getElementById("storeStatus");
       if (status) {
@@ -10076,11 +10163,13 @@
       try {
         return await buyOrEquipStoreItem(id);
       } finally {
-        storeActionLocks.delete(id);
-        setStoreItemPending(id, false);
-        // Re-read the authoritative local mirror after either success or a
-        // rejected request so the button never remains stale.
-        refreshStoreItemCards([id]);
+        if (storeActionLocks.get(id) === actionGeneration) {
+          storeActionLocks.delete(id);
+          setStoreItemPending(id, false);
+          // Re-read the authoritative local mirror after either success or a
+          // rejected request so the button never remains stale.
+          refreshStoreItemCards([id]);
+        }
       }
     }
 
@@ -10749,17 +10838,25 @@
     }
 
     async function performStoreBundleAction(bundleId) {
+      const isCurrent = captureStoreSession();
       const bundle = storeBundles.find((entry) => entry.id === bundleId);
       if (!bundle) return;
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        if (!isCurrent()) return;
         renderStoreSyncFeedback();
         return;
       }
+      if (!isCurrent()) return;
       const status = document.getElementById("storeStatus");
       const details = getStoreBundleDetails(bundle);
       if (!details.items.length) return;
       if (!details.missingItems.length) {
-        await Promise.all(details.items.map((item) => equipStoreItem(item)));
+        const equipped = await Promise.all(details.items.map((item) => equipStoreItem(item)));
+        if (!isCurrent()) return;
+        if (equipped.some((ok) => !ok)) {
+          if (status) status.textContent = "Some cosmetics could not be equipped. Retry after Store sync.";
+          return;
+        }
         savePuzzleState();
         refreshStoreItemCards(details.items.map((item) => item.id));
         if (status) status.textContent = `${bundle.name} equipped. Every included cosmetic is ready.`;
@@ -10782,8 +10879,11 @@
       if (storeServerIsActive()) {
         try {
           await getAuthProvider().purchaseCosmeticBundle(bundle.itemIds, bundle.discount, createStoreIdempotencyKey("bundle"));
+          if (!isCurrent()) return;
           await refreshServerStoreState({ rerender: false });
+          if (!isCurrent()) return;
         } catch (error) {
+          if (!isCurrent()) return;
           if (status) status.textContent = error?.message || "Bundle purchase could not be completed.";
           return;
         }
@@ -10801,27 +10901,33 @@
         recordStoreHistory("unlocked", item);
       });
       savePuzzleState();
-      await Promise.all(details.items.map((item) => equipStoreItem(item)));
+      const equipped = await Promise.all(details.items.map((item) => equipStoreItem(item)));
+      if (!isCurrent()) return;
       playAudioCue("purchase");
       showCelebration("Bundle unlocked!", `-${formatProfileNumber(bundlePrice)} coins · Save ${formatProfileNumber(details.savings)}`, bundle.name);
       refreshStoreItemCards(details.items.map((item) => item.id));
       renderBeginnerProgress();
-      if (status) status.textContent = `${bundle.name} unlocked and equipped. You saved ${formatProfileNumber(details.savings)} coins.`;
+      if (status) status.textContent = equipped.every(Boolean)
+        ? `${bundle.name} unlocked and equipped. You saved ${formatProfileNumber(details.savings)} coins.`
+        : `${bundle.name} purchased. Some cosmetics could not be equipped; retry after Store sync.`;
     }
 
     async function runStoreBundleAction(bundleId) {
+      const actionGeneration = storeSessionGeneration;
       const id = String(bundleId || "");
       if (!id || storeBundleActionLocks.has(id)) return;
       const bundle = storeBundles.find((entry) => entry.id === id);
       if (!bundle) return;
-      storeBundleActionLocks.add(id);
+      storeBundleActionLocks.set(id, actionGeneration);
       setStoreBundlePending(id, true);
       try {
         return await performStoreBundleAction(id);
       } finally {
-        storeBundleActionLocks.delete(id);
-        refreshStoreBundleCard(id);
-        setStoreBundlePending(id, false);
+        if (storeBundleActionLocks.get(id) === actionGeneration) {
+          storeBundleActionLocks.delete(id);
+          refreshStoreBundleCard(id);
+          setStoreBundlePending(id, false);
+        }
       }
     }
 
@@ -30525,7 +30631,9 @@
       admin: "admin"
     });
     const routeModulePromises = new Map();
+    const routeModuleRetries = new Map();
     let routeModuleActivationGeneration = 0;
+    let siteNavigationGeneration = 0;
 
     function getRouteModuleName(panel, tab = "") {
       if (panel === "gameReview") return routeModuleNames.gameReview;
@@ -30544,10 +30652,13 @@
       // every lazy route fails before its module is even requested. Resolve
       // against the document so this also works when the site is hosted under
       // a repository sub-path (for example GitHub Pages).
-      const href = new URL(
+      const routeUrl = new URL(
         `./assets/routes/${encodeURIComponent(name)}.js?v=${encodeURIComponent(routeModuleVersion)}`,
         document.baseURI
-      ).href;
+      );
+      const retry = routeModuleRetries.get(name) || 0;
+      if (retry) routeUrl.searchParams.set("retry", String(retry));
+      const href = routeUrl.href;
       const task = import(href).catch((error) => {
         console.warn(`[Nschess] Route module ${name} failed to load.`, error);
         return { routeError: true, routeName: name, features: [], styles: [] };
@@ -30602,13 +30713,16 @@
           if (featureName.startsWith("route:")) {
             const routeName = featureName.slice("route:".length);
             routeModulePromises.delete(routeName);
+            // Browsers remember failed module imports too. Explicit retry
+            // needs a new URL rather than the already rejected module.
+            routeModuleRetries.set(routeName, (routeModuleRetries.get(routeName) || 0) + 1);
             routeModuleActivationGeneration += 1;
             initializePanelFeatures(panel.id, panel.dataset.routeTab || "");
             return;
           }
           deferredFeaturePromises.delete(featureName);
           void initializeDeferredFeature(featureName).then((ok) => {
-            if (!ok) showRouteFeatureFailure(panel, featureName);
+            if (ok === false) showRouteFeatureFailure(panel, featureName);
             sharedInteractiveBoardWorkspace.sync();
           });
         };
@@ -30797,6 +30911,7 @@
       });
 
       function showHome(shouldScroll = false) {
+        siteNavigationGeneration += 1;
         releaseActivePlayScrollAnchor();
         boardInteractionEngine.cancelAll({ type: "routechange" });
         cancelCoachPremove();
@@ -30837,6 +30952,7 @@
       }
 
       function activateSiteTab(config, shouldScroll = true) {
+        siteNavigationGeneration += 1;
         if (!config) {
           showHome(shouldScroll);
           return;
@@ -31596,6 +31712,8 @@
       const isLoopback = ["localhost", "127.0.0.1", "::1"].includes(host);
       if ((location.protocol !== "https:" && !isLoopback) || host.endsWith(".github.io")) return baseProvider;
       let configPromise = null;
+      let configRetryAt = 0;
+      let configLastError = null;
       let cachedAccount = null;
       let supabaseClientPromise = null;
       let supabaseLibraryPromise = null;
@@ -31706,6 +31824,10 @@
       const startSessionRefresh = (client) => client?.auth?.startAutoRefresh?.();
 
       const getConfig = async () => {
+        // Several lazy surfaces request auth together. Share a brief failure
+        // cooldown as well as the in-flight request instead of hammering an
+        // unavailable configuration endpoint on every render.
+        if (!configPromise && Date.now() < configRetryAt) throw configLastError;
         if (!configPromise) {
           configPromise = fetch("/api/auth-config", { cache: "no-store" })
             .then(async (response) => {
@@ -31723,6 +31845,8 @@
             })
             .catch((error) => {
               configPromise = null;
+              configLastError = error;
+              configRetryAt = Date.now() + 3000;
               throw error;
             });
         }
@@ -33020,6 +33144,19 @@
       renderStore();
     }
 
+    function reopenAccountReviewWhenReady(savedReview, accountId) {
+      const navigationGeneration = siteNavigationGeneration;
+      const accountGeneration = socialNotificationGeneration;
+      void initializeDeferredFeature("play").then((ok) => {
+        if (ok === false || navigationGeneration !== siteNavigationGeneration
+          || accountGeneration !== socialNotificationGeneration
+          || !isApplicationAuthenticated()
+          || normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId) !== accountId
+          || !matchReviews.includes(savedReview)) return;
+        if (isGameReviewRoute() && !document.getElementById("gameReview")?.classList.contains("is-review-page")) openSavedMatchReview(savedReview);
+      });
+    }
+
     function applyAuthenticatedAccount(account, { status = "signed_out" } = {}) {
       if (!account?.username) {
         // A profile/network error is not a logout. Preserve the live account
@@ -33065,11 +33202,7 @@
           savedReview = matchReviews.find((review) => review?.moves?.length && review?.summary);
         }
         if (savedReview) {
-          void initializeDeferredFeature("play").then(() => {
-            if (isGameReviewRoute() && !document.getElementById("gameReview")?.classList.contains("is-review-page")) {
-              openSavedMatchReview(savedReview);
-            }
-          });
+          reopenAccountReviewWhenReady(savedReview, accountId);
         }
       }
       applicationAuthState = "authenticated";
@@ -37494,15 +37627,25 @@
       const destination = getSocialNotificationDestination(notification);
       if (destination.friendView) saveFriendHubState({ view: destination.friendView, search: "" });
       route(destination.tab, destination.href);
+      const navigationGeneration = siteNavigationGeneration;
+      const notificationGeneration = socialNotificationGeneration;
+      const userId = String(getFriendCurrentUserId() || "");
+      const isCurrent = () => navigationGeneration === siteNavigationGeneration
+        && notificationGeneration === socialNotificationGeneration
+        && userId === String(getFriendCurrentUserId() || "");
       if (destination.friendView === "messages" && destination.entityId) {
         window.setTimeout(() => {
+          if (!isCurrent()) return;
           void refreshMessaging().then(() => {
+            if (!isCurrent()) return;
             const conversation = messagingHubState.conversations.find((item) => item.id === destination.entityId);
             if (conversation) void selectMessagingConversation(conversation, { open: false });
-          });
+          }).catch(() => {});
         }, 120);
       }
-      if (destination.action === "giftInbox") window.setTimeout(() => document.getElementById("storeGiftOpen")?.click(), 120);
+      if (destination.action === "giftInbox") window.setTimeout(() => {
+        if (isCurrent()) document.getElementById("storeGiftOpen")?.click();
+      }, 120);
       return destination;
     }
 

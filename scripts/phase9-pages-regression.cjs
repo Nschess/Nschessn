@@ -246,7 +246,7 @@ function testSettingsTabContract() {
 function testStoreAuthorityBoundary() {
   const pendingAction = extractFunction("runStoreItemAction");
   const purchase = extractFunction("buyOrEquipStoreItem");
-  assert.match(pendingAction, /storeActionLocks\.has\(id\)[\s\S]*?storeActionLocks\.add\(id\)[\s\S]*?setStoreItemPending\(id, true\)[\s\S]*?finally[\s\S]*?storeActionLocks\.delete\(id\)[\s\S]*?setStoreItemPending\(id, false\)/);
+  assert.match(pendingAction, /storeActionLocks\.has\(id\)[\s\S]*?storeActionLocks\.set\(id, actionGeneration\)[\s\S]*?setStoreItemPending\(id, true\)[\s\S]*?finally[\s\S]*?storeActionLocks\.get\(id\) === actionGeneration[\s\S]*?storeActionLocks\.delete\(id\)[\s\S]*?setStoreItemPending\(id, false\)/);
   assert.match(purchase, /storeServerIsActive\(\)[\s\S]*?purchaseCosmetic\(item\.id, createStoreIdempotencyKey\("purchase"\)\)[\s\S]*?refreshServerStoreState/);
   assert.match(purchase, /else \{[\s\S]*?puzzleCoins -= price/);
   assert.match(extractFunction("storeServerRequiresAuthority"), /storeAuthState\.status !== "signed_out"/);

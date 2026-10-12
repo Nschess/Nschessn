@@ -8,8 +8,10 @@
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const path = require("node:path");
+const fs = require("node:fs");
 const { spawn } = require("node:child_process");
 const { chromium } = require("playwright");
+const { installOptionalCdnFixtures } = require("./e2e-runtime-fixtures.cjs");
 
 const root = path.resolve(__dirname, "..");
 const port = 4197;
@@ -188,6 +190,11 @@ async function readReviewState(page) {
     return {
       viewport: [window.innerWidth, window.innerHeight],
       board: rect(board),
+      boardUnobscured: Boolean(board && [...board.querySelectorAll("[data-square]")].length === 64
+        && [...board.querySelectorAll("[data-square]")].every((square) => {
+          const box = square.getBoundingClientRect();
+          return square.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        })),
       stage: rect(stage),
       boardWrap: rect(boardWrap),
       slot: rect(slot),
@@ -214,6 +221,15 @@ async function readReviewState(page) {
       fullscreenButton: rect(stage?.querySelector("[data-board-fullscreen-action]"))
     };
   });
+}
+
+async function waitForNormalReviewGeometry(page) {
+  await page.waitForFunction(() => {
+    const board = document.querySelector("#reviewBoardSlot [data-interactive-board]")?.getBoundingClientRect();
+    const stage = document.querySelector("#reviewBoardSlot [data-interactive-board-stage]")?.getBoundingClientRect();
+    return board && stage && board.width > 100 && Math.abs(board.width - board.height) < 1
+      && board.left >= stage.left && board.right <= stage.right + 1;
+  }, null, { timeout: 5000 });
 }
 
 function assertVisible(rect, label, viewport) {
@@ -253,6 +269,8 @@ function requestedViewports() {
 
 async function runCase(browser, width, height) {
   const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
+  await context.route("https://**/*", (route) => route.abort());
+  await installOptionalCdnFixtures(context);
   await context.route("**/api/auth-config", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -271,7 +289,13 @@ async function runCase(browser, width, height) {
   const page = await context.newPage();
   try {
     const reviewEvidence = await openReview(page);
+    await waitForNormalReviewGeometry(page);
     const normal = await readReviewState(page);
+    if (process.env.REVIEW_SCREENSHOTS === "1") {
+      const directory = path.join(root, "e2e-artifacts", "phase10", "review");
+      fs.mkdirSync(directory, { recursive: true });
+      await page.screenshot({ path: path.join(directory, `normal-${width}.png`), animations: "disabled" });
+    }
     assert(normal.board && Math.abs(normal.board.width - normal.board.height) < 1,
       `${width}x${height}: normal Review board is not square: ${JSON.stringify(normal)}.`);
 
@@ -292,11 +316,18 @@ async function runCase(browser, width, height) {
     await page.waitForTimeout(250);
 
     const focused = await readReviewState(page);
+    if (process.env.REVIEW_SCREENSHOTS === "1") {
+      await page.screenshot({ path: path.join(root, "e2e-artifacts", "phase10", "review", `fullscreen-${width}.png`), animations: "disabled" });
+    }
     assert.equal(focused.fullscreenHost.includes("game-review-command-center"), true,
       `${width}x${height}: Review fullscreen did not promote the command center: ${JSON.stringify(focused)}.`);
     assert(focused.board && Math.abs(focused.board.width - focused.board.height) < 1,
       `${width}x${height}: fullscreen Review board is not square: ${JSON.stringify(focused)}.`);
     assertVisible(focused.board, `${width}x${height} fullscreen board; geometry=${JSON.stringify({ stage: focused.stage, boardWrap: focused.boardWrap, slot: focused.slot, analysis: focused.analysis, rail: focused.rail })}`, focused.viewport);
+    assert(focused.board.y >= focused.analysis.y - 1 && focused.board.bottom <= focused.analysis.bottom + 1,
+      `${width}x${height}: board is clipped by its analysis row: ${JSON.stringify(focused)}.`);
+    assert.equal(focused.boardUnobscured, true,
+      `${width}x${height}: all 64 square centers must be visible without scrolling another panel.`);
     assertVisible(focused.current, `${width}x${height} Review evaluation context`, focused.viewport);
     assertVisible(focused.replay, `${width}x${height} Review replay controls`, focused.viewport);
     assert.equal(focused.controlsAccessible, true,
@@ -309,6 +340,12 @@ async function runCase(browser, width, height) {
     await assertReviewControlAccessible(page, "#reviewPrev", `${width}x${height} Review previous control`, focused.viewport);
     assert(focused.fullscreenButton && focused.fullscreenButton.width > 0,
       `${width}x${height}: Review fullscreen control disappeared in focus mode: ${JSON.stringify(focused)}.`);
+    assert(focused.fullscreenButton.width >= 44 && focused.fullscreenButton.height >= 44,
+      `${width}x${height}: exit focus must retain a 44px touch target.`);
+    assertVisible(focused.fullscreenButton, `${width}x${height} exit focus control`, focused.viewport);
+    assert(focused.fullscreenButton.x >= focused.board.right || focused.fullscreenButton.y >= focused.board.bottom,
+      `${width}x${height}: exit focus must not cover playable squares.`);
+    assert.equal(await fullscreenButton.getAttribute("aria-label"), "Exit focus mode");
     assert.equal(focused.hostBoxSizing, "border-box",
       `${width}x${height}: Review fullscreen host must use border-box sizing: ${JSON.stringify(focused)}.`);
     assert(focused.hostScrollWidth <= focused.hostClientWidth + 1 && focused.hostScrollHeight <= focused.hostClientHeight + 1,
@@ -345,11 +382,16 @@ async function runCase(browser, width, height) {
       assert.equal(await page.locator("#reviewNext").isDisabled(), true, `${width}x${height}: next move should disable again at the end.`);
     }
 
-    await requestExitFullscreen(page);
+    // A rectangle alone cannot prove usability: the real Exit focus action
+    // must be reachable without force-clicking through another panel.
+    await fullscreenButton.click({ timeout: 5000 });
     await page.waitForFunction((expected) => !document.fullscreenElement
       && !document.body.classList.contains("interactive-board-fullscreen-active")
       && Number(document.querySelector("#reviewBoardSlot [data-interactive-board-stage]")?.dataset.boardRequestedSize || 0) === expected,
     normal.boardRequestedSize, { timeout: 5000 });
+    await waitForNormalReviewGeometry(page);
+    await page.waitForFunction((expected) => Math.abs((document.querySelector("#reviewBoardSlot [data-interactive-board]")?.getBoundingClientRect().width || 0) - expected) < 2,
+      normal.board.width, { timeout: 5000 });
     const restored = await readReviewState(page);
     assert(Math.abs((restored.board?.width || 0) - normal.board.width) < 2,
       `${width}x${height}: Review normal board size was not restored: ${JSON.stringify({ normal, restored })}.`);
@@ -430,7 +472,9 @@ async function main() {
     await waitForServer();
     const results = [];
     for (const [width, height] of requestedViewports()) {
-      results.push(await runCase(browser, width, height));
+      const result = await runCase(browser, width, height);
+      results.push(result);
+      process.stdout.write(`PASS Review viewport ${result}\n`);
     }
     process.stdout.write(`PASS Review fullscreen regression; engine=${reviewEngineMode} (${results.join(", ")})\n`);
   } finally {

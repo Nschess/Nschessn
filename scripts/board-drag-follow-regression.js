@@ -59,6 +59,7 @@ async function startPlay(page) {
 
 async function setBoardScale(page, value) {
   await page.goto(`${baseUrl}/#settings`, { waitUntil: "domcontentloaded" });
+  await page.locator('#settingsTablist[aria-orientation]').waitFor({ state: "visible" });
   await page.locator('[data-settings-tab="gameplay"]').click();
   const slider = page.locator('input[data-pref-setting="boardScale"]');
   await slider.waitFor({ state: "visible" });

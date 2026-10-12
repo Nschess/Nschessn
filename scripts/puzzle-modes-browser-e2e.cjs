@@ -305,10 +305,18 @@ async function main() {
     await page.locator('.real-puzzle-modes [data-real-mode="Streak"]').click();
     const firstStreakPuzzle = await getCurrentPuzzle(page, catalog, Chess);
     await solveCurrent(page, catalog, Chess);
-    assert.match(await page.locator("#realPuzzleStreak").innerText(), /^1\//, "Streak increments on a verified complete solution");
-    await page.locator('.real-puzzle-modes [data-real-mode="Streak"]').click();
-    assert.match(await page.locator("#realPuzzleStreak").innerText(), /^1\//, "clicking the active mode does not erase a live Streak");
-    await page.locator("#realPuzzleBoardRestart").click();
+    // Exercise immediate replay before the real 1.1s auto-next deadline. Slow
+    // automation round trips between these assertions must not select a new
+    // puzzle and then mistakenly call it a replay of the previous one.
+    const streakReplay = await page.evaluate(() => {
+      const before = document.querySelector("#realPuzzleStreak").textContent;
+      document.querySelector('.real-puzzle-modes [data-real-mode="Streak"]').click();
+      const after = document.querySelector("#realPuzzleStreak").textContent;
+      document.querySelector("#realPuzzleBoardRestart").click();
+      return { before, after };
+    });
+    assert.match(streakReplay.before, /^1\//, "Streak increments on a verified complete solution");
+    assert.match(streakReplay.after, /^1\//, "clicking the active mode does not erase a live Streak");
     const replayedStreakPuzzle = await solveCurrent(page, catalog, Chess);
     assert.equal(replayedStreakPuzzle.runtime.puzzleId, firstStreakPuzzle.runtime.puzzleId);
     assert.match(await page.locator("#realPuzzleStreak").innerText(), /^1\//, "re-solving the same completed position cannot farm Streak progress");
@@ -334,6 +342,13 @@ async function main() {
     const layouts = [];
     for (const width of [1366, 390, 375, 320]) {
       await page.setViewportSize({ width, height: 900 });
+      // The shared sizing controller commits a viewport resize on a frame.
+      // Wait for real geometry, then assert containment as well as squareness.
+      await page.waitForFunction(() => {
+        const board = document.querySelector("#realPuzzleBoard")?.getBoundingClientRect();
+        return board && board.width > 100 && board.left >= 0 && board.right <= innerWidth + 1
+          && Math.abs(board.width - board.height) <= 1;
+      }, null, { timeout: 5000 });
       const layout = await page.evaluate(() => {
         const board = document.querySelector("#realPuzzleBoard").getBoundingClientRect();
         const panel = document.querySelector("#puzzles");
@@ -345,6 +360,8 @@ async function main() {
           puzzlePanelWidth: panel.clientWidth,
           boardWidth: Math.round(board.width),
           boardHeight: Math.round(board.height),
+          boardLeft: board.left,
+          boardRight: board.right,
           smallestTouchTarget: Math.min(...targets.map((button) => button.getBoundingClientRect().height)),
           statusRole: document.querySelector("#realPuzzleFeedback")?.getAttribute("role"),
           accuracyLabel: document.querySelector("#realPuzzleAccuracy")?.getAttribute("aria-label")
@@ -352,6 +369,7 @@ async function main() {
       });
       assert.ok(layout.documentWidth <= width + 1, `puzzle view has no horizontal overflow at ${width}px: ${JSON.stringify(layout)}`);
       assert.ok(layout.boardWidth > 0 && Math.abs(layout.boardWidth - layout.boardHeight) <= 1, `board remains square at ${width}px`);
+      assert.ok(layout.boardLeft >= 0 && layout.boardRight <= width + 1, `entire puzzle board fits at ${width}px`);
       assert.equal(layout.statusRole, "status", "move feedback remains a polite accessible status region");
       assert.ok(layout.smallestTouchTarget >= (width <= 580 ? 44 : 40), `puzzle controls are comfortably tappable without inflating desktop controls at ${width}px: ${JSON.stringify(layout)}`);
       layouts.push(layout);

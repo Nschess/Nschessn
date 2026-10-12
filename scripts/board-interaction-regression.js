@@ -97,7 +97,7 @@ const requiredAppContracts = [
   ["Store purchase reports exact failures", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?reportStorePurchaseDiagnostic\("NO_ITEM"[\s\S]*?reportStorePurchaseDiagnostic\("RPC_FAILED"[\s\S]*?reportStorePurchaseDiagnostic\("INVENTORY_REFRESH_FAILED"/],
   ["Protected RPC validates Supabase user", /const callFriendRpc = async \(name, args = \{\}\) => \{[\s\S]*?supabase\.auth\.getUser\(\)[\s\S]*?supabase\.rpc\(name, args\)/],
   ["Purchase hydrates returned server balance", /purchaseResult = await getAuthProvider\(\)\.purchaseCosmetic[\s\S]*?returnedCoins[\s\S]*?refreshServerStoreState\(\{ rerender: false \}\)/],
-  ["Store actions lock duplicate clicks", /const storeActionLocks = new Set\(\)[\s\S]*?async function runStoreItemAction\(itemId\)[\s\S]*?storeActionLocks\.has\(id\)[\s\S]*?setStoreItemPending\(id, true\)/],
+  ["Store actions lock duplicate clicks", /const storeActionLocks = new Map\(\)[\s\S]*?async function runStoreItemAction\(itemId\)[\s\S]*?storeActionLocks\.has\(id\)[\s\S]*?storeActionLocks\.set\(id, actionGeneration\)[\s\S]*?setStoreItemPending\(id, true\)/],
   ["Store purchase patches mounted cards", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?refreshStoreItemCards\(\[previouslyEquippedId, item\.id\]\)/],
   ["Store purchase does not rebuild catalog", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?refreshStoreItemCards\(\[previouslyEquippedId, item\.id\]\)[\s\S]*?renderBeginnerProgress\(\)/],
   ["Auth lifecycle updates Store authority", /function applyAuthenticatedAccount\(account,\s*\{ status = "signed_out" \}[\s\S]*?const nextStatus = \["unknown", "error", "signed_out"\][\s\S]*?setStoreAuthState\("authenticated"/],
@@ -317,7 +317,7 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v192-daily-puzzle-ux-perf";
+const cacheName = "nschess-shell-v193-master-recovery";
 const shellCssVersion = "daily-compact-v1";
 const shellAppVersion = "play-multiplayer-truth-v239";
 const routeModuleVersion = "review-v226-startup-performance";

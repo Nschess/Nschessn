@@ -43334,12 +43334,18 @@ html body #play:not(.is-review-mode):not(:has(.match-board-column:fullscreen)) .
   position: absolute !important;
   inset: 50% auto auto calc(100% + 8px) !important;
   z-index: 120 !important;
-  inline-size: 34px !important;
-  min-inline-size: 34px !important;
-  block-size: 34px !important;
-  min-block-size: 34px !important;
+  inline-size: 44px !important;
+  min-inline-size: 44px !important;
+  block-size: 44px !important;
+  min-block-size: 44px !important;
   padding: 0 !important;
   transform: translateY(-50%);
+}
+
+#gameReview.is-review-page .game-review-command-center:fullscreen [data-board-fullscreen-label] { display: none !important; }
+#gameReview.is-review-page .game-review-command-center:fullscreen [data-board-fullscreen-action] > [aria-hidden="true"] {
+  display: inline !important;
+  font-size: 22px;
 }
 
 body:has(.game-review-command-center:fullscreen),
@@ -43365,8 +43371,14 @@ html:has(.game-review-command-center:fullscreen) {
     max-block-size: 30dvh;
   }
 
+  :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen #reviewBoardSlot > .play-board-wrap {
+    padding-bottom: 54px !important;
+  }
+
   :is(body:not(.theme-light), body.theme-light) #gameReview.is-review-page .game-review-command-center:fullscreen .play-lobby-board-actions > [data-board-fullscreen-action] {
-    inset: auto 4px -42px auto !important;
+    /* Keep it inside the stage: below-stage positioning was covered by the
+       next analysis panel even though its rectangle was in the viewport. */
+    inset: auto 4px 4px auto !important;
     transform: none;
   }
 }
@@ -44167,6 +44179,40 @@ body.friend-challenge-mode #play :is(
 }
 
 #tutorial .tutorial-settings-actions .button { min-height: 44px; }
+
+/* A fieldset's intrinsic minimum used to widen the entire Study Plan grid,
+   clipping every card while the document itself reported no overflow. */
+#plan :is(.plan-panel, .trainer-field, .trainer-form > label, .training-task > div) { min-width: 0; }
+#plan .plan-list li { grid-template-columns: 36px minmax(0, 1fr); }
+#plan :is(select, .trainer-check) { min-height: 44px; }
+#plan .trainer-check { overflow-wrap: anywhere; }
+
+/* Inner-page navigation must remain usable without the optional icon CDN.
+   Home's approved header presentation is deliberately unchanged. */
+body.site-tab-mode #siteSearchOpen > span { font-size: 0; }
+body.site-tab-mode #siteSearchOpen > span::before { content: "⌕"; font-size: 24px; }
+body.site-tab-mode .nav-mobile-menu > summary > span { font-size: 0; }
+body.site-tab-mode .nav-mobile-menu > summary > span::before { content: "☰"; font-size: 18px; }
+@media (max-width: 560px) {
+  body.site-tab-mode .site-header .nav { grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 6px; }
+  body.site-tab-mode .site-header .brand-copy { display: none; }
+  body.site-tab-mode .site-header .brand { min-height: 44px; }
+  body.site-tab-mode .site-header .nav-utilities { gap: 4px; }
+  body.site-tab-mode .site-header .nav-utilities > :is(a, button),
+  body.site-tab-mode .site-header .nav-mobile-menu > summary {
+    min-width: 44px; max-width: 44px; width: 44px; min-height: 44px;
+    flex: 0 0 44px; padding: 4px; box-sizing: border-box;
+    justify-content: center;
+  }
+  body.site-tab-mode .site-header .nav-utilities .player-flex-chip { grid-template-columns: 32px; }
+  body.site-tab-mode .site-header .nav-utilities .player-flex-main { display: none !important; }
+  body.site-tab-mode .site-header .nav-coin-chip > span:last-child { display: none; }
+  body.site-tab-mode .site-header .nav-mobile-menu > summary b { display: none; }
+}
+@media (max-width: 360px) {
+  /* Coins remain in Store; prioritize navigation and account access here. */
+  body.site-tab-mode .site-header .nav-coin-chip { display: none; }
+}
 
 @media (max-width: 360px) {
   #tutorial .tutorial-rail,
