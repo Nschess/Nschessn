@@ -159,6 +159,7 @@ async function checkDialogKeyboardBehavior(page) {
     return Boolean(node && !node.hidden && getComputedStyle(node).display !== "none");
   }, null, { timeout: 3000 });
   const input = page.locator("#siteSearchInput");
+  await page.waitForFunction(() => document.activeElement?.id === "siteSearchInput", null, { timeout: 3000 });
   assert.equal(await input.evaluate((element) => document.activeElement === element), true,
     "search dialog should move focus to its input.");
   const focusables = dialog.locator("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])");
@@ -166,6 +167,12 @@ async function checkDialogKeyboardBehavior(page) {
   assert(count >= 2, "search dialog should expose a close control and input.");
   await focusables.first().focus();
   await page.keyboard.press("Shift+Tab");
+  await page.waitForFunction(() => {
+    const items = document.querySelector("#siteSearchDialog").querySelectorAll(
+      "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    );
+    return document.activeElement === items[items.length - 1];
+  }, null, { timeout: 3000 });
   assert.equal(await focusables.nth(count - 1).evaluate((element) => document.activeElement === element), true,
     "Shift+Tab at the first search control should wrap inside the dialog.");
   await page.keyboard.press("Escape");
@@ -180,6 +187,41 @@ async function runViewport(browser, viewport) {
   const page = await context.newPage();
   try {
     const results = { viewport: `${viewport.width}x${viewport.height}`, controls: 0 };
+    if (viewport.width <= 768) {
+      await waitForRoute(page, "top");
+      // Exercise the first-visit dialog normally before testing the header;
+      // its delayed opening must not compete with the search focus fixture.
+      await page.locator("#firstVisitSetup").waitFor({ state: "visible", timeout: 3000 });
+      await page.locator("#firstVisitSetupLater").click();
+      const homeControls = await measureVisibleControls(page, "Home navigation", [
+        ".site-header .brand", ".nav-utilities > a", ".nav-utilities > button", ".nav-mobile-menu > summary"
+      ]);
+      results.controls += homeControls.length;
+      await assertNoHorizontalOverflow(page, "Home navigation");
+      if (viewport.width <= 390) assert.equal(await page.evaluate(() => {
+        const mark = document.querySelector(".site-header .brand-mark").getBoundingClientRect();
+        return mark.width >= 30 && getComputedStyle(document.querySelector(".site-header .brand-copy")).display === "none";
+      }), true, "The compact Home brand must show an unclipped logo, not squeezed brand text");
+      assert.equal(await page.evaluate(() => [...document.querySelectorAll(
+        ".site-header .brand, .nav-utilities > a, .nav-utilities > button, .nav-mobile-menu > summary"
+      )].filter((node) => node.getBoundingClientRect().width).every((node) => {
+        const box = node.getBoundingClientRect();
+        return node.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+      })), true, "Home navigation controls must not be covered by another element");
+      await checkDialogKeyboardBehavior(page);
+      const menu = page.locator(".nav-mobile-menu > summary");
+      await menu.focus();
+      await menu.press("Enter");
+      assert.notEqual(await page.locator(".nav-mobile-menu").getAttribute("open"), null);
+      const storeLink = page.locator('.nav-mobile-panel [data-site-tab="store"]').first();
+      await storeLink.focus();
+      await storeLink.press("Enter");
+      await page.waitForFunction(() => location.hash === "#store");
+      const brand = page.locator(".site-header .brand");
+      await brand.focus();
+      await brand.press("Enter");
+      await page.waitForFunction(() => !document.body.classList.contains("site-tab-mode"));
+    }
     const loginSelectors = [
       "#login .login-form input",
       "#login .login-form select",

@@ -97,7 +97,7 @@ async function main() {
       await page.locator(`#${id}`).waitFor({ state: "visible" });
       await page.waitForTimeout(350);
       report.routes.push({ route, ms: Date.now() - start });
-      for (const width of [1366, 980, 390, 375, 320]) {
+      for (const width of [1366, 980, 768, 390, 375, 320]) {
         await page.setViewportSize({ width, height: 900 });
         await page.waitForTimeout(80);
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
@@ -171,8 +171,8 @@ async function main() {
       assert.deepEqual(report.errors, []);
       assert.ok(report.viewports.every((v) => v.overflow <= 1), "all inspected routes fit the viewport");
       assert.ok(report.viewports.every((v) => v.panelOverflow <= 1), "route contents are not silently clipped");
-      for (const sample of report.viewports.filter((v) => v.route !== "top" && v.width <= 390)) {
-        assert.ok(sample.header.every((item) => item.height >= 44 && item.right - item.left >= 44), "inner-page mobile header targets stay 44px");
+      for (const sample of report.viewports.filter((v) => v.width <= 390)) {
+        assert.ok(sample.header.every((item) => item.height >= 44 && item.right - item.left >= 44), "Home and inner-page mobile header targets stay 44px");
         for (let i = 1; i < sample.header.length; i++) assert.ok(sample.header[i].left >= sample.header[i - 1].right, "header controls do not overlap");
       }
       assert.ok(attempts >= 2, "Retry really re-fetches the failed module");

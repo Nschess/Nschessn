@@ -44187,31 +44187,42 @@ body.friend-challenge-mode #play :is(
 #plan :is(select, .trainer-check) { min-height: 44px; }
 #plan .trainer-check { overflow-wrap: anywhere; }
 
-/* Inner-page navigation must remain usable without the optional icon CDN.
-   Home's approved header presentation is deliberately unchanged. */
+/* Navigation stays usable without the optional icon CDN; compact Home
+   navigation shares the small-screen treatment without changing its content. */
 body.site-tab-mode #siteSearchOpen > span { font-size: 0; }
 body.site-tab-mode #siteSearchOpen > span::before { content: "⌕"; font-size: 24px; }
 body.site-tab-mode .nav-mobile-menu > summary > span { font-size: 0; }
 body.site-tab-mode .nav-mobile-menu > summary > span::before { content: "☰"; font-size: 18px; }
+@media (max-width: 840px) {
+  .site-header .brand { min-height: 44px; }
+  .site-header .nav-icon-button { min-width: 44px; min-height: 44px; }
+  .site-header .nav-coin-chip { min-height: 44px; }
+}
 @media (max-width: 560px) {
-  body.site-tab-mode .site-header .nav { grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 6px; }
-  body.site-tab-mode .site-header .brand-copy { display: none; }
-  body.site-tab-mode .site-header .brand { min-height: 44px; }
-  body.site-tab-mode .site-header .nav-utilities { gap: 4px; }
-  body.site-tab-mode .site-header .nav-utilities > :is(a, button),
-  body.site-tab-mode .site-header .nav-mobile-menu > summary {
+  /* Home needs the same compact, tappable navigation as inner pages. Only
+     the narrow header changes; the Home composition and desktop stay intact. */
+  .site-header .nav { grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 6px; }
+  .site-header .brand .brand-copy { display: none; }
+  .site-header .brand { min-height: 44px; }
+  .site-header .nav-utilities { gap: 4px; }
+  .site-header .nav-utilities > :is(a, button),
+  .site-header .nav-mobile-menu > summary {
     min-width: 44px; max-width: 44px; width: 44px; min-height: 44px;
     flex: 0 0 44px; padding: 4px; box-sizing: border-box;
     justify-content: center;
   }
-  body.site-tab-mode .site-header .nav-utilities .player-flex-chip { grid-template-columns: 32px; }
-  body.site-tab-mode .site-header .nav-utilities .player-flex-main { display: none !important; }
-  body.site-tab-mode .site-header .nav-coin-chip > span:last-child { display: none; }
-  body.site-tab-mode .site-header .nav-mobile-menu > summary b { display: none; }
+  .site-header .nav-utilities .player-flex-chip { grid-template-columns: 32px; }
+  .site-header .nav-utilities .player-flex-main { display: none !important; }
+  .site-header .nav-coin-chip > span:last-child { display: none; }
+  .site-header .nav-mobile-menu > summary b { display: none; }
+  .site-header #siteSearchOpen > span { font-size: 0; }
+  .site-header #siteSearchOpen > span::before { content: "⌕"; font-size: 24px; }
+  .site-header .nav-mobile-menu > summary > span { font-size: 0; }
+  .site-header .nav-mobile-menu > summary > span::before { content: "☰"; font-size: 18px; }
 }
 @media (max-width: 360px) {
   /* Coins remain in Store; prioritize navigation and account access here. */
-  body.site-tab-mode .site-header .nav-coin-chip { display: none; }
+  .site-header .nav-coin-chip { display: none; }
 }
 
 @media (max-width: 360px) {

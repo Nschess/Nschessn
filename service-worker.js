@@ -1,7 +1,7 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v193-master-recovery";
+const CACHE_NAME = "nschess-shell-v194-home-accessibility";
 const APP_SHELL = [
   "./",
   "./index.html",
