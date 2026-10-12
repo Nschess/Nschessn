@@ -286,7 +286,7 @@ async function run() {
   assert.match(app, /function validateActiveTutorialStep[\s\S]*?Restart this lesson[\s\S]*?function syncTutorialTurn/, "An invalid/missing task fails closed instead of silently incrementing lesson progress.");
   assert.doesNotMatch(app.slice(app.indexOf("function validateActiveTutorialStep"), app.indexOf("function syncTutorialTurn")), /tutorialMoveStep\s*\+\+/, "Step validation cannot silently skip an exercise.");
   assert.match(html, /id="tutorialTopicFilter"[\s\S]*?id="tutorialLessonList"/, "The filter and lesson list are accessible controls in the tutorial rail.");
-  assert.match(html, /checklist is saved in this browser; it is not a synced course record/i, "Local checklist progress is not presented as a server course record.");
+  assert.match(html, /lesson checklist stays on this device, not a synced account record/i, "Local checklist progress is not presented as a server course record.");
   assert.match(html, /Intermediate, Advanced, and Master are topic roadmaps—not interactive courses yet/i, "Unsupported higher-level course content is labeled honestly.");
 
   process.stdout.write("PASS Learn regression: 68 production catalog entries, valid playable FEN/move lines, fail-closed task integrity, safe saved-state hydration, accessible topic filtering, and truthful roadmap labeling.\n");

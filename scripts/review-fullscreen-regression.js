@@ -260,6 +260,11 @@ async function assertReviewControlAccessible(page, selector, label, viewport) {
 }
 
 function requestedViewports() {
+  if (process.env.REVIEW_VIEWPORTS) return process.env.REVIEW_VIEWPORTS.split(",").map((raw) => {
+    const size = raw.split("x").map(Number);
+    if (size.length !== 2 || size.some((n) => !Number.isInteger(n) || n <= 0)) throw new Error(`Invalid REVIEW_VIEWPORTS: ${raw}`);
+    return size;
+  });
   const raw = String(process.env.REVIEW_VIEWPORT || "").trim();
   if (!raw) return [[1920, 1080], [1440, 900], [1366, 768], [1024, 768], [768, 1024], [624, 844], [390, 844], [375, 812], [320, 740]];
   const [width, height] = raw.split("x").map(Number);
@@ -341,7 +346,7 @@ async function runCase(browser, width, height) {
     assert(focused.fullscreenButton && focused.fullscreenButton.width > 0,
       `${width}x${height}: Review fullscreen control disappeared in focus mode: ${JSON.stringify(focused)}.`);
     assert(focused.fullscreenButton.width >= 44 && focused.fullscreenButton.height >= 44,
-      `${width}x${height}: exit focus must retain a 44px touch target.`);
+      `${width}x${height}: exit focus must retain a 44px touch target: ${JSON.stringify(focused.fullscreenButton)}.`);
     assertVisible(focused.fullscreenButton, `${width}x${height} exit focus control`, focused.viewport);
     assert(focused.fullscreenButton.x >= focused.board.right || focused.fullscreenButton.y >= focused.board.bottom,
       `${width}x${height}: exit focus must not cover playable squares.`);

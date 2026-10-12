@@ -18,9 +18,11 @@ async function main() {
   let failShell = false;
   let measureBaseline = false;
   const baseSources = new Map();
-  if (process.env.MASTER_MEASURE) {
-    for (const name of ["assets/app.js", "assets/app.css", "service-worker.js"]) {
-      const source = execFileSync("git", ["show", `6c07f4fb7d3b4b698dcc410e443ff521ad5765f1:${name}`], { cwd: root, maxBuffer: 8 * 1024 * 1024 }).toString("utf8");
+  const baselineSha = process.env.MASTER_SOURCE_SHA || process.env.MASTER_COMPARE_SHA || "6c07f4fb7d3b4b698dcc410e443ff521ad5765f1";
+  if (process.env.MASTER_MEASURE || process.env.MASTER_SOURCE_SHA) {
+    assert.match(baselineSha, /^[a-f0-9]{40}$/);
+    for (const name of ["index.html", "assets/app.js", "assets/app.css", "service-worker.js"]) {
+      const source = execFileSync("git", ["show", `${baselineSha}:${name}`], { cwd: root, maxBuffer: 8 * 1024 * 1024 }).toString("utf8");
       // Match the build's checkout line endings for comparable byte counts.
       baseSources.set(`/${name}`, fs.readFileSync(path.join(artifact, name), "utf8").includes("\r\n") ? source.replace(/\r?\n/g, "\r\n") : source);
     }
@@ -29,7 +31,8 @@ async function main() {
     const pathname = new URL(req.url, "http://localhost").pathname;
     if (pathname === "/__cache_probe") return res.writeHead(200, { "Content-Type": "text/html" }).end("<!doctype html><title>Local cache regression</title>");
     if (failShell && pathname === "/assets/app.css") return res.writeHead(503).end("Synthetic unavailable response");
-    if (measureBaseline && baseSources.has(pathname)) return res.writeHead(200, { "Content-Type": mime[path.extname(pathname)], "Cache-Control": "no-store" }).end(baseSources.get(pathname));
+    const sourcePath = pathname === "/" ? "/index.html" : pathname;
+    if ((measureBaseline || process.env.MASTER_SOURCE_SHA) && baseSources.has(sourcePath)) return res.writeHead(200, { "Content-Type": mime[path.extname(sourcePath)], "Cache-Control": "no-store" }).end(baseSources.get(sourcePath));
     const file = path.resolve(artifact, `.${pathname === "/" ? "/index.html" : pathname}`);
     if (!file.startsWith(artifact + path.sep)) return res.writeHead(403).end();
     fs.readFile(file, (error, data) => {
@@ -39,7 +42,7 @@ async function main() {
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const browser = await chromium.launch({ headless: true });
-  const report = { label, viewports: [], routes: [], errors: [] };
+  const report = { label, viewports: [], routes: [], states: [], errors: [] };
   try {
     if (process.env.MASTER_MEASURE) {
       const samples = [];
@@ -60,7 +63,7 @@ async function main() {
             decodedBytes: resources.reduce((sum, e) => sum + e.decodedBodySize, 0), nodes: document.querySelectorAll("*").length,
             eagerDailyOrEngine: resources.some((e) => /daily-puzzle\.mjs|daily-puzzles-original|stockfish/.test(e.name)) };
         });
-        samples.push({ source: measureBaseline ? "base-6c07f4f" : "candidate", ...metrics });
+        samples.push({ source: measureBaseline ? baselineSha : "candidate", ...metrics });
         await context.close();
       }
       fs.writeFileSync(path.join(output, "performance.json"), JSON.stringify(samples, null, 2));
@@ -76,7 +79,7 @@ async function main() {
       new PerformanceObserver((list) => window.__longTasks.push(...list.getEntries().map((e) => ({ start: e.startTime, duration: e.duration })))).observe({ type: "longtask", buffered: true });
     });
     const page = await context.newPage();
-    page.setDefaultTimeout(10000);
+    page.setDefaultTimeout(20000);
     page.on("pageerror", (error) => report.errors.push(error.message));
     const origin = `http://127.0.0.1:${server.address().port}`;
     await page.goto(origin, { waitUntil: "load" });
@@ -95,25 +98,96 @@ async function main() {
       await page.evaluate((route) => { location.hash = route; }, route);
       const id = route === "game-review" ? "gameReview" : route;
       await page.locator(`#${id}`).waitFor({ state: "visible" });
+      if (route === "tutorial") await page.waitForFunction(() => document.querySelectorAll("#tutorialLessonList [data-tutorial-lesson-index]").length === 68);
+      if (route === "puzzles") await page.waitForFunction(() => document.querySelectorAll("#realPuzzleBoard [data-square]").length === 64);
       await page.waitForTimeout(350);
       report.routes.push({ route, ms: Date.now() - start });
-      for (const width of [1366, 980, 768, 390, 375, 320]) {
+      for (const width of process.env.MASTER_WIDTHS?.split(",").map(Number) || [1366, 980, 768, 390, 375, 320]) {
         await page.setViewportSize({ width, height: 900 });
         await page.waitForTimeout(80);
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
         const sample = await page.evaluate((id) => {
           const p = document.getElementById(id);
           const r = p.getBoundingClientRect();
+          const board = p.querySelector('#tutorialBoard, #realPuzzleBoard, #coachBoard');
+          const boardRect = board?.getBoundingClientRect();
           return { width: innerWidth, overflow: document.documentElement.scrollWidth - innerWidth, panelOverflow: p.scrollWidth - p.clientWidth,
+            contentHeight: r.height, board: boardRect ? { top: boardRect.top, width: boardRect.width, height: boardRect.height } : null,
             clipped: [...p.querySelectorAll("*")].filter((n) => n.getBoundingClientRect().width && n.getBoundingClientRect().right > r.right + 2).slice(0, 10).map((n) => n.id || n.className),
             header: [...document.querySelectorAll(".nav > .brand, .nav-utilities > *, .nav-mobile-menu > summary")].filter((n) => n.getBoundingClientRect().width).map((n) => ({ name: n.id || n.className, left: n.getBoundingClientRect().left, right: n.getBoundingClientRect().right, height: n.getBoundingClientRect().height }))
           };
         }, id);
         report.viewports.push({ route, ...sample });
-        if (["top", "play", "bots", "puzzles", "tutorial", "game-review", "friends", "login", "store", "settings", "leaderboards", "plan"].includes(route)) {
+        if (process.env.MASTER_ALL_SCREENSHOTS || ["top", "play", "bots", "puzzles", "tutorial", "game-review", "friends", "login", "store", "settings", "leaderboards", "plan"].includes(route)) {
           await page.screenshot({ path: path.join(output, `${route}-${width}.png`), animations: "disabled" });
         }
       }
+    }
+    if (process.env.MASTER_ACTIVITIES) {
+      const widths = process.env.MASTER_WIDTHS?.split(",").map(Number) || [320, 360, 375, 390, 430, 768, 1366];
+      const capture = async (name, boardSelector) => {
+        for (const width of widths) {
+          await page.setViewportSize({ width, height: 900 });
+          await page.waitForTimeout(120);
+          await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+          const state = await page.evaluate((selector) => {
+            const board = selector ? document.querySelector(selector)?.getBoundingClientRect() : null;
+            return { width: innerWidth, overflow: document.documentElement.scrollWidth - innerWidth,
+              nodes: document.querySelectorAll("*").length,
+              board: board ? { top: board.top, width: board.width, height: board.height } : null };
+          }, boardSelector);
+          report.states.push({ name, ...state });
+          await page.screenshot({ path: path.join(output, `${name}-${width}.png`), animations: "disabled", fullPage: true });
+          if (!label.startsWith("before")) {
+            assert.ok(state.overflow <= 1, `${name} fits at ${width}`);
+            if (state.board) assert.ok(Math.abs(state.board.width - state.board.height) <= 1, `${name} board stays square`);
+          }
+        }
+      };
+      await page.goto(`${origin}/#puzzles`);
+      await page.waitForFunction(() => document.querySelectorAll("#realPuzzleBoard [data-square]").length === 64);
+      await page.locator('[data-daily-puzzle-launch]').click();
+      await page.locator('#dailyPuzzleBoard [data-square]').first().waitFor();
+      await capture("daily-active", "#dailyPuzzleBoard");
+      for (const mode of ["Trainer", "Rush", "Streak", "Battle"]) {
+        await page.locator(`[data-real-mode="${mode}"]`).click();
+        await capture(`puzzle-${mode.toLowerCase()}`, "#realPuzzleBoard");
+      }
+      await page.goto(`${origin}/#tutorial`);
+      await page.waitForFunction(() => document.querySelectorAll("#tutorialBoard [data-square]").length === 64);
+      await capture("lesson-active", "#tutorialBoard");
+      if (await page.locator('#tutorialLibrary').count()) {
+        await page.setViewportSize({ width: 390, height: 900 });
+        await page.waitForFunction(() => !document.getElementById('tutorialLibrary').open);
+        await page.locator('#tutorialLibrary summary').press("Enter");
+        assert.equal(await page.locator('#tutorialTopicFilter').isVisible(), true, "keyboard opens the complete lesson library");
+        await page.locator('#tutorialTopicFilter').selectOption("Tactics");
+        assert.ok(await page.locator('[data-tutorial-lesson-index]').count() < 68);
+        await page.locator('#tutorialLessonList [data-tutorial-lesson-index]').first().press("Enter");
+        assert.equal(await page.locator('#tutorialLibrary').evaluate(el => el.open), false);
+        assert.equal(await page.evaluate(() => document.getElementById('tutorialBoard').contains(document.activeElement)), true, "choosing a lesson restores visible board keyboard focus");
+      }
+      await page.goto(`${origin}/#play?mode=friend`);
+      await page.locator('#play').waitFor({ state: "visible" });
+      await capture("friendly-challenge");
+      await page.goto(`${origin}/#bots`);
+      await page.locator('[data-ai-bot-play="bot-pebble"]').click();
+      await page.locator('#aiGameReady').waitFor({ state: "visible" });
+      await capture("bot-ready-dialog");
+      await page.locator('[data-ai-game-ready-pace="none"]').click();
+      await page.locator('#aiGameReadyStart').click();
+      await page.locator('#play.is-active-game').waitFor();
+      await capture("play-active", "#coachBoard");
+      await page.goto(`${origin}/#settings`);
+      await page.locator('#settings').waitFor({ state: "visible" });
+      await page.locator('#siteNotificationsOpen').click();
+      await page.locator('#siteNotificationsDialog').waitFor({ state: "visible" });
+      await capture("notifications-dialog");
+      await page.locator('#siteNotificationsClose').click();
+      await page.locator('#siteSearchOpen').click();
+      await page.locator('#siteSearchDialog').waitFor({ state: "visible" });
+      await capture("search-dialog");
+      await page.locator('#siteSearchInput').press("Escape");
     }
     fs.writeFileSync(path.join(output, "report.json"), JSON.stringify(report, null, 2));
     // Real failed module request followed by the visible recovery control.
@@ -132,6 +206,9 @@ async function main() {
     await failure.getByRole("button", { name: "Retry section" }).click();
     await retryPage.waitForTimeout(600);
     report.routeRecovery = { requests: attempts, failureStillVisible: await failure.isVisible() };
+    // A prior page's scheduled auth retry must not contaminate the next
+    // page's configuration-request measurement.
+    await retryPage.close();
     let configRequests = 0;
     await context.route("**/api/auth-config", (route) => {
       configRequests += 1;

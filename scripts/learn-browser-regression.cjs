@@ -209,7 +209,7 @@ async function main() {
     assert.equal(renderEvidence.listeners.rowClick, 0, "rendered lesson rows do not accumulate individual handlers");
 
     const layouts = [];
-    for (const width of [1366, 390, 375, 320]) {
+    for (const width of [1366, 768, 430, 390, 375, 360, 320]) {
       const layout = await measureLayout(page, width);
       assert.ok(layout.documentWidth <= width + 1, `the Learn page has no horizontal overflow at ${width}px: ${JSON.stringify(layout)}`);
       assert.ok(layout.boardWidth > 0 && layout.boardWidth <= width && layout.boardWidth === layout.boardHeight, `the lesson board remains square and within ${width}px: ${JSON.stringify(layout)}`);

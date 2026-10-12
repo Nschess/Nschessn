@@ -106,10 +106,10 @@ async function main() {
     await page.goBack();
     await page.locator("#pwaInstall").waitFor({ state: "visible" });
     report.backNavigation = "PASS";
-    const before = await page.evaluate(async () => (await caches.match("/assets/app.css?v=daily-compact-v1")).text());
+    const before = await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-workspace-v1")).text());
     shellUnavailable = true;
-    await page.evaluate(() => fetch("/assets/app.css?v=daily-compact-v1").then((r) => r.text()));
-    assert.equal(await page.evaluate(async () => (await caches.match("/assets/app.css?v=daily-compact-v1")).text()), before);
+    await page.evaluate(() => fetch("/assets/app.css?v=mobile-workspace-v1").then((r) => r.text()));
+    assert.equal(await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-workspace-v1")).text()), before);
     await context.setOffline(true);
     await page.reload({ waitUntil: "load" });
     assert.ok(await page.locator("#pwaInstall").count());

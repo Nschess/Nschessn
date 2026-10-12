@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=daily-compact-v1" />
+  <link rel="stylesheet" href="assets/app.css?v=mobile-workspace-v1" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -241,19 +241,20 @@
             <p class="section-kicker">Guided lessons · beginner foundations</p>
             <h2 id="tutorial-title">Learn chess one move at a time</h2>
           </div>
-          <p class="section-intro">68 short board lessons cover piece rules, safe moves, tactics, openings, and endgames. The lesson checklist is saved in this browser; it is not a synced course record.</p>
+          <p class="section-intro">68 short board exercises. Your lesson checklist stays on this device, not a synced account record.</p>
         </div>
         <div class="tutorial-shell">
           <aside class="tutorial-rail" aria-label="Guided lesson library">
-            <div class="tutorial-rail-heading">
-              <strong>Choose a lesson</strong>
-              <span>Filter by topic</span>
-            </div>
+            <details class="tutorial-library" id="tutorialLibrary" open>
+              <summary>Choose a lesson <span>68 board exercises</span></summary>
+              <div class="tutorial-library-content">
             <label class="tutorial-filter-label" for="tutorialTopicFilter">Topic</label>
             <select id="tutorialTopicFilter" aria-label="Filter guided lessons by topic">
               <option value="all">All topics (68)</option>
             </select>
             <div class="tutorial-lesson-list" id="tutorialLessonList" role="group" aria-label="Guided lessons"></div>
+              </div>
+            </details>
           </aside>
           <div class="tutorial-stage">
             <div class="tutorial-progress" aria-live="polite">
@@ -352,30 +353,6 @@
           <p class="section-intro">Keep a local Player Pass, or create a secure account when you’re ready.</p>
         </div>
         <div class="login-shell">
-          <div class="login-card">
-            <p class="eyebrow">Your chess home</p>
-            <h3>Your board <span>remembers.</span></h3>
-            <p>Set a name, choose a goal, and let your next move do the talking.</p>
-            <div class="login-perks" aria-label="Profile perks">
-              <span><strong>Progress</strong><small>Lessons, puzzles, and games move you forward.</small></span>
-              <span><strong>Rhythm</strong><small>Short sessions are easier to keep.</small></span>
-              <span><strong>Direction</strong><small>One useful idea at a time.</small></span>
-            </div>
-            <ul class="login-quest-list" aria-label="Player pass benefits">
-              <li><b>1</b><span>Pick up where you left off.</span></li>
-              <li><b>2</b><span>Earn avatars, themes, and badges.</span></li>
-              <li><b>3</b><span>Turn mistakes into the next puzzle.</span></li>
-            </ul>
-            <div class="login-progress-preview" aria-label="Sample player progress">
-              <span>Next move: +20 XP</span>
-              <div aria-hidden="true"><i></i></div>
-              <p>Save. Solve. Play. Come back stronger.</p>
-            </div>
-            <div class="login-card-actions">
-              <a class="button" href="#plan">See your plan</a>
-              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Try a puzzle</a>
-            </div>
-          </div>
           <div class="login-pass">
             <div class="login-pass-hero">
               <div class="login-avatar" id="loginAvatar" aria-hidden="true">&#10022;</div>
@@ -754,6 +731,33 @@
               </div>
             </div>
           </div>
+          <div class="login-card">
+            <p class="eyebrow">Your chess home</p>
+            <h3>Your board <span>remembers.</span></h3>
+            <p>Set a name, choose a goal, and let your next move do the talking.</p>
+            <details class="login-practice-guide">
+              <summary>Build a practice routine</summary>
+            <div class="login-perks" aria-label="Profile perks">
+              <span><strong>Progress</strong><small>Lessons, puzzles, and games move you forward.</small></span>
+              <span><strong>Rhythm</strong><small>Short sessions are easier to keep.</small></span>
+              <span><strong>Direction</strong><small>One useful idea at a time.</small></span>
+            </div>
+            <ul class="login-quest-list" aria-label="Player pass benefits">
+              <li><b>1</b><span>Pick up where you left off.</span></li>
+              <li><b>2</b><span>Earn avatars, themes, and badges.</span></li>
+              <li><b>3</b><span>Turn mistakes into the next puzzle.</span></li>
+            </ul>
+            <div class="login-progress-preview" aria-label="Sample player progress">
+              <span>One useful idea each session</span>
+              <div aria-hidden="true"><i></i></div>
+              <p>Save. Solve. Play. Come back stronger.</p>
+            </div>
+            </details>
+            <div class="login-card-actions">
+              <a class="button" href="#plan">See your plan</a>
+              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Try a puzzle</a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -771,7 +775,7 @@
           <h3 id="pwaInstallTitle">Nschess on your device</h3>
           <button class="button secondary" id="pwaInstall" type="button" aria-describedby="pwaInstallStatus" style="min-height:44px">Install Nschess</button>
           <p id="pwaInstallStatus" role="status" aria-live="polite">Install from your browser for an app-style window. No app store required.</p>
-          <p>Offline: previously opened local chess practice, lessons and Daily Puzzle assets. Sign-in, friends, multiplayer, purchases and cloud data require internet. Optional engines and content must finish loading online first.</p>
+          <details class="pwa-offline-details"><summary>What works offline?</summary><p>Previously opened local chess practice, lessons and Daily Puzzle assets. Sign-in, friends, multiplayer, purchases and cloud data require internet. Optional engines and content must finish loading online first.</p></details>
         </div>
         <div class="settings-shell" id="settingsShell">
           <nav class="settings-sidebar" id="settingsTablist" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
@@ -1098,7 +1102,7 @@
             <div class="store-wallet-copy">
               <p class="store-wallet-kicker">Currency</p>
               <h3>Coins</h3>
-              <p>Earn coins in play. Unlock your look.</p>
+              <p>Account balance. Choose your look.</p>
               <p class="store-status" id="storeStatus">Choose a reward.</p>
               <div class="store-wallet-actions">
                 <button class="button secondary store-sync-retry" type="button" id="storeSyncRetry" hidden>Retry Store sync</button>
@@ -3868,6 +3872,12 @@
 
     <section class="section-dark game-review-page" id="gameReview" aria-label="Game Review">
       <div class="game-review-page-frame">
+        <article class="review-entry" aria-labelledby="reviewEntryTitle">
+          <p class="section-kicker">Understand your decisions</p>
+          <h2 id="reviewEntryTitle">Bring a game to Review</h2>
+          <p>Finish a game, then open Review from its result. Saved games on this device can also be reopened from Profile. Engine analysis is coaching, not a new result or reward.</p>
+          <div class="review-entry-actions"><a class="button" href="#bots">Play a practice game</a><a class="button secondary" href="#login">Open Profile</a></div>
+        </article>
         <section class="game-review-workspace" id="gameReviewWorkspace" aria-label="Game Review" hidden>
           <div class="game-review-shell">
             <div class="game-review-header-slot" id="reviewHeaderSlot"></div>
@@ -4363,7 +4373,7 @@
             <div>
               <p class="section-kicker">Puzzle practice</p>
               <h3 id="realPuzzlesTitle">Find the winning idea</h3>
-              <p>Practice positions from the Lichess puzzle database, distributed under CC0.</p>
+              <p>Practice: Lichess CC0 · Daily: Nschess originals.</p>
             </div>
             <div class="real-puzzle-source" hidden aria-hidden="true">
               <p id="realPuzzleSource"></p>
@@ -4441,6 +4451,17 @@
                 <span class="badge" id="realPuzzleTheme">Tactic</span>
                 <span class="badge" id="realPuzzleTimer" aria-live="off" aria-label="Time spent on this position">00:00</span>
               </div>
+              <h3 id="realPuzzleTitle">Puzzle ready</h3>
+              <p id="realPuzzlePrompt">Find the strongest move and follow the idea.</p>
+              <p class="real-puzzle-hint" id="realPuzzleHint">Hints appear here.</p>
+              <p class="real-puzzle-feedback" id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose a piece to start.</p>
+              <p class="real-puzzle-local-note">Practice rating and streak are saved on this device. Puzzle practice does not award account XP, coins, or Elo.</p>
+              <div class="real-puzzle-moves" id="realPuzzleMoves" aria-label="Played solution line"></div>
+              <div class="real-puzzle-actions">
+                <button class="button secondary" type="button" id="realPuzzleHintButton">Hint</button>
+                <button class="button secondary" type="button" id="realPuzzleReplay">Replay line</button>
+                <button class="button secondary" type="button" id="realPuzzleFlip">Flip board</button>
+              </div>
               <div class="real-puzzle-control">
                 <div class="real-puzzle-control-head"><span>Difficulty</span><small>Challenge yourself at your own speed</small></div>
                 <div class="real-puzzle-difficulties" role="group" aria-label="Real puzzle difficulty">
@@ -4463,17 +4484,6 @@
                 <div class="real-puzzle-card"><strong id="realPuzzleRating">600</strong><span>Practice rating · local</span></div>
                 <div class="real-puzzle-card"><strong id="realPuzzleSolved">0/0</strong><span>Solved in set</span></div>
                 <div class="real-puzzle-card" hidden><strong id="realPuzzleRushScore">0</strong><span>Rush score</span></div>
-              </div>
-              <h3 id="realPuzzleTitle">Puzzle ready</h3>
-              <p id="realPuzzlePrompt">Find the strongest move and follow the idea.</p>
-              <p class="real-puzzle-hint" id="realPuzzleHint">Hints appear here.</p>
-              <p class="real-puzzle-feedback" id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose a piece to start.</p>
-              <p class="real-puzzle-local-note">Practice rating and streak are saved on this device. Puzzle practice does not award account XP, coins, or Elo.</p>
-              <div class="real-puzzle-moves" id="realPuzzleMoves" aria-label="Played solution line"></div>
-              <div class="real-puzzle-actions">
-                <button class="button secondary" type="button" id="realPuzzleHintButton">Hint</button>
-                <button class="button secondary" type="button" id="realPuzzleReplay">Replay line</button>
-                <button class="button secondary" type="button" id="realPuzzleFlip">Flip board</button>
               </div>
               <div class="real-puzzle-achievements" id="realPuzzleAchievements" aria-label="Device-local practice milestones"></div>
             </div>
@@ -4760,7 +4770,7 @@
   </aside>
 
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
-  <script defer src="assets/app.js?v=play-multiplayer-truth-v239"></script>
+  <script defer src="assets/app.js?v=play-multiplayer-truth-v240"></script>
   <script type="module" src="assets/daily-puzzle-launcher.mjs?v=daily-compact-v1"></script>
   <script type="module" src="assets/pwa-install.mjs?v=pwa-v1"></script>
 </body>

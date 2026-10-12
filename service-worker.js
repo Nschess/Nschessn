@@ -1,15 +1,15 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v195-pwa-release";
+const CACHE_NAME = "nschess-shell-v196-mobile-workspace";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=daily-compact-v1",
+  "./assets/app.css?v=mobile-workspace-v1",
   "./assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces",
-  "./assets/app.js?v=play-multiplayer-truth-v239",
+  "./assets/app.js?v=play-multiplayer-truth-v240",
   "./site.webmanifest",
   "./assets/pwa-install.mjs?v=pwa-v1",
   "./assets/icons/icon-192.png",

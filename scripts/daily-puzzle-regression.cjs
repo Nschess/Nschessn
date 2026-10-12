@@ -146,8 +146,8 @@ async function main() {
   assert.match(app, /no XP, rating, coins, or account reward/i);
   const shell = worker.slice(worker.indexOf("const APP_SHELL"), worker.indexOf('self.addEventListener("install"'));
   assert.doesNotMatch(shell, /daily-puzzle|daily-puzzles-original|chess\.js-1\.0\.0\.mjs/, "Daily catalog and chess engine are not forced into every install's critical shell");
-  assert.match(worker, /const CACHE_NAME = "nschess-shell-v195-pwa-release"/);
-  assert.match(worker, /assets\/app\.css\?v=daily-compact-v1/, "the install-time offline shell caches the same stylesheet version requested by the page");
+  assert.match(worker, /const CACHE_NAME = "nschess-shell-v196-mobile-workspace"/);
+  assert.match(worker, /assets\/app\.css\?v=mobile-workspace-v1/, "the install-time offline shell caches the same stylesheet version requested by the page");
   assert.match(worker, /caches\.match\(request\)\.then\(\(cached\) => cached \|\| fetch\(request\)[\s\S]*?savePublicAsset\(request, copy\)/, "Daily module, existing chess engine, and catalog are cached after first online request for later offline use");
   assert.match(worker, /function savePublicAsset[\s\S]*?cache\.put\(request, response\)/);
 

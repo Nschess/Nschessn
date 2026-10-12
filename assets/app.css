@@ -44232,3 +44232,173 @@ body.site-tab-mode .nav-mobile-menu > summary > span::before { content: "☰"; f
   #tutorial .tutorial-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #tutorial .tutorial-settings-actions { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Mobile workspaces: one compact rhythm, with route-specific composition.
+   Board/fullscreen geometry and application state remain owned by their
+   existing controllers. These rules never resize individual board squares. */
+:root {
+  --mobile-radius: 14px;
+}
+.tutorial-library { min-width: 0; }
+.tutorial-library > summary,
+.login-practice-guide > summary,
+.pwa-offline-details > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text);
+}
+.tutorial-library > summary::before,
+.login-practice-guide > summary::before,
+.pwa-offline-details > summary::before { content: "+"; font-size: 1.1rem; }
+:is(.tutorial-library, .login-practice-guide, .pwa-offline-details)[open] > summary::before { content: "−"; }
+.tutorial-library > summary::-webkit-details-marker,
+.login-practice-guide > summary::-webkit-details-marker,
+.pwa-offline-details > summary::-webkit-details-marker { display: none; }
+.tutorial-library > summary span { margin-left: auto; color: var(--muted); font-size: .72rem; font-weight: 400; }
+.tutorial-library-content { display: grid; gap: 8px; min-width: 0; }
+.login-practice-guide { min-width: 0; }
+.login-practice-guide[open] { display: grid; gap: 12px; }
+.pwa-install-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; }
+.pwa-install-card h3 { margin: 0; font-size: 1rem; }
+.pwa-install-card #pwaInstallStatus { grid-column: 1 / -1; margin: 0; font-size: .8rem; line-height: 1.45; }
+.pwa-offline-details { grid-column: 1 / -1; min-width: 0; }
+.pwa-offline-details > summary { font-size: .8rem; color: var(--soft); }
+.pwa-offline-details p { margin: 0; font-size: .8rem; line-height: 1.5; }
+.review-entry { max-width: 720px; margin: 28px auto; padding: clamp(18px, 3vw, 32px); border: 1px solid var(--ns-border); border-radius: var(--mobile-radius); background: var(--ns-surface-soft); }
+.review-entry h2 { margin: 8px 0 12px; font-size: clamp(1.5rem, 3vw, 2rem); }
+.review-entry p:not(.section-kicker) { color: var(--soft); line-height: 1.5; }
+.review-entry-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+#gameReview.is-review-page .review-entry { display: none; }
+:is(.tutorial-library, .login-practice-guide, .pwa-offline-details) > summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; border-radius: 6px; }
+
+@media (max-width: 768px) {
+  :root { --ns-page-gutter: 12px; }
+  :is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) {
+    padding-block: 18px 26px;
+  }
+  :is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head {
+    min-height: 0; margin-bottom: 16px; padding: 0 0 14px;
+    gap: 8px; border: 0; border-bottom: 1px solid var(--line);
+    border-radius: 0; background: none; box-shadow: none;
+  }
+  :is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head::after { display: none; }
+  :is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head h2 { margin: 4px 0 0; font-size: clamp(1.5rem, 6.5vw, 1.85rem); line-height: 1.15; }
+  :is(body:not(.theme-light), body.theme-light) main > :is(.section-dark, .section-warm):not(#play):not(#gameReview) .section-head .section-intro { font-size: .8rem; line-height: 1.45; max-width: 64ch; }
+  .section-kicker { letter-spacing: .1em; }
+  body.site-tab-mode main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .mobile-bottom-nav { padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)); }
+  .mobile-bottom-nav a { min-height: 48px; min-width: 44px; }
+  .mobile-bottom-nav small { font-size: .68rem; }
+  main :is(.button, .mission-button, .tab-button, .auth-tab, .settings-tab, .game-review-dock-tab) {
+    min-height: 44px; min-width: 44px;
+  }
+  main :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select) { min-height: 44px; }
+  :is(body:not(.theme-light), body.theme-light) main :is(.lesson-card, .adventure-card, .mission-card, .opening-card, .video-card, .book-card, .leaderboard-card, .rule-item, .notation-card, .plan-panel) {
+    padding: 14px; border-radius: var(--mobile-radius); box-shadow: none;
+  }
+  main :is(.rule-item, .notation-card, .plan-panel) p { line-height: 1.5; }
+
+  /* Current lesson first; all 68 lessons remain in a native disclosure. */
+  :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-shell { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-rail {
+    grid-auto-flow: row; grid-auto-columns: auto; position: static;
+    max-height: none; overflow: visible; padding: 8px 12px;
+  }
+  #tutorial .tutorial-library-content { max-height: 280px; overflow-y: auto; padding: 4px 2px; }
+  :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-stage { padding: 10px; gap: 8px; }
+  :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-info { padding: 8px; }
+  #tutorial .tutorial-info h3 { margin-block: 4px 6px; font-size: 1.15rem; }
+  #tutorial .tutorial-info p { font-size: .82rem; line-height: 1.45; }
+  :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-progress { padding: 8px; }
+  #tutorial .tutorial-actions { gap: 6px; }
+  :is(body:not(.theme-light), body.theme-light) #tutorial .tutorial-coach { padding: 12px; gap: 8px; }
+
+  /* Mode choices occupy two rows, not a large nested card before the board. */
+  :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzles-panel { padding: 10px; border-radius: var(--mobile-radius); }
+  :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzles-head { padding-bottom: 8px; gap: 8px; }
+  #puzzles .real-puzzles-head h3 { font-size: 1rem; margin-block: 4px; }
+  #puzzles .real-puzzles-head p:not(.section-kicker) { font-size: .75rem; line-height: 1.4; font-weight: 400; }
+  :is(body:not(.theme-light), body.theme-light) #puzzles .daily-puzzle-mode-control { padding: 8px 0; border: 0; background: none; }
+  #puzzles .daily-puzzle-mode-control .real-puzzle-control-head { margin-bottom: 6px; }
+  :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  #puzzles .real-puzzle-modes button { padding: 6px; font-size: .75rem; }
+  #puzzles .real-puzzle-mode-description { padding: 8px; font-size: .8rem; }
+  :is(body:not(.theme-light), body.theme-light) #puzzles .real-puzzle-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  #puzzles .real-puzzle-stats .real-puzzle-card { padding: 8px; }
+  #puzzles .real-puzzle-stats .real-puzzle-card span { font-size: .7rem; }
+  #puzzles .daily-puzzle-header { gap: 8px; }
+  #puzzles .daily-puzzle-panel { padding: 8px; }
+  #puzzles .daily-puzzle-heading h3 { font-size: 1.2rem; }
+  #puzzles .daily-puzzle-summary > div { padding: 6px 4px; }
+  #puzzles .daily-puzzle-summary span { font-size: .66rem; }
+
+  /* Roster choices and practical actions take priority over featured artwork. */
+  :is(body:not(.theme-light), body.theme-light) #bots .ai-featured-coach { padding: 12px; gap: 10px; }
+  :is(body:not(.theme-light), body.theme-light) #bots .ai-bot-browser { padding: 12px; margin-top: 12px; }
+  :is(body:not(.theme-light), body.theme-light) #bots .ai-bot-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  #bots .ai-bot-controls > :first-child { grid-column: 1 / -1; }
+  #bots .ai-bot-roster { gap: 16px; }
+  #bots .ai-bot-card-details > summary { min-height: 44px; }
+
+  /* The actual Player Pass leads; motivational material is optional. */
+  #login .login-shell { display: flex; flex-direction: column; gap: 12px; }
+  #login .login-shell > * { width: 100%; min-width: 0; }
+  #login .login-card { padding: 14px; }
+  #login .login-card h3 { font-size: 1.35rem; max-width: none; }
+  #login .login-card .login-perks { margin-top: 10px; }
+  #login .login-pass-hero { padding: 12px; }
+  #login .login-pass-panel { padding: 10px; }
+  #login .login-player-profile { padding: 12px; }
+  :is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-detail-section > .profile-detail-summary,
+  :is(body:not(.theme-light), body.theme-light) #login .login-player-profile > details.profile-enhancements > summary { min-height: 44px; }
+  #login .auth-panel { padding: 12px; }
+
+  #settings .pwa-install-card { padding: 12px; margin-bottom: 12px; }
+  #settings .pwa-install-card #pwaInstall { font-size: .8rem; padding-inline: 10px; }
+  #settings .settings-sidebar { gap: 6px; padding: 8px; }
+  #settings .settings-card { padding: 12px; }
+  #settings .settings-page-head { gap: 8px; }
+  #settings .settings-row { padding-block: 10px; }
+
+  #store .store-shell { padding: 10px; }
+  :is(body:not(.theme-light), body.theme-light) #store .store-wallet { padding: 12px; gap: 10px; }
+  :is(body:not(.theme-light), body.theme-light) #store .store-balance { min-height: 0; padding: 8px 12px; font-size: .9rem; }
+  #store .store-wallet-actions .button { min-height: 44px; }
+  #store .store-featured-workspace { margin-top: 12px; }
+  #store .store-featured-main { padding: 12px; }
+
+  #friends :is(.friends-hub-nav, .friends-hub-main, .friends-hub-profile) { padding: 12px; border-radius: var(--mobile-radius); }
+  #friends .friends-hub-nav-list { flex-wrap: wrap; overflow: visible; }
+  #friends .friends-hub-nav-list button { min-height: 44px; }
+  #leaderboards .leaderboard-profile { padding: 12px; }
+  #leaderboards .leaderboard-tabs button { min-height: 44px; }
+  #plan .plan-grid { gap: 12px; }
+  #plan .plan-list { gap: 10px; }
+  #videos .video-watch-path { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  #videos .video-path-card { padding: 12px; min-height: 0; }
+  #videos .video-path-card span { font-size: .75rem; }
+  :is(body:not(.theme-light), body.theme-light) #books .book-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  :is(body:not(.theme-light), body.theme-light) #books .book-stat { padding: 10px 8px; min-width: 0; min-height: 0; background: var(--ns-surface-soft); border: 1px solid var(--ns-border); border-radius: 10px; }
+  :is(body:not(.theme-light), body.theme-light) #books .book-stat:last-child { grid-column: auto; }
+  #books .book-stats strong { font-size: 1.1rem; color: #edf2ff; }
+  #books .book-stats span { font-size: .72rem; line-height: 1.4; color: #bbc8e5; }
+  #books .book-search { color: #edf2ff; }
+  #books .book-category-filters { background: var(--ns-surface-soft); border-color: var(--ns-border); }
+  #books .book-filter { min-height: 44px; background: #17253e; color: #edf2ff; border-color: var(--ns-border); }
+  #books .book-filter[aria-pressed="true"] { background: #5366ed; color: #fff; }
+  body.theme-light #books :is(.book-stats strong, .book-search) { color: #142441; }
+  body.theme-light #books .book-stats span { color: #405575; }
+  #gameReview:not(.is-review-page) { padding-block: 18px; }
+  .review-entry { margin: 0; padding: 16px; }
+  .review-entry-actions .button { flex: 1 1 140px; }
+  :is(.quick-match-close, .site-notification-card button) { min-width: 44px; min-height: 44px; }
+
+  /* Preserve the approved Home art/content, but remove excessive small-screen
+     breathing room between its existing actions. */
+  body:not(.site-tab-mode) #top > .home-command-deck { padding-block: 20px !important; }
+  body:not(.site-tab-mode) #top > .home-command-deck .hero-layout { gap: 14px !important; }
+}

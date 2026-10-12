@@ -174,7 +174,7 @@ async function main() {
     assert.match(await page.locator("#dailyPuzzleHint").innerText(), /Solution:/);
 
     const layouts = [];
-    for (const width of [1366, 390, 375, 320]) {
+    for (const width of [1366, 768, 430, 390, 375, 360, 320]) {
       await page.setViewportSize({ width, height: 900 });
       const measure = await page.evaluate(() => {
         const panel = document.querySelector("#dailyPuzzlePanel");

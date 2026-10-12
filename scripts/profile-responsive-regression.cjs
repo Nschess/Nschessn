@@ -24,7 +24,7 @@ const pageUrl = `${pathToFileURL(path.join(root, "index.html")).href}#login`;
       return login && getComputedStyle(login).display !== "none";
     }, null, { timeout: 10000 });
 
-    for (const width of [1366, 390, 375, 320]) {
+    for (const width of [1366, 768, 430, 390, 375, 360, 320]) {
       await page.setViewportSize({ width, height: width >= 760 ? 900 : 844 });
       await page.waitForTimeout(80);
       const result = await page.evaluate(() => {
@@ -71,7 +71,7 @@ const pageUrl = `${pathToFileURL(path.join(root, "index.html")).href}#login`;
         `${width}px: profile has no internal horizontal overflow (${result.profileScrollWidth}/${result.profileClientWidth})`);
       assert(result.cardRects.every((rect) => rect.left >= -1 && rect.right <= width + 1),
         `${width}px: profile cards stay in bounds (${JSON.stringify(result.cardRects)})`);
-      assert(result.summaries.every((rect) => rect.height >= 40 && rect.left >= -1 && rect.right <= width + 1),
+      assert(result.summaries.every((rect) => rect.height >= (width <= 768 ? 44 : 40) && rect.left >= -1 && rect.right <= width + 1),
         `${width}px: profile disclosure controls remain readable and tappable (${JSON.stringify(result.summaries)})`);
       assert.deepEqual(result.duplicateIds, [], `${width}px: no duplicate DOM IDs`);
       assert(!/^(?:450 Elo|600 Elo|400)$/.test(result.statFields.gameRating)

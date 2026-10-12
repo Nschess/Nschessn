@@ -6882,6 +6882,18 @@
 
     function setupBeginnerTutorial() {
       if (!document.getElementById("tutorialBoard")) return;
+      const library = document.getElementById("tutorialLibrary");
+      const compactLessons = window.matchMedia("(max-width: 768px)");
+      // The complete library remains available, but never precedes the board
+      // as a long scroll on phones. One route-owned listener, no resize loop.
+      const setLibraryLayout = () => {
+        if (!library) return;
+        const hidingFocus = compactLessons.matches && library.contains(document.activeElement);
+        library.open = !compactLessons.matches;
+        if (hidingFocus) library.querySelector("summary")?.focus({ preventScroll: true });
+      };
+      setLibraryLayout();
+      compactLessons.addEventListener("change", setLibraryLayout);
       const lessonList = document.getElementById("tutorialLessonList");
       lessonList?.addEventListener("click", (event) => {
         const button = event.target.closest("[data-tutorial-lesson-index]");
@@ -6890,6 +6902,10 @@
         if (!Number.isInteger(index) || !beginnerTutorialLessons[index]) return;
         currentTutorialLesson = index;
         renderBeginnerTutorial(true);
+        if (compactLessons.matches && library) {
+          library.open = false;
+          document.querySelector('#tutorialBoard [data-square]')?.focus({ preventScroll: true });
+        }
       });
       document.getElementById("tutorialTopicFilter")?.addEventListener("change", (event) => {
         const selectedTopic = String(event.currentTarget.value || "all");

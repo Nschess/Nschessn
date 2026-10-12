@@ -340,7 +340,7 @@ async function main() {
       "the independent Daily launch remains available beside the four distinct practice modes");
 
     const layouts = [];
-    for (const width of [1366, 390, 375, 320]) {
+    for (const width of [1366, 768, 430, 390, 375, 360, 320]) {
       await page.setViewportSize({ width, height: 900 });
       // The shared sizing controller commits a viewport resize on a frame.
       // Wait for real geometry, then assert containment as well as squareness.
