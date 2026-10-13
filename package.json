@@ -17,6 +17,7 @@
     "test:daily-puzzle": "node scripts/daily-puzzle-regression.cjs",
     "test:daily-puzzle-browser": "node scripts/daily-puzzle-browser-e2e.cjs",
     "test:daily-practice": "node scripts/daily-practice-regression.cjs",
+    "test:seo": "node scripts/seo-regression.cjs",
     "test:promotion": "node scripts/promotion-regression.js",
     "test:books": "node scripts/books-regression.js",
     "test:interaction": "node scripts/route-interaction-regression.js",
