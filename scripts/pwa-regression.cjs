@@ -32,10 +32,12 @@ async function cacheContract() {
     await Promise.all(waits);
     return Boolean(response);
   }
-  for (const url of ["/api/auth-config", "/api/store", "/private.json", "/?code=secret", "/assets/app.js?token=secret"]) {
+  for (const url of ["/api/auth-config", "/api/store", "/private.json", "/?code=secret", "/assets/app.js?token=secret", "/chess-training/?code=secret", "/profile/private/"]) {
     assert.equal(await request(url, url.startsWith("/?") ? "navigate" : "cors"), false, url);
   }
   assert.equal(await request("/assets/app.js", "cors", { authorization: "Bearer synthetic" }), false);
+  assert.equal(await request("/chess-training/", "navigate", { authorization: "Bearer synthetic" }), false);
+  assert.equal(await request("/chess-training/", "navigate"), true);
   for (let i = 0; i < 170; i++) await request(`/assets/pieces/test${i}.svg`);
   assert.equal(rows.size, 160, "Optional public cache must be bounded");
 }

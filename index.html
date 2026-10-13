@@ -3,16 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Learn chess with guided lessons, practical puzzles, coach games, and progress tracking for every level." />
+  <title>Nschess | Free Chess Lessons, Puzzles and Computer Practice</title>
+  <meta name="description" content="Learn and practice chess for free with guided lessons, tactics puzzles, computer opponents and completed-game review. Start as a guest in Nschess." />
   <meta name="robots" content="index, follow" />
-  <meta name="theme-color" content="#071220" />
-  <meta name="color-scheme" content="dark light" />
+  <link rel="canonical" href="https://nschessn.vercel.app/" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Nschess" />
-  <meta property="og:title" content="Nschess — Learn Chess One Clear Idea at a Time" />
-  <meta property="og:description" content="Guided chess lessons, practical puzzles, coach games, and progress tracking for every level." />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:title" content="Nschess | Free Chess Lessons, Puzzles and Computer Practice" />
+  <meta property="og:description" content="Learn and practice chess for free with guided lessons, tactics puzzles, computer opponents and completed-game review. Start as a guest in Nschess." />
+  <meta property="og:url" content="https://nschessn.vercel.app/" />
+  <meta property="og:image" content="https://nschessn.vercel.app/assets/icons/icon-512.png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta property="og:image:alt" content="Nschess app icon" />
   <meta name="twitter:card" content="summary" />
-  <link rel="canonical" href="./" />
+  <meta name="twitter:title" content="Nschess | Free Chess Lessons, Puzzles and Computer Practice" />
+  <meta name="twitter:description" content="Learn and practice chess for free with guided lessons, tactics puzzles, computer opponents and completed-game review. Start as a guest in Nschess." />
+  <meta name="twitter:image" content="https://nschessn.vercel.app/assets/icons/icon-512.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://nschessn.vercel.app/#website","url":"https://nschessn.vercel.app/","name":"Nschess","inLanguage":"en"},{"@type":"WebPage","@id":"https://nschessn.vercel.app/#webpage","url":"https://nschessn.vercel.app/","name":"Nschess | Free Chess Lessons, Puzzles and Computer Practice","description":"Learn and practice chess for free with guided lessons, tactics puzzles, computer opponents and completed-game review. Start as a guest in Nschess.","inLanguage":"en","isPartOf":{"@id":"https://nschessn.vercel.app/#website"}}]}</script>
+  <script src="assets/search-metadata.js?v=seo-v1"></script>
+  <meta name="theme-color" content="#071220" />
+  <meta name="color-scheme" content="dark light" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
@@ -20,7 +32,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-  <title>Nschess - Learn Chess From First Move to Strategy</title>
   <link rel="stylesheet" href="assets/app.css?v=mobile-board-focus-v1" />
 </head>
 <body>
@@ -62,7 +73,7 @@
           </div>
         </details>
       </div>
-      <div class="nav-utilities" aria-label="Account actions">
+      <div class="nav-utilities" aria-label="Account actions" data-nosnippet>
         <button class="nav-icon-button" type="button" id="siteSearchOpen" aria-label="Search Nschess" title="Search">
           <span class="nav-utility-icon" data-lucide="search" aria-hidden="true">Search</span>
         </button>
@@ -139,12 +150,12 @@
       <div class="home-command-shell">
         <header class="home-command-header">
           <div class="home-command-intro">
-            <p class="home-command-kicker"><span class="hero-welcome-dot"></span><span id="homeWelcome">Welcome back.</span></p>
-            <p class="home-welcome-note" id="homeWelcomeDelta">Your next clear idea is waiting.</p>
+            <p class="home-command-kicker"><span class="hero-welcome-dot"></span><span id="homeWelcome" data-nosnippet>Welcome back.</span></p>
+            <p class="home-welcome-note" id="homeWelcomeDelta" data-nosnippet>Your next clear idea is waiting.</p>
             <h1 id="hero-title">Make your next move count.</h1>
-            <p class="home-command-description">A focused chess workspace for the game, puzzle, or lesson that helps you improve today.</p>
+            <p class="home-command-description">Free guided chess lessons, puzzles, computer practice and completed-game review. Start as a guest and build one useful idea at a time.</p>
           </div>
-          <div class="home-command-player" aria-label="Your player identity">
+          <div class="home-command-player" aria-label="Your player identity" data-nosnippet>
             <span class="home-command-avatar">Y</span>
             <span><strong data-profile-field="name">You</strong><small data-profile-field="title">Ready to play</small></span>
             <b><span data-profile-field="gameRating">—</span></b>
@@ -158,7 +169,7 @@
         </nav>
 
         <div class="home-command-grid">
-          <section class="home-next-move" aria-labelledby="home-next-move-title">
+          <section class="home-next-move" aria-labelledby="home-next-move-title" data-nosnippet>
             <div class="home-card-heading"><div><p class="home-command-kicker">Personalized focus</p><h2 id="home-next-move-title">Your Next Move</h2></div><span class="home-next-mark" aria-hidden="true">&#10022;</span></div>
             <p class="home-next-reason" id="homeNextReason">Choose a puzzle to practice.</p>
             <a class="button home-next-action" href="#puzzles" id="homeNextAction" data-home-action="puzzle-plan" data-home-plan="adaptive">Practice puzzles</a>
@@ -166,7 +177,7 @@
             <div class="home-next-recommendations" id="homeRecommendations" aria-label="Other useful activities"></div>
           </section>
 
-          <section class="home-progress-panel" aria-labelledby="home-progress-title">
+          <section class="home-progress-panel" aria-labelledby="home-progress-title" data-nosnippet>
             <div class="home-card-heading"><div><p class="home-command-kicker">Your position</p><h2 id="home-progress-title">Progress</h2></div><span class="home-progress-summary">Small gains, clearly tracked</span></div>
             <div class="home-progress-stats" aria-label="Your chess progress">
               <span class="home-command-stat home-progress-rating"><strong id="homeMainRating">450</strong><small>Elo</small><em id="homeMainRatingMeta">Play a game to establish your rating.</em></span>
@@ -180,7 +191,7 @@
           </section>
         </div>
 
-        <section class="home-continue-section" aria-labelledby="home-continue-section-title">
+        <section class="home-continue-section" aria-labelledby="home-continue-section-title" data-nosnippet>
           <div class="home-section-heading"><div><p class="home-command-kicker">Continue</p><h2 id="home-continue-section-title">Where you left off</h2></div><a href="#history" data-home-action="match-history">View history</a></div>
           <div class="home-continue-strip">
             <a class="home-continue-card" id="homeContinueAction" href="#bots" data-site-tab="bots" data-site-panel="bots"><span class="home-action-glyph" aria-hidden="true">&#8634;</span><span><strong id="homeContinueTitle">Choose an AI bot</strong><small id="homeContinueNote">Start a focused game</small></span><b aria-hidden="true">&#8594;</b></a>
@@ -188,7 +199,7 @@
           </div>
         </section>
 
-        <section class="home-session-card home-command-session" id="homeSessionCard" aria-live="polite">
+        <section class="home-session-card home-command-session" id="homeSessionCard" aria-live="polite" data-nosnippet>
           <div class="home-session-copy"><span class="home-session-kicker">Daily session</span><strong id="homeSessionTitle">One calm move</strong><p id="homeSessionCopy">Your next step appears here.</p><span class="home-session-meta" id="homeSessionMeta">On this device</span></div>
           <a class="button secondary" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Continue</a>
           <div class="home-session-ritual" id="homeSessionRitual" aria-label="Today's three-step ritual"></div>
@@ -221,7 +232,19 @@
           <a href="#openings" data-site-tab="openings" data-site-panel="openings"><span aria-hidden="true">&#8961;</span><strong>Openings</strong><small>Build a plan</small><b aria-hidden="true">&#8594;</b></a>
           <a href="#store" data-site-tab="store" data-site-panel="store"><span aria-hidden="true">&#10022;</span><strong>Store</strong><small>Style your board</small><b aria-hidden="true">&#8594;</b></a>
         </nav>
-        <div class="home-discovery-status" aria-label="Live chess activity">
+        <div class="home-section-heading"><div><p class="home-command-kicker">Learn and practice</p><h2 id="home-guides-title">Find your next chess idea</h2></div></div>
+        <nav class="home-discovery-nav" aria-labelledby="home-guides-title">
+          <a href="/learn/"><span aria-hidden="true">&#9816;</span><strong>Chess lessons</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/puzzles/"><span aria-hidden="true">&#9816;</span><strong>Chess puzzles</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/daily-chess-puzzle/"><span aria-hidden="true">&#9816;</span><strong>Daily puzzle</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/play-computer/"><span aria-hidden="true">&#9816;</span><strong>Play a computer</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/game-review/"><span aria-hidden="true">&#9816;</span><strong>Game review</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/chess-rules/"><span aria-hidden="true">&#9816;</span><strong>Chess rules</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/chess-openings/"><span aria-hidden="true">&#9816;</span><strong>Chess openings</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/chess-notation/"><span aria-hidden="true">&#9816;</span><strong>Chess notation</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/chess-training/"><span aria-hidden="true">&#9816;</span><strong>Chess training</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+        </nav>
+        <div class="home-discovery-status" aria-label="Live chess activity" data-nosnippet>
           <article class="home-status-line">
             <div class="home-status-line-head"><span class="home-status-icon" aria-hidden="true">T</span><strong>Upcoming tournaments</strong><a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">View lobby</a></div>
             <div class="home-status-content" id="homeTournaments" aria-live="polite" aria-busy="true"><span>Loading live events</span></div>
@@ -343,7 +366,7 @@
       </div>
     </section>
 
-    <section id="login" class="section-dark login-section" aria-labelledby="login-title">
+    <section id="login" class="section-dark login-section" aria-labelledby="login-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -762,7 +785,7 @@
       </div>
     </section>
 
-    <section id="settings" class="section-dark" aria-labelledby="settings-title">
+    <section id="settings" class="section-dark" aria-labelledby="settings-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -975,7 +998,7 @@
       </div>
     </section>
 
-    <section id="admin" class="section-dark" aria-labelledby="admin-title" data-admin-panel>
+    <section id="admin" class="section-dark" aria-labelledby="admin-title" data-admin-panel data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -1088,7 +1111,7 @@
       </div>
     </section>
 
-    <section id="store" class="section-dark store-page" aria-labelledby="store-title">
+    <section id="store" class="section-dark store-page" aria-labelledby="store-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -2847,7 +2870,7 @@
       </div>
     </section>
 
-    <section id="friends" class="section-dark friends-hub-page" aria-labelledby="friends-title">
+    <section id="friends" class="section-dark friends-hub-page" aria-labelledby="friends-title" data-nosnippet>
       <div class="wrap friends-hub">
         <header class="friends-hub-header">
           <div>
@@ -3871,7 +3894,7 @@
       </div>
     </div>
 
-    <section class="section-dark game-review-page" id="gameReview" aria-label="Game Review">
+    <section class="section-dark game-review-page" id="gameReview" aria-label="Game Review" data-nosnippet>
       <div class="game-review-page-frame">
         <article class="review-entry" aria-labelledby="reviewEntryTitle">
           <p class="section-kicker">Understand your decisions</p>
@@ -4092,7 +4115,7 @@
       </section>
     </div>
 
-    <section id="leaderboards" class="section-dark" aria-labelledby="leaderboards-title">
+    <section id="leaderboards" class="section-dark" aria-labelledby="leaderboards-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -4493,7 +4516,7 @@
       </div>
     </section>
 
-    <section id="plan" class="section-dark" aria-labelledby="plan-title">
+    <section id="plan" class="section-dark" aria-labelledby="plan-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -4791,6 +4814,7 @@
     </div>
   </aside>
 
+  <noscript><p class="wrap">Interactive chess boards require JavaScript. You can read our <a href="/learn/">chess lessons guide</a>, <a href="/chess-rules/">chess rules</a> and <a href="/puzzles/">puzzle practice guide</a> here.</p></noscript>
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
   <script defer src="assets/app.js?v=daily-practice-v1"></script>
   <script type="module" src="assets/daily-puzzle-launcher.mjs?v=daily-compact-v1"></script>

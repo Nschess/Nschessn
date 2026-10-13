@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
 const vm = require("node:vm");
+const { pathToFileURL } = require("node:url");
 const { performance } = require("node:perf_hooks");
 
 const root = path.resolve(__dirname, "..");
@@ -166,7 +167,7 @@ async function exerciseBrowser() {
   let browser;
   try {
     browser = await chromium.launch({ headless: true, executablePath: chromePath, timeout: 20000 });
-    const context = await browser.newContext({ viewport: { width: 1366, height: 900 }, serviceWorkers: "block" });
+    const context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
     const blockedOrigins = new Set();
     await context.route("**/*", async (route) => {
       const url = route.request().url();
@@ -229,6 +230,55 @@ async function exerciseBrowser() {
     await page.waitForFunction(() => location.hash === "#plan");
     await page.waitForFunction(() => document.getElementById("dailyPracticeCount")?.textContent === "1 / 3");
 
+    // Complete the remaining steps through real legal moves and game controls.
+    // Opening a task above was explicitly verified to leave the count at 1/3.
+    await page.locator('[data-daily-practice-start="puzzle"]').click();
+    await page.waitForFunction(() => window.checkmatePuzzleRuntime?.event === "puzzle-loaded");
+    const puzzleId = await page.evaluate(() => window.checkmatePuzzleRuntime.puzzleId);
+    const payload = JSON.parse(fs.readFileSync(path.join(root, "data/puzzles.json"), "utf8"));
+    const puzzle = (Array.isArray(payload) ? payload : payload.puzzles).find((item) => item.id === puzzleId || item.PuzzleId === puzzleId);
+    assert.ok(puzzle, "Trainer position belongs to the shipped catalog");
+    const { Chess } = await import(pathToFileURL(path.join(root, "assets/vendor/chess.js-1.0.0.mjs")));
+    const chess = new Chess(puzzle.fen || puzzle.FEN);
+    const line = [...(puzzle.moves || puzzle.Moves.split(/\s+/))];
+    if (puzzle.primer) {
+      const uci = line.shift();
+      chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci[4] ? { promotion: uci[4] } : {}) });
+    }
+    const player = chess.turn();
+    for (const uci of line) {
+      const turn = chess.turn();
+      chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci[4] ? { promotion: uci[4] } : {}) });
+      if (turn !== player) continue;
+      await page.locator(`#realPuzzleBoard [data-square="${uci.slice(0, 2)}"]`).click();
+      await page.locator(`#realPuzzleBoard [data-square="${uci.slice(2, 4)}"]`).click();
+      if (uci[4]) await page.locator(`.promotion-picker [data-promotion="${uci[4]}"]`).click();
+      await page.waitForFunction(() => ["PlayerTurn", "Completed"].includes(document.getElementById("realPuzzles")?.dataset.puzzlePhase));
+    }
+    await page.waitForFunction(() => document.getElementById("realPuzzles")?.dataset.puzzlePhase === "Completed");
+    await page.evaluate(() => { location.hash = "#plan"; });
+    await page.waitForFunction(() => document.getElementById("dailyPracticeCount")?.textContent === "2 / 3");
+    await page.locator('[data-daily-practice-start="botGame"]').click();
+    await page.locator("#aiBotRoster [data-ai-bot-play]").first().click();
+    await page.locator("#aiGameReady").waitFor({ state: "visible" });
+    await page.locator('#aiGameReady [data-ai-game-ready-pace="none"]').click();
+    await page.locator("#aiGameReadyStart").click();
+    await page.waitForFunction(() => document.getElementById("play")?.classList.contains("is-active-game"));
+    await page.locator('#coachBoard [data-square="e2"]').click();
+    await page.locator('#coachBoard [data-square="e4"]').click();
+    await page.waitForFunction(() => document.getElementById("moveHistory")?.textContent.includes("e4"));
+    await page.locator("#resignGame").click();
+    await page.locator("#resignConfirmButton").click();
+    await page.evaluate(() => { location.hash = "#plan"; });
+    await page.waitForFunction(() => document.getElementById("dailyPracticeCount")?.textContent === "3 / 3");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload({ waitUntil: "load" });
+    await page.waitForFunction(() => document.getElementById("dailyPracticeCount")?.textContent === "3 / 3");
+    await context.setOffline(true);
+    await page.reload({ waitUntil: "load" });
+    await page.waitForFunction(() => document.getElementById("dailyPracticeCount")?.textContent === "3 / 3");
+    assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/, "offline Daily Practice retains private workspace metadata");
+
     const layouts = [];
     for (const width of [1366, 768, 430, 390, 375, 360, 320]) {
       await page.setViewportSize({ width, height: 900 });
@@ -268,7 +318,7 @@ async function exerciseBrowser() {
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("checkmateQuest.beginnerTutorial.v1") || "{}").completed.includes("setup")), true, "reset preserves the underlying completed lesson");
     assert.deepEqual(errors, [], `no uncaught browser errors: ${errors.join("; ")}`);
     await context.close();
-    return { browser: await browser.version(), completedActivity: "lesson board line + knowledge check", localCount: "1 / 3", layouts, externalOriginsBlocked: [...blockedOrigins], pageErrors: errors };
+    return { browser: await browser.version(), completedActivities: ["lesson board line + knowledge check", "legal Trainer solution", "played AI game finished through resignation"], localCount: "3 / 3", offlinePersistence: true, layouts, externalOriginsBlocked: [...blockedOrigins], pageErrors: errors };
   } finally {
     if (browser) await browser.close();
     server.closeAllConnections?.();
@@ -281,7 +331,7 @@ async function main() {
   assert.match(html, /id="dailyPracticeHub"[\s\S]*?id="dailyPracticeCount"[\s\S]*?id="dailyPracticeStatus"[^>]*role="status"/);
   const activeHtml = html.replace(/<template\b[^>]*>[\s\S]*?<\/template>/gi, "");
   assert.match(html, /assets\/app\.js\?v=daily-practice-v1/);
-  assert.match(serviceWorker, /nschess-shell-v198-daily-practice[\s\S]*?assets\/app\.js\?v=daily-practice-v1/, "the offline shell cache is renewed for this app version");
+  assert.match(serviceWorker, /nschess-shell-v199-daily-practice-seo[\s\S]*?assets\/app\.js\?v=daily-practice-v1/, "the offline shell cache is renewed for this app version");
   assert.match(html, /<template class="legacy-study-plan">[\s\S]*?id="dailyTrainingForm"[\s\S]*?<\/template>/, "legacy plan content remains inert template material only");
   assert.doesNotMatch(activeHtml, /id="dailyTrainingForm"/, "the discontinued manual completion form is not active HTML");
   assertCompletionBoundaries();

@@ -1,10 +1,11 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v198-daily-practice";
+const CACHE_NAME = "nschess-shell-v199-daily-practice-seo";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./assets/search-metadata.js?v=seo-v1",
   "./offline.html",
   "./favicon.svg",
   "./assets/app.css?v=mobile-board-focus-v1",
@@ -16,6 +17,13 @@ const APP_SHELL = [
   "./assets/icons/icon-512.png"
 ];
 const SHELL_URLS = new Set(APP_SHELL.map((path) => new URL(path, self.location.href).href));
+// Cache only reviewed public HTML after a visit; no extra install/startup work.
+const PUBLIC_NAVIGATION_PATHS = new Set([
+  "/", "/index.html", "/offline.html",
+  "/learn/", "/puzzles/", "/daily-chess-puzzle/", "/play-computer/",
+  "/game-review/", "/chess-rules/", "/chess-openings/", "/chess-notation/",
+  "/chess-training/", "/privacy.html", "/terms.html", "/account-deletion.html"
+]);
 const MAX_OPTIONAL_ENTRIES = 160;
 let writes = Promise.resolve();
 function savePublicAsset(request, response) {
@@ -45,9 +53,9 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || request.headers.has("authorization") || url.pathname.includes("/api/")) return;
-  // Only the public app entry and shipped static files are offline eligible.
+  // Only reviewed public HTML and shipped static files are offline eligible.
   // Query-bearing navigation (OAuth codes/tokens) must never enter CacheStorage.
-  const safeNavigation = request.mode === "navigate" && !url.search && ["/", "/index.html", "/offline.html"].includes(url.pathname);
+  const safeNavigation = request.mode === "navigate" && !url.search && PUBLIC_NAVIGATION_PATHS.has(url.pathname);
   const publicAsset = /^\/(assets|data)\/[\w./-]+\.(?:js|mjs|css|json|png|webp|svg|wasm|woff2?|mp3|wav|ogg)$/i.test(url.pathname)
     || ["/favicon.svg", "/site.webmanifest", "/offline.html"].includes(url.pathname);
   if (!safeNavigation && !publicAsset) return;

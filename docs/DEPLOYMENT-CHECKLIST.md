@@ -9,7 +9,10 @@
 - [ ] Run `node scripts/multiplayer-regression.js`.
 - [ ] Run `git diff --check`.
 - [ ] Confirm `review-v200-global-board-recovery` is present in `index.html`, `assets/app.js`, and `service-worker.js`.
-- [ ] Publish `dist/` (or the repository root for GitHub Pages) with `offline.html`, `site.webmanifest`, icons, piece assets, and `data/puzzles.json`.
+- [ ] Run `node scripts/seo-regression.cjs --static`; run `npm run test:seo` with Playwright installed for public crawling, responsive layout, privacy metadata, navigation and offline checks.
+- [ ] Publish the built `dist/` static artifact, including public guide directories, `sitemap.xml`, `robots.txt`, `.well-known/assetlinks.json`, `offline.html`, `site.webmanifest`, icons, piece assets, and puzzle catalogs. The repository root alone does not contain the generated public guides.
+- [ ] On Vercel, retain root `/api` functions alongside `dist/` static output as configured by `vercel.json`; verify API responses and authenticated behavior on staging before release.
+- [ ] Follow [Google Search Console setup](GOOGLE-SEARCH-CONSOLE.md) after an approved deployment. Vercel redirects and X-Robots-Tag headers require a hosted check.
 
 ## Supabase migrations
 

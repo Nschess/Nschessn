@@ -540,7 +540,7 @@ async function runRuntimeContract(browser) {
 }
 
 async function runResponsiveBoardContract(browser) {
-  const cases = [[1366, 768], [1366, 900], [1024, 768], [768, 1024], [624, 900], [390, 844]];
+  const cases = [[1366, 768], [1366, 900], [1024, 768], [768, 1024], [624, 900], [390, 844], [320, 844], [375, 844], [430, 844]];
   const routes = [
     ["#tutorial", "#tutorialBoard"],
     ["#adventures", "#adventureBoard"],
@@ -646,7 +646,7 @@ async function readFullscreenBoardState(page) {
 }
 
 async function runFullscreenResponsiveContract(browser) {
-  const cases = [[1920, 1080], [1440, 900], [1366, 768], [1024, 768], [1009, 1074], [957, 956], [949, 1080], [768, 1024], [624, 844], [390, 844]];
+  const cases = [[1920, 1080], [1440, 900], [1366, 768], [1024, 768], [1009, 1074], [957, 956], [949, 1080], [768, 1024], [624, 844], [390, 844], [320, 844], [375, 844], [430, 844]];
   const measurements = [];
   for (const [width, height] of cases) {
     const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
@@ -670,7 +670,7 @@ async function runFullscreenResponsiveContract(browser) {
         // Use the semantic locator to derive the current hit target, then
         // click that target without letting locator.click() perform a second
         // nearest-edge scroll beneath the sticky header.
-        const box = await fullscreenButton.boundingBox();
+        const box = await fullscreenButton.boundingBox({ timeout: 3000 });
         assert(box, "Fullscreen control lost its measurable hit area after centering.");
         await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       };
@@ -684,11 +684,24 @@ async function runFullscreenResponsiveContract(browser) {
         // A prior context can leave Chromium's first fullscreen activation
         // request rejected even though the real button is present. Retry the
         // same user-facing control once before classifying the browser run.
+        const buttonStillAvailable = await fullscreenButton.isVisible().catch(() => false);
+        if (!buttonStillAvailable) {
+          const state = await page.evaluate(() => ({
+            fullscreen: Boolean(document.fullscreenElement),
+            fullscreenHost: document.fullscreenElement?.className || null,
+            activeClass: document.body.classList.contains("interactive-board-fullscreen-active"),
+            requestedSize: Number(document.querySelector("#coachBoard")?.parentElement?.dataset.boardFullscreenSize || 0)
+          }));
+          throw new Error(`Fullscreen did not become ready and its control disappeared: ${JSON.stringify(state)}. ${error.message}`);
+        }
         await clickFullscreen();
         await fullscreenReady().catch(() => { throw error; });
       }
       const focused = await readFullscreenBoardState(page);
-      const minimumBoard = width >= 1800 ? 700 : width >= 1000 ? 480 : width >= 600 ? 480 : 300;
+      // At 320px the existing safe edges leave 284px, so a fixed 300px floor
+      // cannot fit. The separate maxSafeBoard assertion still requires filling
+      // the measured safe square; wider viewports retain their original floor.
+      const minimumBoard = width >= 1800 ? 700 : width >= 1000 ? 480 : width >= 600 ? 480 : Math.min(300, width - 36);
       assert(Math.abs(focused.boardWidth - focused.boardHeight) < 1,
         `fullscreen ${width}x${height}: board is not square: ${JSON.stringify(focused)}.`);
       assert(focused.boardWidth >= minimumBoard,
