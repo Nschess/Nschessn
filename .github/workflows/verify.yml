@@ -28,6 +28,7 @@ jobs:
   stability-gate:
     name: Live Stability Gate
     runs-on: ubuntu-latest
+    environment: staging
     # The job intentionally has no fallback for missing secrets. The
     # environment gate reports BLOCKED/ENVIRONMENT and exits non-zero.
     env:
