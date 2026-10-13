@@ -27,6 +27,7 @@
       "checkmateQuest.bookReader.v1",
       "checkmateQuest.localBooks.v1",
       "checkmateQuest.dailyTraining.v1",
+      "checkmateQuest.dailyPractice.v1",
       "checkmateQuest.gentleStart.v1",
       "checkmateQuest.firstTimeTour.v1",
       "checkmateQuest.firstVisitSetup.v1",
@@ -6790,6 +6791,7 @@
       }
       saveBeginnerTutorialState({ completed: [...completed], rewarded: [...rewarded], achievements: [...achievements] });
       publishLearningActivity("lesson_completed", `lesson:${lesson.id}`, { lessonId: lesson.id, title: lesson.title || "Chess lesson", achievement: lesson.achievement || "" });
+      recordDailyPracticeCompletion("lesson");
       renderBeginnerTutorial(false);
     }
 
@@ -8372,6 +8374,9 @@
       if (!next) return false;
       if (!next.id) next.id = `game-${next.completedAt}-${next.opponentName}-${next.moves}`;
       if (completedGameHistory.some((game) => game.id === next.id)) return false;
+      if (String(record?.mode || "").trim().toLowerCase() === "ai game" && next.result !== "aborted" && next.moves > 0) {
+        recordDailyPracticeCompletion("botGame");
+      }
       completedGameHistory = [next, ...completedGameHistory]
         .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))
         .slice(0, 12);
@@ -29686,6 +29691,7 @@
         return;
       }
       realPuzzleCompletionTransitionId = completionId;
+      if (realPuzzleMode === "Trainer") recordDailyPracticeCompletion("puzzle");
       cancelPendingRealPuzzleReply();
       clearRealPuzzleAnalysisArrows();
       const elapsedMs = realPuzzleElapsedMs + (realPuzzleStartedAt ? Date.now() - realPuzzleStartedAt : 0);
@@ -31040,6 +31046,7 @@
         if (panelInitFrame) window.cancelAnimationFrame(panelInitFrame);
         panelInitFrame = window.requestAnimationFrame(() => {
           panelInitFrame = 0;
+          if (config.panel === "plan") renderDailyPracticeHub();
           initializePanelFeatures(config.panel, config.tab);
           if (config.profileId) {
             window.requestAnimationFrame(() => {
@@ -33198,6 +33205,7 @@
         // the active browser workspace truly anonymous before any route can
         // paint another identity.
         resetApplicationAccountState(previousAccountId, { status: nextStatus, render: true });
+        if (document.getElementById("plan")?.classList.contains("is-active-panel")) renderDailyPracticeHub();
         return;
       }
       const previousAccountId = applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId || "";
@@ -33235,6 +33243,7 @@
       applicationAuthAccount = account;
       setStoreAuthState("authenticated", account.authUserId || account.publicId || "");
       activateSupabaseProfile(account);
+      if (document.getElementById("plan")?.classList.contains("is-active-panel")) renderDailyPracticeHub();
       void refreshServerStoreState().catch(() => {});
       void refreshStoreGiftInbox();
       startFriendPresence();
@@ -34584,6 +34593,291 @@
       return state.lastMistake?.date === getTodayKey() ? state.lastMistake : null;
     }
 
+    const dailyPracticeActivityKeys = Object.freeze(["lesson", "puzzle", "botGame"]);
+    const dailyPracticeStorageKey = "checkmateQuest.dailyPractice.v1";
+
+    function getDailyPracticeUtcDate(date = new Date()) {
+      return date.toISOString().slice(0, 10);
+    }
+
+    function normalizeDailyPracticeState(saved, now = new Date()) {
+      if (!saved || typeof saved !== "object" || Array.isArray(saved) || saved.version !== 1
+        || !saved.days || typeof saved.days !== "object" || Array.isArray(saved.days)) {
+        return { version: 1, days: {} };
+      }
+      const days = {};
+      Object.entries(saved.days).forEach(([date, value]) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        const parsed = new Date(`${date}T00:00:00.000Z`);
+        if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date
+          || !value || typeof value !== "object" || Array.isArray(value)) return;
+        const activityKeys = new Set(dailyPracticeActivityKeys);
+        const optionalKeys = new Set([...dailyPracticeActivityKeys, "review"]);
+        const validKeys = (items, allowed) => Array.isArray(items)
+          ? [...new Set(items.filter((item) => typeof item === "string" && allowed.has(item)))].slice(0, allowed.size)
+          : [];
+        days[date] = {
+          started: validKeys(value.started, optionalKeys),
+          skipped: validKeys(value.skipped, optionalKeys),
+          completed: validKeys(value.completed, activityKeys),
+          reviewOpened: value.reviewOpened === true,
+          reflectionMarked: value.reflectionMarked === true
+        };
+      });
+      const today = getDailyPracticeUtcDate(now);
+      const oldest = new Date(now);
+      oldest.setUTCHours(0, 0, 0, 0);
+      oldest.setUTCDate(oldest.getUTCDate() - 13);
+      const oldestDate = getDailyPracticeUtcDate(oldest);
+      const recentDates = Object.keys(days).filter((date) => date >= oldestDate && date <= today).sort();
+      return { version: 1, days: Object.fromEntries(recentDates.map((date) => [date, days[date]])) };
+    }
+
+    function readDailyPracticeState() {
+      return normalizeDailyPracticeState(readJsonStorage(dailyPracticeStorageKey, null));
+    }
+
+    function writeDailyPracticeState(state) {
+      try {
+        localStorage.setItem(dailyPracticeStorageKey, JSON.stringify(normalizeDailyPracticeState(state)));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function updateDailyPracticeDay(update) {
+      const state = readDailyPracticeState();
+      const date = getDailyPracticeUtcDate();
+      const current = state.days[date] || { started: [], skipped: [], completed: [], reviewOpened: false, reflectionMarked: false };
+      const next = update({ ...current, started: [...current.started], skipped: [...current.skipped], completed: [...current.completed] });
+      state.days[date] = next;
+      return writeDailyPracticeState(state);
+    }
+
+    function recordDailyPracticeStart(activity) {
+      if (![...dailyPracticeActivityKeys, "review"].includes(activity)) return false;
+      return updateDailyPracticeDay((day) => ({
+        ...day,
+        started: [...new Set([...day.started, activity])],
+        skipped: day.skipped.filter((item) => item !== activity),
+        ...(activity === "review" ? { reviewOpened: true } : {})
+      }));
+    }
+
+    function recordDailyPracticeCompletion(activity) {
+      if (!dailyPracticeActivityKeys.includes(activity)) return false;
+      return updateDailyPracticeDay((day) => ({
+        ...day,
+        started: [...new Set([...day.started, activity])],
+        skipped: day.skipped.filter((item) => item !== activity),
+        completed: [...new Set([...day.completed, activity])]
+      }));
+    }
+
+    function setDailyPracticeSkipped(activity, skipped) {
+      if (![...dailyPracticeActivityKeys, "review"].includes(activity)) return false;
+      return updateDailyPracticeDay((day) => ({
+        ...day,
+        skipped: skipped
+          ? [...new Set([...day.skipped, activity])]
+          : day.skipped.filter((item) => item !== activity)
+      }));
+    }
+
+    function getDailyPracticeReview() {
+      return matchReviews.find((review) => review?.moves?.length && review?.summary && typeof review.pgn === "string" && review.pgn.trim()) || null;
+    }
+
+    function renderDailyPracticeHub() {
+      const tasksRoot = document.getElementById("dailyPracticeTasks");
+      if (!tasksRoot) return;
+      const state = readDailyPracticeState();
+      const today = getDailyPracticeUtcDate();
+      const day = state.days[today] || { started: [], skipped: [], completed: [], reviewOpened: false, reflectionMarked: false };
+      const tasks = [
+        { key: "lesson", title: "Learn one idea", detail: "Finish an interactive lesson: play its board task and answer the check-in.", action: "Start a lesson", route: "tutorial" },
+        { key: "puzzle", title: "Solve one Trainer puzzle", detail: "Work through a legal tactical line at your own pace.", action: "Open Trainer", route: "puzzles" },
+        { key: "botGame", title: "Finish a game vs a bot", detail: "Play a complete AI game. Wins are not required.", action: "Choose a bot", route: "bots" }
+      ];
+      const completed = new Set(day.completed);
+      const skipped = new Set(day.skipped);
+      const started = new Set(day.started);
+      const nextTask = tasks.find((task) => !completed.has(task.key) && !skipped.has(task.key));
+      const completedCount = tasks.filter((task) => completed.has(task.key)).length;
+      const dateNode = document.getElementById("dailyPracticeDate");
+      const countNode = document.getElementById("dailyPracticeCount");
+      const statusNode = document.getElementById("dailyPracticeStatus");
+      const resetButton = document.getElementById("dailyPracticeReset");
+      if (dateNode) dateNode.textContent = `${today} · UTC`;
+      if (countNode) countNode.textContent = `${completedCount} / ${tasks.length}`;
+      if (statusNode) {
+        statusNode.textContent = completedCount === tasks.length
+          ? "Your three practice steps are complete for this UTC day. Review is optional; there is no reward or synced streak."
+          : nextTask
+            ? `Next up: ${nextTask.title}. Stop or skip any time; only completed activities count.`
+            : "You have skipped the remaining steps for today. You can undo a skip whenever you like.";
+      }
+      if (resetButton) resetButton.disabled = !day.started.length && !day.skipped.length && !day.completed.length && !day.reviewOpened && !day.reflectionMarked;
+
+      tasksRoot.replaceChildren(...tasks.map((task, index) => {
+        const isComplete = completed.has(task.key);
+        const isSkipped = skipped.has(task.key) && !isComplete;
+        const isStarted = started.has(task.key) && !isComplete && !isSkipped;
+        const status = isComplete ? "Completed today" : isSkipped ? "Skipped" : isStarted ? "In progress" : "Not started";
+        const card = document.createElement("article");
+        card.className = `daily-practice-task${isComplete ? " is-complete" : ""}${task === nextTask ? " is-next" : ""}`;
+        const marker = createBookText("span", "daily-practice-task-number", isComplete ? "✓" : String(index + 1));
+        marker.setAttribute("aria-hidden", "true");
+        const copy = document.createElement("div");
+        copy.className = "daily-practice-task-copy";
+        const heading = document.createElement("div");
+        heading.className = "daily-practice-task-heading";
+        heading.append(createBookText("strong", "", task.title), createBookText("span", "daily-practice-task-state", status));
+        copy.append(heading, createBookText("p", "", task.detail));
+        const actions = document.createElement("div");
+        actions.className = "daily-practice-task-actions";
+        if (!isComplete && !isSkipped) {
+          const button = createBookText("button", "button daily-practice-start", isStarted ? "Continue" : task.action);
+          button.type = "button";
+          button.dataset.dailyPracticeStart = task.key;
+          actions.appendChild(button);
+          const skip = createBookText("button", "daily-practice-skip", "Skip today");
+          skip.type = "button";
+          skip.dataset.dailyPracticeSkip = task.key;
+          actions.appendChild(skip);
+        } else if (isSkipped) {
+          const undo = createBookText("button", "daily-practice-skip", "Undo skip");
+          undo.type = "button";
+          undo.dataset.dailyPracticeUnskip = task.key;
+          actions.appendChild(undo);
+        } else {
+          const done = createBookText("span", "daily-practice-done", "Done for today");
+          actions.appendChild(done);
+        }
+        card.append(marker, copy, actions);
+        return card;
+      }));
+
+      const reflectionRoot = document.getElementById("dailyPracticeReflection");
+      if (reflectionRoot) {
+        const review = getDailyPracticeReview();
+        const reflection = document.createElement("div");
+        reflection.className = "daily-practice-reflection-card";
+        const copy = document.createElement("div");
+        copy.append(
+          createBookText("span", "daily-practice-optional", "OPTIONAL"),
+          createBookText("strong", "", "Review one moment"),
+          createBookText("p", "", review
+            ? "A saved Review is available on this device. Look at one move that changed the game, then mark your own reflection if useful."
+            : "No saved, playable Review is available here yet. This step is optional and does not affect the three-step routine.")
+        );
+        const actions = document.createElement("div");
+        actions.className = "daily-practice-task-actions";
+        const reviewSkipped = day.skipped.includes("review");
+        if (!review) {
+          actions.appendChild(createBookText("span", "daily-practice-task-state", "Unavailable"));
+        } else if (day.reflectionMarked) {
+          actions.appendChild(createBookText("span", "daily-practice-task-state", "Self-marked · device only"));
+        } else if (reviewSkipped) {
+          const undo = createBookText("button", "daily-practice-skip", "Undo skip");
+          undo.type = "button";
+          undo.dataset.dailyPracticeUnskip = "review";
+          actions.appendChild(undo);
+        } else {
+          const open = createBookText("button", "button secondary", day.reviewOpened ? "Open saved Review again" : "Open saved Review");
+          open.type = "button";
+          open.dataset.dailyPracticeReviewOpen = "true";
+          actions.appendChild(open);
+          if (day.reviewOpened) {
+            const mark = createBookText("button", "daily-practice-skip", "I reviewed one move");
+            mark.type = "button";
+            mark.dataset.dailyPracticeReflection = "true";
+            actions.appendChild(mark);
+          }
+          const skip = createBookText("button", "daily-practice-skip", "Skip");
+          skip.type = "button";
+          skip.dataset.dailyPracticeSkip = "review";
+          actions.appendChild(skip);
+        }
+        reflection.append(copy, actions);
+        reflectionRoot.replaceChildren(reflection);
+      }
+    }
+
+    function handleDailyPracticeClick(event) {
+      const target = event.target instanceof Element ? event.target.closest("button") : null;
+      if (!target) return;
+      const skipKey = target.dataset.dailyPracticeSkip;
+      const unskipKey = target.dataset.dailyPracticeUnskip;
+      if (skipKey) {
+        const saved = setDailyPracticeSkipped(skipKey, true);
+        renderDailyPracticeHub();
+        const status = document.getElementById("dailyPracticeStatus");
+        if (status) status.textContent = saved ? "Marked skipped on this device. You can undo this any time." : "This browser could not save the skip; your practice data is unchanged.";
+        return;
+      }
+      if (unskipKey) {
+        const saved = setDailyPracticeSkipped(unskipKey, false);
+        renderDailyPracticeHub();
+        const status = document.getElementById("dailyPracticeStatus");
+        if (status) status.textContent = saved ? "Skip removed. Choose this step whenever you are ready." : "This browser could not save that change.";
+        return;
+      }
+      if (target.dataset.dailyPracticeReflection) {
+        if (!getDailyPracticeReview()) return;
+        const saved = updateDailyPracticeDay((day) => ({ ...day, reflectionMarked: true }));
+        renderDailyPracticeHub();
+        const status = document.getElementById("dailyPracticeStatus");
+        if (status) status.textContent = saved ? "Reflection self-marked on this device. It is not a verified or synced completion." : "This browser could not save your reflection mark.";
+        return;
+      }
+      if (target.dataset.dailyPracticeReviewOpen) {
+        const review = getDailyPracticeReview();
+        if (!review) return;
+        recordDailyPracticeStart("review");
+        renderDailyPracticeHub();
+        openStoredMatchReview(review);
+        return;
+      }
+      const activity = target.dataset.dailyPracticeStart;
+      if (!activity) return;
+      recordDailyPracticeStart(activity);
+      renderDailyPracticeHub();
+      if (activity === "lesson") {
+        const done = new Set(beginnerTutorialState.completed || []);
+        currentTutorialLesson = beginnerTutorialLessons.findIndex((lesson) => !done.has(lesson.id));
+        if (currentTutorialLesson < 0) currentTutorialLesson = 0;
+        saveBeginnerTutorialState({});
+        if (window.location.hash === "#tutorial") renderBeginnerTutorial(true);
+        else window.location.hash = "#tutorial";
+        return;
+      }
+      if (activity === "puzzle") {
+        document.querySelector('[data-site-tab="puzzles"]')?.click();
+        void initializeDeferredFeature("puzzles").then((ready) => {
+          if (ready === false) return;
+          const trainer = document.querySelector('[data-real-mode="Trainer"]');
+          if (trainer && realPuzzleMode !== "Trainer") trainer.click();
+          openRealPuzzleExperience("Trainer");
+        });
+        return;
+      }
+      if (activity === "botGame") document.querySelector('[data-site-tab="bots"]')?.click();
+    }
+
+    function resetDailyPracticeMarks() {
+      const state = readDailyPracticeState();
+      const days = { ...state.days };
+      delete days[getDailyPracticeUtcDate()];
+      const saved = writeDailyPracticeState({ version: 1, days });
+      renderDailyPracticeHub();
+      const status = document.getElementById("dailyPracticeStatus");
+      if (status) status.textContent = saved
+        ? "Today's routine marks were reset on this device. Lesson, puzzle, and game records were not changed."
+        : "This browser could not reset today's marks.";
+    }
+
     function buildDailyTrainingPlan(state) {
       const level = state.level || "Beginner";
       const minutes = Math.max(15, Math.min(60, Number(state.minutes) || 25));
@@ -34709,7 +35003,7 @@
       return selected.length ? selected : ["tactics"];
     }
 
-    function renderDailyTraining() {
+    function renderLegacyDailyTraining() {
       const output = document.getElementById("dailyTrainingOutput");
       if (!output) return;
 
@@ -34818,41 +35112,18 @@
     }
 
     function setupDailyTraining() {
-      const form = document.getElementById("dailyTrainingForm");
-      const minutes = document.getElementById("trainingMinutes");
-      const minutesLabel = document.getElementById("trainingMinutesLabel");
-      const resetButton = document.getElementById("resetTraining");
-      if (!form) return;
+      const hub = document.getElementById("dailyPracticeHub");
+      if (!hub) return;
+      if (!setupDailyTraining.ready) {
+        hub.addEventListener("click", handleDailyPracticeClick);
+        document.getElementById("dailyPracticeReset")?.addEventListener("click", resetDailyPracticeMarks);
+        setupDailyTraining.ready = true;
+      }
+      renderDailyPracticeHub();
+    }
 
-      const state = readDailyTrainingState();
-      syncDailyTrainingForm(state);
-      renderDailyTraining();
-
-      minutes?.addEventListener("input", () => {
-        if (minutesLabel) minutesLabel.textContent = `${minutes.value} min`;
-      });
-
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const nextState = {
-          date: getTodayKey(),
-          level: document.getElementById("trainingLevel").value,
-          minutes: Number(document.getElementById("trainingMinutes").value) || 31,
-          goal: document.getElementById("trainingGoal").value,
-          weaknesses: getSelectedTrainingWeaknesses(),
-          completed: []
-        };
-
-        saveDailyTrainingState(nextState);
-        syncDailyTrainingForm(readDailyTrainingState());
-        renderDailyTraining();
-      });
-
-      resetButton?.addEventListener("click", () => {
-        const current = readDailyTrainingState();
-        saveDailyTrainingState({ ...current, completed: [] });
-        renderDailyTraining();
-      });
+    function renderDailyTraining() {
+      renderDailyPracticeHub();
     }
 
     function readCustomBooks() {

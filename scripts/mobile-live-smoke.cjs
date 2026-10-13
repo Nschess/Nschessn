@@ -83,7 +83,7 @@ async function main(){
     await page.waitForFunction(()=>document.querySelectorAll('#dailyPuzzleBoard [data-square]').length===64);
     evidence.offlineDaily=true;
     evidence.cacheKeys=await page.evaluate(()=>caches.keys());
-    assert.ok(evidence.cacheKeys.includes('nschess-shell-v197-mobile-board-focus'));
+    assert.ok(evidence.cacheKeys.includes('nschess-shell-v198-daily-practice'));
     assert.deepEqual(evidence.errors,[]);assert.deepEqual(evidence.failures,[]);
     evidence.result='PASS';
     await context.close();

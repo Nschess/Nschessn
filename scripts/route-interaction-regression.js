@@ -21,8 +21,8 @@ assert.match(app, /if \(ok === false\) showRouteFeatureFailure\(panelElement, na
 assert.match(app, /function syncOptionalRouteStylesheets\(styles = \[\]\)/, "Route CSS must have an active-route reconciliation path.");
 assert.match(app, /const optionalRouteStylesheetVersion = "play-tournament-density-v238";/, "The tournament discovery release must request its current route stylesheet rather than a released-board cache key.");
 assert.match(app, /const currentHref = new URL\(current\.href, document\.baseURI\)\.href;[\s\S]*?if \(currentHref === requestedHref\)[\s\S]*?current\.remove\(\);/, "An already-injected released Play stylesheet must be replaced when the current entry stylesheet changes.");
-assert.match(html, /assets\/app\.js\?v=play-multiplayer-truth-v241/, "The shipped shell must request the current multiplayer-truth controller.");
-assert.match(serviceWorker, /nschess-shell-v197-mobile-board-focus[\s\S]*?assets\/app\.js\?v=play-multiplayer-truth-v241/, "The offline shell must refresh with the current app and current 32-puzzle pack.");
+assert.match(html, /assets\/app\.js\?v=daily-practice-v1/, "The shipped shell must request the current Daily Practice controller.");
+assert.match(serviceWorker, /nschess-shell-v198-daily-practice[\s\S]*?assets\/app\.js\?v=daily-practice-v1/, "The offline shell must refresh with the current app and its local practice experience.");
 assert.match(app, /link\.remove\(\);\s*optionalRouteStylesheetPromises\.delete\(key\);/, "Inactive route CSS must be removed with its cached loader promise.");
 assert.match(app, /firstVisitSetupClose\?\.\(\{ restoreFocus: false \}\)/, "Home onboarding must close before changing routes.");
 assert.match(app, /document\.body\.classList\.toggle\("is-board-route", \["play", "puzzles", "gameReview"\]\.includes\(config\.panel\)\)/, "Board-centric routes must own compact navigation state.");

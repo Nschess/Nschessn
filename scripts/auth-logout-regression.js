@@ -29,6 +29,7 @@ if (!/const accountWorkspaceStorageKey = "checkmateQuest\.accountWorkspaces\.v1"
 for (const key of [
   "checkmateQuest.academy.v1",
   "checkmateQuest.dailyTraining.v1",
+  "checkmateQuest.dailyPractice.v1",
   "checkmateQuest.gentleStart.v1",
   "checkmateQuest.firstTimeTour.v1",
   "checkmateQuest.firstVisitSetup.v1",

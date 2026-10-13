@@ -44463,6 +44463,66 @@ body.site-tab-mode .nav-mobile-menu > summary > span::before { content: "☰"; f
   #books .book-filter[aria-pressed="true"] { background: #5366ed; color: #fff; }
   body.theme-light #books :is(.book-stats strong, .book-search) { color: #142441; }
   body.theme-light #books .book-stats span { color: #405575; }
+}
+
+#plan .daily-practice-hub {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: clamp(16px, 2.5vw, 26px);
+  border: 1px solid var(--cq-border, var(--line));
+  border-radius: var(--cq-radius-card, var(--radius));
+  background: var(--cq-card-surface, var(--panel));
+  box-shadow: var(--cq-inset-highlight), var(--cq-shadow-sm);
+}
+#plan .daily-practice-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-width: 0; }
+#plan .daily-practice-head h3 { margin: 0 0 6px; font-size: clamp(1.15rem, 2vw, 1.45rem); }
+#plan .daily-practice-head p:not(.section-kicker) { margin: 0; color: var(--cq-text-muted, var(--muted)); }
+#plan .daily-practice-count { display: grid; gap: 3px; flex: 0 0 auto; text-align: right; }
+#plan .daily-practice-count strong { font-size: 1.25rem; font-variant-numeric: tabular-nums; color: var(--cq-text-primary, #edf2ff); }
+#plan .daily-practice-count span { color: var(--cq-text-muted, var(--muted)); font-size: .78rem; }
+#plan .daily-practice-status { margin: 0; padding: 11px 13px; border: 1px solid var(--cq-border, var(--line)); border-radius: var(--cq-radius-control, 10px); color: var(--cq-text-secondary, #d4def4); background: var(--cq-surface-elevated, rgba(255,255,255,.035)); line-height: 1.45; }
+#plan .daily-practice-tasks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+#plan .daily-practice-task { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-content: start; gap: 10px; min-width: 0; padding: 15px; border: 1px solid var(--cq-border, var(--line)); border-radius: var(--cq-radius-control, 12px); background: var(--cq-surface-elevated, rgba(255,255,255,.035)); }
+#plan .daily-practice-task.is-next { border-color: var(--cq-border-strong, rgba(111,168,220,.55)); box-shadow: 0 0 0 1px rgba(111,168,220,.08); }
+#plan .daily-practice-task.is-complete { border-color: rgba(127,166,80,.48); }
+#plan .daily-practice-task-number { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--cq-text-primary, #edf2ff); background: rgba(111,168,220,.16); font-weight: 800; }
+#plan .daily-practice-task.is-complete .daily-practice-task-number { background: rgba(127,166,80,.22); color: #cce5aa; }
+#plan .daily-practice-task-copy { min-width: 0; }
+#plan .daily-practice-task-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 9px; min-width: 0; }
+#plan .daily-practice-task-heading strong { overflow-wrap: anywhere; color: var(--cq-text-primary, #edf2ff); }
+#plan .daily-practice-task-copy p,
+#plan .daily-practice-reflection-card p { margin: 6px 0 0; color: var(--cq-text-muted, var(--muted)); font-size: .88rem; line-height: 1.45; }
+#plan .daily-practice-task-state { color: var(--cq-text-muted, #afbdd6); font-size: .76rem; }
+#plan .daily-practice-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; grid-column: 2; min-width: 0; }
+#plan .daily-practice-start,
+#plan .daily-practice-task-actions .button { min-height: 44px; }
+#plan .daily-practice-skip { min-width: 44px; min-height: 44px; padding: 8px 4px; border: 0; color: var(--cq-text-muted, #b9c5dc); background: transparent; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: inherit; font-size: .78rem; }
+#plan .daily-practice-done { min-height: 44px; display: inline-flex; align-items: center; color: #cce5aa; font-size: .84rem; font-weight: 700; }
+#plan .daily-practice-reflection { min-width: 0; }
+#plan .daily-practice-reflection-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; padding: 14px 16px; border: 1px solid var(--cq-border, var(--line)); border-radius: var(--cq-radius-control, 12px); background: rgba(111,168,220,.055); }
+#plan .daily-practice-reflection-card > div:first-child { min-width: 0; }
+#plan .daily-practice-reflection-card strong { display: block; color: var(--cq-text-primary, #edf2ff); }
+#plan .daily-practice-optional { display: block; margin-bottom: 4px; color: var(--cq-text-muted, #afbdd6); font-size: .67rem; font-weight: 800; letter-spacing: .1em; }
+#plan .daily-practice-reflection-card .daily-practice-task-actions { flex: 0 0 auto; }
+#plan .daily-practice-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 0; }
+#plan .daily-practice-footer p { margin: 0; color: var(--cq-text-muted, var(--muted)); font-size: .78rem; line-height: 1.45; }
+#plan .daily-practice-footer .button { min-height: 44px; flex: 0 0 auto; }
+#plan .daily-practice-hub :is(button, a):focus-visible { outline: 3px solid var(--cq-focus, #8ebdff); outline-offset: 3px; }
+@media (max-width: 820px) {
+  #plan .daily-practice-tasks { grid-template-columns: 1fr; }
+  #plan .daily-practice-task { grid-template-columns: 30px minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  #plan .daily-practice-head,
+  #plan .daily-practice-reflection-card,
+  #plan .daily-practice-footer { align-items: flex-start; flex-direction: column; }
+  #plan .daily-practice-count { text-align: left; }
+  #plan .daily-practice-reflection-card .daily-practice-task-actions { flex-basis: auto; }
+  #plan .daily-practice-footer .button { width: 100%; }
+}
+
+@media (max-width: 768px) {
   #gameReview:not(.is-review-page) { padding-block: 18px; }
   .review-entry { margin: 0; padding: 16px; }
   .review-entry-actions .button { flex: 1 1 140px; }

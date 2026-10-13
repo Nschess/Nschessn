@@ -4498,12 +4498,33 @@
         <div class="section-head">
           <div>
             <p class="section-kicker">Study rhythm</p>
-            <h2 id="plan-title">Fast progress roadmap</h2>
+            <h2 id="plan-title">Daily Practice</h2>
           </div>
-          <p class="section-intro">Pick the track that matches your level, train for a short focused block each day, then repeat the weekly rhythm until the goals feel easy.</p>
+          <p class="section-intro">A calm, flexible routine built from real practice—not page visits or promised rewards.</p>
         </div>
 
-        <div class="study-plan">
+        <section class="daily-practice-hub" id="dailyPracticeHub" aria-labelledby="dailyPracticeTitle">
+          <header class="daily-practice-head">
+            <div>
+              <p class="section-kicker">A little chess, often</p>
+              <h3 id="dailyPracticeTitle">Three useful steps for today</h3>
+              <p>Take them in any order. Finish what fits; skip anything that does not.</p>
+            </div>
+            <div class="daily-practice-count" aria-label="Today's local practice progress">
+              <strong id="dailyPracticeCount">0 / 3</strong>
+              <span id="dailyPracticeDate">UTC day</span>
+            </div>
+          </header>
+          <p class="daily-practice-status" id="dailyPracticeStatus" role="status" aria-live="polite" aria-atomic="true">Your practice marks are saved on this device only. No synced streak or account reward.</p>
+          <div class="daily-practice-tasks" id="dailyPracticeTasks" aria-label="Today's practice steps"></div>
+          <section class="daily-practice-reflection" id="dailyPracticeReflection" aria-label="Optional game review"></section>
+          <footer class="daily-practice-footer">
+            <p>Practice completion is device-local. Clearing this browser's data may remove these marks.</p>
+            <button class="button secondary" type="button" id="dailyPracticeReset">Reset today's marks</button>
+          </footer>
+        </section>
+
+        <template class="legacy-study-plan">
           <article class="plan-panel">
             <div class="plan-meta">
               <span class="badge">Beginner</span>
@@ -4686,7 +4707,7 @@
               <li><span>7</span><div><a href="#play">Play longer games with calm analysis.</a></div></li>
             </ul>
           </article>
-        </div>
+        </template>
       </div>
     </section>
   </main>
@@ -4771,7 +4792,7 @@
   </aside>
 
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
-  <script defer src="assets/app.js?v=play-multiplayer-truth-v241"></script>
+  <script defer src="assets/app.js?v=daily-practice-v1"></script>
   <script type="module" src="assets/daily-puzzle-launcher.mjs?v=daily-compact-v1"></script>
   <script type="module" src="assets/pwa-install.mjs?v=pwa-v1"></script>
 </body>
