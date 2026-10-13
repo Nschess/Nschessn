@@ -112,7 +112,14 @@ Run the following before deploying a static change:
 node scripts/verify-site.js
 node scripts/build-pages.js
 node scripts/check-deploy-assets.js dist
+node scripts/seo-regression.cjs --static
 ```
+
+The build generates nine readable public chess guides and a 13-URL sitemap in
+`dist/`. Deploy that static artifact; Vercel continues to discover server functions
+from the root `api/` directory. Run `npm run test:seo` with the existing Playwright
+dependency for browser verification. See [SEO implementation and audit](docs/SEO-AUDIT.md)
+and [Search Console setup](docs/GOOGLE-SEARCH-CONSOLE.md).
 
 ### Authenticated browser verification
 

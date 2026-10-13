@@ -25,7 +25,8 @@
     "test:store-auth-boundary": "npm run test:environment && node scripts/store-auth-boundary-regression.cjs --environment-preflighted",
     "provision:e2e-b": "node scripts/provision-e2e-account.cjs",
     "test:e2e-wallet": "node scripts/provision-e2e-account.cjs --wallet-only",
-    "build": "node scripts/build-pages.js"
+    "build": "node scripts/build-pages.js",
+    "test:seo": "npm run build && node scripts/seo-regression.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

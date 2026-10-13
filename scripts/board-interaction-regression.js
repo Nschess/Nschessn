@@ -317,7 +317,7 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v197-mobile-board-focus";
+const cacheName = "nschess-shell-v198-search-discovery";
 const shellCssVersion = "mobile-board-focus-v1";
 const shellAppVersion = "play-multiplayer-truth-v241";
 const routeModuleVersion = "review-v226-startup-performance";

@@ -6,6 +6,7 @@ const indexPath = path.join(siteDir, "index.html");
 const html = fs.readFileSync(indexPath, "utf8");
 const required = [
   "index.html",
+  ".well-known/assetlinks.json",
   "assets/stockfish/stockfish-nnue-16-single.js",
   "assets/stockfish/stockfish-nnue-16-single.wasm",
   "THIRD-PARTY-NOTICES.md",

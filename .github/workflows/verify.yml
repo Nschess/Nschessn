@@ -22,6 +22,8 @@ jobs:
       - run: node --check api/_supabase.js && node --check api/auth-config.js && node --check api/health.js && node --check api/leaderboard.js
       - run: node scripts/build-pages.js
       - run: node scripts/check-deploy-assets.js dist
+      - name: Public search discovery contracts
+        run: node scripts/seo-regression.cjs --static
 
   stability-gate:
     name: Live Stability Gate
