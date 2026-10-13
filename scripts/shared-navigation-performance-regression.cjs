@@ -248,7 +248,9 @@ async function main() {
     assert.deepEqual(pageErrors, [], "route changes and board interaction produce no uncaught page errors");
     assert.match(app, /function setupSiteTabs\(\)\s*\{\s*if \(setupSiteTabs\.ready\) return;/, "the global route listeners are guarded against duplicate setup");
     assert.match(app, /function initializeDeferredFeature\(name\)[\s\S]*?const existing = deferredFeaturePromises\.get\(name\)[\s\S]*?if \(existing\) return existing/, "route feature initialization is shared rather than repeated on each visit");
-    assert.match(worker, /CACHE_NAME = "nschess-shell-v\d+-[^\"]+"[\s\S]*?isReviewShellAsset[\s\S]*?cache\.put\(request, copy\)/, "service worker maintains versioned shell caching and runtime caching for route assets");
+    assert.match(worker, /CACHE_NAME = "nschess-shell-v\d+-[^\"]+"/, "service worker uses a versioned cache for shell updates");
+    assert.match(worker, /function savePublicAsset\(request, response\)[\s\S]*?cache\.put\(request, response\)[\s\S]*?MAX_OPTIONAL_ENTRIES/, "public runtime assets enter the bounded cache through the shared writer");
+    assert.match(worker, /const isReviewShellAsset[\s\S]*?response\.clone\(\)[\s\S]*?savePublicAsset\(request, copy\)/, "shell asset responses are cloned and saved through the bounded cache path");
 
     console.log(JSON.stringify(report, null, 2));
     await context.close();
