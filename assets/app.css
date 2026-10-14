@@ -31552,14 +31552,22 @@ body.site-tab-mode main > .site-panel.is-active-panel {
 
 @media (max-width: 699px) {
   .global-network-status {
-    inset-inline: 12px;
-    top: max(72px, calc(env(safe-area-inset-top) + 10px));
+    position: relative;
+    inset: auto;
+    z-index: auto;
     width: auto;
+    margin: max(8px, env(safe-area-inset-top)) 12px 8px;
+    animation: network-status-enter 160ms ease-out both;
   }
 }
 
+@keyframes network-status-enter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .global-network-status { transition: none; }
+  .global-network-status { animation: none; transition: none; }
 }
 
 @media (forced-colors: active) {

@@ -28,8 +28,8 @@ The five Git conflicts were in `service-worker.js` and the cache assertions in
 `board-interaction-regression.js`, `daily-puzzle-regression.cjs`,
 `mobile-live-smoke.cjs` and `route-interaction-regression.js`. Both phases chose
 a different cache generation named v198. The integrated shell uses
-`nschess-shell-v199-daily-practice-seo`, retains Phase 11's
-`assets/app.js?v=daily-practice-v1`, and caches the SEO metadata script. The
+`nschess-shell-v200-daily-practice-seo-mobile`, retains Phase 11's
+`assets/app.js?v=daily-practice-v2`, and caches the SEO metadata script. The
 Daily Practice cache assertion is aligned with that same generation.
 
 Routing/navigation, the homepage, package scripts, manifest, gameplay and shared

@@ -330,8 +330,8 @@ async function main() {
   const start = performance.now();
   assert.match(html, /id="dailyPracticeHub"[\s\S]*?id="dailyPracticeCount"[\s\S]*?id="dailyPracticeStatus"[^>]*role="status"/);
   const activeHtml = html.replace(/<template\b[^>]*>[\s\S]*?<\/template>/gi, "");
-  assert.match(html, /assets\/app\.js\?v=daily-practice-v1/);
-  assert.match(serviceWorker, /nschess-shell-v199-daily-practice-seo[\s\S]*?assets\/app\.js\?v=daily-practice-v1/, "the offline shell cache is renewed for this app version");
+  assert.match(html, /assets\/app\.js\?v=daily-practice-v2/);
+  assert.match(serviceWorker, /nschess-shell-v200-daily-practice-seo-mobile[\s\S]*?assets\/app\.js\?v=daily-practice-v2/, "the offline shell cache is renewed for this app version");
   assert.match(html, /<template class="legacy-study-plan">[\s\S]*?id="dailyTrainingForm"[\s\S]*?<\/template>/, "legacy plan content remains inert template material only");
   assert.doesNotMatch(activeHtml, /id="dailyTrainingForm"/, "the discontinued manual completion form is not active HTML");
   assertCompletionBoundaries();

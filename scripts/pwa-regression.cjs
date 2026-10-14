@@ -108,10 +108,33 @@ async function main() {
     await page.goBack();
     await page.locator("#pwaInstall").waitFor({ state: "visible" });
     report.backNavigation = "PASS";
-    const before = await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-board-focus-v1")).text());
+    await page.setViewportSize({ width: 320, height: 900 });
+    await context.setOffline(true);
+    await page.waitForFunction(() => {
+      const status = document.getElementById("globalNetworkStatus");
+      return status && !status.hidden && status.dataset.state === "offline";
+    });
+    const offlineLayout = await page.evaluate(() => {
+      const status = document.getElementById("globalNetworkStatus");
+      const header = document.querySelector(".site-header");
+      const statusBox = status.getBoundingClientRect();
+      const headerBox = header.getBoundingClientRect();
+      return { position: getComputedStyle(status).position, statusBottom: statusBox.bottom, headerTop: headerBox.top };
+    });
+    assert.equal(offlineLayout.position, "relative", "narrow offline notices stay in document flow instead of covering the navigation or board controls");
+    assert.ok(offlineLayout.statusBottom <= offlineLayout.headerTop + 1, `offline notice must finish before the mobile header: ${JSON.stringify(offlineLayout)}`);
+    await page.locator(".nav-mobile-menu > summary").click();
+    await page.locator('.nav-mobile-panel a[href="#play"]').click();
+    await page.waitForFunction(() => location.hash === "#play");
+    await page.waitForFunction(() => document.getElementById("globalNetworkStatus")?.dataset.state === "offline");
+    await context.setOffline(false);
+    await page.waitForFunction(() => document.getElementById("globalNetworkStatus")?.dataset.state === "reconnected");
+    await page.waitForFunction(() => document.getElementById("globalNetworkStatus")?.hidden === true, null, { timeout: 7000 });
+    report.networkStatus = "PASS: 320px offline notice clears navigation, route changes remain available, reconnect notice appears and clears";
+    const before = await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-board-focus-v2")).text());
     shellUnavailable = true;
-    await page.evaluate(() => fetch("/assets/app.css?v=mobile-board-focus-v1").then((r) => r.text()));
-    assert.equal(await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-board-focus-v1")).text()), before);
+    await page.evaluate(() => fetch("/assets/app.css?v=mobile-board-focus-v2").then((r) => r.text()));
+    assert.equal(await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-board-focus-v2")).text()), before);
     await context.setOffline(true);
     await page.reload({ waitUntil: "load" });
     assert.ok(await page.locator("#pwaInstall").count());

@@ -1009,6 +1009,7 @@
       let resizeFrame = 0;
       let syncFrame = 0;
       let activeResizeStage = null;
+      let cachedViewportSize = null;
       const sharedResizeObserver = typeof ResizeObserver === "function"
         ? new ResizeObserver(() => {
           if (hasLiveResize()) {
@@ -1120,13 +1121,15 @@
       }
 
       function viewportSize() {
+        if (cachedViewportSize) return cachedViewportSize;
         const visualViewport = window.visualViewport;
         const width = Number(visualViewport?.width) || Number(window.innerWidth) || Number(document.documentElement.clientWidth) || 240;
         const height = Number(visualViewport?.height) || Number(window.innerHeight) || Number(document.documentElement.clientHeight) || 320;
-        return {
+        cachedViewportSize = Object.freeze({
           width: Math.max(240, width),
           height: Math.max(320, height)
-        };
+        });
+        return cachedViewportSize;
       }
 
       function responsiveDefaultSize() {
@@ -1448,6 +1451,11 @@
           syncFrame = 0;
           sync();
         });
+      }
+
+      function handleViewportResize() {
+        cachedViewportSize = null;
+        scheduleSync();
       }
 
       function scheduleResize(stage, requested) {
@@ -1833,6 +1841,7 @@
       }
 
       document.addEventListener("fullscreenchange", () => {
+        cachedViewportSize = null;
         let activeBoardStage = false;
         stages.forEach((stage) => {
           const state = states.get(stage);
@@ -1886,10 +1895,10 @@
         }
         scheduleSync();
       });
-      window.addEventListener("resize", scheduleSync, { passive: true });
-      window.addEventListener("orientationchange", scheduleSync, { passive: true });
-      window.visualViewport?.addEventListener("resize", scheduleSync, { passive: true });
-      window.visualViewport?.addEventListener("scroll", scheduleSync, { passive: true });
+      window.addEventListener("resize", handleViewportResize, { passive: true });
+      window.addEventListener("orientationchange", handleViewportResize, { passive: true });
+      window.visualViewport?.addEventListener("resize", handleViewportResize, { passive: true });
+      window.visualViewport?.addEventListener("scroll", handleViewportResize, { passive: true });
 
       return Object.freeze({
         sync,

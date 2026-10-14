@@ -317,9 +317,9 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v199-daily-practice-seo";
-const shellCssVersion = "mobile-board-focus-v1";
-const shellAppVersion = "daily-practice-v1";
+const cacheName = "nschess-shell-v200-daily-practice-seo-mobile";
+const shellCssVersion = "mobile-board-focus-v2";
+const shellAppVersion = "daily-practice-v2";
 const routeModuleVersion = "review-v226-startup-performance";
 assert.match(html, new RegExp(shellCssVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current stylesheet version");
 assert.match(html, new RegExp(shellAppVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current application version");
@@ -327,6 +327,10 @@ assert.match(app, new RegExp(routeModuleVersion.replace(/[.*+?^${}()|[\]\\]/g, "
 assert.match(worker, new RegExp(shellCssVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell stylesheet is not current");
 assert.match(worker, new RegExp(shellAppVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell application is not current");
 assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker cache name is not current");
+assert.match(app, /let cachedViewportSize = null;[\s\S]*?function viewportSize\(\)[\s\S]*?if \(cachedViewportSize\) return cachedViewportSize;[\s\S]*?cachedViewportSize = Object\.freeze/,
+  "Board syncs must share a viewport snapshot instead of rereading dimensions for each mounted board.");
+assert.match(app, /function handleViewportResize\(\)[\s\S]*?cachedViewportSize = null;[\s\S]*?scheduleSync\(\)[\s\S]*?window\.visualViewport\?\.addEventListener\("resize", handleViewportResize/,
+  "Viewport changes must invalidate the shared dimensions before the next board sync.");
 const installShell = worker.slice(worker.indexOf("const APP_SHELL"), worker.indexOf('self.addEventListener("install"'));
 assert.doesNotMatch(installShell, /assets\/vendor\/chess\.js-1\.0\.0\.mjs/, "Route-specific chess.js vendor module must not block first shell install");
 assert.match(worker, /caches\.match\(request\)\.then\(\(cached\) => cached \|\| fetch\(request\)/, "Route-specific assets must remain cacheable after first request");

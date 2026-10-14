@@ -198,9 +198,12 @@ async function browserChecks() {
     await app.goForward();
     assert.match(await app.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
     await app.goto(base + "/");
+    await app.waitForFunction(() => document.documentElement.dataset.authState === "guest");
     await app.evaluate(() => { document.documentElement.dataset.authState = "authenticated"; });
+    await app.waitForFunction(() => document.querySelector('meta[name="robots"]')?.content.includes("noindex"));
     assert.match(await app.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
     await app.evaluate(() => { document.documentElement.dataset.authState = "guest"; });
+    await app.waitForFunction(() => document.querySelector('meta[name="robots"]')?.content === "index, follow");
     assert.equal(await app.locator('meta[name="robots"]').getAttribute("content"), "index, follow");
     await app.locator('#homeContinueLearningAction').click();
     assert.deepEqual(appErrors, []);
