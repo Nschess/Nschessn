@@ -831,10 +831,10 @@ function runStaticChecks(full) {
   ];
   if (full) {
     checks.push(
-      ["deploy assets", () => runNode("scripts/check-deploy-assets.js")],
+      ["static build", () => runNode("scripts/build-pages.js")],
+      ["deploy assets", () => runNode("scripts/check-deploy-assets.js", ["dist"])],
       ["multiplayer regression", () => runNode("scripts/multiplayer-regression.js")],
-      ["matchmaking regression", () => runNode("scripts/matchmaking-regression.js")],
-      ["static build", () => runNode("scripts/build-pages.js")]
+      ["matchmaking regression", () => runNode("scripts/matchmaking-regression.js")]
     );
   }
   for (const [name, task] of checks) {
@@ -1690,8 +1690,8 @@ async function runGuestBrowserTests(browser, baseUrl, viewports) {
   const routes = [
     ["home", "#top", "#top"],
     ["profile", "#login", "#loginDisplayName"],
-    ["play", "#play", "#coachBoard"],
-    ["tournaments", "#play?mode=tournament", "#coachBoard"],
+    ["play", "#play", "#humanPlayEntry"],
+    ["tournaments", "#play?mode=tournament", "#tournamentLobby"],
     ["puzzles", "#puzzles", "#realPuzzleBoard"],
     ["openings", "#openings", "#openingExplorerBoard"],
     ["store", "#store", "#storeGrid"],
@@ -1732,37 +1732,31 @@ async function runGuestBrowserTests(browser, baseUrl, viewports) {
         }
       }
       if (name === "play") {
-        const playSetup = await page.evaluate(() => {
-          const board = document.querySelector("#coachBoard");
-          const rect = board?.getBoundingClientRect();
+        const playEntry = await page.evaluate(() => {
+          const entry = document.querySelector("#humanPlayEntry");
+          const rect = entry?.getBoundingClientRect();
+          const actions = [...(entry?.querySelectorAll(".human-play-entry-option") || [])].map((link) => ({
+            text: link.querySelector("strong")?.textContent.trim() || "",
+            href: link.getAttribute("href") || ""
+          }));
+          const botPractice = [...(entry?.querySelectorAll("a") || [])].find((link) => link.getAttribute("href") === "#bots");
           return {
-            opponent: document.querySelector("#aiPlayerName")?.textContent.trim() || "",
-            selected: [...document.querySelectorAll("[data-beginner-bot], [data-game-difficulty]")]
-              .filter((button) => button.getAttribute("aria-pressed") === "true")
-              .map((button) => button.dataset.beginnerBot || button.dataset.gameDifficulty),
-            playerClock: document.querySelector("[data-match-timer]")?.textContent.trim() || "",
-            opponentClock: document.querySelector("#aiPlayerTimer")?.textContent.trim() || "",
-            status: document.querySelector("#gameStatusBadge")?.textContent.trim() || "",
-            turn: document.querySelector("#gameTurnBadge")?.textContent.trim() || "",
-            startDisabled: Boolean(document.querySelector("#restartGame")?.disabled),
-            draggable: [...(board?.querySelectorAll("[data-square]") || [])].some((square) => square.draggable),
-            boardWidth: rect?.width || 0,
-            boardHeight: rect?.height || 0,
+            width: rect?.width || 0,
+            height: rect?.height || 0,
+            actions,
+            botPracticeHref: botPractice?.getAttribute("href") || "",
             horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
           };
         });
-        assert(!/Nova Rookie|Club Tutor/i.test(playSetup.opponent), `${name}@${width}: Play mounted a default bot: ${JSON.stringify(playSetup)}`);
-        assert(playSetup.selected.length === 0, `${name}@${width}: Play marked a bot or difficulty selected before user action: ${JSON.stringify(playSetup)}`);
-        assert(playSetup.playerClock === "--:--" && playSetup.opponentClock === "--:--", `${name}@${width}: Play clock started before setup: ${JSON.stringify(playSetup)}`);
-        assert(/Choose a bot|Waiting/i.test(playSetup.status) && /Waiting|start/i.test(playSetup.turn), `${name}@${width}: Play did not expose its idle setup state: ${JSON.stringify(playSetup)}`);
-        assert(playSetup.startDisabled && !playSetup.draggable, `${name}@${width}: Play exposed active game controls before bot selection: ${JSON.stringify(playSetup)}`);
-        assert(Math.abs(playSetup.boardWidth - playSetup.boardHeight) < 1 && playSetup.boardWidth > 0, `${name}@${width}: Play board geometry is invalid: ${JSON.stringify(playSetup)}`);
-        assert(!playSetup.horizontalOverflow, `${name}@${width}: Play introduced horizontal overflow: ${JSON.stringify(playSetup)}`);
-        if (width >= 1181) assert(playSetup.boardWidth >= 720, `${name}@${width}: desktop Play board was silently reduced: ${JSON.stringify(playSetup)}`);
+        assert(playEntry.width > 0 && playEntry.height > 0, "Play entry has no visible content.");
+        assert(playEntry.actions.some((action) => /Play Now/i.test(action.text) && action.href === "#play?mode=quick"), "Play entry is missing its Quick Match action.");
+        assert(playEntry.actions.some((action) => /Play a Friend/i.test(action.text) && action.href === "#play?mode=friend"), "Play entry is missing its friend challenge action.");
+        assert(playEntry.actions.some((action) => /Challenge a Player/i.test(action.text) && action.href === "#friends"), "Play entry is missing its player search action.");
+        assert(playEntry.botPracticeHref === "#bots", "Play entry is missing its AI bot link.");
+        assert(!playEntry.horizontalOverflow, "Play entry introduced horizontal overflow.");
       }
       await auditIdentity(page, `${name}@${width}`);
       await auditVisibleBoards(page, `${name}@${width}`);
-      if (name === "home") await checkVisualSnapshot(page, `navbar-${width}`, ".site-header");
     }
     await gotoHash(page, baseUrl, "#puzzles");
     await drawAndToggleManualArrow(page, "#realPuzzleBoard", `puzzles@${width}`);
@@ -4024,7 +4018,25 @@ async function runDeepAuthenticatedQa(browser, baseUrl, primaryState) {
       await waitForAuthenticatedHydration(page, `deep ${label}@${width}`);
       await waitForStoreHydration(page, `deep ${label}@${width}`);
       const state = await readIdentityVisualState(page);
-      assertIdentityVisualConsistency(state, `deep ${label}@${width}`, expectedStyle);
+      const compactLobby = width <= 430 && ["play", "tournaments"].includes(label);
+      if (compactLobby && state.player.length === 0) {
+        // The compact navbar hides player-name text to keep the mobile lobby clear;
+        // the profile chip must remain visible and accessible as the account entry.
+        const profileControl = await page.evaluate(() => {
+          const element = document.querySelector(".player-flex-chip");
+          const rect = element?.getBoundingClientRect();
+          const style = element ? getComputedStyle(element) : null;
+          return {
+            visible: Boolean(element && rect?.width > 0 && rect?.height > 0 && style?.visibility !== "hidden" && Number(style?.opacity || 0) > 0),
+            hasAccessibleName: Boolean(element?.getAttribute("aria-label")?.trim()),
+            href: element?.getAttribute("href") || ""
+          };
+        });
+        assert(profileControl.visible && profileControl.hasAccessibleName && profileControl.href === "#login", `deep ${label}@${width}: compact account control is not visible, named, and linked to the profile route.`);
+        assert(state.scrollWidth <= width + 1, `deep ${label}@${width}: compact lobby has horizontal overflow.`);
+      } else {
+        assertIdentityVisualConsistency(state, `deep ${label}@${width}`, expectedStyle);
+      }
     }
     await context.close();
     pass(`browser: deep identity route audit @ ${width}px (${routes.length} routes)`);
@@ -4203,6 +4215,9 @@ async function runBrowserTests() {
     server.stdout.on("data", (chunk) => process.stdout.write(`[e2e-server] ${chunk}`));
     server.stderr.on("data", (chunk) => process.stderr.write(`[e2e-server] ${chunk}`));
     browser = await createBrowser();
+    // Keep pixel baselines in isolated, deterministic contexts; the route matrix
+    // below separately audits navigation and visible identity on each route.
+    if (mode === "full") await runVisualSmokeTests(browser, baseUrl);
     if (visualOnly) {
       await runVisualSmokeTests(browser, baseUrl);
       return;
