@@ -43482,8 +43482,9 @@ body:not(.site-tab-mode) #top > .home-discovery-section .home-status-content.hom
 
 /* The human-first entry stylesheet loads by route. Hide the legacy pre-game
    workspace in the always-present shell stylesheet so a delayed route
-   stylesheet can never flash an AI board before the human choices appear. */
-#play.play-lobby:not(.is-active-game):not(.is-review-mode) .play-shell {
+   stylesheet or initializer can never flash an empty AI board before the human
+   choices appear. This guard must not depend on the deferred play-lobby class. */
+html body #play#play:not(.is-active-game):not(.is-review-mode) .play-shell {
   display: none !important;
 }
 

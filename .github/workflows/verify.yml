@@ -52,6 +52,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Deferred Play lobby and active board regression
+        run: npm run test:play-lobby-loading
+      - name: Store settlement predicate regression
+        run: node scripts/store-purchase-settlement-regression.cjs
+      - name: Awaited browser and RPC readiness regression
+        run: node scripts/async-readiness-regression.cjs
+      - name: Active Play workspace state regression
+        run: node scripts/play-active-state-regression.cjs
       - name: Validate live test environment
         run: npm run test:environment
       - name: Run live matchmaking Stability Gate

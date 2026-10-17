@@ -131,10 +131,10 @@ async function main() {
     await page.waitForFunction(() => document.getElementById("globalNetworkStatus")?.dataset.state === "reconnected");
     await page.waitForFunction(() => document.getElementById("globalNetworkStatus")?.hidden === true, null, { timeout: 7000 });
     report.networkStatus = "PASS: 320px offline notice clears navigation, route changes remain available, reconnect notice appears and clears";
-    const before = await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-board-focus-v2")).text());
+    const before = await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-board-focus-v3")).text());
     shellUnavailable = true;
-    await page.evaluate(() => fetch("/assets/app.css?v=mobile-board-focus-v2").then((r) => r.text()));
-    assert.equal(await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-board-focus-v2")).text()), before);
+    await page.evaluate(() => fetch("/assets/app.css?v=mobile-board-focus-v3").then((r) => r.text()));
+    assert.equal(await page.evaluate(async () => (await caches.match("/assets/app.css?v=mobile-board-focus-v3")).text()), before);
     await context.setOffline(true);
     await page.reload({ waitUntil: "load" });
     assert.ok(await page.locator("#pwaInstall").count());

@@ -11,7 +11,7 @@ const http = require("node:http");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const { chromium } = require("playwright");
-const { installOfflineSupabaseFixture } = require("./e2e-runtime-fixtures.cjs");
+const { installOfflineSupabaseFixture, installOptionalCdnFixtures } = require("./e2e-runtime-fixtures.cjs");
 
 const root = path.resolve(__dirname, "..");
 const port = Number(process.env.E2E_PORT || 4174);
@@ -429,6 +429,7 @@ async function runRuntimeContract(browser) {
     serviceWorkers: "block"
   });
   await installOfflineSupabaseFixture(context);
+  await installOptionalCdnFixtures(context);
   // The required chess module is local. Abort every jsDelivr request so this
   // test proves the board does not silently fall back to a CDN.
   await context.route("https://cdn.jsdelivr.net/**", (route) => route.abort());
@@ -550,6 +551,7 @@ async function runResponsiveBoardContract(browser) {
   for (const [width, height] of cases) {
     const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
     await installOfflineSupabaseFixture(context);
+    await installOptionalCdnFixtures(context);
     const page = await context.newPage();
     try {
       for (const [hash, selector] of routes) {
@@ -651,6 +653,7 @@ async function runFullscreenResponsiveContract(browser) {
   for (const [width, height] of cases) {
     const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
     await installOfflineSupabaseFixture(context);
+    await installOptionalCdnFixtures(context);
     const page = await context.newPage();
     try {
       await openRoute(page, "#bots");

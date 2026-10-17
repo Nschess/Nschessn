@@ -15416,7 +15416,12 @@
     }
 
     function rememberVisitSnapshot() {
-      writeJsonStorage(visitSnapshotStorageKey, getCurrentVisitSnapshot());
+      const snapshot = getCurrentVisitSnapshot();
+      // Do not recreate an empty account-scoped record when an untouched guest
+      // page exits after logout. Real guest activity still keeps its recap.
+      if (!isApplicationAuthenticated() && !["xp", "solved", "coins", "streak", "best", "lessons", "games"]
+        .some((key) => Number(snapshot[key]) > 0)) return;
+      writeJsonStorage(visitSnapshotStorageKey, snapshot);
     }
 
     function getMissionWeekKey(date = new Date()) {
@@ -23287,7 +23292,11 @@
       // workspace or Game Review.
       play.classList.toggle("play-lobby", isPreGame);
       play.classList.remove("is-pre-game");
-      play.classList.toggle("is-active-game", !isPreGame && !inReview && !isSpecialLobby);
+      // Friend/tournament routes are lobbies only until their remote game is
+      // active. Keep completed games visible for the existing result/review UI.
+      const hasSpecialGame = Boolean(friendChallengeState?.active
+        || (friendChallengeState?.remote && friendChallengeState.status === "completed"));
+      play.classList.toggle("is-active-game", !isPreGame && !inReview && (!isSpecialLobby || hasSpecialGame));
       if (!isPreGame) setupPlayAuthPrompt.close?.();
       syncPlayLobbyGuestPlacement(isPreGame);
 
@@ -31974,7 +31983,9 @@
         }
         stopSessionRefresh();
         if (clearAuthStorage) clearSupabaseBrowserAuthStorage();
-        writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), currentEmail: "", rememberEmail: "" });
+        // Session cleanup can arrive after the workspace reset. Remove the
+        // account-owned record rather than recreating it in the guest workspace.
+        try { localStorage.removeItem(authPreferencesStorageKey); } catch {}
       };
 
       const safeAuthMetadataUsername = (user) => {
