@@ -3,24 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Learn chess with guided lessons, practical puzzles, coach games, and progress tracking for every level." />
+  <title>Nschess | Free Chess Lessons, Puzzles and Computer Practice</title>
+  <meta name="description" content="Learn and practice chess for free with guided lessons, tactics puzzles, computer opponents and completed-game review. Start as a guest in Nschess." />
   <meta name="robots" content="index, follow" />
-  <meta name="theme-color" content="#071220" />
-  <meta name="color-scheme" content="dark light" />
+  <link rel="canonical" href="https://nschessn.vercel.app/" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Nschess" />
-  <meta property="og:title" content="Nschess — Learn Chess One Clear Idea at a Time" />
-  <meta property="og:description" content="Guided chess lessons, practical puzzles, coach games, and progress tracking for every level." />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:title" content="Nschess | Free Chess Lessons, Puzzles and Computer Practice" />
+  <meta property="og:description" content="Learn and practice chess for free with guided lessons, tactics puzzles, computer opponents and completed-game review. Start as a guest in Nschess." />
+  <meta property="og:url" content="https://nschessn.vercel.app/" />
+  <meta property="og:image" content="https://nschessn.vercel.app/assets/icons/icon-512.png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta property="og:image:alt" content="Nschess app icon" />
   <meta name="twitter:card" content="summary" />
-  <link rel="canonical" href="./" />
+  <meta name="twitter:title" content="Nschess | Free Chess Lessons, Puzzles and Computer Practice" />
+  <meta name="twitter:description" content="Learn and practice chess for free with guided lessons, tactics puzzles, computer opponents and completed-game review. Start as a guest in Nschess." />
+  <meta name="twitter:image" content="https://nschessn.vercel.app/assets/icons/icon-512.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://nschessn.vercel.app/#website","url":"https://nschessn.vercel.app/","name":"Nschess","inLanguage":"en"},{"@type":"WebPage","@id":"https://nschessn.vercel.app/#webpage","url":"https://nschessn.vercel.app/","name":"Nschess | Free Chess Lessons, Puzzles and Computer Practice","description":"Learn and practice chess for free with guided lessons, tactics puzzles, computer opponents and completed-game review. Start as a guest in Nschess.","inLanguage":"en","isPartOf":{"@id":"https://nschessn.vercel.app/#website"}}]}</script>
+  <script src="assets/search-metadata.js?v=seo-v1"></script>
+  <meta name="theme-color" content="#071220" />
+  <meta name="color-scheme" content="dark light" />
   <link rel="manifest" href="site.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" />
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-  <title>Nschess - Learn Chess From First Move to Strategy</title>
-  <link rel="stylesheet" href="assets/app.css?v=review-v219-multiplayer-truth" />
+  <link rel="stylesheet" href="assets/app.css?v=mobile-board-focus-v3" />
 </head>
 <body>
   <a class="skip-link" href="#top">Skip to main content</a>
@@ -61,13 +73,13 @@
           </div>
         </details>
       </div>
-      <div class="nav-utilities" aria-label="Account actions">
+      <div class="nav-utilities" aria-label="Account actions" data-nosnippet>
         <button class="nav-icon-button" type="button" id="siteSearchOpen" aria-label="Search Nschess" title="Search">
           <span class="nav-utility-icon" data-lucide="search" aria-hidden="true">Search</span>
         </button>
         <a class="nav-coin-chip" href="#store" data-site-tab="store" data-site-panel="store" aria-label="Open Store and view coins">
           <span class="nav-utility-icon" data-lucide="coins" aria-hidden="true">&#9670;</span>
-          <span data-profile-field="tokens">0</span>
+          <span data-profile-field="tokens">—</span>
         </a>
         <button class="nav-icon-button" type="button" id="siteNotificationsOpen" aria-label="Open activity updates" aria-haspopup="dialog" aria-controls="siteNotificationsDialog" title="Activity updates">
           <span class="nav-utility-icon" data-lucide="bell" aria-hidden="true">&#9673;</span><i id="siteNotificationsDot" aria-hidden="true" hidden></i>
@@ -78,11 +90,11 @@
             <span class="player-flex-name">
               <span data-profile-field="name">Guest Explorer</span>
             </span>
-            <span class="player-flex-title" data-profile-field="rank">Rank: Explorer</span>
-            <span class="player-flex-meta" aria-label="Player rating and coins">
-              <span data-profile-field="gameRating">450 Elo</span>
+            <span class="player-flex-title" data-profile-field="rank">Guest profile</span>
+            <span class="player-flex-meta" aria-label="Account rating and coins">
+              <span data-profile-field="gameRating">—</span>
               <span aria-hidden="true">&middot;</span>
-              <span class="player-flex-coin-label" title="Coins"><span aria-hidden="true">&#9670;</span> <span data-profile-field="tokens">0</span></span>
+              <span class="player-flex-coin-label" title="Account coins"><span aria-hidden="true">&#9670;</span> <span data-profile-field="tokens">—</span></span>
             </span>
             <span class="player-flex-progress" aria-hidden="true"><span data-profile-progress-fill></span></span>
           </span>
@@ -138,34 +150,34 @@
       <div class="home-command-shell">
         <header class="home-command-header">
           <div class="home-command-intro">
-            <p class="home-command-kicker"><span class="hero-welcome-dot"></span><span id="homeWelcome">Welcome back.</span></p>
-            <p class="home-welcome-note" id="homeWelcomeDelta">Your next clear idea is waiting.</p>
+            <p class="home-command-kicker"><span class="hero-welcome-dot"></span><span id="homeWelcome" data-nosnippet>Welcome back.</span></p>
+            <p class="home-welcome-note" id="homeWelcomeDelta" data-nosnippet>Your next clear idea is waiting.</p>
             <h1 id="hero-title">Make your next move count.</h1>
-            <p class="home-command-description">A focused chess workspace for the game, puzzle, or lesson that helps you improve today.</p>
+            <p class="home-command-description">Free guided chess lessons, puzzles, computer practice and completed-game review. Start as a guest and build one useful idea at a time.</p>
           </div>
-          <div class="home-command-player" aria-label="Your player identity">
+          <div class="home-command-player" aria-label="Your player identity" data-nosnippet>
             <span class="home-command-avatar">Y</span>
             <span><strong data-profile-field="name">You</strong><small data-profile-field="title">Ready to play</small></span>
-            <b><span data-profile-field="gameRating">600</span><small>Elo</small></b>
+            <b><span data-profile-field="gameRating">—</span></b>
           </div>
         </header>
 
         <nav class="home-primary-actions" aria-label="Start an activity">
           <a class="home-primary-action is-primary" id="homePlayAction" href="#play" data-site-tab="play" data-site-panel="play" data-play-mode="quick"><span class="home-action-glyph" aria-hidden="true">&#9816;</span><span><strong>Play</strong><small>Start a focused game</small></span><b aria-hidden="true">&#8594;</b></a>
-          <a class="home-primary-action" id="newToChessButton" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles" data-home-action="daily-puzzle"><span class="home-action-glyph" aria-hidden="true">&#9671;</span><span><strong>Daily Puzzle</strong><small>Find today's pattern</small></span><b aria-hidden="true">&#8594;</b></a>
+          <a class="home-primary-action" id="newToChessButton" href="#puzzles" data-site-tab="puzzles" data-site-panel="puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive"><span class="home-action-glyph" aria-hidden="true">&#9671;</span><span><strong>Puzzle Practice</strong><small>Train with a position</small></span><b aria-hidden="true">&#8594;</b></a>
           <a class="home-primary-action" id="homeContinueLearningAction" href="#tutorial" data-site-tab="tutorial" data-site-panel="tutorial"><span class="home-action-glyph" aria-hidden="true">&#8961;</span><span><strong>Continue Learning</strong><small>Build one useful skill</small></span><b aria-hidden="true">&#8594;</b></a>
         </nav>
 
         <div class="home-command-grid">
-          <section class="home-next-move" aria-labelledby="home-next-move-title">
+          <section class="home-next-move" aria-labelledby="home-next-move-title" data-nosnippet>
             <div class="home-card-heading"><div><p class="home-command-kicker">Personalized focus</p><h2 id="home-next-move-title">Your Next Move</h2></div><span class="home-next-mark" aria-hidden="true">&#10022;</span></div>
-            <p class="home-next-reason" id="homeNextReason">Solve today's puzzle for XP and coins.</p>
-            <a class="button home-next-action" href="#puzzles" id="homeNextAction" data-home-action="daily-puzzle">Start daily puzzle</a>
+            <p class="home-next-reason" id="homeNextReason">Choose a puzzle to practice.</p>
+            <a class="button home-next-action" href="#puzzles" id="homeNextAction" data-home-action="puzzle-plan" data-home-plan="adaptive">Practice puzzles</a>
             <p class="home-insight" id="homeInsight">One clear idea is enough for today's session.</p>
             <div class="home-next-recommendations" id="homeRecommendations" aria-label="Other useful activities"></div>
           </section>
 
-          <section class="home-progress-panel" aria-labelledby="home-progress-title">
+          <section class="home-progress-panel" aria-labelledby="home-progress-title" data-nosnippet>
             <div class="home-card-heading"><div><p class="home-command-kicker">Your position</p><h2 id="home-progress-title">Progress</h2></div><span class="home-progress-summary">Small gains, clearly tracked</span></div>
             <div class="home-progress-stats" aria-label="Your chess progress">
               <span class="home-command-stat home-progress-rating"><strong id="homeMainRating">450</strong><small>Elo</small><em id="homeMainRatingMeta">Play a game to establish your rating.</em></span>
@@ -173,13 +185,13 @@
               <span class="home-command-stat"><strong id="homePuzzleAccuracy">—</strong><small>Puzzle accuracy</small></span>
               <span class="home-command-stat is-highlight"><strong id="homeXp">0 XP</strong><small>XP earned</small></span>
             </div>
-            <div class="home-progress-goal-line"><a id="homeWeeklyGoal" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Week goal: 0/120 XP</a><a id="homeDailyGoal" href="#puzzles" data-home-action="daily-puzzle">Daily: 0/3</a></div>
+            <div class="home-progress-goal-line"><a id="homeWeeklyGoal" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Week goal: 0/120 XP</a><a id="homeDailyGoal" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Today: 0/3</a></div>
             <div class="home-progress-legacy" aria-hidden="true"><span id="homeGamesPlayed">0</span><span id="homeThemesMastered">0</span><span id="homeLearningTime">0 min</span><span id="homeSkillsUnlocked">0</span></div>
             <div class="home-milestone-row"><span class="home-command-kicker">Next milestone</span><div id="homeUnlocks" aria-label="Achievement roadmap"></div></div>
           </section>
         </div>
 
-        <section class="home-continue-section" aria-labelledby="home-continue-section-title">
+        <section class="home-continue-section" aria-labelledby="home-continue-section-title" data-nosnippet>
           <div class="home-section-heading"><div><p class="home-command-kicker">Continue</p><h2 id="home-continue-section-title">Where you left off</h2></div><a href="#history" data-home-action="match-history">View history</a></div>
           <div class="home-continue-strip">
             <a class="home-continue-card" id="homeContinueAction" href="#bots" data-site-tab="bots" data-site-panel="bots"><span class="home-action-glyph" aria-hidden="true">&#8634;</span><span><strong id="homeContinueTitle">Choose an AI bot</strong><small id="homeContinueNote">Start a focused game</small></span><b aria-hidden="true">&#8594;</b></a>
@@ -187,7 +199,7 @@
           </div>
         </section>
 
-        <section class="home-session-card home-command-session" id="homeSessionCard" aria-live="polite">
+        <section class="home-session-card home-command-session" id="homeSessionCard" aria-live="polite" data-nosnippet>
           <div class="home-session-copy"><span class="home-session-kicker">Daily session</span><strong id="homeSessionTitle">One calm move</strong><p id="homeSessionCopy">Your next step appears here.</p><span class="home-session-meta" id="homeSessionMeta">On this device</span></div>
           <a class="button secondary" id="homeSessionAction" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Continue</a>
           <div class="home-session-ritual" id="homeSessionRitual" aria-label="Today's three-step ritual"></div>
@@ -220,7 +232,19 @@
           <a href="#openings" data-site-tab="openings" data-site-panel="openings"><span aria-hidden="true">&#8961;</span><strong>Openings</strong><small>Build a plan</small><b aria-hidden="true">&#8594;</b></a>
           <a href="#store" data-site-tab="store" data-site-panel="store"><span aria-hidden="true">&#10022;</span><strong>Store</strong><small>Style your board</small><b aria-hidden="true">&#8594;</b></a>
         </nav>
-        <div class="home-discovery-status" aria-label="Live chess activity">
+        <div class="home-section-heading"><div><p class="home-command-kicker">Learn and practice</p><h2 id="home-guides-title">Find your next chess idea</h2></div></div>
+        <nav class="home-discovery-nav" aria-labelledby="home-guides-title">
+          <a href="/learn/"><span aria-hidden="true">&#9816;</span><strong>Chess lessons</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/puzzles/"><span aria-hidden="true">&#9816;</span><strong>Chess puzzles</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/daily-chess-puzzle/"><span aria-hidden="true">&#9816;</span><strong>Daily puzzle</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/play-computer/"><span aria-hidden="true">&#9816;</span><strong>Play a computer</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/game-review/"><span aria-hidden="true">&#9816;</span><strong>Game review</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/chess-rules/"><span aria-hidden="true">&#9816;</span><strong>Chess rules</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/chess-openings/"><span aria-hidden="true">&#9816;</span><strong>Chess openings</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/chess-notation/"><span aria-hidden="true">&#9816;</span><strong>Chess notation</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+          <a href="/chess-training/"><span aria-hidden="true">&#9816;</span><strong>Chess training</strong><small>Read the guide</small><b aria-hidden="true">&#8594;</b></a>
+        </nav>
+        <div class="home-discovery-status" aria-label="Live chess activity" data-nosnippet>
           <article class="home-status-line">
             <div class="home-status-line-head"><span class="home-status-icon" aria-hidden="true">T</span><strong>Upcoming tournaments</strong><a href="#play?mode=tournament" data-site-tab="tournaments" data-site-panel="play" data-site-focus="tournamentLobby">View lobby</a></div>
             <div class="home-status-content" id="homeTournaments" aria-live="polite" aria-busy="true"><span>Loading live events</span></div>
@@ -237,16 +261,27 @@
       <div class="wrap">
         <div class="section-head cq-section-header">
           <div>
-            <p class="section-kicker">Beginner tutorial</p>
+            <p class="section-kicker">Guided lessons · beginner foundations</p>
             <h2 id="tutorial-title">Learn chess one move at a time</h2>
           </div>
-          <p class="section-intro">A replayable guided path for brand-new players: setup, pieces, rules, tactics, quizzes, rewards, and gentle hints.</p>
+          <p class="section-intro">68 board exercises. Your lesson checklist stays on this device, not a synced account record.</p>
         </div>
         <div class="tutorial-shell">
-          <aside class="tutorial-rail" aria-label="Tutorial lessons" id="tutorialLessonList"></aside>
+          <aside class="tutorial-rail" aria-label="Guided lesson library">
+            <details class="tutorial-library" id="tutorialLibrary" open>
+              <summary>Choose a lesson <span>68 board exercises</span></summary>
+              <div class="tutorial-library-content">
+            <label class="tutorial-filter-label" for="tutorialTopicFilter">Topic</label>
+            <select id="tutorialTopicFilter" aria-label="Filter guided lessons by topic">
+              <option value="all">All topics (68)</option>
+            </select>
+            <div class="tutorial-lesson-list" id="tutorialLessonList" role="group" aria-label="Guided lessons"></div>
+              </div>
+            </details>
+          </aside>
           <div class="tutorial-stage">
             <div class="tutorial-progress" aria-live="polite">
-              <span id="tutorialProgressText">0/0 lessons complete</span>
+              <span id="tutorialProgressText">0/68 complete · All topics</span>
               <span class="tutorial-progress-bar" aria-hidden="true"><span id="tutorialProgressFill"></span></span>
             </div>
             <div class="tutorial-info">
@@ -265,12 +300,17 @@
             </div>
             <div class="tutorial-actions">
               <button class="button secondary" type="button" id="tutorialHint">Hint</button>
-              <button class="button secondary" type="button" id="tutorialCoordinates" aria-pressed="true">Coords On</button>
-              <button class="button secondary" type="button" id="tutorialFlip" aria-pressed="false">View: White</button>
-              <button class="button secondary" type="button" id="tutorialVoice" aria-pressed="false">Voice Off</button>
               <button class="button secondary" type="button" id="tutorialReplay">Replay lesson</button>
               <button class="button" type="button" id="tutorialNext">Next lesson</button>
             </div>
+            <details class="tutorial-settings">
+              <summary>Board settings</summary>
+              <div class="tutorial-settings-actions">
+                <button class="button secondary" type="button" id="tutorialCoordinates" aria-pressed="true">Coords On</button>
+                <button class="button secondary" type="button" id="tutorialFlip" aria-pressed="false">View: White</button>
+                <button class="button secondary" type="button" id="tutorialVoice" aria-pressed="false">Voice Off</button>
+              </div>
+            </details>
             <div class="tutorial-quiz" id="tutorialQuiz" aria-label="Mini quiz"></div>
           </div>
           <aside class="tutorial-coach" aria-live="polite">
@@ -326,7 +366,7 @@
       </div>
     </section>
 
-    <section id="login" class="section-dark login-section" aria-labelledby="login-title">
+    <section id="login" class="section-dark login-section" aria-labelledby="login-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -336,30 +376,6 @@
           <p class="section-intro">Keep a local Player Pass, or create a secure account when you’re ready.</p>
         </div>
         <div class="login-shell">
-          <div class="login-card">
-            <p class="eyebrow">Your chess home</p>
-            <h3>Your board <span>remembers.</span></h3>
-            <p>Set a name, choose a goal, and let your next move do the talking.</p>
-            <div class="login-perks" aria-label="Profile perks">
-              <span><strong>Progress</strong><small>Lessons, puzzles, and games move you forward.</small></span>
-              <span><strong>Rhythm</strong><small>Short sessions are easier to keep.</small></span>
-              <span><strong>Direction</strong><small>One useful idea at a time.</small></span>
-            </div>
-            <ul class="login-quest-list" aria-label="Player pass benefits">
-              <li><b>1</b><span>Pick up where you left off.</span></li>
-              <li><b>2</b><span>Earn avatars, themes, and badges.</span></li>
-              <li><b>3</b><span>Turn mistakes into the next puzzle.</span></li>
-            </ul>
-            <div class="login-progress-preview" aria-label="Sample player progress">
-              <span>Next move: +20 XP</span>
-              <div aria-hidden="true"><i></i></div>
-              <p>Save. Solve. Play. Come back stronger.</p>
-            </div>
-            <div class="login-card-actions">
-              <a class="button" href="#plan">See your plan</a>
-              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Try a puzzle</a>
-            </div>
-          </div>
           <div class="login-pass">
             <div class="login-pass-hero">
               <div class="login-avatar" id="loginAvatar" aria-hidden="true">&#10022;</div>
@@ -378,9 +394,9 @@
                   <div class="player-profile-title">
                     <span class="player-profile-kicker">Rookie avatar</span>
                     <strong class="player-profile-name" data-profile-field="name">Guest Explorer</strong>
-                    <span class="player-profile-level" data-profile-field="level">Level 1 Explorer</span>
+                    <span class="player-profile-level" data-profile-field="level">—</span>
                   </div>
-                  <span class="profile-presence" title="Your player profile is ready"><i aria-hidden="true"></i>Ready</span>
+                  <span class="profile-presence"><i aria-hidden="true"></i>Profile</span>
                 </div>
                 <div class="profile-overview-actions">
                   <button class="player-profile-save" type="button" data-player-profile-save>
@@ -409,59 +425,59 @@
               </details>
 
               <details class="profile-performance profile-detail-section">
-                <summary class="profile-detail-summary"><span>Ratings</span><span data-profile-achievement-summary>0/18 unlocked</span></summary>
+                <summary class="profile-detail-summary"><span>Ratings & practice</span><span>Account + device</span></summary>
                 <div class="profile-detail-body">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Performance</span>
-                    <h4 id="profilePerformanceTitle">Ratings</h4>
+                    <span class="profile-section-kicker">Account rating · device practice</span>
+                    <h4 id="profilePerformanceTitle">Ratings & practice</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-achievement-summary>0/18 unlocked</span>
+                  <span class="profile-section-status">Ratings are account-backed when available</span>
                 </div>
                 <div class="profile-rating-grid">
                   <article class="profile-rating-card">
-                    <span>Game rating</span>
-                    <strong data-profile-field="gameRating">450 Elo</strong>
-                    <small><span data-profile-field="gamesPlayed">0 games</span><span aria-hidden="true">&middot;</span><span data-profile-field="winRate">0% wins</span></small>
+                    <span>Game rating · account</span>
+                    <strong data-profile-field="gameRating">—</strong>
+                    <small><span data-profile-field="gamesPlayed">— games</span><span aria-hidden="true">&middot;</span><span data-profile-field="winRate">—</span></small>
                   </article>
                   <article class="profile-rating-card">
-                    <span>Puzzle rating</span>
-                    <strong data-profile-field="puzzleRating">400</strong>
-                    <small data-profile-field="puzzleAccuracy">Solve a puzzle to begin</small>
+                    <span>Puzzle practice estimate · this device</span>
+                    <strong data-profile-field="puzzleRating">—</strong>
+                    <small data-profile-field="puzzleAccuracy">No local attempts</small>
                   </article>
                 </div>
                 <details class="profile-optional-detail">
-                  <summary>Rating history <small data-profile-history-status>First puzzle starts your trend</small></summary>
+                  <summary>Practice estimate history <small data-profile-history-status>No local puzzle practice yet</small></summary>
                   <div class="profile-rating-history">
                     <div class="profile-rating-history-head">
-                      <span>Puzzle rating trend</span>
-                      <small>Recent progress</small>
+                      <span>Local practice estimate trend</span>
+                      <small>Device-only · not Elo</small>
                     </div>
-                    <div class="profile-rating-chart" data-profile-rating-history role="img" aria-label="Puzzle rating history">
-                      <span class="profile-rating-empty">Current rating</span>
+                    <div class="profile-rating-chart" data-profile-rating-history role="img" aria-label="Device-local puzzle practice estimate history; not Elo">
+                      <span class="profile-rating-empty">Solve a puzzle to start a local trend.</span>
                     </div>
                   </div>
                 </details>
                 </div>
               </details>
 
-              <section class="profile-stat-section" aria-label="Profile stats">
+              <section class="profile-stat-section" aria-label="Player progress and account facts">
                 <div class="profile-stat-heading">
-                  <span>Player stats</span>
-                  <small>Overview</small>
+                  <span>Progress &amp; account facts</span>
+                  <small>Local streak · account XP and coins when available</small>
                 </div>
                 <div class="player-profile-stats">
                   <div class="player-profile-stat">
-                    <strong data-profile-field="streak">0</strong>
-                    <span>Day streak</span>
+                    <strong data-profile-field="streak">—</strong>
+                    <span>Day streak · device</span>
                   </div>
                   <div class="player-profile-stat">
-                    <strong data-profile-field="xp">0</strong>
-                    <span>Total XP</span>
+                    <strong data-profile-field="xp">—</strong>
+                    <span>Account XP</span>
                   </div>
                   <div class="player-profile-stat">
-                    <strong data-profile-field="tokens">0</strong>
-                    <span>Coins</span>
+                    <strong data-profile-field="tokens">—</strong>
+                    <span>Account coins</span>
                   </div>
                 </div>
               </section>
@@ -470,13 +486,13 @@
                 <div class="profile-section-heading">
                   <div>
                     <span class="profile-section-kicker">Progress</span>
-                    <h4 id="profileProgressTitle" class="player-profile-rank" data-profile-field="rank">Rank: Explorer</h4>
+                    <h4 id="profileProgressTitle" class="player-profile-rank" data-profile-field="rank">Guest profile</h4>
                   </div>
-                  <span data-profile-field="progress">0%</span>
+                  <span data-profile-field="progress">—</span>
                 </div>
                 <div class="player-profile-progress-labels">
                   <span>Level progress</span>
-                  <span data-profile-field="next">Next Level: 80 XP</span>
+                  <span data-profile-field="next">Sign in to track progress</span>
                 </div>
                 <div class="player-profile-progress" aria-hidden="true">
                   <span data-profile-progress-fill></span>
@@ -517,16 +533,16 @@
               </details>
 
               <details class="profile-achievement-section profile-detail-section">
-                <summary class="profile-detail-summary"><span>Achievements</span><span data-profile-achievement-summary>0/18 unlocked</span></summary>
+                <summary class="profile-detail-summary"><span>Activity milestones</span><span data-profile-achievement-summary>— on this device</span></summary>
                 <div class="profile-detail-body">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Milestones</span>
-                    <h4 id="profileAchievementsTitle">Achievements</h4>
+                    <span class="profile-section-kicker">On this device · no server rewards</span>
+                    <h4 id="profileAchievementsTitle">Activity milestones</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-achievement-summary>0/18 unlocked</span>
+                  <span class="profile-section-status" data-profile-achievement-summary>— on this device</span>
                 </div>
-                <div class="player-profile-achievements" data-profile-achievements aria-label="Achievements"></div>
+                <div class="player-profile-achievements" data-profile-achievements aria-label="On-device activity milestones"></div>
                 </div>
               </details>
 
@@ -538,16 +554,16 @@
                     <span class="profile-section-kicker">Player card</span>
                     <h4 id="profileCommandTitle">Stats</h4>
                   </div>
-                  <span class="profile-section-status">Live</span>
+                  <span class="profile-section-status">Account facts + local activity</span>
                 </div>
                 <div class="profile-command-grid">
                   <article class="profile-command-card">
-                    <span class="profile-command-label">Match record</span>
-                    <div class="profile-record-grid" data-profile-record aria-label="Win loss draw record"></div>
+                    <span class="profile-command-label">Account match record</span>
+                    <div class="profile-record-grid" data-profile-record aria-label="Account-backed win loss draw totals"></div>
                   </article>
                   <article class="profile-command-card">
-                    <span class="profile-command-label">Puzzle practice</span>
-                    <div class="profile-mini-stats" data-profile-puzzle-stats aria-label="Puzzle statistics"></div>
+                    <span class="profile-command-label">Puzzle practice · this device</span>
+                    <div class="profile-mini-stats" data-profile-puzzle-stats aria-label="Device-local puzzle practice statistics"></div>
                   </article>
                 </div>
               </div>
@@ -561,7 +577,7 @@
                 </div>
                 <div class="profile-favorites-grid">
                   <article class="profile-favorite-card">
-                    <span class="profile-command-label">Openings</span>
+                    <span class="profile-command-label">Saved review openings · this device</span>
                     <div data-profile-openings></div>
                   </article>
                   <article class="profile-favorite-card">
@@ -585,10 +601,10 @@
               <div class="profile-history-section" aria-labelledby="profileHistoryTitle">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Recent play</span>
-                    <h4 id="profileHistoryTitle">Match history</h4>
+                    <span class="profile-section-kicker">Local review notes</span>
+                    <h4 id="profileHistoryTitle">Saved review history</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-history-count>No completed games</span>
+                  <span class="profile-section-status" data-profile-history-count>—</span>
                 </div>
                 <div class="profile-match-history" data-profile-match-history aria-label="Recent match history"></div>
               </div>
@@ -596,40 +612,41 @@
               <div class="profile-season-section" aria-labelledby="profileSeasonTitle">
                 <div class="profile-section-heading">
                   <div>
-                    <span class="profile-section-kicker">Season</span>
-                    <h4 id="profileSeasonTitle">Progress</h4>
+                    <span class="profile-section-kicker">Guidance · this device</span>
+                    <h4 id="profileSeasonTitle">XP milestone</h4>
                   </div>
-                  <span class="profile-section-status" data-profile-season-label>Current season</span>
+                  <span class="profile-section-status" data-profile-season-label>Not available</span>
                 </div>
                 <div class="profile-season-card">
                   <div class="profile-season-row">
-                    <span>Season XP</span>
-                    <strong data-profile-season-xp>0 / 1,000 XP</strong>
+                    <span>Profile XP milestone</span>
+                    <strong data-profile-season-xp>— / 1,000 XP</strong>
                   </div>
                   <div class="profile-season-progress" aria-hidden="true"><span data-profile-season-fill></span></div>
-                  <p data-profile-season-note>Keep playing, solving, and learning to advance your season track.</p>
+                  <p data-profile-season-note>This is a device-visible guidance target, not a timed season or server achievement.</p>
                 </div>
               </div>
               </details>
             </aside>
             <details class="account-vault" aria-labelledby="accountVaultTitle">
               <summary id="accountVaultTitle">Account details <span>View</span></summary>
-              <p class="auth-note">Your saved profile details and preferences, ready to sync when you use a secure account.</p>
+              <p class="auth-note" data-account-vault-description>Local preferences stay in this browser. Account-backed ratings, XP, wallet, and game totals appear after sign-in.</p>
+              <p class="auth-note" data-account-source-note>Guest activity is not presented as account progress. Sign in to load profile-backed ratings, XP, wallet, and game totals.</p>
               <div class="account-vault-grid">
                 <span><strong data-account-field="username">Guest Explorer</strong>Username</span>
                 <span><strong data-account-field="avatar">Pawn Rookie</strong>Avatar</span>
-                <span><strong data-account-field="level">Level 1 Explorer</strong>Level</span>
-                <span><strong data-account-field="title">Explorer</strong>Title</span>
-                <span><strong data-account-field="xp">0 XP</strong>Total XP</span>
-                <span><strong data-account-field="streak">0 days</strong>Current streak</span>
-                <span><strong data-account-field="puzzleRating">400</strong>Puzzle rating</span>
-                <span><strong data-account-field="gameRating">400</strong>Game rating</span>
-                <span><strong data-account-field="achievements">0/18</strong>Achievements</span>
-                <span><strong data-account-field="story">0/8</strong>Story progress</span>
-                <span><strong data-account-field="settings">Dark / Wood</strong>Settings</span>
-                <span><strong data-account-field="stats">0 games</strong>Statistics</span>
-                <span><strong data-account-field="joinDate">Today</strong>Join date</span>
-                <span><strong data-account-field="lastLogin">Today</strong>Last login</span>
+                <span><strong data-account-field="level">—</strong>Level · this device</span>
+                <span><strong data-account-field="title">—</strong>Title · this device</span>
+                <span><strong data-account-field="xp">—</strong>XP · this device</span>
+                <span><strong data-account-field="streak">—</strong>Streak · this device</span>
+                <span><strong data-account-field="puzzleRating">—</strong>Practice estimate · this device, not Elo</span>
+                <span><strong data-account-field="gameRating">—</strong>Game rating · account</span>
+                <span><strong data-account-field="achievements">—</strong>Milestones · this device</span>
+                <span><strong data-account-field="story">—</strong>Story progress · this device</span>
+                <span><strong data-account-field="settings">Dark / Wood</strong>Settings · this device</span>
+                <span><strong data-account-field="stats">—</strong>Account games · local puzzles</span>
+                <span><strong data-account-field="joinDate">—</strong>Join date</span>
+                <span><strong data-account-field="lastLogin">—</strong>Last login</span>
               </div>
             </details>
             <form class="login-form" id="loginForm">
@@ -737,11 +754,38 @@
               </div>
             </div>
           </div>
+          <div class="login-card">
+            <p class="eyebrow">Your chess home</p>
+            <h3>Your board <span>remembers.</span></h3>
+            <p>Set a name, choose a goal, and let your next move do the talking.</p>
+            <details class="login-practice-guide">
+              <summary>Build a practice routine</summary>
+            <div class="login-perks" aria-label="Profile perks">
+              <span><strong>Progress</strong><small>Lessons, puzzles, and games move you forward.</small></span>
+              <span><strong>Rhythm</strong><small>Short sessions are easier to keep.</small></span>
+              <span><strong>Direction</strong><small>One useful idea at a time.</small></span>
+            </div>
+            <ul class="login-quest-list" aria-label="Player pass benefits">
+              <li><b>1</b><span>Pick up where you left off.</span></li>
+              <li><b>2</b><span>Earn avatars, themes, and badges.</span></li>
+              <li><b>3</b><span>Turn mistakes into the next puzzle.</span></li>
+            </ul>
+            <div class="login-progress-preview" aria-label="Sample player progress">
+              <span>One useful idea each session</span>
+              <div aria-hidden="true"><i></i></div>
+              <p>Save. Solve. Play. Come back stronger.</p>
+            </div>
+            </details>
+            <div class="login-card-actions">
+              <a class="button" href="#plan">See your plan</a>
+              <a class="button secondary" href="#puzzles" data-home-action="puzzle-plan" data-home-plan="adaptive">Try a puzzle</a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section id="settings" class="section-dark" aria-labelledby="settings-title">
+    <section id="settings" class="section-dark" aria-labelledby="settings-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -750,17 +794,23 @@
           </div>
           <p class="section-intro">Tune sound, profile, gameplay, appearance, privacy, and notifications in one clean place. Changes save automatically.</p>
         </div>
+        <div class="settings-card pwa-install-card" aria-labelledby="pwaInstallTitle">
+          <h3 id="pwaInstallTitle">Nschess on your device</h3>
+          <button class="button secondary" id="pwaInstall" type="button" aria-describedby="pwaInstallStatus" style="min-height:44px">Install Nschess</button>
+          <p id="pwaInstallStatus" role="status" aria-live="polite">Install from your browser for an app-style window. No app store required.</p>
+          <details class="pwa-offline-details"><summary>What works offline?</summary><p>Previously opened local chess practice, lessons and Daily Puzzle assets. Sign-in, friends, multiplayer, purchases and cloud data require internet. Optional engines and content must finish loading online first.</p></details>
+        </div>
         <div class="settings-shell" id="settingsShell">
-          <nav class="settings-sidebar" aria-label="Settings sections">
-            <button class="settings-tab" type="button" data-settings-tab="audio" aria-selected="true">Audio</button>
-            <button class="settings-tab" type="button" data-settings-tab="profile" aria-selected="false">Profile</button>
-            <button class="settings-tab" type="button" data-settings-tab="gameplay" aria-selected="false">Gameplay</button>
-            <button class="settings-tab" type="button" data-settings-tab="appearance" aria-selected="false">Appearance</button>
-            <button class="settings-tab" type="button" data-settings-tab="privacy" aria-selected="false">Privacy</button>
-            <button class="settings-tab" type="button" data-settings-tab="notifications" aria-selected="false">Notifications</button>
+          <nav class="settings-sidebar" id="settingsTablist" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+            <button class="settings-tab" id="settingsTabAudio" type="button" role="tab" aria-controls="settingsPageAudio" tabindex="0" data-settings-tab="audio" aria-selected="true">Audio</button>
+            <button class="settings-tab" id="settingsTabProfile" type="button" role="tab" aria-controls="settingsPageProfile" tabindex="-1" data-settings-tab="profile" aria-selected="false">Profile</button>
+            <button class="settings-tab" id="settingsTabGameplay" type="button" role="tab" aria-controls="settingsPageGameplay" tabindex="-1" data-settings-tab="gameplay" aria-selected="false">Gameplay</button>
+            <button class="settings-tab" id="settingsTabAppearance" type="button" role="tab" aria-controls="settingsPageAppearance" tabindex="-1" data-settings-tab="appearance" aria-selected="false">Appearance</button>
+            <button class="settings-tab" id="settingsTabPrivacy" type="button" role="tab" aria-controls="settingsPagePrivacy" tabindex="-1" data-settings-tab="privacy" aria-selected="false">Privacy</button>
+            <button class="settings-tab" id="settingsTabNotifications" type="button" role="tab" aria-controls="settingsPageNotifications" tabindex="-1" data-settings-tab="notifications" aria-selected="false">Notifications</button>
           </nav>
           <div class="settings-content">
-            <article class="settings-page is-active" data-settings-page="audio">
+            <article class="settings-page is-active" id="settingsPageAudio" role="tabpanel" aria-labelledby="settingsTabAudio" tabindex="0" data-settings-page="audio">
               <div class="settings-page-head">
                 <div><h3>Audio</h3><p>Fine-tune ambient, game, UI, puzzle, coach, and notification mixes.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -814,7 +864,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="profile">
+            <article class="settings-page" id="settingsPageProfile" role="tabpanel" aria-labelledby="settingsTabProfile" tabindex="0" data-settings-page="profile" hidden>
               <div class="settings-page-head">
                 <div><h3>Profile</h3><p>Customize how your player card, name, and account details appear.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -848,7 +898,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="gameplay">
+            <article class="settings-page" id="settingsPageGameplay" role="tabpanel" aria-labelledby="settingsTabGameplay" tabindex="0" data-settings-page="gameplay" hidden>
               <div class="settings-page-head">
                 <div><h3>Gameplay</h3><p>Keep the board readable, responsive, and beginner-friendly.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -872,7 +922,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="appearance">
+            <article class="settings-page" id="settingsPageAppearance" role="tabpanel" aria-labelledby="settingsTabAppearance" tabindex="0" data-settings-page="appearance" hidden>
               <div class="settings-page-head">
                 <div><h3>Appearance</h3><p>Make the whole site feel like your own training room.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -894,7 +944,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="privacy">
+            <article class="settings-page" id="settingsPagePrivacy" role="tabpanel" aria-labelledby="settingsTabPrivacy" tabindex="0" data-settings-page="privacy" hidden>
               <div class="settings-page-head">
                 <div><h3>Privacy</h3><p>Control what other players could see when community features are added.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -924,7 +974,7 @@
               </div>
             </article>
 
-            <article class="settings-page" data-settings-page="notifications">
+            <article class="settings-page" id="settingsPageNotifications" role="tabpanel" aria-labelledby="settingsTabNotifications" tabindex="0" data-settings-page="notifications" hidden>
               <div class="settings-page-head">
                 <div><h3>Notifications</h3><p>Choose reminders that help without pressure.</p></div>
                 <span class="settings-status" data-settings-status>Saved</span>
@@ -948,7 +998,7 @@
       </div>
     </section>
 
-    <section id="admin" class="section-dark" aria-labelledby="admin-title" data-admin-panel>
+    <section id="admin" class="section-dark" aria-labelledby="admin-title" data-admin-panel data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -1061,7 +1111,7 @@
       </div>
     </section>
 
-    <section id="store" class="section-dark store-page" aria-labelledby="store-title">
+    <section id="store" class="section-dark store-page" aria-labelledby="store-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -1075,7 +1125,7 @@
             <div class="store-wallet-copy">
               <p class="store-wallet-kicker">Currency</p>
               <h3>Coins</h3>
-              <p>Earn coins in play. Unlock your look.</p>
+              <p>Account balance. Choose your look.</p>
               <p class="store-status" id="storeStatus">Choose a reward.</p>
               <div class="store-wallet-actions">
                 <button class="button secondary store-sync-retry" type="button" id="storeSyncRetry" hidden>Retry Store sync</button>
@@ -1289,7 +1339,7 @@
             <p class="section-kicker">Learning paths</p>
             <h2 id="paths-title">Complete beginner missions</h2>
           </div>
-          <p class="section-intro">No ratings, no heavy analysis. Finish one tiny mission, celebrate it, and remember: you're getting better every day.</p>
+          <p class="section-intro">Beginner missions link to existing puzzle practice. Intermediate, Advanced, and Master are topic roadmaps—not interactive courses yet. For board-based lessons with legal-move feedback, open <a href="#tutorial">Guided Lessons</a>.</p>
         </div>
 
         <aside class="gentle-start" id="gentleStart" aria-labelledby="gentleStartTitle">
@@ -1540,6 +1590,27 @@
           <p class="section-intro">Every piece becomes a character in Chess Kingdom, and every rule becomes a mission the player can picture before they move.</p>
         </div>
 
+        <div class="adventure-play" aria-labelledby="adventurePlayTitle">
+          <div class="adventure-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="adventure" aria-label="Playable adventure board">
+            <div class="adventure-board" id="adventureBoard" data-interactive-board></div>
+          </div>
+          <div class="adventure-panel">
+            <div class="mission-selector" id="adventureMissionList" aria-label="Adventure mission list"></div>
+            <div class="puzzle-meta">
+              <span class="badge" id="adventureRole">Knight mission</span>
+              <span class="badge" id="adventureMove">White to move</span>
+            </div>
+            <h3 id="adventurePlayTitle">Adventure mission</h3>
+            <p id="adventureTask">Choose a mission to begin.</p>
+            <p class="puzzle-hint" id="adventureTip">Select the glowing character, then click the target square.</p>
+            <p class="feedback" id="adventureFeedback">Start with the knight mission.</p>
+            <div class="puzzle-actions">
+              <button class="button" type="button" id="nextAdventure">Next Mission</button>
+              <button class="button secondary" type="button" id="restartAdventure">Restart Mission</button>
+            </div>
+          </div>
+        </div>
+
         <div class="story-mode-card" aria-labelledby="storyModeTitle">
           <div>
             <p class="section-kicker">Story mode</p>
@@ -1669,26 +1740,6 @@
           </article>
         </div>
 
-        <div class="adventure-play" aria-labelledby="adventurePlayTitle">
-            <div class="adventure-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="adventure" aria-label="Playable adventure board">
-            <div class="adventure-board" id="adventureBoard" data-interactive-board></div>
-          </div>
-          <div class="adventure-panel">
-            <div class="mission-selector" id="adventureMissionList" aria-label="Adventure mission list"></div>
-            <div class="puzzle-meta">
-              <span class="badge" id="adventureRole">Knight mission</span>
-              <span class="badge" id="adventureMove">White to move</span>
-            </div>
-            <h3 id="adventurePlayTitle">Adventure mission</h3>
-            <p id="adventureTask">Choose a mission to begin.</p>
-            <p class="puzzle-hint" id="adventureTip">Select the glowing character, then click the target square.</p>
-            <p class="feedback" id="adventureFeedback">Start with the knight mission.</p>
-            <div class="puzzle-actions">
-              <button class="button" type="button" id="nextAdventure">Next Mission</button>
-              <button class="button secondary" type="button" id="restartAdventure">Restart Mission</button>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -2802,8 +2853,8 @@
           <div class="ai-featured-coach-copy">
             <p class="ai-featured-coach-kicker">Featured coach</p>
             <h3>KingNorbert <span aria-hidden="true">♛</span></h3>
-            <p>Calm pressure, clear plans, and practical calculation for your next serious game.</p>
-            <div class="ai-featured-coach-meta"><strong>2000 Elo</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Balanced</span><span>Tactical</span></div>
+            <p>A strong local Stockfish preset for practical calculation. Bot strength is not tournament-calibrated.</p>
+            <div class="ai-featured-coach-meta"><strong>Stockfish challenge</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Balanced</span><span>Tactical</span></div>
           </div>
           <button class="button" type="button" id="aiFeaturedCoachPlay">Play KingNorbert</button>
         </article>
@@ -2811,7 +2862,7 @@
           <div class="ai-bot-controls" role="search">
             <div class="ai-bot-search-field"><label for="aiBotSearch">Search roster</label><span class="ai-bot-search-input"><input id="aiBotSearch" type="search" placeholder="Name, style, or opening" autocomplete="off" aria-describedby="aiBotResults" /><button class="ai-bot-clear" id="aiBotClear" type="button" aria-label="Clear bot search" hidden>&times;</button></span></div>
             <label><span>Level</span><select id="aiBotFilter"><option value="All">All levels</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option><option value="Master">Master</option></select></label>
-            <label><span>Sort</span><select id="aiBotSort"><option value="rating-asc">Rating: low to high</option><option value="rating-desc">Rating: high to low</option><option value="name">Name: A to Z</option></select></label>
+            <label><span>Sort</span><select id="aiBotSort"><option value="difficulty-asc">Difficulty: low to high</option><option value="difficulty-desc">Difficulty: high to low</option><option value="name">Name: A to Z</option></select></label>
           </div>
           <div class="ai-bot-browser-meta"><p id="aiBotResults" role="status" aria-live="polite"></p><button class="ai-bot-reset" id="aiBotReset" type="button" hidden>Reset filters</button></div>
           <div class="ai-bot-roster" id="aiBotRoster" aria-live="polite"></div>
@@ -2819,7 +2870,7 @@
       </div>
     </section>
 
-    <section id="friends" class="section-dark friends-hub-page" aria-labelledby="friends-title">
+    <section id="friends" class="section-dark friends-hub-page" aria-labelledby="friends-title" data-nosnippet>
       <div class="wrap friends-hub">
         <header class="friends-hub-header">
           <div>
@@ -2828,7 +2879,7 @@
             <p>Find your people, see who is online, and start a private game without leaving your social space.</p>
           </div>
           <div class="friends-hub-header-actions">
-            <span class="friends-hub-live" id="friendsHubLiveStatus"><span class="friend-status-dot"></span> Live</span>
+            <span class="friends-hub-live" id="friendsHubLiveStatus" aria-label="Sign in for live presence"><span class="friend-status-dot is-offline"></span><span data-friends-live-label>Sign in for live presence</span></span>
             <a class="button" href="#play?mode=friend" data-site-tab="friendChallenge" data-site-panel="play" data-site-focus="friendChallenge">Open challenge board</a>
           </div>
         </header>
@@ -3188,12 +3239,12 @@
               </div>
             </article>
             <article class="review-accuracy-card">
-              <div class="review-score-ring" id="reviewPlayerScoreRing" aria-label="Your accuracy">
-                <strong id="reviewPlayerAccuracy">--</strong><small>Quick accuracy</small>
+              <div class="review-score-ring" id="reviewPlayerScoreRing" aria-label="Your average centipawn loss">
+                <strong id="reviewPlayerAccuracy">--</strong><small>Avg. CP loss</small>
               </div>
               <div class="review-accuracy-compare">
                 <span><small>You</small><strong id="reviewPlayerName">Player</strong></span>
-                <span><small>Opponent</small><strong id="reviewOpponentAccuracy">--</strong></span>
+                <span><small>Opponent · avg. CP loss</small><strong id="reviewOpponentAccuracy">--</strong></span>
               </div>
             </article>
             <article class="review-quality-card">
@@ -3221,9 +3272,9 @@
                 <button class="mission-button" type="button" data-coach-side="b" aria-pressed="false">Black</button>
               </div>
               <span class="play-setup-chip">Casual</span>
-              <span class="play-setup-chip">Stockfish WASM</span>
+              <span class="play-setup-chip" id="playEngineBadge">Choose a bot</span>
               <span class="badge" id="gameDifficultyBadge">No bot selected</span>
-              <span class="play-setup-chip" id="gameEloBadge">— Elo</span>
+              <span class="play-setup-chip" id="gameStrengthBadge">Choose a level</span>
               <span class="badge status-skeleton" id="gameStatusBadge" role="status" aria-live="polite" aria-atomic="true"><span class="sr-only">Loading chess rules.</span></span>
               <span class="badge" id="gameTurnBadge">Waiting to start</span>
               <span class="badge" id="gameBossBadge" hidden>Boss battle</span>
@@ -3236,11 +3287,18 @@
                   <button class="mission-button" type="button" data-game-difficulty="hard" aria-pressed="false">Hard</button>
                   <button class="mission-button" type="button" data-game-difficulty="expert" aria-pressed="false">Expert</button>
                   <button class="mission-button" type="button" data-game-difficulty="master" aria-pressed="false">Master</button>
-                  <button class="mission-button" type="button" data-game-difficulty="strong" aria-pressed="false">2000 Bot</button>
+                  <button class="mission-button" type="button" data-game-difficulty="strong" aria-pressed="false">Stockfish challenge</button>
                 </div>
               </details>
               </div>
             </details>
+            <div class="play-live-status" id="playLiveStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+              <span class="play-live-status-mark" aria-hidden="true"></span>
+              <span class="play-live-status-copy">
+                <strong id="playLiveStatusTitle">Your turn</strong>
+                <small id="playLiveStatusDetail">Choose a move to begin.</small>
+              </span>
+            </div>
             <aside class="ai-player-card player-frame player-frame--opponent cq-player-card" id="aiPlayerCard" data-ai-rarity="Common" aria-label="Opponent player frame">
               <div class="player-frame-topline">
                 <span class="player-frame-kicker">Opponent</span>
@@ -3258,7 +3316,7 @@
                 <dl class="player-frame-stats player-frame-stats--opponent" aria-label="Opponent details">
                   <div><dt>Engine</dt><dd data-ai-stat="engine">Stockfish 16</dd></div>
                   <div><dt>Difficulty</dt><dd data-ai-stat="difficulty">Easy engine</dd></div>
-                  <div><dt>Elo</dt><dd data-ai-stat="rating">1050 Elo</dd></div>
+                  <div><dt>Practice level</dt><dd data-ai-stat="rating">Choose a level</dd></div>
                   <div><dt>Style</dt><dd data-ai-stat="style">Balanced</dd></div>
                   <div><dt>Strength</dt><dd data-ai-stat="strength">Skill 3/20</dd></div>
                   <div><dt>Level</dt><dd data-ai-stat="level">Novice</dd></div>
@@ -3492,7 +3550,7 @@
                   <svg viewBox="0 0 240 70" role="img" aria-label="Evaluation trend"><path d="M1 47 L18 52 L34 44 L52 48 L69 37 L85 31 L102 35 L118 20 L136 28 L153 17 L170 25 L188 18 L206 30 L223 23 L239 28" fill="none" pathLength="1"/><path d="M1 47 L18 52 L34 44 L52 48 L69 37 L85 31 L102 35 L118 20 L136 28 L153 17 L170 25 L188 18 L206 30 L223 23 L239 28 L239 70 L1 70 Z" aria-hidden="true"/></svg>
                 </div>
                 <div class="engine-row">
-                  <span>Rating <strong id="engineRating">1100</strong></span>
+                  <span>Skill setting <strong id="engineRating">3</strong>/20</span>
                   <span>Depth <strong id="engineDepth">4</strong></span>
                   <span id="engineThinking">Engine idle</span>
                 </div>
@@ -3508,8 +3566,8 @@
               <div class="featured-coach-copy">
                 <span>Featured coach bot</span>
                 <h4>KingNorbert <span aria-hidden="true">♛</span></h4>
-                <div class="featured-coach-meta"><strong>2000 Elo</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Balanced · Tactical</span></div>
-                <p>Calm, analytical coaching for middlegame plans, endgames, and practical calculation.</p>
+                <div class="featured-coach-meta"><strong>Stockfish challenge</strong><span class="player-country-flag" data-country-code="PH">🇵🇭</span><span>Skill setting 20/20</span></div>
+                <p>Local Stockfish 16 Lite, configured for a longer search. Bot strength is not tournament-calibrated.</p>
               </div>
               <button class="button" type="button" id="playKingNorbert">Play Coach</button>
             </article>
@@ -3562,22 +3620,22 @@
                     <small id="reviewSummaryLine">Your clean replay and best lessons appear here after the game.</small>
                   </div>
                 </div>
-                <span class="badge" id="reviewAccuracyBadge">Quick score --</span>
+                <span class="badge" id="reviewAccuracyBadge">Engine checks --</span>
               </div>
-              <article class="review-performance-card" aria-label="Performance by game phase">
-                <div class="review-performance-ring" id="reviewPerformanceRing" aria-label="Overall performance score">
-                  <strong id="reviewPerformanceScore">--</strong><small>Performance</small>
+            <article class="review-performance-card" aria-label="Engine analysis coverage and centipawn loss">
+                <div class="review-performance-ring" id="reviewPerformanceRing" aria-label="Engine analysis coverage">
+                  <strong id="reviewPerformanceScore">--</strong><small>Engine checks</small>
                 </div>
                 <div class="review-performance-copy">
-                  <span>Performance score</span>
+                  <span>Engine evidence</span>
                   <strong id="reviewPerformanceLabel">Reviewing your game</strong>
-                  <small id="reviewPerformanceNote">Your phase scores appear after analysis.</small>
+                  <small id="reviewPerformanceNote">Only returned engine scores are shown.</small>
                 </div>
                 <div class="review-phase-grid">
-                  <span><small>Opening</small><strong id="reviewOpeningPhase">--</strong></span>
-                  <span><small>Middlegame</small><strong id="reviewMiddlegamePhase">--</strong></span>
-                  <span><small>Endgame</small><strong id="reviewEndgamePhase">--</strong></span>
-                  <span><small>Tactics</small><strong id="reviewTacticsPhase">--</strong></span>
+                  <span><small>Opening · avg CP loss</small><strong id="reviewOpeningPhase">--</strong></span>
+                  <span><small>Middlegame · avg CP loss</small><strong id="reviewMiddlegamePhase">--</strong></span>
+                  <span><small>Endgame · avg CP loss</small><strong id="reviewEndgamePhase">--</strong></span>
+                  <span><small>Tactical errors / checked</small><strong id="reviewTacticsPhase">--</strong></span>
                 </div>
               </article>
               <article class="review-focus-card" id="reviewFocusCard">
@@ -3799,7 +3857,7 @@
         </section>
     </div>
 
-    <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" hidden>
+    <div class="post-game-decision" id="postGameDecision" role="dialog" aria-modal="true" aria-labelledby="postGameDecisionTitle" aria-describedby="postGameDecisionSummary" hidden>
       <div class="post-game-decision-card">
         <div class="post-game-decision-result">
           <span class="post-game-decision-icon" id="postGameDecisionIcon" aria-hidden="true">&#127942;</span>
@@ -3810,7 +3868,7 @@
         </div>
         <dl class="post-game-decision-stats" aria-label="Game statistics">
           <div>
-            <dt>Accuracy</dt>
+            <dt>Engine checks</dt>
             <dd id="postGameDecisionAccuracy">Pending</dd>
           </div>
           <div>
@@ -3836,8 +3894,14 @@
       </div>
     </div>
 
-    <section class="section-dark game-review-page" id="gameReview" aria-label="Game Review">
+    <section class="section-dark game-review-page" id="gameReview" aria-label="Game Review" data-nosnippet>
       <div class="game-review-page-frame">
+        <article class="review-entry" aria-labelledby="reviewEntryTitle">
+          <p class="section-kicker">Understand your decisions</p>
+          <h2 id="reviewEntryTitle">Bring a game to Review</h2>
+          <p>Finish a game, then open Review from its result. Saved games on this device can also be reopened from Profile. Engine analysis is coaching, not a new result or reward.</p>
+          <div class="review-entry-actions"><a class="button" href="#bots">Play a practice game</a><a class="button secondary" href="#login">Open Profile</a></div>
+        </article>
         <section class="game-review-workspace" id="gameReviewWorkspace" aria-label="Game Review" hidden>
           <div class="game-review-shell">
             <div class="game-review-header-slot" id="reviewHeaderSlot"></div>
@@ -3978,8 +4042,8 @@
         <h2 id="matchHistoryTitle">Match History</h2>
         <p class="quick-match-status" id="matchHistorySummary" role="status" aria-live="polite">Loading saved games…</p>
         <section class="match-history-accuracy" id="matchHistoryAccuracy" aria-labelledby="matchHistoryAccuracyTitle" hidden>
-          <div><strong id="matchHistoryAccuracyTitle">Accuracy by side</strong><span id="matchHistoryAccuracyMeta"></span></div>
-          <svg class="match-history-chart" id="matchHistoryAccuracyChart" viewBox="0 0 320 96" role="img" aria-label="Accuracy trend by side"></svg>
+          <div><strong id="matchHistoryAccuracyTitle">Average CP loss by side</strong><span id="matchHistoryAccuracyMeta"></span></div>
+          <svg class="match-history-chart" id="matchHistoryAccuracyChart" viewBox="0 0 320 96" role="img" aria-label="Average centipawn loss trend by side; lower is better"></svg>
         </section>
         <div class="match-history-list" id="matchHistoryList"></div>
       </section>
@@ -4051,7 +4115,7 @@
       </section>
     </div>
 
-    <section id="leaderboards" class="section-dark" aria-labelledby="leaderboards-title">
+    <section id="leaderboards" class="section-dark" aria-labelledby="leaderboards-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
@@ -4076,7 +4140,7 @@
                 <strong data-profile-field="name">Guest Explorer</strong>
                 <small data-profile-field="title">Explorer</small>
               </span>
-              <span class="leaderboard-summary-rating"><strong data-profile-field="gameRating">450 Elo</strong><small>Game rating</small></span>
+              <span class="leaderboard-summary-rating"><strong data-profile-field="gameRating">—</strong><small>Account game rating</small></span>
             </article>
             <dl class="leaderboard-position-stats" aria-label="Your leaderboard positions">
               <div><dt data-leaderboard-puzzle-rank>--</dt><dd>Puzzle rank</dd></div>
@@ -4148,9 +4212,9 @@
         <div class="section-head">
           <div>
             <p class="section-kicker">Puzzle board</p>
-            <h2 id="puzzles-title">Puzzle Trainer</h2>
+            <h2 id="puzzles-title">Puzzles</h2>
           </div>
-          <p class="section-intro">Become a Chess Ninja: pick one 60-second trick, move the pieces, solve the mini puzzle, then jump to the next idea.</p>
+          <p class="section-intro">Choose a mode, find the forcing move, and learn from the line.</p>
         </div>
 
         <div class="puzzle-shell" hidden aria-hidden="true">
@@ -4169,7 +4233,7 @@
             <div class="puzzle-meta">
               <span class="badge" id="puzzleLevel">Beginner</span>
               <span class="badge" id="puzzleSide">White to move</span>
-              <span class="badge daily-puzzle-badge" id="dailyPuzzleBadge">Today</span>
+              <span class="badge daily-puzzle-badge" id="dailyPuzzleBadge">Puzzle practice</span>
             </div>
             <div class="puzzle-brief" aria-label="Puzzle details">
               <span class="pressure-rating"><strong id="puzzleRating">400</strong> Elo</span>
@@ -4266,7 +4330,7 @@
                   <div class="progress-track"><span class="progress-fill" id="learnerXpFill"></span></div>
                 </div>
                 <div class="rpg-level-path" id="rpgLevelPath" aria-label="RPG level ladder"></div>
-                <p class="habit-reward" id="dailyReward">Reward locked: finish today's puzzle.</p>
+                <p class="habit-reward" id="dailyReward">Daily Puzzle is unavailable until a rights-cleared production catalog is approved.</p>
                 <p class="simple-coach" id="simpleCoach">Take one calm move at a time. Learning counts more than winning.</p>
                 <div class="achievement-row" id="achievementBadges" aria-label="Achievement badges"></div>
                 <div class="weekly-chart" id="weeklyChart" aria-label="Weekly progress chart"></div>
@@ -4310,7 +4374,7 @@
                 <button class="button secondary" type="button" id="prevPuzzle">Previous</button>
                 <button class="button" type="button" id="nextPuzzle">Next Puzzle</button>
                 <button class="button secondary" type="button" id="randomPuzzle">Random</button>
-                <button class="button secondary" type="button" id="dailyPuzzle">Today&apos;s Puzzle</button>
+                <button class="button secondary" type="button" id="dailyPuzzle" disabled aria-disabled="true">Daily Puzzle unavailable</button>
               </div>
               <div class="puzzle-action-row">
                 <button class="button secondary" type="button" id="hintPuzzle">Hint</button>
@@ -4331,9 +4395,9 @@
         <article class="real-puzzles-panel" id="realPuzzles" aria-labelledby="realPuzzlesTitle">
           <div class="real-puzzles-head">
             <div>
-              <p class="section-kicker">Puzzle studio</p>
+              <p class="section-kicker">Puzzle practice</p>
               <h3 id="realPuzzlesTitle">Find the winning idea</h3>
-              <p>Play the line, learn one tactical pattern, and collect progress without the pressure.</p>
+              <p>Practice: Lichess CC0 · Daily: Nschess originals.</p>
             </div>
             <div class="real-puzzle-source" hidden aria-hidden="true">
               <p id="realPuzzleSource"></p>
@@ -4341,13 +4405,61 @@
             </div>
           </div>
 
+          <div class="real-puzzle-control daily-puzzle-mode-control">
+            <div class="real-puzzle-control-head"><span>Puzzle mode</span><small>Choose a way to practice</small></div>
+            <div class="real-puzzle-modes" role="group" aria-label="Puzzle mode">
+              <button class="mission-button" type="button" data-daily-puzzle-launch aria-pressed="false" aria-controls="dailyPuzzlePanel" disabled aria-disabled="true">Daily · local</button>
+              <button class="mission-button" type="button" data-real-mode="Trainer" aria-pressed="true">Trainer</button>
+              <button class="mission-button" type="button" data-real-mode="Rush" aria-pressed="false">Rush</button>
+              <button class="mission-button" type="button" data-real-mode="Streak" aria-pressed="false">Streak</button>
+              <button class="mission-button" type="button" data-real-mode="Battle" aria-pressed="false">Solo Battle</button>
+            </div>
+          </div>
+
+          <article class="daily-puzzle-panel" id="dailyPuzzlePanel" aria-labelledby="dailyPuzzleHeading" hidden>
+            <header class="daily-puzzle-header">
+              <div class="daily-puzzle-heading">
+                <p class="section-kicker">DAILY CHALLENGE · UTC</p>
+                <h3 id="dailyPuzzleHeading">Daily Puzzle</h3>
+                <p class="daily-puzzle-subtitle">Find the forcing move.</p>
+              </div>
+              <div class="daily-puzzle-summary" aria-label="Device-local puzzle progress">
+                <div><strong id="dailyPuzzleDate">UTC date</strong><span>Today</span></div>
+                <div><strong id="dailyPuzzleAttempts">0</strong><span>Attempts</span></div>
+                <div><strong id="dailyPuzzleStreak">0</strong><span>Local streak</span></div>
+                <div><strong id="dailyPuzzleNext">—</strong><span>Next puzzle</span></div>
+              </div>
+            </header>
+            <div class="daily-puzzle-play" id="dailyPuzzlePlay" hidden>
+              <div class="daily-puzzle-board-wrap real-puzzle-board-wrap">
+                <div class="puzzle-board daily-puzzle-board" id="dailyPuzzleBoard" role="group" aria-roledescription="chess board" aria-label="Daily puzzle board. Focus a square, use arrow keys to move, and press Enter or Space to select or move." data-interactive-board></div>
+              </div>
+              <div class="daily-puzzle-details">
+                <div class="puzzle-meta">
+                  <span class="badge" id="dailyPuzzleTheme">Tactic</span>
+                  <span class="badge" id="dailyPuzzleSide">White to move</span>
+                </div>
+                <h4 id="dailyPuzzleTitle">Today's position</h4>
+                <p id="dailyPuzzlePrompt">Find the forcing move.</p>
+                <p class="daily-puzzle-feedback" id="dailyPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose your move.</p>
+                <p class="daily-puzzle-hint" id="dailyPuzzleHint" hidden></p>
+                <div class="daily-puzzle-actions" aria-label="Daily puzzle actions">
+                  <button class="button secondary" type="button" id="dailyPuzzleHintButton">Hint</button>
+                  <button class="button secondary" type="button" id="dailyPuzzleRevealButton" hidden>Show solution</button>
+                  <button class="button" type="button" id="dailyPuzzleRestartButton" hidden>Practice again</button>
+                </div>
+                <p class="daily-puzzle-local-note" id="dailyPuzzleStorageStatus" aria-live="polite">Device-local practice · no account rewards</p>
+              </div>
+            </div>
+          </article>
+
           <div class="real-puzzle-shell">
             <div class="real-board-stack">
               <div class="puzzle-board-wrap real-puzzle-board-wrap interactive-board-fullscreen-host interactive-board-sizing-stage interactive-board-sizing-target" data-interactive-board-stage data-board-surface="real-puzzle" aria-label="Real chess puzzle board">
                 <div class="puzzle-board play-board" id="realPuzzleBoard" role="group" aria-roledescription="chess board" aria-label="Real puzzle board. Select a piece, then its highlighted destination." data-interactive-board></div>
               </div>
               <div class="real-board-quick-actions" aria-label="Quick puzzle actions">
-                <button class="button secondary" type="button" id="realPuzzleBoardRestart">Restart</button>
+                <button class="button secondary" type="button" id="realPuzzleBoardRestart">Restart position</button>
                 <button class="button" type="button" id="realPuzzleBoardNext">Next Puzzle</button>
               </div>
               <div class="real-puzzle-analysis-tools" aria-label="Puzzle analysis tools">
@@ -4356,21 +4468,23 @@
               </div>
             </div>
             <div class="real-puzzle-info">
+              <p class="real-puzzle-mode-description" id="realPuzzleModeDescription">Trainer · no time pressure. Study the full line; the solved explanation stays until you choose another position.</p>
               <div class="puzzle-meta">
                 <span class="badge" id="realPuzzleDifficulty">Easy</span>
                 <span class="badge" id="realPuzzleSide">White to move</span>
                 <span class="badge" id="realPuzzleTheme">Tactic</span>
-                <span class="badge" id="realPuzzleTimer">00:00</span>
+                <span class="badge" id="realPuzzleTimer" aria-live="off" aria-label="Time spent on this position">00:00</span>
               </div>
-              <div class="real-puzzle-control">
-                <div class="real-puzzle-control-head"><span>Practice mode</span><small>Pick the pace that feels good today</small></div>
-                <div class="real-puzzle-modes" role="group" aria-label="Puzzle mode">
-                  <button class="mission-button" type="button" data-real-mode="Daily" aria-pressed="false">Daily</button>
-                  <button class="mission-button" type="button" data-real-mode="Trainer" aria-pressed="true">Trainer</button>
-                  <button class="mission-button" type="button" data-real-mode="Rush" aria-pressed="false">Rush</button>
-                  <button class="mission-button" type="button" data-real-mode="Streak" aria-pressed="false">Streak</button>
-                  <button class="mission-button" type="button" data-real-mode="Battle" aria-pressed="false">Battle</button>
-                </div>
+              <h3 id="realPuzzleTitle">Puzzle ready</h3>
+              <p id="realPuzzlePrompt">Find the strongest move and follow the idea.</p>
+              <p class="real-puzzle-hint" id="realPuzzleHint">Hints appear here.</p>
+              <p class="real-puzzle-feedback" id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose a piece to start.</p>
+              <p class="real-puzzle-local-note">Practice rating and streak are saved on this device. Puzzle practice does not award account XP, coins, or Elo. Practice positions: Lichess CC0; Daily: Nschess originals.</p>
+              <div class="real-puzzle-moves" id="realPuzzleMoves" aria-label="Played solution line"></div>
+              <div class="real-puzzle-actions">
+                <button class="button secondary" type="button" id="realPuzzleHintButton">Hint</button>
+                <button class="button secondary" type="button" id="realPuzzleReplay">Replay line</button>
+                <button class="button secondary" type="button" id="realPuzzleFlip">Flip board</button>
               </div>
               <div class="real-puzzle-control">
                 <div class="real-puzzle-control-head"><span>Difficulty</span><small>Challenge yourself at your own speed</small></div>
@@ -4387,48 +4501,53 @@
                 <span>Choose a challenge</span>
                 <select class="real-puzzle-select" id="realPuzzleSelect"></select>
               </label>
-              <div class="real-puzzle-name-list" id="realPuzzleNameList" aria-label="All real puzzle names" hidden></div>
               <div class="real-puzzle-stats" aria-label="Real puzzle progress">
-                <div class="real-puzzle-card"><strong id="realPuzzleCounter">1 / 12</strong><span>Progress</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleAccuracy">100%</strong><span>Accuracy</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleCounter">1 / 12</strong><span>Position</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleAccuracy">—</strong><span>Accuracy</span></div>
                 <div class="real-puzzle-card"><strong id="realPuzzleStreak">0</strong><span>Streak</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleRating">600</strong><span>Puzzle rating</span></div>
-                <div class="real-puzzle-card"><strong id="realPuzzleCoins">0</strong><span>Rewards</span></div>
-                <div hidden><strong id="realPuzzleSolved">0</strong><strong id="realPuzzleBest">--</strong><strong id="realPuzzleRecommend">Mate</strong></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleRating">600</strong><span>Practice rating · local</span></div>
+                <div class="real-puzzle-card"><strong id="realPuzzleSolved">0/0</strong><span>Solved in set</span></div>
+                <div class="real-puzzle-card" hidden><strong id="realPuzzleRushScore">0</strong><span>Rush score</span></div>
               </div>
-              <h3 id="realPuzzleTitle">Puzzle ready</h3>
-              <p id="realPuzzlePrompt">Find the strongest move and follow the idea.</p>
-              <p class="real-puzzle-hint" id="realPuzzleHint">Hints appear here.</p>
-              <p class="real-puzzle-feedback" id="realPuzzleFeedback" role="status" aria-live="polite" aria-atomic="true">Choose a piece to start.</p>
-              <div class="real-puzzle-moves" id="realPuzzleMoves" aria-label="Played solution line"></div>
-              <div class="real-puzzle-actions">
-                <button class="button secondary" type="button" id="realPuzzlePrev">Previous</button>
-                <button class="button secondary" type="button" id="realPuzzleNext">Next</button>
-                <button class="button secondary" type="button" id="realPuzzleRandom">Random</button>
-                <button class="button secondary" type="button" id="realPuzzleRestart">Restart</button>
-                <button class="button secondary" type="button" id="realPuzzleHintButton">Hint</button>
-                <button class="button secondary" type="button" id="realPuzzleReplay">Replay</button>
-                <button class="button secondary" type="button" id="realPuzzleFlip">Flip</button>
-                <button class="button" type="button" id="realPuzzleNextUnsolved">Next Unsolved</button>
-              </div>
-              <div class="real-puzzle-achievements" id="realPuzzleAchievements" aria-label="Real puzzle achievements"></div>
+              <div class="real-puzzle-achievements" id="realPuzzleAchievements" aria-label="Device-local practice milestones"></div>
             </div>
           </div>
         </article>
       </div>
     </section>
 
-    <section id="plan" class="section-dark" aria-labelledby="plan-title">
+    <section id="plan" class="section-dark" aria-labelledby="plan-title" data-nosnippet>
       <div class="wrap">
         <div class="section-head">
           <div>
             <p class="section-kicker">Study rhythm</p>
-            <h2 id="plan-title">Fast progress roadmap</h2>
+            <h2 id="plan-title">Daily Practice</h2>
           </div>
-          <p class="section-intro">Pick the track that matches your level, train for a short focused block each day, then repeat the weekly rhythm until the goals feel easy.</p>
+          <p class="section-intro">A calm, flexible routine built from real practice—not page visits or promised rewards.</p>
         </div>
 
-        <div class="study-plan">
+        <section class="daily-practice-hub" id="dailyPracticeHub" aria-labelledby="dailyPracticeTitle">
+          <header class="daily-practice-head">
+            <div>
+              <p class="section-kicker">A little chess, often</p>
+              <h3 id="dailyPracticeTitle">Three useful steps for today</h3>
+              <p>Take them in any order. Finish what fits; skip anything that does not.</p>
+            </div>
+            <div class="daily-practice-count" aria-label="Today's local practice progress">
+              <strong id="dailyPracticeCount">0 / 3</strong>
+              <span id="dailyPracticeDate">UTC day</span>
+            </div>
+          </header>
+          <p class="daily-practice-status" id="dailyPracticeStatus" role="status" aria-live="polite" aria-atomic="true">Your practice marks are saved on this device only. No synced streak or account reward.</p>
+          <div class="daily-practice-tasks" id="dailyPracticeTasks" aria-label="Today's practice steps"></div>
+          <section class="daily-practice-reflection" id="dailyPracticeReflection" aria-label="Optional game review"></section>
+          <footer class="daily-practice-footer">
+            <p>Practice completion is device-local. Clearing this browser's data may remove these marks.</p>
+            <button class="button secondary" type="button" id="dailyPracticeReset">Reset today's marks</button>
+          </footer>
+        </section>
+
+        <template class="legacy-study-plan">
           <article class="plan-panel">
             <div class="plan-meta">
               <span class="badge">Beginner</span>
@@ -4611,7 +4730,7 @@
               <li><span>7</span><div><a href="#play">Play longer games with calm analysis.</a></div></li>
             </ul>
           </article>
-        </div>
+        </template>
       </div>
     </section>
   </main>
@@ -4695,7 +4814,10 @@
     </div>
   </aside>
 
+  <noscript><p class="wrap">Interactive chess boards require JavaScript. You can read our <a href="/learn/">chess lessons guide</a>, <a href="/chess-rules/">chess rules</a> and <a href="/puzzles/">puzzle practice guide</a> here.</p></noscript>
   <script defer src="assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces"></script>
-  <script defer src="assets/app.js?v=play-multiplayer-truth-v239"></script>
+  <script defer src="assets/app.js?v=daily-practice-v3"></script>
+  <script type="module" src="assets/daily-puzzle-launcher.mjs?v=daily-compact-v1"></script>
+  <script type="module" src="assets/pwa-install.mjs?v=pwa-v1"></script>
 </body>
 </html>

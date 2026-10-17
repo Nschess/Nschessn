@@ -8,13 +8,26 @@
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const path = require("node:path");
+const fs = require("node:fs");
 const { spawn } = require("node:child_process");
 const { chromium } = require("playwright");
+const { installOptionalCdnFixtures } = require("./e2e-runtime-fixtures.cjs");
 
 const root = path.resolve(__dirname, "..");
 const port = 4197;
 const baseUrl = `http://127.0.0.1:${port}`;
 const reviewFixtureUserId = "00000000-0000-4000-8000-000000000001";
+const reviewEngineMode = process.env.REVIEW_ENGINE === "available" ? "available" : "unavailable";
+
+// Native fullscreen can expose a never-settling promise in restricted
+// headless Chromium.  Do not return that promise through Playwright; the
+// following state assertion remains the source of truth for test success.
+async function requestExitFullscreen(page) {
+  await page.evaluate(() => {
+    if (!document.fullscreenElement || typeof document.exitFullscreen !== "function") return;
+    try { void document.exitFullscreen(); } catch {}
+  }).catch(() => {});
+}
 
 function installAuthenticatedReviewFixture(context) {
   return context.addInitScript({ content: `
@@ -85,6 +98,7 @@ async function openReview(page) {
   }, null, { timeout: 15000 });
   await page.locator("#resignGame").click();
   await page.locator("#resignConfirmButton").click();
+  const analysisStartedAt = Date.now();
   await page.locator("#postGameDecisionReview").click();
   await page.waitForFunction(() => {
     const review = document.getElementById("gameReview");
@@ -92,7 +106,59 @@ async function openReview(page) {
     return review?.classList.contains("is-review-page") && workspace && !workspace.hidden;
   }, null, { timeout: 30000 });
   await page.waitForFunction(() => document.querySelectorAll("#reviewBoardSlot [data-square]").length === 64, null, { timeout: 15000 });
+  await page.waitForFunction(() => {
+    const panel = document.getElementById("premiumReview");
+    return panel && !panel.classList.contains("review-state-loading") && !panel.hasAttribute("aria-busy");
+  }, null, { timeout: 20000 });
+  const fallback = await page.evaluate(() => ({
+    eval: document.getElementById("reviewEvalBadge")?.textContent || "",
+    accuracy: document.getElementById("reviewPlayerAccuracy")?.textContent || "",
+    coverage: document.getElementById("reviewAccuracyBadge")?.textContent || "",
+    confidence: document.getElementById("reviewEngineConfidence")?.textContent || "",
+    score: document.getElementById("reviewCenterEval")?.textContent || "",
+    playerScoreRing: {
+      meter: document.getElementById("reviewPlayerScoreRing")?.style.getPropertyValue("--review-score") || "",
+      label: document.getElementById("reviewPlayerScoreRing")?.getAttribute("aria-label") || ""
+    },
+    rail: {
+      hidden: document.getElementById("reviewEvalRail")?.hidden ?? true,
+      available: document.getElementById("reviewEvalRail")?.dataset.evaluationAvailable || "",
+      score: document.getElementById("reviewEvalScore")?.textContent || "",
+      label: document.getElementById("reviewEvalRail")?.getAttribute("aria-label") || ""
+    },
+    momentHeading: document.querySelector("#reviewOneMoment .review-one-moment-copy > span")?.textContent || "",
+    momentCopy: document.getElementById("reviewOneMomentCopy")?.textContent || "",
+    keyMoments: [...document.querySelectorAll("#reviewKeyMoments .review-key-content strong")].map((node) => node.textContent || "")
+  }));
+  assert.equal(fallback.playerScoreRing.meter.trim(), "0%",
+    `CP loss must not be visualized as a percentage score: ${JSON.stringify(fallback.playerScoreRing)}.`);
+  assert.match(fallback.playerScoreRing.label, /average centipawn loss/i);
+  if (reviewEngineMode === "available") {
+    assert.match(fallback.coverage, /Engine checks [1-9]\d*\//,
+      `Locally available Stockfish must produce at least one verified move: ${JSON.stringify(fallback)}.`);
+    assert.doesNotMatch(fallback.confidence, /no moves fully engine-verified/);
+  } else {
+    assert.match(fallback.eval, /Engine score unavailable|Mate score/);
+    assert.equal(fallback.accuracy, "—", `Unavailable engine must not show fabricated CP loss: ${JSON.stringify(fallback)}.`);
+    assert.match(fallback.coverage, /Engine checks 0\//);
+    assert.doesNotMatch(fallback.coverage, /%/);
+    assert.match(fallback.confidence, /no moves fully engine-verified/);
+    assert.doesNotMatch(fallback.score, /^[-+]?0\.00$/);
+    assert.equal(fallback.rail.hidden, false);
+    assert.equal(fallback.rail.available, "false");
+    assert.equal(fallback.rail.score, "—");
+    assert.match(fallback.rail.label, /no position balance is inferred/);
+    assert.match(fallback.momentHeading, /Practice candidate · not engine-rated/);
+    assert.match(fallback.momentCopy, /not an engine verdict/);
+    assert(!fallback.keyMoments.includes("Best"), `No-engine Review cannot identify a best move: ${JSON.stringify(fallback)}.`);
+  }
   await page.waitForTimeout(180);
+  const coverageMatch = fallback.coverage.match(/Engine checks (\d+)\/(\d+)/);
+  return {
+    reviewReadyMs: Date.now() - analysisStartedAt,
+    engineCheckedMoves: Number(coverageMatch?.[1] || 0),
+    totalMoves: Number(coverageMatch?.[2] || 0)
+  };
 }
 
 async function readReviewState(page) {
@@ -110,6 +176,10 @@ async function readReviewState(page) {
     };
     const board = document.querySelector("#reviewBoardSlot [data-interactive-board]");
     const stage = document.querySelector("#reviewBoardSlot [data-interactive-board-stage]");
+    const boardWrap = document.querySelector("#reviewBoardSlot > .play-board-wrap");
+    const slot = document.getElementById("reviewBoardSlot");
+    const analysis = document.querySelector(".game-review-command-center > .game-review-analysis-slot");
+    const rail = boardWrap?.querySelector(":scope > .review-eval-rail");
     const host = document.fullscreenElement;
     const current = document.querySelector(".game-review-current-column");
     const replay = document.querySelector("#reviewReplaySlot");
@@ -120,7 +190,16 @@ async function readReviewState(page) {
     return {
       viewport: [window.innerWidth, window.innerHeight],
       board: rect(board),
+      boardUnobscured: Boolean(board && [...board.querySelectorAll("[data-square]")].length === 64
+        && [...board.querySelectorAll("[data-square]")].every((square) => {
+          const box = square.getBoundingClientRect();
+          return square.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        })),
       stage: rect(stage),
+      boardWrap: rect(boardWrap),
+      slot: rect(slot),
+      analysis: rect(analysis),
+      rail: rect(rail),
       host: rect(host),
       current: rect(current),
       replay: rect(replay),
@@ -136,10 +215,21 @@ async function readReviewState(page) {
       pageScrollHeight: scrollingElement.scrollHeight,
       boardFullscreenSize: Number(stage?.dataset.boardFullscreenSize || 0),
       boardRequestedSize: Number(stage?.dataset.boardRequestedSize || 0),
-      controlsAccessible: Boolean(prev && next && !prev.disabled && !next.disabled),
+      controlsAccessible: Boolean(prev && next && (!prev.disabled || !next.disabled)),
+      previousDisabled: Boolean(prev?.disabled),
+      nextDisabled: Boolean(next?.disabled),
       fullscreenButton: rect(stage?.querySelector("[data-board-fullscreen-action]"))
     };
   });
+}
+
+async function waitForNormalReviewGeometry(page) {
+  await page.waitForFunction(() => {
+    const board = document.querySelector("#reviewBoardSlot [data-interactive-board]")?.getBoundingClientRect();
+    const stage = document.querySelector("#reviewBoardSlot [data-interactive-board-stage]")?.getBoundingClientRect();
+    return board && stage && board.width > 100 && Math.abs(board.width - board.height) < 1
+      && board.left >= stage.left && board.right <= stage.right + 1;
+  }, null, { timeout: 5000 });
 }
 
 function assertVisible(rect, label, viewport) {
@@ -170,8 +260,13 @@ async function assertReviewControlAccessible(page, selector, label, viewport) {
 }
 
 function requestedViewports() {
+  if (process.env.REVIEW_VIEWPORTS) return process.env.REVIEW_VIEWPORTS.split(",").map((raw) => {
+    const size = raw.split("x").map(Number);
+    if (size.length !== 2 || size.some((n) => !Number.isInteger(n) || n <= 0)) throw new Error(`Invalid REVIEW_VIEWPORTS: ${raw}`);
+    return size;
+  });
   const raw = String(process.env.REVIEW_VIEWPORT || "").trim();
-  if (!raw) return [[1920, 1080], [1440, 900], [1366, 768], [1024, 768], [768, 1024], [624, 844], [390, 844]];
+  if (!raw) return [[1920, 1080], [1440, 900], [1366, 768], [1024, 768], [768, 1024], [624, 844], [390, 844], [375, 812], [320, 740]];
   const [width, height] = raw.split("x").map(Number);
   if (!Number.isFinite(width) || !Number.isFinite(height)) throw new Error(`Invalid REVIEW_VIEWPORT: ${raw}`);
   return [[width, height]];
@@ -179,6 +274,8 @@ function requestedViewports() {
 
 async function runCase(browser, width, height) {
   const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
+  await context.route("https://**/*", (route) => route.abort());
+  await installOptionalCdnFixtures(context);
   await context.route("**/api/auth-config", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -188,11 +285,22 @@ async function runCase(browser, width, height) {
       authRedirectOrigins: [baseUrl]
     })
   }));
+  // Exercise unavailable-engine behavior deterministically by default. Set
+  // REVIEW_ENGINE=available to use the checked-in local Stockfish worker.
+  if (reviewEngineMode === "unavailable") {
+    await context.route("**/assets/stockfish/**", (route) => route.abort("blockedbyclient"));
+  }
   await installAuthenticatedReviewFixture(context);
   const page = await context.newPage();
   try {
-    await openReview(page);
+    const reviewEvidence = await openReview(page);
+    await waitForNormalReviewGeometry(page);
     const normal = await readReviewState(page);
+    if (process.env.REVIEW_SCREENSHOTS === "1") {
+      const directory = path.join(root, "e2e-artifacts", "phase10", "review");
+      fs.mkdirSync(directory, { recursive: true });
+      await page.screenshot({ path: path.join(directory, `normal-${width}.png`), animations: "disabled" });
+    }
     assert(normal.board && Math.abs(normal.board.width - normal.board.height) < 1,
       `${width}x${height}: normal Review board is not square: ${JSON.stringify(normal)}.`);
 
@@ -213,22 +321,36 @@ async function runCase(browser, width, height) {
     await page.waitForTimeout(250);
 
     const focused = await readReviewState(page);
+    if (process.env.REVIEW_SCREENSHOTS === "1") {
+      await page.screenshot({ path: path.join(root, "e2e-artifacts", "phase10", "review", `fullscreen-${width}.png`), animations: "disabled" });
+    }
     assert.equal(focused.fullscreenHost.includes("game-review-command-center"), true,
       `${width}x${height}: Review fullscreen did not promote the command center: ${JSON.stringify(focused)}.`);
     assert(focused.board && Math.abs(focused.board.width - focused.board.height) < 1,
       `${width}x${height}: fullscreen Review board is not square: ${JSON.stringify(focused)}.`);
-    assertVisible(focused.board, `${width}x${height} fullscreen board; stage=${JSON.stringify(focused.stage)}`, focused.viewport);
+    assertVisible(focused.board, `${width}x${height} fullscreen board; geometry=${JSON.stringify({ stage: focused.stage, boardWrap: focused.boardWrap, slot: focused.slot, analysis: focused.analysis, rail: focused.rail })}`, focused.viewport);
+    assert(focused.board.y >= focused.analysis.y - 1 && focused.board.bottom <= focused.analysis.bottom + 1,
+      `${width}x${height}: board is clipped by its analysis row: ${JSON.stringify(focused)}.`);
+    assert.equal(focused.boardUnobscured, true,
+      `${width}x${height}: all 64 square centers must be visible without scrolling another panel.`);
     assertVisible(focused.current, `${width}x${height} Review evaluation context`, focused.viewport);
     assertVisible(focused.replay, `${width}x${height} Review replay controls`, focused.viewport);
+    assert.equal(focused.controlsAccessible, true,
+      `${width}x${height}: no adjacent Review move is available: ${JSON.stringify(focused)}.`);
     // On compact touch viewports the replay dock is intentionally scrollable so
     // the full control set remains available without shrinking the board or
     // making the fullscreen document scroll. Prove the controls are reachable
     // through that dock rather than requiring every button to be visible at
     // once in the initial composition.
     await assertReviewControlAccessible(page, "#reviewPrev", `${width}x${height} Review previous control`, focused.viewport);
-    await assertReviewControlAccessible(page, "#reviewNext", `${width}x${height} Review next control`, focused.viewport);
     assert(focused.fullscreenButton && focused.fullscreenButton.width > 0,
       `${width}x${height}: Review fullscreen control disappeared in focus mode: ${JSON.stringify(focused)}.`);
+    assert(focused.fullscreenButton.width >= 44 && focused.fullscreenButton.height >= 44,
+      `${width}x${height}: exit focus must retain a 44px touch target: ${JSON.stringify(focused.fullscreenButton)}.`);
+    assertVisible(focused.fullscreenButton, `${width}x${height} exit focus control`, focused.viewport);
+    assert(focused.fullscreenButton.x >= focused.board.right || focused.fullscreenButton.y >= focused.board.bottom,
+      `${width}x${height}: exit focus must not cover playable squares.`);
+    assert.equal(await fullscreenButton.getAttribute("aria-label"), "Exit focus mode");
     assert.equal(focused.hostBoxSizing, "border-box",
       `${width}x${height}: Review fullscreen host must use border-box sizing: ${JSON.stringify(focused)}.`);
     assert(focused.hostScrollWidth <= focused.hostClientWidth + 1 && focused.hostScrollHeight <= focused.hostClientHeight + 1,
@@ -250,19 +372,31 @@ async function runCase(browser, width, height) {
     // otherwise the fullscreen contract is the board/control workspace itself.
     const reviewMoveCount = await page.locator("#reviewCenterTimeline .review-timeline-item").count();
     if (reviewMoveCount > 1) {
+      assert.equal(focused.previousDisabled, false, `${width}x${height}: previous move should be enabled at the end of the game.`);
+      assert.equal(focused.nextDisabled, true, `${width}x${height}: next move should be disabled at the end of the game.`);
       const beforeMove = await page.locator("#coachBoard").innerHTML();
       await page.locator("#reviewPrev").click();
       await page.waitForFunction((previous) => document.getElementById("coachBoard")?.innerHTML !== previous, beforeMove, { timeout: 5000 });
+      assert.equal(await page.locator("#reviewPrev").isDisabled(), true, `${width}x${height}: previous move should disable at the first ply.`);
+      assert.equal(await page.locator("#reviewNext").isDisabled(), false, `${width}x${height}: next move should enable at the first ply.`);
+      await assertReviewControlAccessible(page, "#reviewNext", `${width}x${height} Review next control`, focused.viewport);
       const afterPrevious = await page.locator("#coachBoard").innerHTML();
       await page.locator("#reviewNext").click();
       await page.waitForFunction((previous) => document.getElementById("coachBoard")?.innerHTML !== previous, afterPrevious, { timeout: 5000 });
+      assert.equal(await page.locator("#reviewPrev").isDisabled(), false, `${width}x${height}: previous move should re-enable at the end.`);
+      assert.equal(await page.locator("#reviewNext").isDisabled(), true, `${width}x${height}: next move should disable again at the end.`);
     }
 
-    await page.evaluate(() => document.exitFullscreen());
+    // A rectangle alone cannot prove usability: the real Exit focus action
+    // must be reachable without force-clicking through another panel.
+    await fullscreenButton.click({ timeout: 5000 });
     await page.waitForFunction((expected) => !document.fullscreenElement
       && !document.body.classList.contains("interactive-board-fullscreen-active")
       && Number(document.querySelector("#reviewBoardSlot [data-interactive-board-stage]")?.dataset.boardRequestedSize || 0) === expected,
     normal.boardRequestedSize, { timeout: 5000 });
+    await waitForNormalReviewGeometry(page);
+    await page.waitForFunction((expected) => Math.abs((document.querySelector("#reviewBoardSlot [data-interactive-board]")?.getBoundingClientRect().width || 0) - expected) < 2,
+      normal.board.width, { timeout: 5000 });
     const restored = await readReviewState(page);
     assert(Math.abs((restored.board?.width || 0) - normal.board.width) < 2,
       `${width}x${height}: Review normal board size was not restored: ${JSON.stringify({ normal, restored })}.`);
@@ -277,10 +411,13 @@ async function runCase(browser, width, height) {
       const review = {
         id: "review-e2e-refresh",
         date: new Date().toISOString(),
-        pgn: "1. e4 *",
-        fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
-        moves: [{ ply: 1, from: "e2", to: "e4", san: "e4", color: "w", piece: "p", fenBefore: "", fenAfter: "" }],
-        analysis: { mode: "Quick engine", verifiedMoves: 0, totalMoves: 1 },
+        pgn: "1. e4 e5 *",
+        fen: "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+        moves: [
+          { ply: 1, moveNumber: 1, from: "e2", to: "e4", san: "e4", color: "w", piece: "p", phase: "Opening", label: "Unverified", engineVerified: false, cpLoss: null, tactic: "position awareness", explanation: "Engine unavailable.", fenBefore: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", fenAfter: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1" },
+          { ply: 2, moveNumber: 1, from: "e7", to: "e5", san: "e5", color: "b", piece: "p", phase: "Opening", label: "Unverified", engineVerified: false, cpLoss: null, tactic: "position awareness", explanation: "Engine unavailable.", fenBefore: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", fenAfter: "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2" }
+        ],
+        analysis: { mode: "Quick engine", reviewModelVersion: 2, verifiedMoves: 0, totalMoves: 2, averageDepth: 0 },
         summary: { opening: "King's Pawn Game", turning: "1. e4", mvp: "e4", mistake: "No major mistake found.", chances: "One move to review.", result: "Game finished.", tip: "Keep using center, development, and king safety." }
       };
       state.matchReviews = [review, ...(Array.isArray(state.matchReviews) ? state.matchReviews : [])].slice(0, 12);
@@ -319,11 +456,9 @@ async function runCase(browser, width, height) {
     assert(refreshed.board && Math.abs(refreshed.board.width - refreshed.board.height) < 1,
       `${width}x${height}: Review refresh lost square board geometry: ${JSON.stringify(refreshed)}.`);
 
-    return `${width}x${height}:${Math.round(focused.board.width)}px`;
+    return `${width}x${height}:${Math.round(focused.board.width)}px, Review-ready=${reviewEvidence.reviewReadyMs}ms, engine checks=${reviewEvidence.engineCheckedMoves}/${reviewEvidence.totalMoves}`;
   } finally {
-    if (await page.evaluate(() => Boolean(document.fullscreenElement)).catch(() => false)) {
-      await page.evaluate(() => document.exitFullscreen()).catch(() => {});
-    }
+    if (await page.evaluate(() => Boolean(document.fullscreenElement)).catch(() => false)) await requestExitFullscreen(page);
     await context.close();
   }
 }
@@ -334,17 +469,22 @@ async function main() {
     env: { ...process.env, E2E_PORT: String(port) },
     stdio: ["ignore", "ignore", "ignore"]
   });
-  const browser = await chromium.launch({ headless: true });
+  let browser = null;
   try {
+    const launchOptions = { headless: true };
+    if (process.env.REVIEW_CHROMIUM_EXECUTABLE) launchOptions.executablePath = process.env.REVIEW_CHROMIUM_EXECUTABLE;
+    browser = await chromium.launch(launchOptions);
     await waitForServer();
     const results = [];
     for (const [width, height] of requestedViewports()) {
-      results.push(await runCase(browser, width, height));
+      const result = await runCase(browser, width, height);
+      results.push(result);
+      process.stdout.write(`PASS Review viewport ${result}\n`);
     }
-    process.stdout.write(`PASS Review fullscreen regression (${results.join(", ")})\n`);
+    process.stdout.write(`PASS Review fullscreen regression; engine=${reviewEngineMode} (${results.join(", ")})\n`);
   } finally {
-    await browser.close();
-    server.kill();
+    if (browser) await browser.close().catch(() => {});
+    if (server.exitCode === null) server.kill();
   }
 }
 

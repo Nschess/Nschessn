@@ -1,2 +1,6 @@
 User-agent: *
 Allow: /
+
+# Indexing is limited by page metadata and API X-Robots-Tag headers.
+# Keep CSS and JavaScript crawlable; robots rules are not access controls.
+Sitemap: https://nschessn.vercel.app/sitemap.xml

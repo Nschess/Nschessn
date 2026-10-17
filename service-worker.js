@@ -1,19 +1,41 @@
 // Bump this name whenever the shipped shell changes. Keep only the critical
 // shell in the install cache; route modules and optional styles are cached
 // after their first request so install work stays small.
-const CACHE_NAME = "nschess-shell-v189-multiplayer-truth";
+const CACHE_NAME = "nschess-shell-v201-play-lobby-loading";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./assets/search-metadata.js?v=seo-v1",
   "./offline.html",
   "./favicon.svg",
-  "./assets/app.css?v=review-v219-multiplayer-truth",
+  "./assets/app.css?v=mobile-board-focus-v3",
   "./assets/auth-redirect-policy.js?v=review-v203-focus-fit-pieces",
-  "./assets/app.js?v=play-multiplayer-truth-v239",
+  "./assets/app.js?v=daily-practice-v3",
   "./site.webmanifest",
+  "./assets/pwa-install.mjs?v=pwa-v1",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
 ];
+const SHELL_URLS = new Set(APP_SHELL.map((path) => new URL(path, self.location.href).href));
+// Cache only reviewed public HTML after a visit; no extra install/startup work.
+const PUBLIC_NAVIGATION_PATHS = new Set([
+  "/", "/index.html", "/offline.html",
+  "/learn/", "/puzzles/", "/daily-chess-puzzle/", "/play-computer/",
+  "/game-review/", "/chess-rules/", "/chess-openings/", "/chess-notation/",
+  "/chess-training/", "/privacy.html", "/terms.html", "/account-deletion.html"
+]);
+const MAX_OPTIONAL_ENTRIES = 160;
+let writes = Promise.resolve();
+function savePublicAsset(request, response) {
+  // Serialize pruning, protect install-shell entries, never cache private URLs.
+  writes = writes.catch(() => {}).then(async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response);
+    const optional = (await cache.keys()).filter((entry) => !SHELL_URLS.has(entry.url));
+    await Promise.all(optional.slice(0, Math.max(0, optional.length - MAX_OPTIONAL_ENTRIES)).map((entry) => cache.delete(entry)));
+  });
+  return writes;
+}
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -30,7 +52,14 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.pathname.includes("/api/")) return;
+  if (url.origin !== self.location.origin || request.headers.has("authorization") || url.pathname.includes("/api/")) return;
+  // Only reviewed public HTML and shipped static files are offline eligible.
+  // Query-bearing navigation (OAuth codes/tokens) must never enter CacheStorage.
+  const safeNavigation = request.mode === "navigate" && !url.search && PUBLIC_NAVIGATION_PATHS.has(url.pathname);
+  const publicAsset = /^\/(assets|data)\/[\w./-]+\.(?:js|mjs|css|json|png|webp|svg|wasm|woff2?|mp3|wav|ogg)$/i.test(url.pathname)
+    || ["/favicon.svg", "/site.webmanifest", "/offline.html"].includes(url.pathname);
+  if (!safeNavigation && !publicAsset) return;
+  if ([...url.searchParams.keys()].some((key) => key !== "v")) return;
 
   const isPieceAsset = url.pathname.includes("/assets/pieces/");
   const isStoreAudioAsset = url.pathname.includes("/assets/audio/");
@@ -38,8 +67,10 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate" || isReviewShellAsset || isPieceAsset || isStoreAudioAsset) {
     event.respondWith(fetch(request)
       .then((response) => {
+        // Do not replace a working offline shell with a CDN/server error page.
+        if (!response.ok) return caches.match(request).then((cached) => cached || response);
         const copy = response.clone();
-        void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        event.waitUntil(savePublicAsset(request, copy).catch(() => {}));
         return response;
       })
       .catch(() => caches.match(request).then((cached) => cached || (request.mode === "navigate" ? caches.match("./offline.html") : Response.error()))));
@@ -50,7 +81,7 @@ self.addEventListener("fetch", (event) => {
     .then((response) => {
       if (!response || response.status !== 200 || response.type !== "basic") return response;
       const copy = response.clone();
-      void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+      event.waitUntil(savePublicAsset(request, copy).catch(() => {}));
       return response;
     })));
 });

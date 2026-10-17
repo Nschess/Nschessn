@@ -11,7 +11,13 @@
     "test:e2e": "npm run test:environment && node scripts/e2e-runner.cjs e2e --required --environment-preflighted",
     "test:visual": "node scripts/e2e-runner.cjs visual",
     "test:board-sizing": "node scripts/board-sizing-regression.js",
+    "test:ai-bots": "node scripts/ai-bot-regression.cjs",
+    "test:pwa": "node scripts/pwa-regression.cjs",
+    "test:play-lobby-loading": "node scripts/play-lobby-loading-regression.cjs",
     "test:play-layout": "node scripts/play-board-priority-regression.js",
+    "test:daily-puzzle": "node scripts/daily-puzzle-regression.cjs",
+    "test:daily-puzzle-browser": "node scripts/daily-puzzle-browser-e2e.cjs",
+    "test:daily-practice": "node scripts/daily-practice-regression.cjs",
     "test:promotion": "node scripts/promotion-regression.js",
     "test:books": "node scripts/books-regression.js",
     "test:interaction": "node scripts/route-interaction-regression.js",
@@ -21,7 +27,8 @@
     "test:store-auth-boundary": "npm run test:environment && node scripts/store-auth-boundary-regression.cjs --environment-preflighted",
     "provision:e2e-b": "node scripts/provision-e2e-account.cjs",
     "test:e2e-wallet": "node scripts/provision-e2e-account.cjs --wallet-only",
-    "build": "node scripts/build-pages.js"
+    "build": "node scripts/build-pages.js",
+    "test:seo": "npm run build && node scripts/seo-regression.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

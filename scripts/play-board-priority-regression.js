@@ -21,7 +21,10 @@ const viewports = [
   [1024, 768, 560],
   [768, 1024, 560],
   [624, 844, 460],
-  [390, 844, 250]
+  [390, 844, 250],
+  [320, 844, 220],
+  [375, 844, 235],
+  [430, 844, 290]
 ];
 
 function waitForServer() {
@@ -85,6 +88,7 @@ async function readLayout(page) {
       }) || null;
     const fullscreenActionRect = rect(fullscreenAction);
     const restart = document.getElementById("restartGame");
+    const liveStatus = document.getElementById("playLiveStatus");
     const directRailDrawers = [...document.querySelectorAll("#play.is-active-game .play-right-sidebar > details")];
     const overlap = Boolean(board && discoveryRect
       && discoveryRect.x < rect(board).right
@@ -128,6 +132,13 @@ async function readLayout(page) {
       fullscreenAction: fullscreenActionRect,
       fullscreenActionTitle: fullscreenAction?.getAttribute("title") || "",
       fullscreenActionLabel: fullscreenAction?.getAttribute("aria-label") || "",
+      liveStatus: liveStatus ? {
+        hidden: liveStatus.hidden,
+        display: getComputedStyle(liveStatus).display,
+        role: liveStatus.getAttribute("role") || "",
+        title: liveStatus.querySelector("strong")?.textContent?.trim() || "",
+        detail: liveStatus.querySelector("small")?.textContent?.trim() || ""
+      } : null,
       restart: rect(restart),
       directRailDrawers: directRailDrawers.map((drawer) => ({ id: drawer.id, open: drawer.open }))
     };
@@ -180,6 +191,12 @@ async function main() {
           `${width}x${height}: board piece rendering disappeared: ${JSON.stringify(layout)}.`);
         assert(layout.piece.width <= layout.square.width + 1 && layout.piece.height <= layout.square.height + 1,
           `${width}x${height}: piece scaling escaped its square: ${JSON.stringify(layout)}.`);
+        assert(layout.liveStatus && layout.liveStatus.hidden === false && layout.liveStatus.display !== "none",
+          `${width}x${height}: active Play did not expose the live turn/status signal: ${JSON.stringify(layout)}.`);
+        assert.equal(layout.liveStatus.role, "status",
+          `${width}x${height}: live turn/status signal lost its status semantics: ${JSON.stringify(layout)}.`);
+        assert(layout.liveStatus.title && layout.liveStatus.detail,
+          `${width}x${height}: live turn/status signal is missing readable copy: ${JSON.stringify(layout)}.`);
         assert(layout.board.y >= -1 && layout.board.bottom <= height + 1,
           `${width}x${height}: active-game board was not initially visible: ${JSON.stringify(layout)}.`);
         assert.equal(layout.overlap, false,
@@ -196,6 +213,10 @@ async function main() {
         assert.equal(layout.fullscreen, false, `${width}x${height}: normal layout unexpectedly entered fullscreen.`);
         assert(layout.fullscreenAction && layout.fullscreenAction.width > 0 && layout.fullscreenAction.height > 0,
           `${width}x${height}: active Play fullscreen control is not rendered: ${JSON.stringify(layout)}.`);
+        if (width <= 700) {
+          assert(layout.fullscreenAction.width >= 43.5 && layout.fullscreenAction.height >= 43.5,
+            `${width}x${height}: fullscreen control missed the 44px touch target: ${JSON.stringify(layout)}.`);
+        }
         assert.match(layout.fullscreenActionTitle, /Fullscreen/i,
           `${width}x${height}: active Play fullscreen control is missing its accessible tooltip: ${JSON.stringify(layout)}.`);
         assert.match(layout.fullscreenActionLabel, /Fullscreen/i,
@@ -395,7 +416,7 @@ async function runActiveContextAndFullscreenRegression(browser) {
       const name = document.getElementById("aiPlayerName")?.textContent?.trim();
       return document.getElementById("play")?.classList.contains("is-active-game")
         && name && name !== previous
-        && document.getElementById("aiPlayerRating")?.textContent?.includes("2000");
+        && document.getElementById("aiPlayerRating")?.textContent?.includes("Stockfish challenge preset");
     }, firstBot, { timeout: 10000 });
     assert.notEqual((await page.locator("#aiPlayerName").textContent()).trim(), firstBot,
       "Selecting the second AI did not replace the previous opponent metadata.");

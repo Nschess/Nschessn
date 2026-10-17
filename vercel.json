@@ -1,0 +1,316 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "codex/play768-staging-fix": false
+    }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/api/:path*",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/data/:path*",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/offline.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/404.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "code"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "access_token"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "refresh_token"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "token"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "error"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "state"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "challenge"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "spectate"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "tournament"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/index.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/learn/index.html",
+      "destination": "/learn/",
+      "permanent": true
+    },
+    {
+      "source": "/learn",
+      "destination": "/learn/",
+      "permanent": true
+    },
+    {
+      "source": "/puzzles/index.html",
+      "destination": "/puzzles/",
+      "permanent": true
+    },
+    {
+      "source": "/puzzles",
+      "destination": "/puzzles/",
+      "permanent": true
+    },
+    {
+      "source": "/daily-chess-puzzle/index.html",
+      "destination": "/daily-chess-puzzle/",
+      "permanent": true
+    },
+    {
+      "source": "/daily-chess-puzzle",
+      "destination": "/daily-chess-puzzle/",
+      "permanent": true
+    },
+    {
+      "source": "/play-computer/index.html",
+      "destination": "/play-computer/",
+      "permanent": true
+    },
+    {
+      "source": "/play-computer",
+      "destination": "/play-computer/",
+      "permanent": true
+    },
+    {
+      "source": "/game-review/index.html",
+      "destination": "/game-review/",
+      "permanent": true
+    },
+    {
+      "source": "/game-review",
+      "destination": "/game-review/",
+      "permanent": true
+    },
+    {
+      "source": "/chess-rules/index.html",
+      "destination": "/chess-rules/",
+      "permanent": true
+    },
+    {
+      "source": "/chess-rules",
+      "destination": "/chess-rules/",
+      "permanent": true
+    },
+    {
+      "source": "/chess-openings/index.html",
+      "destination": "/chess-openings/",
+      "permanent": true
+    },
+    {
+      "source": "/chess-openings",
+      "destination": "/chess-openings/",
+      "permanent": true
+    },
+    {
+      "source": "/chess-notation/index.html",
+      "destination": "/chess-notation/",
+      "permanent": true
+    },
+    {
+      "source": "/chess-notation",
+      "destination": "/chess-notation/",
+      "permanent": true
+    },
+    {
+      "source": "/chess-training/index.html",
+      "destination": "/chess-training/",
+      "permanent": true
+    },
+    {
+      "source": "/chess-training",
+      "destination": "/chess-training/",
+      "permanent": true
+    }
+  ]
+}

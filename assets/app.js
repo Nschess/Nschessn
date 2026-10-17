@@ -27,6 +27,7 @@
       "checkmateQuest.bookReader.v1",
       "checkmateQuest.localBooks.v1",
       "checkmateQuest.dailyTraining.v1",
+      "checkmateQuest.dailyPractice.v1",
       "checkmateQuest.gentleStart.v1",
       "checkmateQuest.firstTimeTour.v1",
       "checkmateQuest.firstVisitSetup.v1",
@@ -143,9 +144,14 @@
     function clearAccountWorkspaceAfterLogout(accountId = "") {
       const id = normalizeAccountWorkspaceId(accountId || activeAccountWorkspaceId);
       if (id) persistAccountWorkspace(id);
+      // At startup the last guest snapshot has already been saved and active
+      // keys intentionally cleared pending identity resolution. With no active
+      // owner, do not replace that snapshot with the temporary empty workspace.
       clearActiveAccountWorkspaceStorage();
       activeAccountWorkspaceId = "";
       try { localStorage.setItem(accountWorkspaceOwnerKey, "guest"); } catch {}
+      restoreAccountWorkspace("guest");
+      activeAccountWorkspaceId = "guest";
     }
 
     // Never paint a previous account's local workspace while Supabase is
@@ -154,9 +160,21 @@
     // available in switchAccountWorkspace().
     (() => {
       const previousOwner = normalizeAccountWorkspaceId(readRawStorageValue(accountWorkspaceOwnerKey));
-      if (previousOwner && previousOwner !== "guest") persistAccountWorkspace(previousOwner);
+      if (previousOwner) persistAccountWorkspace(previousOwner);
       clearActiveAccountWorkspaceStorage();
       activeAccountWorkspaceId = "";
+      if (previousOwner === "guest") {
+        // Guest practice is device-local and may be restored immediately; it
+        // cannot contain another verified account's workspace.
+        restoreAccountWorkspace("guest");
+        activeAccountWorkspaceId = "guest";
+      } else if (!previousOwner) {
+        // Legacy/unowned keys were cleared above. New anonymous work starts in
+        // an explicit guest scope so it survives reload without crossing into
+        // a later authenticated account.
+        try { localStorage.setItem(accountWorkspaceOwnerKey, "guest"); } catch {}
+        activeAccountWorkspaceId = "guest";
+      }
     })();
 
     function reportDeployAssetError(asset, detail = "") {
@@ -465,8 +483,8 @@
           if (Math.abs(rect.width - state.ghostWidth) < 0.1 && Math.abs(rect.height - state.ghostHeight) < 0.1) return;
           state.ghostWidth = rect.width;
           state.ghostHeight = rect.height;
-          state.ghost.style.width = `${rect.width}px`;
-          state.ghost.style.height = `${rect.height}px`;
+          state.ghost.style.setProperty("width", `${rect.width}px`, "important");
+          state.ghost.style.setProperty("height", `${rect.height}px`, "important");
         };
         const positionGhost = () => {
           state.ghostFrame = 0;
@@ -503,8 +521,8 @@
           ghost.style.position = "fixed";
           ghost.style.left = "0";
           ghost.style.top = "0";
-          ghost.style.width = `${rect.width}px`;
-          ghost.style.height = `${rect.height}px`;
+          ghost.style.setProperty("width", `${rect.width}px`, "important");
+          ghost.style.setProperty("height", `${rect.height}px`, "important");
           ghost.style.minWidth = "0";
           ghost.style.minHeight = "0";
           ghost.style.maxWidth = "none";
@@ -991,6 +1009,7 @@
       let resizeFrame = 0;
       let syncFrame = 0;
       let activeResizeStage = null;
+      let cachedViewportSize = null;
       const sharedResizeObserver = typeof ResizeObserver === "function"
         ? new ResizeObserver(() => {
           if (hasLiveResize()) {
@@ -1102,13 +1121,15 @@
       }
 
       function viewportSize() {
+        if (cachedViewportSize) return cachedViewportSize;
         const visualViewport = window.visualViewport;
         const width = Number(visualViewport?.width) || Number(window.innerWidth) || Number(document.documentElement.clientWidth) || 240;
         const height = Number(visualViewport?.height) || Number(window.innerHeight) || Number(document.documentElement.clientHeight) || 320;
-        return {
+        cachedViewportSize = Object.freeze({
           width: Math.max(240, width),
           height: Math.max(320, height)
-        };
+        });
+        return cachedViewportSize;
       }
 
       function responsiveDefaultSize() {
@@ -1141,6 +1162,9 @@
           const reviewAnalysisWidth = Number(reviewAnalysis?.clientWidth)
             || Number(reviewAnalysis?.getBoundingClientRect?.().width)
             || 0;
+          const reviewAnalysisHeight = Number(reviewAnalysis?.clientHeight)
+            || Number(reviewAnalysis?.getBoundingClientRect?.().height)
+            || 0;
           const paddingInline = (Number.parseFloat(hostStyle?.paddingInlineStart) || 0)
             + (Number.parseFloat(hostStyle?.paddingInlineEnd) || 0);
           const paddingBlock = (Number.parseFloat(hostStyle?.paddingBlockStart) || 0)
@@ -1159,6 +1183,10 @@
           );
           const stageRect = stage.getBoundingClientRect?.();
           const boardRect = board.getBoundingClientRect?.();
+          const reviewRail = reviewHost ? stage.querySelector(":scope > .review-eval-rail") : null;
+          const stageGridStyle = reviewHost ? getComputedStyle(stage) : null;
+          const reviewRailAndGap = (reviewRail?.getBoundingClientRect?.().width || 0)
+            + (Number.parseFloat(stageGridStyle?.columnGap || "") || 0);
           const playUtility = !reviewHost
             ? stage.querySelector(":scope > .play-lobby-board-actions")
             : null;
@@ -1166,17 +1194,24 @@
           // The shared stage keeps a framed wrapper around the square board.
           // Fullscreen fitting must reserve that frame, otherwise the rows
           // can exceed the viewport even when the square itself fits exactly.
-          const measuredFrame = reviewHost
-            ? Number(stageRect?.height) - Number(boardRect?.height)
-            : Number(stageRect?.width) - Number(boardRect?.width);
-          // In fullscreen the stage itself expands to the viewport. Its width
-          // minus the board is therefore not the board's presentation frame;
-          // using that value makes a previously clamped board collapse to 1px.
-          // Keep the measured frame when it is plausible, otherwise use the
-          // stable shared frame allowance.
-          const boardFrameReserve = Number.isFinite(measuredFrame) && measuredFrame > 0
-            ? Math.min(measuredFrame, 96)
+          const measuredHorizontalFrame = Number(stageRect?.width) - Number(boardRect?.width);
+          const measuredVerticalFrame = Number(stageRect?.height) - Number(boardRect?.height);
+          // Review wraps the square board beside its evaluation rail. Measure
+          // that horizontal frame from width, not height: on narrow phones the
+          // analysis track is deliberately taller than the square, and using
+          // its vertical slack as a width reserve needlessly shrinks the board.
+          // Keep Play's existing width-based reserve unchanged.
+          const horizontalFrame = reviewHost
+            ? Math.max(measuredHorizontalFrame, reviewRailAndGap)
+            : measuredHorizontalFrame;
+          const horizontalFrameReserve = Number.isFinite(horizontalFrame) && horizontalFrame > 0
+            ? Math.min(horizontalFrame, 96)
             : 20;
+          const verticalFrameReserve = reviewHost
+            && Number.isFinite(measuredVerticalFrame)
+            && measuredVerticalFrame > 0
+            ? Math.min(measuredVerticalFrame, 96)
+            : horizontalFrameReserve;
           // Active Play keeps the fullscreen action as a small edge overlay on
           // wider fullscreen viewports, so it does not consume a permanent
           // board-width column. Narrow desktop/tablet layouts retain the
@@ -1187,15 +1222,15 @@
             && playUtilityRect.left >= stageRect.right
             ? playUtilityRect.width + Math.max(0, playUtilityRect.left - stageRect.right)
             : 0;
-          const mobileStageActionsReserve = viewportWidth < 900 ? 42 : 0;
+          const mobileStageActionsReserve = viewportWidth < 900 ? (reviewHost ? 54 : 42) : 0;
           const fullscreenRows = reservePlayerCards
             ? 1 + cards.length + (controlsHeight > 0 ? 1 : 0)
             : 1;
           const gridGapReserve = rowGap * Math.max(0, fullscreenRows - 1);
           const widthBudget = reviewAnalysisWidth || hostWidth;
-          const widthFitWithoutUtility = widthBudget - paddingInline - boardFrameReserve;
+          const widthFitWithoutUtility = widthBudget - paddingInline - horizontalFrameReserve;
           const heightFitWithoutUtility = hostHeight - paddingBlock
-            - cardsHeight - controlsHeight - gridGapReserve - boardFrameReserve - mobileStageActionsReserve;
+            - cardsHeight - controlsHeight - gridGapReserve - verticalFrameReserve - mobileStageActionsReserve;
           // The wider edge overlay needs only the amount that prevents it
           // touching a width-limited board. Height-limited compositions do
           // not reserve any horizontal space at all.
@@ -1222,15 +1257,21 @@
           // intentionally reserved for evaluation context. Fit the square to
           // the actual analysis track instead of the whole command-center
           // border box, otherwise the board can intrude into that context.
-          const widthFit = widthBudget - paddingInline - utilityRailReserve - boardFrameReserve;
+          const widthFit = widthBudget - paddingInline - utilityRailReserve - horizontalFrameReserve;
           const verticalReserve = reviewHost
-            ? paddingBlock + controlsHeight + boardFrameReserve + mobileStageActionsReserve + 8
-            : paddingBlock + cardsHeight + controlsHeight + gridGapReserve + boardFrameReserve + mobileStageActionsReserve;
+            ? paddingBlock + controlsHeight + verticalFrameReserve + mobileStageActionsReserve + 8
+            : paddingBlock + cardsHeight + controlsHeight + gridGapReserve + verticalFrameReserve + mobileStageActionsReserve;
+          // In stacked Review, evaluation and replay consume their own grid
+          // rows. The remaining analysis row, not the full screen, bounds the
+          // board. It has a zero-minimum track independent of our square size.
+          const heightFit = reviewAnalysisHeight > 0
+            ? reviewAnalysisHeight - verticalFrameReserve - 8
+            : hostHeight - verticalReserve;
           // The measured fit is authoritative in focus mode. Do not raise it
           // back to the shared minimum: on a short viewport that would make
           // the board overflow the very player cards and controls we just
           // reserved space for.
-          return Math.max(1, Math.floor(Math.min(maxSize, widthFit, hostHeight - verticalReserve)));
+          return Math.max(1, Math.floor(Math.min(maxSize, widthFit, heightFit)));
         }
         const parentRect = stage.parentElement?.getBoundingClientRect?.();
         const stageRect = stage.getBoundingClientRect?.();
@@ -1299,7 +1340,31 @@
         // board's current document offset (which would make a scrolled or
         // tall workspace shrink unexpectedly).
         const vertical = viewportHeight - (reservePlayerCards ? 264 : 170);
-        const widthLimit = width - (stage.classList.contains("tutorial-board-wrap") ? 52 : 20);
+        // Portrait lessons use a single rank/file rail; the four-rail desktop
+        // allowance otherwise leaves a needless gutter beside the phone board.
+        const tutorialRailReserve = viewportWidth <= 768 ? 20 : 52;
+        const puzzleFrameReserve = viewportWidth <= 768 && stage.classList.contains("real-puzzle-board-wrap") ? 10 : 20;
+        let widthLimit = width - (stage.classList.contains("tutorial-board-wrap") ? tutorialRailReserve : puzzleFrameReserve);
+        if (stage.closest("#gameReview.is-review-page")) {
+          // Review's frame has an independent CSS maximum inside its wider
+          // analysis column. Reserve its rail and frame, not the outer track.
+          // Read the fixed max-width rather than feeding our own board width
+          // back into the sizing controller on each ResizeObserver pass.
+          const style = getComputedStyle(stage);
+          const maximum = Number.parseFloat(style.maxWidth);
+          const rail = stage.querySelector(":scope > .review-eval-rail");
+          const frame = [style.paddingLeft, style.paddingRight, style.borderLeftWidth, style.borderRightWidth]
+            .reduce((sum, value) => sum + (Number.parseFloat(value) || 0), 0);
+          const railWidth = rail?.getBoundingClientRect().width || 0;
+          widthLimit = Math.min(width, Number.isFinite(maximum) ? maximum : width) - frame
+            - (railWidth ? railWidth + (Number.parseFloat(style.columnGap) || 0) : 0);
+        }
+        // A short landscape phone cannot fit the portrait minimum. Keep its
+        // physical board within the usable height; manual preferences remain
+        // saved and regain their size when the viewport grows again.
+        if (viewportWidth > viewportHeight && viewportHeight < 600) {
+          return Math.max(1, Math.floor(Math.min(widthLimit, Math.max(1, vertical))));
+        }
         const safeWidthMinimum = Math.min(viewportSafeMinimum, Math.max(1, widthLimit));
         return Math.max(safeWidthMinimum, Math.floor(Math.min(widthLimit, vertical > safeWidthMinimum ? vertical : widthLimit)));
       }
@@ -1386,6 +1451,11 @@
           syncFrame = 0;
           sync();
         });
+      }
+
+      function handleViewportResize() {
+        cachedViewportSize = null;
+        scheduleSync();
       }
 
       function scheduleResize(stage, requested) {
@@ -1525,12 +1595,19 @@
         handle.setAttribute("aria-valuenow", handle.getAttribute("aria-valuenow") || String(legacyFallbackSize));
         handle.setAttribute("aria-valuetext", "Board size. Drag the lower-right corner to resize.");
 
+        const reviewOwnsBoardControls = Boolean(stage.closest("#gameReview.is-review-page"));
         let actions = stage.querySelector(":scope > [data-board-stage-actions]");
         if (!actions) {
           actions = document.createElement("div");
           actions.className = "interactive-board-actions";
           actions.dataset.boardStageActions = "true";
           stage.append(actions);
+        }
+        // Review and the static Play shell own their route-specific action
+        // rail styling. Apply the shared primitive only to dynamically
+        // created rails so Review does not inherit the normal-play geometry.
+        if (!reviewOwnsBoardControls && !actions.classList.contains("play-lobby-board-actions")) {
+          actions.classList.add("interactive-board-actions");
         }
         let fullscreen = actions.querySelector("[data-board-fullscreen-action]");
         if (!fullscreen || fullscreen.tagName !== "BUTTON") {
@@ -1542,6 +1619,9 @@
           fullscreen.innerHTML = '<span aria-hidden="true">⛶</span><span data-board-fullscreen-label>Fullscreen</span>';
           actions.append(fullscreen);
         }
+        if (!reviewOwnsBoardControls && !actions.classList.contains("play-lobby-board-actions")) {
+          fullscreen.classList.add("interactive-board-fullscreen-button");
+        }
         fullscreen.title = "Fullscreen — focus on your game";
         fullscreen.setAttribute("aria-label", "Fullscreen — focus on your game");
         let settings = actions.querySelector("[data-board-settings-action]");
@@ -1552,6 +1632,9 @@
           settings.dataset.boardSettingsAction = surface === "coach" ? "play" : surface;
           settings.innerHTML = '<span aria-hidden="true">⚙</span>';
           actions.append(settings);
+        }
+        if (!reviewOwnsBoardControls && !actions.classList.contains("play-lobby-board-actions")) {
+          settings.classList.add("interactive-board-settings-button");
         }
         settings.title = "Board controls";
         settings.setAttribute("aria-label", "Board controls");
@@ -1758,6 +1841,7 @@
       }
 
       document.addEventListener("fullscreenchange", () => {
+        cachedViewportSize = null;
         let activeBoardStage = false;
         stages.forEach((stage) => {
           const state = states.get(stage);
@@ -1811,10 +1895,10 @@
         }
         scheduleSync();
       });
-      window.addEventListener("resize", scheduleSync, { passive: true });
-      window.addEventListener("orientationchange", scheduleSync, { passive: true });
-      window.visualViewport?.addEventListener("resize", scheduleSync, { passive: true });
-      window.visualViewport?.addEventListener("scroll", scheduleSync, { passive: true });
+      window.addEventListener("resize", handleViewportResize, { passive: true });
+      window.addEventListener("orientationchange", handleViewportResize, { passive: true });
+      window.visualViewport?.addEventListener("resize", handleViewportResize, { passive: true });
+      window.visualViewport?.addEventListener("scroll", handleViewportResize, { passive: true });
 
       return Object.freeze({
         sync,
@@ -2126,6 +2210,11 @@
         feedback
       }));
     }
+
+    // Keep the date-selected Daily Puzzle unavailable until a rights-cleared
+    // production catalog is approved. The existing collection remains usable
+    // through ordinary practice modes.
+    const dailyPuzzleLaunchEnabled = false;
 
     // The production collection and its validated fallback are created on demand.
     let puzzles = [];
@@ -3100,7 +3189,7 @@
       }
     })();
     const realPuzzleDifficultyLevels = ["All", "Beginner", "Intermediate", "Advanced", "Expert", "Master"];
-    const realPuzzleModes = ["Daily", "Trainer", "Rush", "Streak", "Battle"];
+    const realPuzzleModes = ["Trainer", "Rush", "Streak", "Battle"];
     const realPuzzleDifficultyAliases = { Easy: "Beginner", Medium: "Intermediate", Hard: "Advanced" };
     let puzzleCollectionReady = false;
     let realPuzzleCollectionSource = "data/puzzles.json";
@@ -4352,11 +4441,11 @@
       ...boardBorderStoreItems,
       { id: "title-tactician", type: "title", value: "Puzzle Tactician", name: "Puzzle Tactician Title", cost: 25, tag: "Title", description: "A profile title for learners who love patterns.", previewText: "Puzzle Tactician" },
       { id: "title-guardian", type: "title", value: "Castle Guardian", name: "Castle Guardian Title", cost: 50, tag: "Title", description: "A calm defender title for safer games.", previewText: "Castle Guardian" },
-      { id: "title-cm", type: "title", value: "CM Chess Master", name: "CM Chess Master Title", cost: 2000, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2000 Elo AI.", previewText: "CM Chess Master" },
-      { id: "title-nm", type: "title", value: "NM National Master", name: "NM National Master Title", cost: 2100, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2100 Elo AI.", previewText: "NM National Master" },
-      { id: "title-fm", type: "title", value: "FM FIDE Master", name: "FM FIDE Master Title", cost: 2200, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2200 Elo AI.", previewText: "FM FIDE Master" },
-      { id: "title-im", type: "title", value: "IM International Master", name: "IM International Master Title", cost: 2300, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2300 Elo AI.", previewText: "IM International Master" },
-      { id: "title-gm", type: "title", value: "GM Grandmaster", name: "GM Grandmaster Title", cost: 2500, tag: "AI title", awardOnly: true, description: "Unlocks after defeating a 2500 Elo AI.", previewText: "GM Grandmaster" },
+      { id: "title-cm", type: "title", value: "CM Chess Master", name: "CM Chess Master Title", cost: 2000, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2000.", previewText: "CM Chess Master" },
+      { id: "title-nm", type: "title", value: "NM National Master", name: "NM National Master Title", cost: 2100, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2100.", previewText: "NM National Master" },
+      { id: "title-fm", type: "title", value: "FM FIDE Master", name: "FM FIDE Master Title", cost: 2200, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2200.", previewText: "FM FIDE Master" },
+      { id: "title-im", type: "title", value: "IM International Master", name: "IM International Master Title", cost: 2300, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2300.", previewText: "IM International Master" },
+      { id: "title-gm", type: "title", value: "GM Grandmaster", name: "GM Grandmaster Title", cost: 2500, tag: "Rating milestone", awardOnly: true, description: "Earned when your in-game rating reaches 2500.", previewText: "GM Grandmaster" },
       { id: "title-champion-trophy", type: "title", value: "Champion Trophy", name: "Champion Trophy", cost: 980, rarity: "Legendary", tag: "Title", description: "A trophy title for players who keep showing up, learning, and finishing strong.", inlineSvg: '<svg viewBox="0 0 24 24" role="img" aria-label="Champion Trophy" fill="none" stroke="#ffd36b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H6v7a6 6 0 0 0 12 0z"/><path d="M6 5H4.5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1H6M18 5h1.5a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H18M10 17v1.3a3 3 0 0 1-2 2.7L4 22M14 17v1.3a3 3 0 0 0 2 2.7l4 1M4 22h16"/></svg>' },
       { id: "title-champion", type: "title", value: "Champion", name: "Champion Title", cost: 5000, tag: "Legendary title", description: "Awarded for clearing the full Stockfish campaign.", previewText: "Champion" },
       { id: "trail-stars", type: "trail", value: "stars", name: "Star Confetti Trail", cost: 30, tag: "Celebration", description: "Make lesson and puzzle celebrations sparkle.", previewText: "Star burst" },
@@ -4397,11 +4486,11 @@
       }
     ]);
     const storeUnlockMetadata = Object.freeze({
-      "title-cm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2000 Elo AI", awardOnly: true },
-      "title-nm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2100 Elo AI", awardOnly: true },
-      "title-fm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2200 Elo AI", awardOnly: true },
-      "title-im": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2300 Elo AI", awardOnly: true },
-      "title-gm": { unlockMethod: "Achievement", unlockLabel: "Defeat a 2500 Elo AI", awardOnly: true },
+      "title-cm": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2000", awardOnly: true },
+      "title-nm": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2100", awardOnly: true },
+      "title-fm": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2200", awardOnly: true },
+      "title-im": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2300", awardOnly: true },
+      "title-gm": { unlockMethod: "Achievement", unlockLabel: "Reach an in-game rating of 2500", awardOnly: true },
       "avatar-legendary": { unlockMethod: "Achievement", unlockLabel: "Clear the Chess Master campaign", awardOnly: true },
       "border-legendary": { unlockMethod: "Achievement", unlockLabel: "Clear the Chess Master campaign", awardOnly: true },
       "title-champion": { unlockMethod: "Achievement", unlockLabel: "Clear the full Stockfish campaign", awardOnly: true },
@@ -4804,8 +4893,8 @@
       { id: "knight", badge: "Piece moves", title: "Knight = Trickster Jumper", text: "Knights jump in an L shape and can leap over pieces.", coach: "Jump the knight from g1 to f3. Knights do not need a clear path.", fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR", from: "g1", targets: ["f3", "h3", "e2"], correct: "f3", quiz: ["What makes a knight special?", "It jumps over pieces", "It moves like a rook", "It moves only one square"], answer: 1, reward: { xp: 12, coins: 6 }, achievement: "Knight Jumper" },
       { id: "queen", badge: "Piece moves", title: "Queen = Superhero", text: "The queen combines rook and bishop power: straight lines and diagonals.", coach: "Send the queen from d1 to h5 along a diagonal.", fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR", from: "d1", targets: ["e2", "f3", "g4", "h5", "d2", "d3"], correct: "h5", quiz: ["The queen moves like...", "Rook + bishop", "Knight + pawn", "Only the king"], answer: 1, reward: { xp: 12, coins: 6 }, achievement: "Queen Hero" },
       { id: "king", badge: "King safety", title: "King = Nervous Boss", text: "The king moves one square and must never move into danger.", coach: "Move the king from e1 to f1, one safe square away.", fen: "8/8/8/8/8/8/8/4K2k", from: "e1", targets: ["d1", "d2", "e2", "f2", "f1"], correct: "f1", quiz: ["What happens if your king is attacked?", "You can ignore it", "You must answer the check", "You win"], answer: 2, reward: { xp: 12, coins: 6 }, achievement: "King Safety" },
-      { id: "capture", badge: "Captures", title: "Capture The Attacker", text: "You capture by moving onto an enemy piece's square, if your piece moves that way.", coach: "Use the bishop on c4 to capture the pawn on f7.", fen: "rnbqkbnr/pppp1ppp/8/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR", from: "c4", targets: ["b5", "a6", "d5", "e6", "f7", "b3", "a2", "d3"], correct: "f7", quiz: ["Capturing means...", "Landing on an enemy piece", "Jumping off the board", "Moving twice"], answer: 1, reward: { xp: 12, coins: 6 }, achievement: "Clean Capture" },
-      { id: "check", badge: "Check", title: "Give A Check", text: "Check means the king is under attack and must respond.", coach: "Move the queen from e2 to e7 to check the king on e8.", fen: "4k3/8/8/8/8/8/4Q3/4K3", from: "e2", targets: ["e3", "e4", "e5", "e6", "e7", "a2", "b2", "c2", "d2"], correct: "e7", quiz: ["When in check, the player must...", "Make any move", "Answer the attack", "Skip the turn"], answer: 2, reward: { xp: 14, coins: 7 }, achievement: "First Check" },
+      { id: "capture", badge: "Captures", title: "Capture A Pawn With Check", text: "A capture lands on an enemy piece. Here the bishop takes the f7 pawn and checks the king.", coach: "Capture the pawn on f7 with the bishop; the rook on f1 protects the checking bishop.", fen: "rnbqkbnr/pppp1ppp/8/4p3/2B1P3/8/PPPP3P/RNBQKR1R", from: "c4", targets: ["b5", "a6", "d5", "e6", "f7", "b3", "a2", "d3"], correct: "f7", quiz: ["Capturing means...", "Landing on an enemy piece", "Jumping off the board", "Moving twice"], answer: 1, reward: { xp: 12, coins: 6 }, achievement: "Clean Capture" },
+      { id: "check", badge: "Check", title: "Give A Safe Check", text: "A check attacks the king and must be answered. Look for a check that cannot simply be captured.", coach: "Move the queen from e2 to b5; the diagonal check reaches the king on e8.", fen: "4k3/8/8/8/4P3/8/4Q3/K7", from: "e2", targets: ["e3", "e5", "d3", "c4", "b5", "f3", "g4", "h5"], correct: "b5", quiz: ["When in check, the player must...", "Make any move", "Answer the attack", "Skip the turn"], answer: 2, reward: { xp: 14, coins: 7 }, achievement: "First Check" },
       { id: "mate", badge: "Checkmate", title: "Finish With Checkmate", text: "Checkmate means the king is in check and has no safe escape.", coach: "Move the rook from f1 to f8. The king is trapped by the rook and your king.", fen: "7k/8/6K1/8/8/8/8/5R2", from: "f1", targets: ["f2", "f3", "f4", "f5", "f6", "f7", "f8", "a1", "b1", "c1", "d1", "e1"], correct: "f8", quiz: ["Checkmate means...", "The king is captured", "No legal answer to check", "A pawn promotes"], answer: 2, reward: { xp: 16, coins: 8 }, achievement: "Mate Maker" },
       { id: "castle", badge: "Special rule", title: "Castle The King", text: "Castling moves the king two squares and the rook jumps beside it. It helps king safety.", coach: "Castle short: move the king from e1 to g1.", fen: "r3k2r/8/8/8/8/8/8/R3K2R", from: "e1", targets: ["g1", "c1", "d1", "e2", "f1"], correct: "g1", special: "castle", quiz: ["Why castle?", "To protect the king and connect rooks", "To promote a pawn", "To capture the king"], answer: 1, reward: { xp: 16, coins: 8 }, achievement: "Castle Ready" },
       { id: "en-passant", badge: "Special rule", title: "En Passant Surprise", text: "If a pawn moves two squares beside your pawn, you may capture it as if it moved one square.", coach: "Capture en passant: move the pawn from e5 to d6.", fen: "8/8/8/3pP3/8/8/8/4K2k", from: "e5", targets: ["e6", "d6"], correct: "d6", special: "enpassant", quiz: ["En passant is...", "A special pawn capture", "A rook move", "A draw rule"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Rule Explorer" },
@@ -4813,29 +4902,24 @@
       { id: "opening", badge: "Openings", title: "Opening Principles", text: "Control the center, develop knights and bishops, castle early, and avoid moving the queen too soon.", coach: "Develop the knight from g1 to f3. That helps the center and prepares castling.", fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR", from: "g1", targets: ["f3", "h3", "e2"], correct: "f3", quiz: ["A good opening habit is...", "Move only the queen", "Develop pieces and castle", "Ignore the center"], answer: 2, reward: { xp: 16, coins: 8 }, achievement: "Opening Starter" },
       { id: "fork", badge: "Tactics", title: "Fork Trick", text: "A fork attacks two targets at once. Knights are famous for this trick.", coach: "Jump the knight from f5 to e7. It attacks the king and queen.", fen: "2q3k1/8/8/5N2/8/8/8/4K3", from: "f5", targets: ["e7", "g7", "d6", "d4", "e3", "g3", "h4", "h6"], correct: "e7", quiz: ["A fork attacks...", "Two or more targets", "Only pawns", "Only your own king"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Fork Finder" },
       { id: "pin", badge: "Tactics", title: "Pin Rescue", text: "A pin freezes a piece because moving it would expose something more valuable behind it.", coach: "Move the bishop from c4 to b5. The knight on c6 is pinned to the king.", fen: "4k3/8/2n5/8/2B5/8/8/4K3", from: "c4", targets: ["b5", "a6", "d5", "e6", "f7", "g8"], correct: "b5", quiz: ["In a pin, the front piece...", "Cannot move safely", "Always promotes", "Moves like a knight"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Pin Spotter" },
-      { id: "skewer", badge: "Tactics", title: "Skewer Line", text: "A skewer attacks a valuable piece first. When it moves, something behind it falls.", coach: "Move the bishop from b5 to e8 to start the skewer idea.", fen: "4r1k1/8/8/1B6/8/8/8/4K3", from: "b5", targets: ["c6", "d7", "e8", "a6", "a4", "c4", "d3", "e2"], correct: "e8", quiz: ["A skewer attacks...", "The valuable piece first", "Only empty squares", "Only your pieces"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Skewer Scout" },
-      { id: "discovered", badge: "Tactics", title: "Discovered Attack", text: "A discovered attack happens when one piece moves away and opens an attack from another piece.", coach: "Move the knight from d3 to f4. The bishop's diagonal wakes up.", fen: "4k3/8/8/8/2B5/3N4/8/4K3", from: "d3", targets: ["f4", "f2", "e5", "c5", "b4", "b2"], correct: "f4", quiz: ["A discovered attack is opened by...", "Moving the blocking piece", "Resigning", "Changing the board color"], answer: 1, reward: { xp: 20, coins: 10 }, achievement: "Tactic Starter" }
+      { id: "skewer", badge: "Captures", title: "Bishop Captures A Rook", text: "A bishop can capture an undefended piece along a clear diagonal.", coach: "Move the bishop from b5 to e8 and capture the rook along the open diagonal.", fen: "4r1k1/8/8/1B6/8/8/8/4K3", from: "b5", targets: ["c6", "d7", "e8", "a6", "a4", "c4", "d3", "e2"], correct: "e8", quiz: ["A bishop moves along...", "Clear diagonals", "Straight files only", "An L shape"], answer: 1, reward: { xp: 18, coins: 9 }, achievement: "Diagonal Capture" },
+      { id: "discovered", badge: "Tactics", title: "Discovered Attack", text: "A discovered attack happens when one piece moves away and opens an attack from another piece.", coach: "Move the knight from e6 to f4. It uncovers the bishop's diagonal toward the king.", fen: "6k1/8/4N3/8/2B5/8/8/4K3", from: "e6", targets: ["c5", "c7", "d4", "d8", "f4", "f8", "g5", "g7"], correct: "f4", quiz: ["A discovered attack is opened by...", "Moving a blocking piece", "Resigning", "Changing the board color"], answer: 1, reward: { xp: 20, coins: 10 }, achievement: "Tactic Starter" }
     ];
     function expandCoreBeginnerTutorialMoves() {
       const followUps = {
         setup: [["g1", "f3"], ["f1", "c4"]],
         pawn: [["e4", "e5"]],
         rook: [["a8", "h8"]],
-        bishop: [["b5", "e8"]],
         knight: [["f3", "e5"]],
         queen: [["h5", "e2"]],
         king: [["f1", "e2"]],
         capture: [["f7", "g8"]],
-        check: [["e7", "a7"]],
-        mate: [["f8", "a8"]],
         castle: [["f1", "e1"], ["g1", "g2"]],
         "en-passant": [["d6", "d7"]],
         promotion: [["a8", "a7"]],
         opening: [["f1", "c4"], ["e1", "g1", ["g1"], "Castle after developing.", "castle"]],
         fork: [["e7", "c8"], ["c8", "b6"]],
         pin: [["b5", "c6"], ["c6", "d7"]],
-        skewer: [["e8", "d7"]],
-        discovered: [["c4", "e6"]]
       };
       beginnerTutorialLessons.forEach((lesson) => {
         if (lesson.moves) return;
@@ -4868,43 +4952,43 @@
         ["pawn-march", "Pawn Power", "Rookie March", "Move a pawn forward and notice how it gains space.", "8/8/8/8/8/8/4P3/4K2k", [["e2", "e4"], ["e4", "e5"]], "Pawns move mainly...", "Forward", "Sideways", "Like knights"],
         ["queen-pawn-march", "Pawn Power", "Queen Pawn March", "A queen pawn can also take center space.", "8/8/8/8/8/8/3P4/4K2k", [["d2", "d4"], ["d4", "d5"]], "A pawn from its start can move...", "Two squares", "Five squares", "Like a rook"],
         ["rook-lift", "Rook", "Rook Elevator", "Lift the rook, then slide across the rank.", "8/8/8/8/8/8/8/R3K2k", [["a1", "a4"], ["a4", "h4"]], "Rooks move on...", "Ranks and files", "Diagonals", "L shapes"],
-        ["rook-patrol", "Rook", "Castle Wall Patrol", "Practice long rook lines without jumping.", "8/8/8/8/8/8/8/4K1Rk", [["g1", "g4"], ["g4", "b4"]], "Rooks need the path to be...", "Clear", "Blocked", "Diagonal"],
+        ["rook-patrol", "Rook", "Castle Wall Patrol", "Practice long rook lines without jumping.", "k7/8/8/8/8/8/8/4K1R1", [["g1", "g4"], ["g4", "b4"]], "Rooks need the path to be...", "Clear", "Blocked", "Diagonal"],
         ["bishop-trail", "Bishop", "Diagonal Trail", "Follow one diagonal, then keep the bishop active.", "8/8/8/8/2B5/8/8/4K2k", [["c4", "b5"], ["b5", "e8"]], "Bishops stay on...", "One color", "Every file", "Only ranks"],
         ["bishop-switchback", "Bishop", "Sniper Switchback", "A bishop can travel far and return on another diagonal.", "8/8/8/8/2B5/8/8/4K2k", [["c4", "g8"], ["g8", "b3"]], "A bishop is strongest with...", "Long diagonals", "Tiny corners", "Blocked pawns"],
         ["knight-hop", "Knight", "Two-Hop Knight", "Jump to a safe square, then improve the knight again.", "8/8/8/8/8/8/8/2N1K2k", [["c1", "b3"], ["b3", "d4"]], "Knights move in...", "An L shape", "Straight lines", "Diagonals only"],
         ["knight-outpost", "Knight", "Knight Outpost Climb", "Move the knight toward squares where it attacks more.", "8/8/8/8/8/8/8/4K1Nk", [["g1", "f3"], ["f3", "e5"]], "Knights are happy near...", "The center", "The edge only", "Their king"],
         ["queen-line", "Queen", "Queen Road Test", "Use the queen's straight road, then diagonal power.", "8/8/8/8/8/8/8/3QK2k", [["d1", "d5"], ["d5", "h5"]], "Queens combine...", "Rook and bishop", "Pawn and knight", "King and pawn"],
         ["queen-diagonal", "Queen", "Superhero Diagonal", "The queen can sweep along a diagonal quickly.", "8/8/8/8/8/8/8/3QK2k", [["d1", "h5"], ["h5", "e8"]], "The queen is powerful because she moves...", "Many directions", "Only one square", "Only forward"],
-        ["defend-knight", "Safety", "Defend The Jumper", "Support a knight before sending it forward.", "8/8/8/8/8/5N2/4P3/4K2k", [["e2", "e3"], ["f3", "g5"]], "Before moving, ask if pieces are...", "Protected", "Invisible", "Always safe"],
-        ["save-bishop", "Safety", "Save The Bishop", "Move the bishop to an active square instead of leaving it loose.", "8/8/8/8/2B5/8/8/4K2k", [["c4", "b5"], ["b5", "d7"]], "A hanging piece is...", "Undefended", "Promoted", "Castled"],
-        ["queen-escape", "Safety", "Queen Escape Route", "When a queen is attacked, move her with purpose.", "8/8/8/8/8/8/8/3QK2k", [["d1", "h5"], ["h5", "e2"]], "A safe move should avoid...", "Free captures", "Good squares", "Development"],
+        ["defend-knight", "Safety", "Move An Attacked Knight", "A rook attacks the knight on f3. Move the knight off the rook's file.", "5r1k/8/8/8/8/5N2/8/4K3", [["f3", "g5"]], "Before moving, ask if a piece is...", "Under attack", "Invisible", "Always safe"],
+        ["save-bishop", "Safety", "Save The Attacked Bishop", "The rook attacks the bishop on c4; move it off the open file.", "2r5/8/8/8/2B5/8/8/4K2k", [["c4", "b5"], ["b5", "d7"]], "A hanging piece is...", "Undefended", "Promoted", "Castled"],
+        ["queen-escape", "Safety", "Queen Escape Route", "The rook attacks the queen on d1. Move her to a safe square.", "3r4/8/8/8/8/8/8/3QK2k", [["d1", "h5"], ["h5", "e2"]], "A safe move should avoid...", "Free captures", "Good squares", "Development"],
         ["rook-swing", "Safety", "Rook Swing Guard", "Lift a rook and guard the middle rank.", "8/8/8/8/8/8/8/R3K2k", [["a1", "a3"], ["a3", "e3"]], "Rooks can defend from...", "Open lines", "Closed boxes", "Only corners"],
-        ["knight-retreat", "Safety", "Knight Retreat Trick", "Retreating can be strong when it saves a piece.", "8/8/8/8/8/5N2/8/4K2k", [["f3", "g1"], ["g1", "e2"]], "A retreat can be...", "A smart save", "Always bad", "Illegal"],
-        ["pawn-shield", "King Safety", "Build A Shield", "Small pawn moves can give the king breathing room.", start, [["g2", "g3"], ["h2", "h3"], ["f2", "f3"]], "A king shield uses...", "Nearby pawns", "Only queens", "Enemy pieces"],
+        ["knight-retreat", "Safety", "Knight Retreat Route", "A knight can step back to g1, then take a new route to e2.", "8/8/8/8/8/5N2/8/4K2k", [["f3", "g1"], ["g1", "e2"]], "A retreat can be...", "A useful route", "Always bad", "Illegal"],
+        ["pawn-shield", "King Safety", "Shape The King-Side Pawns", "After castling, nearby pawn moves reshape the king's cover; advancing them can create space but also open lines.", "4k3/8/8/8/8/8/5PPP/5RK1", [["g2", "g3"], ["h2", "h3"], ["f2", "f3"]], "A king-side pawn move can...", "Create space but loosen lines", "Only help the queen", "Never change king safety"],
         ["center-protect", "Safety", "Protect The Center Pawn", "Support your center so it does not become free material.", start, [["e2", "e4"], ["d2", "d3"], ["g1", "f3"]], "A protected pawn is harder to...", "Win for free", "See", "Promote instantly"],
         ["castle-shelter", "King Safety", "Castle Shelter", "Castle, then keep developing calmly.", "r3k2r/8/8/8/8/5N2/PPPPBPPP/RNBQK2R", [["e1", "g1", ["g1"], "Castle to safety.", "castle"], ["b1", "c3"], ["d2", "d3"]], "Castling helps...", "King safety", "Pawn promotion", "Taking the king"],
         ["clear-back-rank", "Development", "Clear The Back Rank", "Move pieces out so the rooks can breathe later.", start, [["g1", "f3"], ["e2", "e4"], ["f1", "e2"]], "Development means...", "Bring pieces out", "Hide all pieces", "Repeat one piece"],
         ["safe-capture-scan", "Capture", "Safe Capture Scan", "Capture, then push only after the square is safe.", "8/8/8/5p2/4P3/8/8/4K2k", [["e4", "f5"], ["f5", "f6"]], "Before a capture, check...", "What recaptures", "The board color", "The clock only"],
         ["knight-fork-mini", "Tactics", "Mini Fork Finder", "A knight jump can attack two important targets.", "2q3k1/8/8/5N2/8/8/8/4K3", [["f5", "e7"], ["e7", "c8"]], "A fork attacks...", "Two targets", "One empty square", "Only pawns"],
         ["pin-mini", "Tactics", "Pin And Win", "Pin a piece, then collect it when it cannot move safely.", "4k3/8/2n5/8/2B5/8/8/4K3", [["c4", "b5"], ["b5", "c6"]], "A pin makes a piece...", "Hard to move", "A queen", "Invisible"],
-        ["skewer-mini", "Tactics", "Skewer Starter", "Attack the valuable piece first, then take what is behind.", "4r1k1/8/8/1B6/8/8/8/4K3", [["b5", "e8"], ["e8", "d7"]], "A skewer attacks...", "The valuable piece first", "Only pawns", "Your own king"],
-        ["discovered-mini", "Tactics", "Wake The Bishop", "Move one piece away and open another piece's line.", "4k3/8/8/8/2B5/3N4/8/4K3", [["d3", "f4"], ["c4", "e6"]], "A discovered attack opens a...", "Hidden line", "New board", "Draw offer"],
-        ["double-attack-mini", "Tactics", "Two Threats At Once", "Create one move that makes the opponent answer two problems.", "6k1/8/8/8/8/2N5/8/3QK3", [["d1", "h5"], ["c3", "d5"]], "Double attacks work because...", "One side cannot answer both", "They are random", "They hide kings"],
+        ["skewer-mini", "Captures", "Bishop Captures A Rook", "Use a clear diagonal to capture the undefended rook.", "4r1k1/8/8/1B6/8/8/8/4K3", [["b5", "e8"]], "A bishop moves along...", "Clear diagonals", "Straight files only", "An L shape"],
+        ["discovered-mini", "Tactics", "Discovered Check", "Move a blocking knight to reveal your bishop's line to the king.", "6k1/8/4N3/8/2B5/8/8/4K3", [["e6", "f4"]], "A discovered attack opens when...", "A blocking piece moves aside", "A new board appears", "The clock stops"],
+        ["double-attack-mini", "Tactics", "Knight Fork: Two Targets", "Move the knight to d7+: it checks the king and attacks the queen, while the rook protects the knight.", "1q3k2/8/5N2/8/8/8/8/3RK3", [["f6", "d7"]], "A knight fork can...", "Check a king and attack a queen", "Only attack one square", "Move in a straight line"],
         ["back-rank-door", "Mate Pattern", "Back Rank Door", "Use the rook line to pressure the back rank.", "6k1/5ppp/8/8/8/8/8/4K2R", [["h1", "h7"], ["h7", "h8"]], "Back-rank ideas use...", "Trapped kings", "Only knights", "Pawn races"],
-        ["remove-defender", "Tactics", "Remove The Guard", "First remove a defender, then use the open file.", "6k1/5ppp/8/8/8/8/5B2/4K2R", [["f2", "h4"], ["h1", "h8"]], "Removing a defender makes...", "A target weaker", "Your king vanish", "Pieces illegal"],
-        ["queen-rook-team", "Attack", "Queen And Rook Team", "Line up heavy pieces so they help each other.", "6k1/6pp/8/8/8/8/5Q2/4K2R", [["f2", "a7"], ["h1", "h8"]], "A battery means pieces...", "Work on one line", "Refuse to move", "Trade randomly"],
+        ["remove-defender", "Rook", "Open-File Rook Check", "The bishop protects h8, so the rook can safely use the clear h-file to check.", "6k1/5p2/8/4B3/8/8/8/4K2R", [["h1", "h8"]], "Why is the rook safe on h8?", "The bishop protects that square", "The king cannot capture any rook", "Rooks cannot be captured"],
+        ["queen-rook-team", "Queen", "Long Queen Diagonal", "Use an open diagonal to carry the queen across the board.", "6k1/6pp/8/8/8/8/5Q2/4K2R", [["f2", "a7"]], "What makes this queen route possible?", "The diagonal is clear", "Queens jump over pawns", "The king moves first"],
         ["knight-route", "Tactics", "Knight Route Map", "Plan two knight jumps instead of one random hop.", "8/8/8/3N4/8/8/8/4K2k", [["d5", "f6"], ["f6", "h5"]], "Knights improve by finding...", "Useful squares", "Only edge squares", "Straight roads"],
-        ["pressure-pin", "Tactics", "Add Pin Pressure", "Use a bishop line, then improve the attack.", "4k3/4r3/8/8/2B5/8/8/4K3", [["c4", "f7"], ["f7", "g8"]], "Pressure means adding...", "More attackers", "More mistakes", "Less vision"],
+        ["pressure-pin", "Check", "Give A Protected Check", "The bishop can check the king from f7, and your king protects the bishop on that square.", "4k3/8/6K1/8/2B5/8/8/8", [["c4", "f7"]], "Why can the bishop safely check on f7?", "The king protects the bishop", "Bishops cannot be captured", "The opposing king is not on the board"],
         ["rook-box", "Endgame", "Rook Box", "Use the rook to limit the king's space.", "7k/8/8/8/8/8/8/R3K3", [["a1", "a7"], ["a7", "g7"]], "Rooks in endgames should...", "Cut the king off", "Hide forever", "Move like bishops"],
         ["king-activity", "Endgame", "Active King Walk", "In endgames, the king becomes a strong helper.", "8/8/8/8/8/8/4K3/7k", [["e2", "e3"], ["e3", "d4"], ["d4", "c5"]], "In endgames, the king should be...", "Active", "Afraid forever", "Off the board"],
-        ["passed-pawn", "Endgame", "Passed Pawn Runner", "A passed pawn is powerful when the king helps.", "8/P7/8/8/8/8/4K3/7k", [["e2", "d3"], ["a7", "a8", ["a8"], "Promote the runner.", "promotion"]], "A passed pawn wants to...", "Promote", "Castle", "Move backward"],
-        ["opposition-intro", "Endgame", "Opposition Intro", "Kings fight for key squares one step at a time.", "8/8/8/8/3K4/8/8/7k", [["d4", "e4"], ["e4", "e5"]], "Opposition is about...", "King squares", "Queen tricks", "Opening traps"],
-        ["promotion-choice", "Endgame", "Promotion Choice", "Push the pawn and choose a queen when it reaches the end.", "7k/P7/8/8/8/8/4K3/8", [["e2", "e3"], ["a7", "a8", ["a8"], "Promote to a queen.", "promotion"]], "Most beginner promotions become...", "Queens", "Kings", "Pawns"],
-        ["save-the-king", "Defense", "Save The King", "When danger appears, move the king to safety first.", "8/8/8/8/8/8/8/4K2k", [["e1", "f1"], ["f1", "g1"]], "In check, you must...", "Answer the threat", "Ignore it", "Move any pawn"],
-        ["block-line", "Defense", "Block The Line", "Sometimes defense means stepping into the attacking line.", "4k3/8/8/8/8/8/3B4/4K3", [["d2", "e3"], ["e3", "f4"]], "Blocking works against...", "Line attacks", "Knight jumps", "Promotion only"],
-        ["capture-attacker", "Defense", "Capture The Attacker", "If an enemy piece attacks you, taking it can be the cleanest answer.", "8/8/8/4p3/2B1P3/8/8/4K2k", [["c4", "e6"], ["e6", "g8"]], "One defense is to...", "Capture the attacker", "Forget the king", "Move randomly"],
-        ["create-luft", "Defense", "Make Breathing Room", "A small pawn move can stop back-rank trouble.", start, [["h2", "h3"], ["g2", "g3"]], "Breathing room helps the...", "King", "Enemy queen", "Captured pieces"],
-        ["final-beginner-flow", "Review", "Beginner Flow Combo", "Center, develop, and castle: the calm beginner formula.", start, [["e2", "e4"], ["g1", "f3"], ["f1", "c4"]], "The beginner flow is...", "Center, develop, castle", "Queen, queen, queen", "Only pawns"]
+        ["passed-pawn", "Endgame", "Passed Pawn Runner", "Bring the king beside the passed pawn before promoting it.", "8/P7/1K6/8/8/8/8/7k", [["b6", "b7"], ["a7", "a8", ["a8"], "Promote the supported runner.", "promotion"]], "A passed pawn wants to...", "Promote", "Castle", "Move backward"],
+        ["opposition-intro", "Endgame", "Step Aside From Opposition", "When kings face with one square between them, a safe side-step avoids walking into the opposing king.", "8/8/4k3/8/4K3/8/8/8", [["e4", "d4"]], "When kings are directly opposed, the side with opposition is...", "The side not to move", "Always White", "Always the stronger side"],
+        ["promotion-choice", "Endgame", "Promotion Choice", "Push the pawn to the back rank and choose a queen.", "7k/P7/8/8/8/8/4K3/8", [["a7", "a8", ["a8"], "Promote to a queen.", "promotion"]], "Most beginner promotions become...", "Queens", "Kings", "Pawns"],
+        ["save-the-king", "King safety", "Escape The Rook Check", "The rook checks along the e-file. Move the king to f1, off the attacked line.", "k3r3/8/8/8/8/8/8/4K3", [["e1", "f1"]], "When in check, you must...", "Answer the threat with a legal move", "Ignore it", "Move any pawn"],
+        ["block-line", "Defense", "Block The Rook Check", "The rook checks along the e-file. Interpose the bishop on e3 to stop the line.", "k3r3/8/8/8/8/8/3B4/4K3", [["d2", "e3"]], "Blocking works against...", "Line attacks", "Knight jumps", "Promotion only"],
+        ["capture-attacker", "Defense", "Capture The Attacking Pawn", "The black pawn on d5 attacks your pawn on e4. Capture that pawn to remove the threat.", "8/8/8/3p4/4P3/8/8/4K2k", [["e4", "d5"], ["d5", "d6"]], "One defense is to...", "Capture the attacker", "Forget the king", "Move randomly"],
+        ["create-luft", "Defense", "Make A King Escape Square", "After castling, push the h-pawn to leave h2 open as a flight square.", "k7/8/8/8/8/8/5PPP/5RK1", [["h2", "h3"]], "Breathing room helps the...", "King", "Enemy queen", "Captured pieces"],
+        ["final-beginner-flow", "Review", "Beginner Flow Combo", "Center, develop, then castle: the calm beginner formula.", start, [["e2", "e4"], ["g1", "f3"], ["f1", "c4"], ["e1", "g1", ["g1"], "Castle after developing.", "castle"]], "The beginner flow is...", "Center, develop, castle", "Queen, queen, queen", "Only pawns"]
       ];
       return seed.map(([id, badge, title, text, fen, moves, question, right, wrongA, wrongB], index) => ({
         id: `beginner-quest-${id}`,
@@ -4976,10 +5060,10 @@
         "Good effort. Try one puzzle, then rematch me."
       ]
     }));
-    function getAiBotCategory(elo) {
-      if (elo <= 800) return "Beginner";
-      if (elo <= 1500) return "Intermediate";
-      if (elo <= 2200) return "Advanced";
+    function getAiBotCategory(index) {
+      if (index < 10) return "Beginner";
+      if (index < 20) return "Intermediate";
+      if (index < 29) return "Advanced";
       return "Master";
     }
     const aiBotRosterAdditions = [["bot-cedar","Cedar Vale",1260,"Steady","Colle System","I build a compact position and improve one piece at a time."],["bot-nia","Nia Tempo",1320,"Active","Scandinavian Defense","I like active pieces and simple tempo gains."],["bot-juno","Juno File",1380,"Resourceful","English Opening","I make space on one wing, then switch sides."],["bot-dante","Dante Watch",1450,"Alert","Pirc Defense","I defend carefully, then look for a tactical reply."],["bot-lyra","Lyra Spark",1550,"Dynamic","King's Indian Attack","I keep pieces active and create practical problems."],["bot-cassian","Cassian Quiet",1620,"Restrained","Queen's Indian","I improve my worst piece and limit counterplay."],["bot-emma","Emma Endgame",1700,"Precise","Exchange Slav","I trade into endings where every pawn matters."],["bot-vik","Vik Storm",1780,"Forceful","Yugoslav Attack","I coordinate my pieces around the enemy king."],["bot-soren","Soren Clamp",1850,"Methodical","Hedgehog","I squeeze small weaknesses until the position opens."],["bot-iris","Iris Gambit",1930,"Creative","Smith-Morra Gambit","I value initiative and find surprising attacking resources."],["bot-kellan","Kellan Hold",2020,"Resilient","Petroff Defense","I make tough positions hard to win and save difficult games."],["bot-freya","Freya File",2110,"Direct","Open Sicilian","I claim open files and bring rooks into the game quickly."],["bot-roman","Roman Line",2200,"Calculated","Grunfeld Defense","I calculate forcing lines before committing my pieces."],["bot-ansel","Ansel Classic",2300,"Disciplined","Queen's Gambit Declined","I follow sound principles and punish slow moves."],["bot-selene","Selene Silk",2380,"Subtle","Nimzo-Indian","I create long-term pressure that is hard to notice early."],["bot-torben","Torben Table",2460,"Technical","Berlin Defense","I simplify accurately and convert small endgame edges."],["bot-zenith","Zenith Prep",2540,"Sharp","Najdorf Sicilian","I know the critical ideas and strike when a line opens."],["bot-maeve","Maeve Counter",2620,"Fearless","Modern Defense","I invite space, then counterattack from a flexible setup."],["bot-cyra","Cyra Crown",2700,"Universal","Catalan Opening","I adapt to the position and keep every piece coordinated."],["bot-auric","Auric Prime",2800,"Relentless","Ruy Lopez","I turn small inaccuracies into lasting pressure."]].map(([id, name, elo, personality, opening, bio]) => ({
@@ -4993,14 +5077,18 @@
     beginnerBots.push(...aiBotRosterAdditions);
     const aiBotAvatars = ["PP","SS","MM","PC","NK","LB","RR","IG","KT","ZC","OC","MP","FF","SH","AA","TT","OL","RM","CV","NT","JF","DW","LS","CQ","EE","VS","SC","IG2","KH","FF2","RL","AC","SS2","TT2","ZP","MC","CC","AP"];
     const aiBotStyles = ["Safe pawn moves","Happy development","Check hunting","Castle first","Knight forks","Bishop pressure","Bold attacks","King safety","Capture first","Center control","Solid structure","Pin play","Fork spotting","Patient counterplay","Fast development","Pattern tactics","Club pressure","Balanced mentoring","Positional building","Active pieces","Queenside space","Tactical defense","Dynamic initiative","Prophylaxis","Endgame conversion","Attacking pairs","Strategic squeeze","Sacrificial pressure","Technical defense","Open-file attack","Concrete calculation","Classical precision","Positional mastery","Endgame technique","Sharp preparation","Counterattacking resources","Universal mastery","Relentless accuracy"];
+    const localPracticeBotCount = 14;
     beginnerBots.forEach((bot, index) => {
       bot.avatar = aiBotAvatars[index] || bot.avatar;
       bot.style = aiBotStyles[index] || bot.opening;
-      bot.category = getAiBotCategory(bot.elo);
-      bot.skill = Math.max(0, Math.min(20, Math.round((bot.elo - 200) / 130)));
-      bot.depth = Math.max(1, Math.min(15, Math.ceil((bot.elo - 100) / 200)));
-      bot.movetime = Math.max(45, Math.min(3000, 45 + Math.round((bot.elo - 200) * 1.1)));
-      bot.blunder = Math.max(.015, .42 - (bot.elo - 200) * .00016);
+      bot.difficultyIndex = index + 1;
+      bot.category = getAiBotCategory(index);
+      bot.engineRequired = index >= localPracticeBotCount;
+      bot.skill = Math.round((index / Math.max(1, beginnerBots.length - 1)) * 20);
+      bot.depth = 1 + Math.floor((index / Math.max(1, beginnerBots.length - 1)) * 14);
+      bot.movetime = 45 + Math.round((index / Math.max(1, beginnerBots.length - 1)) * 2955);
+      bot.practicePool = Math.max(1, 5 - Math.floor(index / 3));
+      bot.blunder = Math.max(.08, .36 - (index / Math.max(1, localPracticeBotCount - 1)) * .28);
     });
     let savedPuzzleState = readPuzzleState();
     let puzzleStateMatchesBank = savedPuzzleState.bankVersion === puzzleBankVersion;
@@ -5022,6 +5110,7 @@
     // explicit session state so an authenticated Supabase user can never be
     // downgraded to the guest/local wallet while auth is still resolving.
     let storeAuthState = { status: "unknown", userId: "" };
+    let storeSessionGeneration = 0;
     let storeAuthResolutionPromise = null;
     let giftInboxState = [];
     let selectedGiftItemId = "";
@@ -5035,8 +5124,8 @@
     // clicked control immediate feedback and prevents a rapid double click
     // from issuing two server purchases while the authoritative RPC is in
     // flight.
-    const storeActionLocks = new Set();
-    const storeBundleActionLocks = new Set();
+    const storeActionLocks = new Map();
+    const storeBundleActionLocks = new Map();
     let deferredCosmeticRefreshFrame = 0;
     let storeScrollPerfReady = false;
     let storeScrollPerfTimer = 0;
@@ -5093,7 +5182,15 @@
     let realPuzzleSide = "w";
     let realPuzzleHintStep = 0;
     let realPuzzleStartedAt = 0;
+    let realPuzzleElapsedMs = 0;
     let realPuzzleTimerId = 0;
+    const realPuzzleRushDurationMs = 3 * 60 * 1000;
+    let realPuzzleRushRemainingMs = realPuzzleRushDurationMs;
+    let realPuzzleRushSegmentStartedAt = 0;
+    let realPuzzleRushTimerId = 0;
+    let realPuzzleRushScore = 0;
+    let realPuzzleRushStarted = false;
+    let realPuzzleRushFinished = false;
     let realPuzzleMistakes = 0;
     let realPuzzleMoveSans = [];
     let realPuzzleFlipped = false;
@@ -5185,6 +5282,8 @@
     let tutorialBoardState = [];
     let tutorialLastMove = null;
     let tutorialMoveStep = 0;
+    let tutorialTopicFilter = "all";
+    let tutorialLineFailure = "";
     let tutorialVoiceOn = Boolean(beginnerTutorialState.voice);
     let tutorialCoordinatesOn = beginnerTutorialState.coords !== false;
     let tutorialFlipped = Boolean(beginnerTutorialState.flipped);
@@ -5239,7 +5338,7 @@
       { id: "dragon-realm", icon: "\uD83D\uDC09", name: "Dragon Realm", chapter: 6, aiCount: 3, levels: ["dragon1", "dragon2", "dragon3"], names: ["Dragon Scout", "Scale Guardian", "Crystal Dragon"], boss: "Chess Master", bossLevel: "dragonBoss", finalBoss: true, rewardItems: ["avatar-legendary", "border-legendary", "title-champion", "flex-master"], coinBase: 320, xpBase: 120, bossReward: { xp: 500, coins: 5000, stars: 5, keys: 5 } }
     ];
     const levelNames = {
-      beginner: "Beginner", easy: "Easy", medium: "Medium", hard: "Hard", expert: "Expert", master: "Master", strong: "2000 Bot",
+      beginner: "Beginner", easy: "Easy", medium: "Medium", hard: "Hard", expert: "Expert", master: "Master", strong: "Stockfish challenge",
       village1: "Starter 1", village2: "Starter 2", village3: "Starter 3", villageBoss: "Village Boss",
       forest1: "Easy 1", forest2: "Easy 2", forest3: "Easy 3", forestBoss: "Forest Boss",
       castle1: "Medium 1", castle2: "Medium 2", castle3: "Medium 3", castleBoss: "Castle Boss",
@@ -5383,6 +5482,23 @@
       activeAdventureWorld = adventureWorldProgression.some((world) => world.id === bossBattleState.world) ? bossBattleState.world : "village";
       activeAdventureBoss = adventureBosses.some((boss) => boss.id === bossBattleState.active) ? bossBattleState.active : "";
       flexBadgeState = normalizeFlexBadgeState(savedPuzzleState.flexBadges, savedPuzzleState.store, readJsonStorage(learnerPrefsStorageKey, {}));
+
+      // Review analysis is account-owned runtime state.  Invalidate it before
+      // restoring the new workspace so a delayed Stockfish result or cached
+      // review from A cannot become visible while B is hydrating (including
+      // an A -> B -> A transition).
+      cancelActiveReviewAnalysis("Account workspace changed");
+      activeMatchReview = null;
+      reviewRequestedPgn = "";
+      reviewRetryState = null;
+      reviewSelfAnalysisState = null;
+      postGameDecisionPgn = "";
+      // Terminal signatures and local recording guards are account-owned too.
+      // Clear them at the workspace boundary so a completed game can reopen
+      // its authoritative post-game Review after A → B → A without minting
+      // another server result.
+      completedGameSignature = "";
+      coachGameRecorded = false;
 
       // Non-rendered account services also keep in-memory state.  Reset them
       // at the same workspace boundary as the profile/progress globals so a
@@ -5613,6 +5729,7 @@
     const friendRecentPlayersStorageKey = "checkmateQuest.friendRecent.v1";
     const tournamentStorageKey = "checkmateQuest.tournaments.v1";
     const reviewAnalysisCacheStorageKey = "checkmateQuest.reviewAnalysis.v1";
+    const reviewAnalysisSchemaVersion = 2;
     flexBadgeState = normalizeFlexBadgeState(savedPuzzleState.flexBadges, savedPuzzleState.store, readJsonStorage(learnerPrefsStorageKey, {}));
     let storyState = readJsonStorage(storyStorageKey, { completed: [], stars: 0 });
     let activeBookLevel = "all";
@@ -5903,7 +6020,7 @@
       const meta = document.createElement("div");
       meta.className = "boss-meta";
       meta.append(
-        createBookText("span", "game-unlock", `${config.elo} Elo`),
+        createBookText("span", "game-unlock", `Engine preset · skill ${config.skill}/20`),
         createBookText("span", "game-unlock", `Depth ${config.depth}`),
         createBookText("span", "game-unlock", `Skill ${config.skill}`),
         createBookText("span", "game-unlock", boss.difficulty || "AI")
@@ -5959,7 +6076,7 @@
           createBookText("span", "", `${boss.label} - ${boss.difficulty}`),
           createBookText("strong", "", `${getBossAvatar(boss)} ${boss.name}`),
           createBookText("small", "", `Depth ${config.depth} | Skill ${config.skill}`),
-          createBookText("small", "", `${config.elo} Elo | +${boss.reward.coins} coins`)
+          createBookText("small", "", `Engine preset · skill ${config.skill}/20 | +${boss.reward.coins} coins`)
         );
         return button;
       }));
@@ -6208,7 +6325,29 @@
     function readBeginnerTutorialState() {
       const fallback = { current: 0, completed: [], achievements: [], rewarded: [], voice: false, coords: true, flipped: false };
       const saved = readJsonStorage(beginnerTutorialStorageKey, fallback);
-      return saved && typeof saved === "object" ? { ...fallback, ...saved } : fallback;
+      const source = saved && typeof saved === "object" && !Array.isArray(saved) ? saved : fallback;
+      const supportedIds = new Set(beginnerTutorialLessons.map((lesson) => lesson.id));
+      const savedIds = (value) => Array.isArray(value)
+        ? [...new Set(value.filter((id) => typeof id === "string" && supportedIds.has(id)))]
+        : [];
+      const supportedAchievements = new Set(beginnerTutorialLessons.map((lesson) => lesson.achievement).filter(Boolean));
+      supportedAchievements.add("Rules Ready");
+      supportedAchievements.add("Tactic Starter");
+      supportedAchievements.add("Beginner Graduate");
+      const achievements = Array.isArray(source.achievements)
+        ? [...new Set(source.achievements.filter((item) => typeof item === "string" && supportedAchievements.has(item)))]
+        : [];
+      const currentValue = Number(source.current);
+      return {
+        ...fallback,
+        current: Number.isFinite(currentValue) ? Math.max(0, Math.min(beginnerTutorialLessons.length - 1, Math.trunc(currentValue))) : 0,
+        completed: savedIds(source.completed),
+        achievements,
+        rewarded: savedIds(source.rewarded),
+        voice: source.voice === true,
+        coords: source.coords !== false,
+        flipped: source.flipped === true
+      };
     }
 
     function saveBeginnerTutorialState(patch = {}) {
@@ -6324,42 +6463,78 @@
     }
 
     function chooseTutorialAutoReply(nextMove) {
-      if (!tutorialGame) return null;
-      const avoid = new Set([nextMove?.from, nextMove?.correct].filter(Boolean));
+      if (!tutorialGame || !nextMove) return null;
+      const avoid = new Set([nextMove.from, nextMove.correct].filter(Boolean));
       const legal = tutorialGame.moves({ verbose: true });
-      return legal.find((move) => !avoid.has(move.to) && !avoid.has(move.from) && !move.captured && !move.promotion)
-        || legal.find((move) => !avoid.has(move.to))
-        || legal[0]
-        || null;
+      const preferred = legal.filter((move) => !avoid.has(move.to) && !avoid.has(move.from) && !move.captured && !move.promotion);
+      const alternate = legal.filter((move) => !avoid.has(move.to));
+      const seen = new Set();
+      const candidates = [...preferred, ...alternate, ...legal].filter((move) => {
+        const key = `${move.from}:${move.to}:${move.promotion || ""}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      for (const candidate of candidates) {
+        const played = tutorialGame.move(toCoachMoveInput(candidate));
+        if (!played) continue;
+        const preservesNextStep = tutorialGame.get(nextMove.from)?.color === tutorialGame.turn()
+          && Boolean(getTutorialLegalMove(nextMove));
+        tutorialGame.undo();
+        if (preservesNextStep) return candidate;
+      }
+      return null;
     }
 
-    function skipIllegalTutorialSteps(lesson) {
-      let safety = 0;
-      const moves = getTutorialMoves(lesson);
-      while (tutorialGame && tutorialMoveStep < moves.length && safety < moves.length) {
-        const move = getActiveTutorialMove(lesson);
-        const piece = tutorialGame.get(move.from);
-        if (piece && piece.color !== tutorialGame.turn()) break;
-        if (piece && getTutorialLegalMove(move)) break;
-        tutorialMoveStep += 1;
-        safety += 1;
+    function validateActiveTutorialStep(lesson) {
+      const move = getActiveTutorialMove(lesson);
+      if (!move) {
+        tutorialLineFailure = "";
+        return true;
       }
+      const piece = tutorialGame?.get(move.from);
+      if (!piece) {
+        tutorialLineFailure = `The guided piece is no longer on ${move.from}. Restart this lesson to reset the position.`;
+        return false;
+      }
+      if (piece.color !== tutorialGame.turn()) {
+        tutorialLineFailure = "";
+        return true;
+      }
+      if (!getTutorialLegalMove(move)) {
+        tutorialLineFailure = "This lesson step is not legal in the current position. Restart this lesson to reset the board.";
+        return false;
+      }
+      tutorialLineFailure = "";
+      return true;
     }
 
     function syncTutorialTurn(lesson) {
-      if (!tutorialGame) return;
+      if (!tutorialGame) return false;
+      const finish = (ready) => {
+        tutorialBoardState = fenToSquares(tutorialGame.fen().split(/\s+/)[0]);
+        return ready;
+      };
       let safety = 0;
       while (safety < 6) {
-        skipIllegalTutorialSteps(lesson);
+        if (!validateActiveTutorialStep(lesson)) return finish(false);
         const move = getActiveTutorialMove(lesson);
-        if (!move || tutorialGame.get(move.from)?.color === tutorialGame.turn()) break;
+        if (!move || tutorialGame.get(move.from)?.color === tutorialGame.turn()) return finish(true);
         const reply = chooseTutorialAutoReply(move);
-        if (!reply) break;
+        if (!reply) {
+          tutorialLineFailure = "No legal practice reply keeps the next lesson step available. Restart this lesson to reset the board.";
+          return finish(false);
+        }
         const played = tutorialGame.move(toCoachMoveInput(reply));
-        if (played) tutorialLastMove = [played.from, played.to];
+        if (!played) {
+          tutorialLineFailure = "The practice reply could not be played. Restart this lesson to reset the board.";
+          return finish(false);
+        }
+        tutorialLastMove = [played.from, played.to];
         safety += 1;
       }
-      tutorialBoardState = fenToSquares(tutorialGame.fen().split(/\s+/)[0]);
+      tutorialLineFailure = "This lesson line could not reach its next guided move. Restart this lesson to reset the board.";
+      return finish(false);
     }
 
     function speakTutorial(text) {
@@ -6372,20 +6547,44 @@
       window.speechSynthesis.speak(utterance);
     }
 
+    function renderTutorialTopicFilter() {
+      const filter = document.getElementById("tutorialTopicFilter");
+      if (!filter) return;
+      const completed = new Set(beginnerTutorialState.completed || []);
+      const topics = [...new Set(beginnerTutorialLessons.map((lesson) => lesson.badge || "Guided practice"))];
+      const options = [
+        { value: "all", label: `All topics (${beginnerTutorialLessons.length})` },
+        ...topics.map((topic) => {
+          const lessons = beginnerTutorialLessons.filter((lesson) => (lesson.badge || "Guided practice") === topic);
+          const done = lessons.filter((lesson) => completed.has(lesson.id)).length;
+          return { value: topic, label: `${topic} (${done}/${lessons.length})` };
+        })
+      ];
+      filter.replaceChildren(...options.map(({ value, label }) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        return option;
+      }));
+      if (!options.some((option) => option.value === tutorialTopicFilter)) tutorialTopicFilter = "all";
+      filter.value = tutorialTopicFilter;
+    }
+
     function renderTutorialLessonList() {
       const list = document.getElementById("tutorialLessonList");
       if (!list) return;
       const completed = new Set(beginnerTutorialState.completed || []);
-      list.replaceChildren(...beginnerTutorialLessons.map((lesson, index) => {
+      const visibleLessons = beginnerTutorialLessons
+        .map((lesson, index) => ({ lesson, index }))
+        .filter(({ lesson }) => tutorialTopicFilter === "all" || (lesson.badge || "Guided practice") === tutorialTopicFilter);
+      list.replaceChildren(...visibleLessons.map(({ lesson, index }) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = `tutorial-step${completed.has(lesson.id) ? " is-complete" : ""}`;
         button.setAttribute("aria-current", index === currentTutorialLesson ? "step" : "false");
-        button.textContent = `${index + 1}. ${lesson.title}`;
-        button.addEventListener("click", () => {
-          currentTutorialLesson = index;
-          renderBeginnerTutorial(true);
-        });
+        button.dataset.tutorialLessonIndex = String(index);
+        button.setAttribute("aria-label", `${index + 1}. ${lesson.title}, ${lesson.badge}${completed.has(lesson.id) ? ", completed on this device" : ""}`);
+        button.textContent = `${index + 1}. ${lesson.title}${completed.has(lesson.id) ? " · Done" : ""}`;
         return button;
       }));
     }
@@ -6394,6 +6593,7 @@
       const board = document.getElementById("tutorialBoard");
       const lesson = getTutorialLesson();
       if (tutorialGame) syncTutorialTurn(lesson);
+      if (tutorialLineFailure) setTutorialCoach(tutorialLineFailure);
       const move = getActiveTutorialMove(lesson);
       if (!board) return;
       sharedInteractiveBoardWorkspace.scheduleSync();
@@ -6523,6 +6723,11 @@
         playAudioCue("hint");
         return;
       }
+      if (tutorialLineFailure) {
+        setTutorialCoach(`${tutorialLineFailure} Use Replay lesson to start again.`);
+        playAudioCue("illegal");
+        return;
+      }
       if (!move) {
         setTutorialCoach("Practice moves complete. Answer the mini quiz to finish this lesson.");
         return;
@@ -6595,12 +6800,20 @@
       }
       saveBeginnerTutorialState({ completed: [...completed], rewarded: [...rewarded], achievements: [...achievements] });
       publishLearningActivity("lesson_completed", `lesson:${lesson.id}`, { lessonId: lesson.id, title: lesson.title || "Chess lesson", achievement: lesson.achievement || "" });
+      recordDailyPracticeCompletion("lesson");
       renderBeginnerTutorial(false);
     }
 
     function renderTutorialQuiz(lesson) {
       const quiz = document.getElementById("tutorialQuiz");
       if (!quiz) return;
+      if (tutorialLineFailure) {
+        quiz.replaceChildren(
+          createBookText("strong", "game-unlock", "Lesson paused"),
+          createBookText("span", "", `${tutorialLineFailure} Use Replay lesson to start again.`)
+        );
+        return;
+      }
       const moves = getTutorialMoves(lesson);
       if (tutorialMoveStep < moves.length) {
         const move = getActiveTutorialMove(lesson);
@@ -6644,6 +6857,7 @@
       if (!lesson) return;
       if (resetBoard) {
         tutorialGame = null;
+        tutorialLineFailure = "";
         if (CoachChess) {
           try {
             tutorialGame = new CoachChess(getTutorialFen(lesson));
@@ -6660,11 +6874,15 @@
       const completed = new Set(beginnerTutorialState.completed || []);
       const moves = getTutorialMoves(lesson);
       const progress = Math.round((completed.size / beginnerTutorialLessons.length) * 100);
+      const topicLessons = tutorialTopicFilter === "all"
+        ? beginnerTutorialLessons
+        : beginnerTutorialLessons.filter((item) => (item.badge || "Guided practice") === tutorialTopicFilter);
+      const topicCompleted = topicLessons.filter((item) => completed.has(item.id)).length;
       document.getElementById("tutorialBadge").textContent = lesson.badge;
       document.getElementById("tutorialLessonTitle").textContent = lesson.title;
       document.getElementById("tutorialLessonText").textContent = `${lesson.text} Guided moves: ${moves.length}.`;
-      document.getElementById("tutorialReward").textContent = `Reward: +${lesson.reward.xp} XP, +${lesson.reward.coins} coins`;
-      document.getElementById("tutorialProgressText").textContent = `${completed.size}/${beginnerTutorialLessons.length} lessons complete`;
+      document.getElementById("tutorialReward").textContent = "Device-local practice · no account rewards";
+      document.getElementById("tutorialProgressText").textContent = `${completed.size}/${beginnerTutorialLessons.length} complete · ${tutorialTopicFilter === "all" ? "All topics" : `${tutorialTopicFilter} ${topicCompleted}/${topicLessons.length}`}`;
       document.getElementById("tutorialProgressFill").style.setProperty("--tutorial-progress", `${progress}%`);
       document.getElementById("tutorialCoordinates").textContent = tutorialCoordinatesOn ? "Coords On" : "Coords Off";
       document.getElementById("tutorialCoordinates").setAttribute("aria-pressed", String(tutorialCoordinatesOn));
@@ -6674,7 +6892,8 @@
       document.getElementById("tutorialVoice").setAttribute("aria-pressed", String(tutorialVoiceOn));
       document.getElementById("tutorialNext").textContent = currentTutorialLesson >= beginnerTutorialLessons.length - 1 ? "Finish path" : "Next lesson";
       const move = getActiveTutorialMove(lesson);
-      setTutorialCoach(move ? `${lesson.coach} ${getTutorialStatusLine()} Step ${tutorialMoveStep + 1} of ${moves.length}: ${move.from} to ${move.correct}.` : lesson.coach);
+      setTutorialCoach(tutorialLineFailure || (move ? `${lesson.coach} ${getTutorialStatusLine()} Step ${tutorialMoveStep + 1} of ${moves.length}: ${move.from} to ${move.correct}.` : lesson.coach));
+      renderTutorialTopicFilter();
       renderTutorialLessonList();
       renderTutorialBoard();
       renderTutorialQuiz(lesson);
@@ -6684,6 +6903,43 @@
 
     function setupBeginnerTutorial() {
       if (!document.getElementById("tutorialBoard")) return;
+      const library = document.getElementById("tutorialLibrary");
+      const compactLessons = window.matchMedia("(max-width: 768px)");
+      // The complete library remains available, but never precedes the board
+      // as a long scroll on phones. One route-owned listener, no resize loop.
+      const setLibraryLayout = () => {
+        if (!library) return;
+        const hidingFocus = compactLessons.matches && library.contains(document.activeElement);
+        library.open = !compactLessons.matches;
+        if (hidingFocus) library.querySelector("summary")?.focus({ preventScroll: true });
+      };
+      setLibraryLayout();
+      compactLessons.addEventListener("change", setLibraryLayout);
+      const lessonList = document.getElementById("tutorialLessonList");
+      lessonList?.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-tutorial-lesson-index]");
+        if (!button || !lessonList.contains(button)) return;
+        const index = Number(button.dataset.tutorialLessonIndex);
+        if (!Number.isInteger(index) || !beginnerTutorialLessons[index]) return;
+        currentTutorialLesson = index;
+        renderBeginnerTutorial(true);
+        if (compactLessons.matches && library) {
+          library.open = false;
+          document.querySelector('#tutorialBoard [data-square]')?.focus({ preventScroll: true });
+        }
+      });
+      document.getElementById("tutorialTopicFilter")?.addEventListener("change", (event) => {
+        const selectedTopic = String(event.currentTarget.value || "all");
+        tutorialTopicFilter = selectedTopic;
+        const completed = new Set(beginnerTutorialState.completed || []);
+        const visible = beginnerTutorialLessons
+          .map((lesson, index) => ({ lesson, index }))
+          .filter(({ lesson }) => selectedTopic === "all" || (lesson.badge || "Guided practice") === selectedTopic);
+        if (!visible.some(({ index }) => index === currentTutorialLesson)) {
+          currentTutorialLesson = visible.find(({ lesson }) => !completed.has(lesson.id))?.index ?? visible[0]?.index ?? 0;
+        }
+        renderBeginnerTutorial(true);
+      });
       document.getElementById("tutorialHint")?.addEventListener("click", () => {
         const lesson = getTutorialLesson();
         const move = getActiveTutorialMove(lesson);
@@ -6718,6 +6974,7 @@
       });
       document.getElementById("tutorialNext")?.addEventListener("click", () => {
         currentTutorialLesson = Math.min(beginnerTutorialLessons.length - 1, currentTutorialLesson + 1);
+        if (tutorialTopicFilter !== "all" && beginnerTutorialLessons[currentTutorialLesson]?.badge !== tutorialTopicFilter) tutorialTopicFilter = "all";
         renderBeginnerTutorial(true);
       });
       renderBeginnerTutorial(true);
@@ -7965,7 +8222,9 @@
       }
 
       if (action === "daily-puzzle") {
-        openRealPuzzleExperience("Easy");
+        // Older saved links may still use this action. Fail safely into normal
+        // practice; never select a date-derived puzzle or imply a Daily reward.
+        openRealPuzzleExperience("Trainer");
         return;
       }
 
@@ -8124,6 +8383,9 @@
       if (!next) return false;
       if (!next.id) next.id = `game-${next.completedAt}-${next.opponentName}-${next.moves}`;
       if (completedGameHistory.some((game) => game.id === next.id)) return false;
+      if (String(record?.mode || "").trim().toLowerCase() === "ai game" && next.result !== "aborted" && next.moves > 0) {
+        recordDailyPracticeCompletion("botGame");
+      }
       completedGameHistory = [next, ...completedGameHistory]
         .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))
         .slice(0, 12);
@@ -8199,14 +8461,19 @@
       const meta = document.getElementById("matchHistoryAccuracyMeta");
       if (!card || !chart || !meta) return;
       const history = matchReviews
-        .map((review) => ({ white: Number(review?.whiteAccuracy), black: Number(review?.blackAccuracy) }))
-        .filter((entry) => Number.isFinite(entry.white) && Number.isFinite(entry.black))
+        .filter((review) => Number(review?.analysis?.reviewModelVersion) === reviewAnalysisSchemaVersion)
+        .map((review) => ({
+          white: review?.whiteAverageCentipawnLoss,
+          black: review?.blackAverageCentipawnLoss
+        }))
+        .filter((entry) => typeof entry.white === "number" && Number.isFinite(entry.white)
+          && typeof entry.black === "number" && Number.isFinite(entry.black))
         .slice(0, 8)
         .reverse();
       card.hidden = !history.length;
       if (!history.length) return;
       const latest = history[history.length - 1];
-      meta.textContent = `${history.length} reviewed ${history.length === 1 ? "game" : "games"} · White ${Math.round(latest.white)}% · Black ${Math.round(latest.black)}%`;
+      meta.textContent = `${history.length} reviewed ${history.length === 1 ? "game" : "games"} · White ${Math.round(latest.white)} cp · Black ${Math.round(latest.black)} cp`;
       const namespace = "http://www.w3.org/2000/svg";
       const width = 320;
       const height = 96;
@@ -8221,20 +8488,20 @@
       };
       const points = (key) => history.map((entry, index) => {
         const x = history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth;
-        const y = paddingY + ((100 - Math.max(0, Math.min(100, entry[key]))) / 100) * plotHeight;
+        const y = paddingY + (Math.max(0, Math.min(300, entry[key])) / 300) * plotHeight;
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       }).join(" ");
-      const grid = [25, 50, 75].map((value) => createSvg("line", {
-        x1: paddingX, x2: width - paddingX, y1: paddingY + ((100 - value) / 100) * plotHeight, y2: paddingY + ((100 - value) / 100) * plotHeight, class: "match-history-chart-grid"
+      const grid = [75, 150, 225].map((value) => createSvg("line", {
+        x1: paddingX, x2: width - paddingX, y1: paddingY + (value / 300) * plotHeight, y2: paddingY + (value / 300) * plotHeight, class: "match-history-chart-grid"
       }));
       const whiteLine = createSvg("polyline", { points: points("white"), class: "match-history-chart-line is-white" });
       const blackLine = createSvg("polyline", { points: points("black"), class: "match-history-chart-line is-black" });
       const dots = history.flatMap((entry, index) => [
-        createSvg("circle", { cx: history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth, cy: paddingY + ((100 - entry.white) / 100) * plotHeight, r: 2.8, class: "match-history-chart-dot is-white" }),
-        createSvg("circle", { cx: history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth, cy: paddingY + ((100 - entry.black) / 100) * plotHeight, r: 2.8, class: "match-history-chart-dot is-black" })
+        createSvg("circle", { cx: history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth, cy: paddingY + (Math.max(0, Math.min(300, entry.white)) / 300) * plotHeight, r: 2.8, class: "match-history-chart-dot is-white" }),
+        createSvg("circle", { cx: history.length === 1 ? width / 2 : paddingX + (index / (history.length - 1)) * plotWidth, cy: paddingY + (Math.max(0, Math.min(300, entry.black)) / 300) * plotHeight, r: 2.8, class: "match-history-chart-dot is-black" })
       ]);
       const title = createSvg("title");
-      title.textContent = `Accuracy by side across ${history.length} reviewed ${history.length === 1 ? "game" : "games"}. Latest: White ${Math.round(latest.white)}%, Black ${Math.round(latest.black)}%.`;
+      title.textContent = `Average centipawn loss by side across ${history.length} reviewed ${history.length === 1 ? "game" : "games"}; lower is better. Latest: White ${Math.round(latest.white)} cp, Black ${Math.round(latest.black)} cp.`;
       chart.replaceChildren(title, ...grid, whiteLine, blackLine, ...dots);
       chart.setAttribute("aria-label", title.textContent);
     }
@@ -8560,6 +8827,7 @@
 
     function setStoreAuthState(status = "unknown", userId = "") {
       const nextStatus = ["unknown", "authenticated", "signed_out", "error"].includes(status) ? status : "error";
+      if (storeAuthState.status !== nextStatus || storeAuthState.userId !== (nextStatus === "authenticated" ? String(userId || "") : "")) storeSessionGeneration += 1;
       storeAuthState = { status: nextStatus, userId: nextStatus === "authenticated" ? String(userId || "") : "" };
       document.documentElement.dataset.storeSyncStatus = nextStatus === "authenticated" ? "syncing" : nextStatus;
       if (nextStatus !== "authenticated") {
@@ -8567,6 +8835,12 @@
         serverStoreState = null;
       }
       return storeAuthState;
+    }
+
+    function captureStoreSession() {
+      const generation = storeSessionGeneration;
+      // Generation also rejects A -> B -> A; matching the user ID alone does not.
+      return () => generation === storeSessionGeneration;
     }
 
     const storePurchaseDiagnosticMessages = Object.freeze({
@@ -8609,7 +8883,8 @@
       }
       if (storeAuthState.status === "signed_out") return null;
       if (storeAuthResolutionPromise) return storeAuthResolutionPromise;
-      storeAuthResolutionPromise = (async () => {
+      const isCurrent = captureStoreSession();
+      const resolution = (async () => {
         try {
           // An authenticated Store must never silently downgrade to the local
           // wallet because a provider method is missing or auth is still
@@ -8621,6 +8896,7 @@
             throw error;
           }
           const userId = String(await provider.getAuthenticatedUserId()).trim();
+          if (!isCurrent()) return null;
           if (userId) {
             setStoreAuthState("authenticated", userId);
             return { id: userId };
@@ -8629,12 +8905,14 @@
           error.code = "STORE_AUTH_PENDING";
           throw error;
         } catch (error) {
+          if (!isCurrent()) return null;
           setStoreAuthState(error?.code === "STORE_AUTH_PENDING" ? "unknown" : "error");
           throw error;
-        } finally {
-          storeAuthResolutionPromise = null;
         }
-      })();
+      })().finally(() => {
+        if (storeAuthResolutionPromise === resolution) storeAuthResolutionPromise = null;
+      });
+      storeAuthResolutionPromise = resolution;
       return storeAuthResolutionPromise;
     }
 
@@ -8782,10 +9060,11 @@
     }
 
     async function refreshServerStoreState({ rerender = true } = {}) {
+      const isCurrent = captureStoreSession();
       const provider = getAuthProvider();
       if (!provider?.getStoreState) return null;
       const user = await getAuthoritativeStoreUser();
-      if (!user) return null;
+      if (!user || !isCurrent()) return null;
       const expectedAccountId = normalizeAccountWorkspaceId(user.id || applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId);
       if (serverStoreRefreshPromise && serverStoreRefreshAccountId === expectedAccountId) return serverStoreRefreshPromise;
       serverStoreSyncStatus = "syncing";
@@ -8795,7 +9074,7 @@
       serverStoreRefreshAccountId = expectedAccountId;
       const refreshPromise = Promise.resolve().then(() => provider.getStoreState()).then((state) => {
         const currentAccountId = normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId);
-        if (!isApplicationAuthenticated() || currentAccountId !== expectedAccountId) return null;
+        if (!isCurrent() || !isApplicationAuthenticated() || currentAccountId !== expectedAccountId) return null;
         const source = state && typeof state === "object" ? state : {};
         const catalog = Array.isArray(source.catalog) ? source.catalog : [];
         const nextCatalog = new Map(catalog.map((item) => [String(item.item_id || item.itemId || ""), item]).filter(([id]) => id));
@@ -8858,7 +9137,7 @@
         }
         return serverStoreState;
       }).catch((error) => {
-        if (!isApplicationAuthenticated() || normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId) !== expectedAccountId) return null;
+        if (!isCurrent() || !isApplicationAuthenticated() || normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId) !== expectedAccountId) return null;
         serverStoreReady = false;
         serverStoreState = null;
         serverStoreSyncStatus = "error";
@@ -8875,7 +9154,7 @@
         if (rerender) renderStore();
         throw error;
       }).finally(() => {
-        if (serverStoreRefreshAccountId === expectedAccountId) {
+        if (serverStoreRefreshPromise === refreshPromise) {
           serverStoreRefreshPromise = null;
           serverStoreRefreshAccountId = "";
         }
@@ -8885,17 +9164,20 @@
     }
 
     async function ensureServerStoreReady() {
+      const isCurrent = captureStoreSession();
       const provider = getAuthProvider();
       if (!provider?.getStoreState) return true;
       let user = null;
       try {
         user = await getAuthoritativeStoreUser();
       } catch (error) {
+        if (!isCurrent()) return false;
         serverStoreSyncStatus = "error";
         serverStoreSyncError = error instanceof Error ? error : new Error(String(error?.message || error || "Authentication could not be verified."));
         renderStoreSyncFeedback();
         return false;
       }
+      if (!isCurrent()) return false;
       if (!user) {
         const status = document.getElementById("storeStatus");
         if (status) status.textContent = "Sign in to purchase Store cosmetics.";
@@ -8905,15 +9187,20 @@
       try {
         await refreshServerStoreState({ rerender: false });
       } catch (error) {
+        if (!isCurrent()) return false;
         serverStoreSyncStatus = "error";
         serverStoreSyncError = error instanceof Error ? error : new Error(String(error?.message || error || "Store sync failed."));
         renderStoreSyncFeedback();
         return false;
       }
-      return storeServerIsActive();
+      return isCurrent() && storeServerIsActive();
     }
 
     function clearServerStoreState() {
+      storeSessionGeneration += 1;
+      storeAuthResolutionPromise = null;
+      storeActionLocks.clear();
+      storeBundleActionLocks.clear();
       serverStoreState = null;
       serverStoreCatalog = new Map();
       serverStoreReady = false;
@@ -8941,6 +9228,7 @@
     }
 
     function renderStoreGiftInbox() {
+      const isCurrent = captureStoreSession();
       const inbox = document.getElementById("storeGiftInbox");
       if (!inbox) return;
       if (!giftInboxState.length) {
@@ -8958,12 +9246,32 @@
           const claim = createBookText("button", "button", "Claim");
           claim.type = "button";
           claim.addEventListener("click", async () => {
-            try { await getAuthProvider()?.claimCosmeticGift?.(gift.id); await refreshServerStoreState({ rerender: false }); await refreshStoreGiftInbox(); } catch (error) { const status = document.getElementById("storeGiftStatus"); if (status) status.textContent = error?.message || "Gift could not be claimed."; await refreshStoreGiftInbox(); }
+            if (!isCurrent() || claim.disabled) return;
+            claim.disabled = decline.disabled = true;
+            try {
+              await getAuthProvider().claimCosmeticGift(gift.id);
+              if (!isCurrent()) return;
+              await refreshServerStoreState({ rerender: false });
+              if (isCurrent()) await refreshStoreGiftInbox();
+            } catch (error) {
+              if (!isCurrent()) return;
+              const status = document.getElementById("storeGiftStatus");
+              if (status) status.textContent = error?.message || "Gift could not be claimed.";
+            } finally { if (isCurrent()) claim.disabled = decline.disabled = false; }
           });
           const decline = createBookText("button", "button secondary", "Decline");
           decline.type = "button";
           decline.addEventListener("click", async () => {
-            try { await getAuthProvider()?.declineCosmeticGift?.(gift.id); await refreshServerStoreState({ rerender: false }); await refreshStoreGiftInbox(); } catch (error) { const status = document.getElementById("storeGiftStatus"); if (status) status.textContent = error?.message || "Gift could not be declined."; await refreshStoreGiftInbox(); }
+            if (!isCurrent() || decline.disabled) return;
+            claim.disabled = decline.disabled = true;
+            try {
+              await getAuthProvider().declineCosmeticGift(gift.id);
+              if (isCurrent()) await refreshStoreGiftInbox();
+            } catch (error) {
+              if (!isCurrent()) return;
+              const status = document.getElementById("storeGiftStatus");
+              if (status) status.textContent = error?.message || "Gift could not be declined.";
+            } finally { if (isCurrent()) claim.disabled = decline.disabled = false; }
           });
           actions.append(claim, decline);
         } else actions.append(createBookText("small", "", gift.status));
@@ -8973,6 +9281,7 @@
     }
 
     async function refreshStoreGiftInbox() {
+      const isCurrent = captureStoreSession();
       const provider = getAuthProvider();
       const expectedUserId = String(getFriendCurrentUserId?.() || "");
       if (!provider?.listGiftInbox || !expectedUserId) {
@@ -8982,10 +9291,10 @@
       }
       try {
         const rows = await provider.listGiftInbox(40);
-        if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
+        if (!isCurrent() || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
         giftInboxState = Array.isArray(rows) ? rows : [];
       } catch {
-        if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
+        if (!isCurrent() || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return giftInboxState;
         giftInboxState = [];
       }
       renderStoreGiftInbox();
@@ -9000,25 +9309,31 @@
       document.getElementById("storeGiftRefresh")?.addEventListener("click", () => void refreshStoreGiftInbox());
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        const isCurrent = captureStoreSession();
         const recipient = String(document.getElementById("storeGiftRecipient")?.value || "").trim();
         const itemId = String(document.getElementById("storeGiftItem")?.value || selectedGiftItemId).trim();
         const message = String(document.getElementById("storeGiftMessage")?.value || "").trim();
         const status = document.getElementById("storeGiftStatus");
         if (!recipient || !itemId) { if (status) status.textContent = "Choose a recipient and a cosmetic first."; return; }
         if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+          if (!isCurrent()) return;
           renderStoreSyncFeedback();
           if (status) status.textContent = document.getElementById("storeStatus")?.textContent || "Store sync failed — Retry.";
           return;
         }
+        if (!isCurrent()) return;
         if (!storeServerIsActive()) { if (status) status.textContent = "Sign in to send a server-verified cosmetic gift."; return; }
         try {
           await getAuthProvider().createCosmeticGift(recipient, itemId, message, createStoreIdempotencyKey("gift"));
+          if (!isCurrent()) return;
           await refreshServerStoreState({ rerender: false });
+          if (!isCurrent()) return;
           form.reset();
           selectedGiftItemId = "";
           if (status) status.textContent = "Gift sent. The recipient has been notified.";
           renderStore();
         } catch (error) {
+          if (!isCurrent()) return;
           if (status) status.textContent = error?.message || "Gift could not be sent.";
         }
       });
@@ -9647,11 +9962,14 @@
     }
 
     async function equipStoreItem(item) {
+      const isCurrent = captureStoreSession();
       if (item?.type === "arrowSkin" && !isStoreItemOwned(item)) return false;
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        if (!isCurrent()) return false;
         renderStoreSyncFeedback();
         return false;
       }
+      if (!isCurrent()) return false;
       if (storeServerIsActive()) {
         const validation = validateServerStoreItem(item);
         if (!validation.ok) {
@@ -9661,8 +9979,11 @@
         }
         try {
           await getAuthProvider().equipCosmetic(item.id);
+          if (!isCurrent()) return false;
           await refreshServerStoreState({ rerender: false });
+          if (!isCurrent()) return false;
         } catch (error) {
+          if (!isCurrent()) return false;
           const status = document.getElementById("storeStatus");
           if (status) status.textContent = error?.message || "Cosmetic could not be equipped.";
           return false;
@@ -9727,6 +10048,7 @@
     }
 
     async function buyOrEquipStoreItem(itemId) {
+      const isCurrent = captureStoreSession();
       const item = getStoreItem(itemId);
       if (!item) {
         reportStorePurchaseDiagnostic("NO_ITEM", { itemId });
@@ -9734,6 +10056,7 @@
       }
       const previouslyEquippedId = getEquippedStoreId(item.type);
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        if (!isCurrent()) return;
         renderStoreSyncFeedback();
         reportStorePurchaseDiagnostic(getStoreReadinessDiagnostic(), {
           itemId: item.id,
@@ -9747,6 +10070,7 @@
         });
         return;
       }
+      if (!isCurrent()) return;
       const owned = new Set(storeState.owned);
       const status = document.getElementById("storeStatus");
       const isFlexBadge = item.type === "flexBadge";
@@ -9794,7 +10118,9 @@
           let purchaseResult;
           try {
             purchaseResult = await getAuthProvider().purchaseCosmetic(item.id, createStoreIdempotencyKey("purchase"));
+            if (!isCurrent()) return;
           } catch (error) {
+            if (!isCurrent()) return;
             reportStorePurchaseDiagnostic("RPC_FAILED", {
               itemId: item.id,
               code: error?.code || "",
@@ -9815,7 +10141,9 @@
           }
           try {
             await refreshServerStoreState({ rerender: false });
+            if (!isCurrent()) return;
           } catch (error) {
+            if (!isCurrent()) return;
             reportStorePurchaseDiagnostic("INVENTORY_REFRESH_FAILED", {
               itemId: item.id,
               code: error?.code || "",
@@ -9839,6 +10167,7 @@
         showCelebration("Reward unlocked!", `-${item.cost} coins`, item.name);
       }
       if (!await equipStoreItem(item)) return;
+      if (!isCurrent()) return;
       savePuzzleState();
       // The catalog, filters, search, and scroll container stay mounted. Only
       // the affected item(s), wallet, inventory summary, and featured action
@@ -9856,13 +10185,14 @@
     }
 
     async function runStoreItemAction(itemId) {
+      const actionGeneration = storeSessionGeneration;
       const item = getStoreItem(itemId);
       if (!item) return buyOrEquipStoreItem(itemId);
       const id = String(item.id);
       // A second click while the server-authoritative transaction is in flight
       // is ignored rather than becoming a second purchase request.
       if (storeActionLocks.has(id)) return;
-      storeActionLocks.add(id);
+      storeActionLocks.set(id, actionGeneration);
       setStoreItemPending(id, true);
       const status = document.getElementById("storeStatus");
       if (status) {
@@ -9873,11 +10203,13 @@
       try {
         return await buyOrEquipStoreItem(id);
       } finally {
-        storeActionLocks.delete(id);
-        setStoreItemPending(id, false);
-        // Re-read the authoritative local mirror after either success or a
-        // rejected request so the button never remains stale.
-        refreshStoreItemCards([id]);
+        if (storeActionLocks.get(id) === actionGeneration) {
+          storeActionLocks.delete(id);
+          setStoreItemPending(id, false);
+          // Re-read the authoritative local mirror after either success or a
+          // rejected request so the button never remains stale.
+          refreshStoreItemCards([id]);
+        }
       }
     }
 
@@ -10546,17 +10878,25 @@
     }
 
     async function performStoreBundleAction(bundleId) {
+      const isCurrent = captureStoreSession();
       const bundle = storeBundles.find((entry) => entry.id === bundleId);
       if (!bundle) return;
       if (storeServerRequiresAuthority() && !await ensureServerStoreReady()) {
+        if (!isCurrent()) return;
         renderStoreSyncFeedback();
         return;
       }
+      if (!isCurrent()) return;
       const status = document.getElementById("storeStatus");
       const details = getStoreBundleDetails(bundle);
       if (!details.items.length) return;
       if (!details.missingItems.length) {
-        await Promise.all(details.items.map((item) => equipStoreItem(item)));
+        const equipped = await Promise.all(details.items.map((item) => equipStoreItem(item)));
+        if (!isCurrent()) return;
+        if (equipped.some((ok) => !ok)) {
+          if (status) status.textContent = "Some cosmetics could not be equipped. Retry after Store sync.";
+          return;
+        }
         savePuzzleState();
         refreshStoreItemCards(details.items.map((item) => item.id));
         if (status) status.textContent = `${bundle.name} equipped. Every included cosmetic is ready.`;
@@ -10579,8 +10919,11 @@
       if (storeServerIsActive()) {
         try {
           await getAuthProvider().purchaseCosmeticBundle(bundle.itemIds, bundle.discount, createStoreIdempotencyKey("bundle"));
+          if (!isCurrent()) return;
           await refreshServerStoreState({ rerender: false });
+          if (!isCurrent()) return;
         } catch (error) {
+          if (!isCurrent()) return;
           if (status) status.textContent = error?.message || "Bundle purchase could not be completed.";
           return;
         }
@@ -10598,27 +10941,33 @@
         recordStoreHistory("unlocked", item);
       });
       savePuzzleState();
-      await Promise.all(details.items.map((item) => equipStoreItem(item)));
+      const equipped = await Promise.all(details.items.map((item) => equipStoreItem(item)));
+      if (!isCurrent()) return;
       playAudioCue("purchase");
       showCelebration("Bundle unlocked!", `-${formatProfileNumber(bundlePrice)} coins · Save ${formatProfileNumber(details.savings)}`, bundle.name);
       refreshStoreItemCards(details.items.map((item) => item.id));
       renderBeginnerProgress();
-      if (status) status.textContent = `${bundle.name} unlocked and equipped. You saved ${formatProfileNumber(details.savings)} coins.`;
+      if (status) status.textContent = equipped.every(Boolean)
+        ? `${bundle.name} unlocked and equipped. You saved ${formatProfileNumber(details.savings)} coins.`
+        : `${bundle.name} purchased. Some cosmetics could not be equipped; retry after Store sync.`;
     }
 
     async function runStoreBundleAction(bundleId) {
+      const actionGeneration = storeSessionGeneration;
       const id = String(bundleId || "");
       if (!id || storeBundleActionLocks.has(id)) return;
       const bundle = storeBundles.find((entry) => entry.id === id);
       if (!bundle) return;
-      storeBundleActionLocks.add(id);
+      storeBundleActionLocks.set(id, actionGeneration);
       setStoreBundlePending(id, true);
       try {
         return await performStoreBundleAction(id);
       } finally {
-        storeBundleActionLocks.delete(id);
-        refreshStoreBundleCard(id);
-        setStoreBundlePending(id, false);
+        if (storeBundleActionLocks.get(id) === actionGeneration) {
+          storeBundleActionLocks.delete(id);
+          refreshStoreBundleCard(id);
+          setStoreBundlePending(id, false);
+        }
       }
     }
 
@@ -12441,7 +12790,7 @@
 
     function completeDailyHabit() {
       const today = getTodayKey();
-      if (dailyHabit.rewardDate === today) return false;
+      if (!dailyPuzzleLaunchEnabled || dailyHabit.rewardDate === today) return false;
 
       const gap = dailyHabit.lastDate ? getDayDistance(dailyHabit.lastDate, today) : 999;
       dailyHabit.streak = gap === 1 ? dailyHabit.streak + 1 : 1;
@@ -13510,14 +13859,22 @@
       (tournamentRuntime?.events || []).filter(isTournamentWithinLeaderboardPeriod).forEach((event) => {
         (event.standings || []).forEach((entry) => {
           if (!isTournamentEntryInScope(entry)) return;
-          const wins = Math.max(0, Number(entry.wins) || 0);
-          const draws = Math.max(0, Number(entry.draws) || 0);
-          const losses = Math.max(0, Number(entry.losses) || 0);
-          const games = Math.max(0, Number(entry.gamesPlayed ?? entry.games_played) || wins + draws + losses);
-          const scoreValue = Math.max(0, Number(entry.score) || 0);
+          const username = normalizeAuthUsername(entry.username);
+          const wins = readLeaderboardMetric(entry.wins);
+          const draws = readLeaderboardMetric(entry.draws);
+          const losses = readLeaderboardMetric(entry.losses);
+          let games = readLeaderboardMetric(entry.gamesPlayed ?? entry.games_played);
+          if (games === null && wins !== null && draws !== null && losses !== null) {
+            const total = wins + draws + losses;
+            if (Number.isSafeInteger(total)) games = total;
+          }
+          const scoreValue = readLeaderboardMetric(entry.score, { integer: false });
+          if (!username || scoreValue === null) return;
+          const displayMetric = (value) => value === null ? "—" : formatProfileNumber(value);
+          const rating = readLeaderboardMetric(entry.rating, { min: 400, max: 3000 });
           rows.push({
-            id: String(entry.id || entry.publicId || entry.public_id || `${event.code}-${entry.username || rows.length}`).toLowerCase(),
-            name: normalizeAuthUsername(entry.username || "Player"),
+            id: String(entry.id || entry.publicId || entry.public_id || `${event.code}-${username}`).toLowerCase(),
+            name: username,
             title: entry.title || "",
             nameStyle: entry.nameStyle || entry.name_style || "",
             avatarFrame: entry.avatarFrame || entry.avatar_frame || "",
@@ -13527,12 +13884,12 @@
             flag: formatCountryFlag(entry.countryFlag || entry.country_flag || ""),
             countryCode: entry.countryFlag || entry.country_flag || "",
             icons: event.status === "completed" && Number(entry.playerRank || entry.player_rank) === 1 ? [{ icon: "T", label: "Tournament winner" }] : [],
-            score: Math.round(scoreValue * 100 + wins * 25 + draws * 8 + games),
-            tieRating: Math.max(400, Number(entry.rating) || 400),
-            tieWins: wins,
-            tieGames: games,
+            score: Math.round(scoreValue * 100 + (wins ?? 0) * 25 + (draws ?? 0) * 8 + (games ?? 0)),
+            tieRating: rating ?? 0,
+            tieWins: wins ?? -1,
+            tieGames: games ?? -1,
             primary: `${scoreValue.toFixed(scoreValue % 1 ? 1 : 0)} pts`,
-            meta: [`${event.title}`, `${wins}W ${draws}D ${losses}L`, `${games} games`],
+            meta: [`${event.title}`, `${displayMetric(wins)}W ${displayMetric(draws)}D ${displayMetric(losses)}L`, `${displayMetric(games)} games`],
             isPlayer: Boolean(currentId && String(entry.id || entry.publicId || entry.public_id || "").toLowerCase() === currentId)
           });
         });
@@ -13546,6 +13903,39 @@
       );
     }
 
+    function readLeaderboardMetric(value, { integer = true, min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+      if (value === null || value === undefined || typeof value === "boolean" || (typeof value === "string" && !value.trim())) return null;
+      const number = Number(value);
+      if (!Number.isFinite(number) || number < min || number > max || (integer && !Number.isSafeInteger(number))) return null;
+      return number;
+    }
+
+    function getLeaderboardMetrics(account = {}) {
+      const stats = account.statistics && typeof account.statistics === "object" ? account.statistics : {};
+      const firstPresent = (...values) => values.find((value) => value !== undefined && value !== null);
+      const rating = (value) => readLeaderboardMetric(value, { min: 400, max: 3000 });
+      const count = (value) => readLeaderboardMetric(value);
+      const wins = count(firstPresent(stats.wins, account.wins));
+      const losses = count(firstPresent(stats.losses, account.losses));
+      const draws = count(firstPresent(stats.draws, account.draws));
+      let gamesPlayed = count(firstPresent(stats.gamesPlayed, stats.games_played, account.gamesPlayed, account.games_played));
+      if (gamesPlayed === null && wins !== null && losses !== null && draws !== null) {
+        const total = wins + losses + draws;
+        if (Number.isSafeInteger(total)) gamesPlayed = total;
+      }
+      const puzzlesSolved = count(firstPresent(stats.puzzlesSolved, stats.puzzles_solved, account.puzzlesSolved, account.puzzles_solved));
+      const puzzleAccuracy = readLeaderboardMetric(firstPresent(stats.puzzleAccuracy, stats.puzzle_accuracy, account.puzzleAccuracy, account.puzzle_accuracy), { integer: false, min: 0, max: 100 });
+      const lessonsCompleted = count(firstPresent(stats.lessonsCompleted, stats.lessons_completed, account.lessonsCompleted, account.lessons_completed));
+      const cleanGames = count(firstPresent(stats.cleanGames, stats.clean_games, account.cleanGames, account.clean_games));
+      const bossClears = count(firstPresent(stats.bossClears, stats.boss_clears, account.bossClears, account.boss_clears));
+      return {
+        gameRating: rating(firstPresent(account.gameRating, account.game_rating, account.rating)),
+        puzzleRating: rating(firstPresent(account.puzzleRating, account.puzzle_rating)),
+        wins, losses, draws, gamesPlayed, puzzlesSolved, puzzleAccuracy, lessonsCompleted, cleanGames, bossClears,
+        winRate: gamesPlayed > 0 && wins !== null ? Math.round((wins / gamesPlayed) * 100) : null
+      };
+    }
+
     function buildLeaderboardEntries(type = "puzzles") {
       const authenticated = isApplicationAuthenticated();
       const currentName = authenticated ? normalizeAuthUsername(readLearnerProfile().name).toLowerCase() : "";
@@ -13557,20 +13947,22 @@
         .map((account) => {
           const id = getLeaderboardAccountId(account);
           if (seen.has(id)) return null;
+          const metrics = getLeaderboardMetrics(account);
+          const { gamesPlayed: games, wins, puzzleRating, gameRating } = metrics;
+          // A game rating is not a puzzle rating. Keep incomplete records out
+          // of a board instead of manufacturing a 400 rating or zero stats.
+          if (type === "puzzles" && puzzleRating === null && (metrics.puzzlesSolved === null || metrics.puzzleAccuracy === null)) return null;
+          if (type !== "puzzles" && gameRating === null) return null;
           seen.add(id);
-          const stats = account.statistics && typeof account.statistics === "object" ? account.statistics : {};
-          const games = Math.max(0, Number(stats.gamesPlayed) || 0);
-          const wins = Math.max(0, Number(stats.wins) || 0);
-          const solved = Math.max(0, Number(stats.puzzlesSolved) || 0);
-          const accuracy = Math.max(0, Math.min(100, Number(stats.puzzleAccuracy) || 0));
-          const winRate = games ? Math.round((wins / games) * 100) : 0;
-          const puzzleRating = Math.max(400, Number(account.puzzleRating) || 400);
-          const gameRating = Math.max(400, Number(account.gameRating) || 400);
-          const cleanGames = Math.max(0, Number(stats.cleanGames) || 0);
-          const bossClears = Math.max(0, Number(stats.bossClears) || 0);
+          const solved = metrics.puzzlesSolved;
+          const accuracy = metrics.puzzleAccuracy;
+          const winRate = metrics.winRate;
+          const cleanGames = metrics.cleanGames;
+          const bossClears = metrics.bossClears;
+          const displayMetric = (value) => value === null ? "—" : formatProfileNumber(value);
           const score = type === "puzzles"
-            ? puzzleRating + solved * 8 + accuracy * 3
-            : gameRating + wins * 30 + winRate * 2 + cleanGames * 10 + bossClears * 35;
+            ? (puzzleRating ?? 0) + (solved ?? 0) * 8 + (accuracy ?? 0) * 3
+            : gameRating + (wins ?? 0) * 30 + (winRate ?? 0) * 2 + (cleanGames ?? 0) * 10 + (bossClears ?? 0) * 35;
           return {
             id,
             name: normalizeAuthUsername(account.username),
@@ -13585,12 +13977,12 @@
             icons: Array.isArray(account.achievements) && account.achievements.length ? [{ icon: "🏆", label: account.achievements[0] }] : [],
             score,
             tieRating: type === "puzzles" ? puzzleRating : gameRating,
-            tieWins: wins,
-            tieGames: games,
-            primary: type === "puzzles" ? `${formatProfileNumber(puzzleRating)} rating` : `${formatProfileNumber(gameRating)} Elo`,
+            tieWins: wins ?? -1,
+            tieGames: games ?? -1,
+            primary: type === "puzzles" ? (puzzleRating === null ? "Practice stats" : `${formatProfileNumber(puzzleRating)} rating`) : `${formatProfileNumber(gameRating)} Elo`,
             meta: type === "puzzles"
-              ? [`${solved} solved`, `${accuracy}% accuracy`, `${formatProfileNumber(stats.lessonsCompleted || 0)} lessons`]
-              : [`${wins} wins`, `${games} games`, `${winRate}% win rate`],
+              ? [`${displayMetric(solved)} solved`, `${accuracy === null ? "—" : `${displayMetric(accuracy)}%`} accuracy`, `${displayMetric(metrics.lessonsCompleted)} lessons`]
+              : [`${displayMetric(wins)} wins`, `${displayMetric(games)} games`, `${winRate === null ? "—" : `${displayMetric(winRate)}%`} win rate`],
             isPlayer: normalizeAuthUsername(account.username).toLowerCase() === currentName
           };
         })
@@ -13845,39 +14237,44 @@
       setProfileText("[data-match-avatar]", profile.avatar);
       setProfileText(".player-profile-kicker", profile.avatarLabel);
       setProfileText("#loginAvatar", profile.avatar);
-      setProfileText('[data-profile-field="level"]', profile.level);
-      setProfileText('[data-profile-field="streak"]', formatProfileNumber(profile.streak));
-      setProfileText('[data-profile-field="xp"]', formatProfileNumber(profile.xp));
-      setProfileText('[data-profile-field="tokens"]', formatProfileNumber(profile.tokens));
-      setProfileText('[data-profile-field="rank"]', `Rank: ${profile.rank}`);
-      setProfileText('[data-profile-field="title"]', profile.rank || "Chess player");
       const authenticated = isApplicationAuthenticated();
-      const gameRating = authenticated ? getLearnerGameRating() : 450;
-      const puzzleRating = authenticated ? getLearnerPuzzleRating() : 400;
-      const gamesPlayed = authenticated ? Math.max(0, Number(gameStats.played) || 0) : 0;
-      const wins = authenticated ? Math.max(0, Number(gameStats.wins) || 0) : 0;
-      const winRate = gamesPlayed ? Math.round((wins / gamesPlayed) * 100) : 0;
-      const puzzleAttemptsTotal = authenticated ? puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts) : 0;
+      const serverStats = getProfileServerStatistics();
+      const practiceStats = getProfileLocalPracticeStatistics(authenticated);
+      const gameRatingLabel = serverStats.gameRating === null ? "—" : `${formatProfileNumber(serverStats.gameRating)} Elo`;
+      setProfileText('[data-profile-field="level"]', authenticated ? profile.level : "Sign in to save progress");
+      setProfileText('[data-profile-field="streak"]', authenticated ? formatProfileNumber(profile.streak) : "—");
+      setProfileText('[data-profile-field="xp"]', serverStats.xp === null ? "—" : formatProfileNumber(serverStats.xp));
+      setProfileText('[data-profile-field="tokens"]', serverStats.coins === null ? "—" : formatProfileNumber(serverStats.coins));
+      setProfileText('[data-profile-field="rank"]', authenticated ? `Rank: ${profile.rank}` : "Guest profile");
+      setProfileText('[data-profile-field="title"]', authenticated ? (profile.rank || "Chess player") : "Progress is not saved");
       const unlockedAchievements = profile.achievements.filter((achievement) => achievement.unlocked).length;
-      setProfileText('[data-profile-field="gameRating"]', `${formatProfileNumber(gameRating)} Elo`);
-      setProfileText('[data-profile-field="puzzleRating"]', formatProfileNumber(puzzleRating));
-      setProfileText('[data-profile-field="gamesPlayed"]', `${formatProfileNumber(gamesPlayed)} ${gamesPlayed === 1 ? "game" : "games"}`);
-      setProfileText('[data-profile-field="winRate"]', gamesPlayed ? `${winRate}% wins` : "No games yet");
-      setProfileText('[data-profile-field="puzzleAccuracy"]', puzzleAttemptsTotal ? `${getPuzzleAccuracy(0)}% accuracy` : "Solve a puzzle to begin");
-      setProfileText('[data-profile-achievement-summary]', `${unlockedAchievements}/${profile.achievements.length} unlocked`);
+      setProfileText('[data-profile-field="gameRating"]', gameRatingLabel);
+      setProfileText('[data-profile-field="puzzleRating"]', practiceStats.score === null ? "—" : formatProfileNumber(practiceStats.score));
+      setProfileText('[data-profile-field="gamesPlayed"]', serverStats.gamesPlayed === null
+        ? "— games"
+        : `${formatProfileNumber(serverStats.gamesPlayed)} ${serverStats.gamesPlayed === 1 ? "game" : "games"}`);
+      setProfileText('[data-profile-field="winRate"]', serverStats.winRate === null ? "—" : `${serverStats.winRate}% wins`);
+      setProfileText('[data-profile-field="puzzleAccuracy"]', practiceStats.accuracy === null
+        ? "No local attempts"
+        : `${practiceStats.accuracy}% accuracy · this device`);
+      setProfileText('[data-profile-achievement-summary]', `${unlockedAchievements}/${profile.achievements.length} on this device`);
       document.querySelectorAll(".player-flex-chip [data-profile-field='rank']").forEach((rank) => {
-        const compact = getCompactPlayerTitle(profile.rank);
-        rank.textContent = compact ? `Rank: ${compact.short}` : `Rank: ${String(profile.rank || "Explorer").replace(/\s+Avatar$/i, "").slice(0, 18)}`;
+        const compact = authenticated ? getCompactPlayerTitle(profile.rank) : null;
+        rank.textContent = !authenticated ? "Guest profile" : compact ? `Rank: ${compact.short}` : `Rank: ${String(profile.rank || "Explorer").replace(/\s+Avatar$/i, "").slice(0, 18)}`;
       });
       document.querySelectorAll(".player-flex-chip").forEach((chip) => {
-        chip.setAttribute("aria-label", `Open profile for ${profile.name}, ${formatProfileNumber(gameRating)} Elo and ${formatProfileNumber(profile.tokens)} coins`);
+        const ratingDescription = serverStats.gameRating === null ? "game rating unavailable" : `${formatProfileNumber(serverStats.gameRating)} Elo`;
+        const coinsDescription = serverStats.coins === null ? "account coins unavailable" : `${formatProfileNumber(serverStats.coins)} coins`;
+        chip.setAttribute("aria-label", `Open profile for ${profile.name}, ${ratingDescription} and ${coinsDescription}`);
       });
-      setProfileText('[data-profile-field="progress"]', `${profile.progress}%`);
-      setProfileText('[data-profile-field="next"]', profile.nextLevelXp ? `Next Level: ${formatProfileNumber(profile.nextLevelXp)} XP` : "Legend path complete");
-      setProfileText("[data-profile-save-state]", "Saved");
+      setProfileText('[data-profile-field="progress"]', authenticated ? `${profile.progress}%` : "—");
+      setProfileText('[data-profile-field="next"]', authenticated
+        ? profile.nextLevelXp ? `Next Level: ${formatProfileNumber(profile.nextLevelXp)} XP` : "Legend path complete"
+        : "Sign in to track progress");
+      setProfileText("[data-profile-save-state]", authenticated ? "Saved on this device" : "Guest profile");
       applyAvatarRankBadges(profile);
       document.querySelectorAll("[data-profile-progress-fill]").forEach((fill) => {
-        fill.style.width = `${profile.progress}%`;
+        fill.style.width = `${authenticated ? profile.progress : 0}%`;
       });
       document.querySelectorAll(".player-profile-avatar").forEach((avatar) => {
         if (avatar.dataset.profileLevel === profile.level) return;
@@ -13904,13 +14301,13 @@
           badge.className = `player-profile-achievement${achievement.unlocked ? "" : " is-locked"}`;
           badge.dataset.achievementTier = achievement.tier || "";
           const progress = achievement.progress || { current: 0, target: 1, label: "progress" };
-          badge.title = `${achievement.label}: ${achievement.unlocked ? "unlocked" : `${progress.current}/${progress.target} ${progress.label}`}. Reward: ${achievement.reward || "badge"}`;
+          badge.title = `${achievement.label}: ${achievement.unlocked ? "milestone reached" : `${progress.current}/${progress.target} ${progress.label}`}. Calculated from activity on this device; no server reward is recorded.`;
           badge.setAttribute("aria-label", badge.title);
           badge.dataset.profileAchievementLabel = achievement.label;
           badge.append(
             createBookText("strong", "profile-achievement-icon", achievement.icon),
             createBookText("small", "profile-achievement-label", achievement.secret && !achievement.unlocked ? "Secret" : achievement.label),
-            createBookText("small", "profile-achievement-meta", achievement.unlocked ? "Unlocked" : `${Math.round(progress.current * 10) / 10}/${progress.target}`)
+            createBookText("small", "profile-achievement-meta", achievement.unlocked ? "Reached · this device" : `${Math.round(progress.current * 10) / 10}/${progress.target}`)
           );
           return badge;
         }));
@@ -13928,7 +14325,8 @@
 
     function renderProfileRatingHistory() {
       const authenticated = isApplicationAuthenticated();
-      const currentRating = authenticated ? getLearnerPuzzleRating() : 400;
+      const practiceStats = getProfileLocalPracticeStatistics(authenticated);
+      const currentRating = practiceStats.score;
       const recorded = authenticated && Array.isArray(puzzleRatingHistory)
         ? puzzleRatingHistory
           .map((entry) => ({ rating: Number(entry?.rating), at: entry?.at || "" }))
@@ -13936,9 +14334,26 @@
           .slice(-11)
         : [];
       const latest = recorded.at(-1);
-      const points = latest?.rating === currentRating
+      const points = currentRating === null || latest?.rating === currentRating
         ? recorded
         : [...recorded, { rating: currentRating, at: "" }].slice(-12);
+      if (!points.length) {
+        document.querySelectorAll("[data-profile-history-status]").forEach((status) => {
+          status.textContent = authenticated ? "No local puzzle practice yet" : "Sign in to view saved practice";
+        });
+        document.querySelectorAll("[data-profile-rating-history]").forEach((chart) => {
+          const emptySignature = authenticated ? "empty-local-practice" : "guest-practice-unavailable";
+          chart.setAttribute("aria-label", authenticated
+            ? "No device-local puzzle practice estimate history is saved yet; this is not an Elo rating."
+            : "Puzzle practice history is unavailable for a guest profile.");
+          if (chart.dataset.profileRatingSignature === emptySignature) return;
+          chart.dataset.profileRatingSignature = emptySignature;
+          chart.replaceChildren(createBookText("span", "profile-rating-empty", authenticated
+            ? "Solve a puzzle to start a device-only trend."
+            : "Sign in to see locally saved practice."));
+        });
+        return;
+      }
       const ratings = points.map((point) => point.rating);
       const low = Math.min(400, ...ratings);
       const high = Math.max(...ratings, low + 40);
@@ -13947,8 +14362,9 @@
       const chartCeiling = high + (spread * 0.12);
       const historyCount = recorded.length;
       const historyLabel = historyCount
-        ? `${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"} tracked`
-        : "First puzzle starts your trend";
+        ? `${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"} · this device`
+        : "Local practice · this device";
+      const latestPracticeScore = currentRating ?? points.at(-1)?.rating ?? null;
       const historySignature = points.map((point) => `${point.rating}:${point.at || "current"}`).join("|");
 
       document.querySelectorAll("[data-profile-history-status]").forEach((status) => {
@@ -13956,8 +14372,8 @@
       });
       document.querySelectorAll("[data-profile-rating-history]").forEach((chart) => {
         const label = historyCount
-          ? `Puzzle rating trend across ${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"}. Current rating ${formatProfileNumber(currentRating)}.`
-          : `Current puzzle rating ${formatProfileNumber(currentRating)}. Complete puzzles to build a rating trend.`;
+          ? `Device-local puzzle practice estimate history across ${historyCount} recent ${historyCount === 1 ? "puzzle" : "puzzles"}; this is not an Elo rating. Latest estimate ${formatProfileNumber(currentRating ?? points.at(-1)?.rating)}.`
+          : `Device-local puzzle practice estimate ${formatProfileNumber(currentRating)}; this is not an Elo rating. Complete puzzles to build a local trend.`;
         chart.setAttribute("aria-label", label);
         if (chart.dataset.profileRatingSignature === historySignature) return;
         chart.dataset.profileRatingSignature = historySignature;
@@ -13995,11 +14411,11 @@
           marker.setAttribute("tabindex", "0");
           marker.setAttribute("role", "img");
           marker.setAttribute("aria-label", point.at
-            ? `${formatProfileNumber(point.rating)} puzzle rating - ${new Date(point.at).toLocaleDateString()}`
-            : `Current puzzle rating: ${formatProfileNumber(point.rating)}`);
+            ? `${formatProfileNumber(point.rating)} device-local practice estimate, not Elo - ${new Date(point.at).toLocaleDateString()}`
+            : `Current device-local practice estimate, not Elo: ${formatProfileNumber(point.rating)}`);
           svg.append(marker);
         });
-        const footer = createBookText("div", "profile-rating-axis", `${formatProfileNumber(points[0]?.rating || currentRating)}  ·  ${formatProfileNumber(currentRating)} current`);
+        const footer = createBookText("div", "profile-rating-axis", `${formatProfileNumber(points[0]?.rating ?? latestPracticeScore)}  ·  ${formatProfileNumber(latestPracticeScore)} latest estimate`);
         chart.replaceChildren(svg, footer);
       });
     }
@@ -14007,27 +14423,23 @@
     function renderProfileShowcase(profile = getDragonProfileSnapshot()) {
       const authenticated = isApplicationAuthenticated();
       const records = authenticated ? getCompletedGamesWithReviews() : [];
-      const recordedWins = records.filter((game) => game.result === "win").length;
-      const recordedDraws = records.filter((game) => game.result === "draw").length;
-      const recordedLosses = records.filter((game) => game.result === "loss").length;
-      const played = authenticated ? Math.max(0, Number(gameStats.played) || 0, recordedWins + recordedDraws + recordedLosses) : 0;
-      const wins = authenticated ? Math.min(played, Math.max(0, Number(gameStats.wins) || 0, recordedWins)) : 0;
-      const draws = authenticated ? Math.min(Math.max(0, played - wins), Math.max(0, Number(gameStats.draws) || 0, recordedDraws)) : 0;
-      const losses = authenticated ? Math.max(0, played - wins - draws, recordedLosses) : 0;
-      const puzzleAttemptsTotal = authenticated ? puzzleCorrect + Math.max(puzzleFailed, puzzleAttempts) : 0;
-      const puzzleAccuracy = puzzleAttemptsTotal ? getPuzzleAccuracy(0) : 0;
+      const serverStats = getProfileServerStatistics();
+      const practiceStats = getProfileLocalPracticeStatistics(authenticated);
       const setContent = (selector, nodes) => document.querySelectorAll(selector).forEach((target) => target.replaceChildren(...nodes));
       const metric = (value, label, tone = "") => {
         const node = createBookText("span", `profile-mini-stat${tone ? ` is-${tone}` : ""}`, "");
-        node.append(createBookText("strong", "", formatProfileNumber(value)), createBookText("small", "", label));
+        node.append(createBookText("strong", "", value === null ? "—" : formatProfileNumber(value)), createBookText("small", "", label));
         return node;
       };
 
-      setContent("[data-profile-record]", [metric(wins, "Wins", "positive"), metric(losses, "Losses", "negative"), metric(draws, "Draws")]);
-      setContent("[data-profile-puzzle-stats]", [metric(authenticated ? solvedPuzzles.size : 0, "Solved", "positive"), metric(puzzleAccuracy, "Accuracy"), metric(authenticated ? bestPuzzleStreak : 0, "Best streak")]);
+      setContent("[data-profile-record]", [metric(serverStats.wins, "Account wins", "positive"), metric(serverStats.losses, "Account losses", "negative"), metric(serverStats.draws, "Account draws")]);
+      setContent("[data-profile-puzzle-stats]", [
+        metric(practiceStats.solved, "Solved · device", "positive"),
+        metric(practiceStats.accuracy, "Accuracy · device"),
+        metric(practiceStats.bestStreak, "Best streak · device")
+      ]);
 
       const openingCounts = new Map();
-      if (authenticated && favoriteOpening) openingCounts.set(favoriteOpening, 1);
       if (authenticated) matchReviews.forEach((review) => {
         const opening = String(review?.summary?.opening || "").trim();
         if (opening) openingCounts.set(opening, (openingCounts.get(opening) || 0) + 1);
@@ -14036,10 +14448,10 @@
       setContent("[data-profile-openings]", openings.length
         ? openings.map(([name, count], index) => {
           const row = createBookText("div", "profile-favorite-row", "");
-          row.append(createBookText("span", "profile-favorite-rank", `${index + 1}`), createBookText("strong", "", name), createBookText("small", "", `${count} ${count === 1 ? "game" : "games"}`));
+          row.append(createBookText("span", "profile-favorite-rank", `${index + 1}`), createBookText("strong", "", name), createBookText("small", "", `${count} saved ${count === 1 ? "review" : "reviews"}`));
           return row;
         })
-        : [createBookText("p", "profile-empty-note", "Play or review a game to reveal your openings.")]);
+        : [createBookText("p", "profile-empty-note", "Save a game review with opening details to see patterns here.")]);
 
       const prefs = authenticated ? readLearnerPrefs() : { board: "wood", pieceSkin: "chessnut", backgroundTheme: "classic" };
       const cosmetics = [
@@ -14058,12 +14470,11 @@
         const progress = achievement.progress || { current: 0, target: 1, label: "progress" };
         card.append(
           createBookText("span", "profile-showcase-icon", achievement.icon),
-          createBookText("strong", "", achievement.secret && !achievement.unlocked ? "Secret achievement" : achievement.label),
-          createBookText("small", "", `${achievement.tier || "Milestone"} · ${achievement.unlocked ? "Unlocked" : `${Math.round(progress.current * 10) / 10}/${progress.target} ${progress.label}`}`),
-          createBookText("small", "profile-showcase-reward", `Reward: ${achievement.reward || "badge"}`)
+          createBookText("strong", "", achievement.secret && !achievement.unlocked ? "Secret milestone" : achievement.label),
+          createBookText("small", "", `${achievement.tier || "Milestone"} · ${achievement.unlocked ? "Reached on this device" : `${Math.round(progress.current * 10) / 10}/${progress.target} ${progress.label}`}`)
         );
-        card.title = achievement.condition || achievement.note || "Achievement";
-        card.setAttribute("aria-label", `${achievement.label}: ${achievement.unlocked ? "unlocked" : "locked"}. ${achievement.condition || "Hidden condition"}. Reward: ${achievement.reward || "badge"}`);
+        card.title = `${achievement.condition || achievement.note || "Activity milestone"}. Calculated on this device; no server achievement or reward is recorded.`;
+        card.setAttribute("aria-label", `${achievement.label}: ${achievement.unlocked ? "reached on this device" : "in progress"}. ${achievement.condition || "Hidden condition"}. No server reward is recorded.`);
         return card;
       }));
 
@@ -14077,7 +14488,7 @@
         const fill = createBookText("span", "", "");
         fill.style.width = `${progress.percent}%`;
         bar.append(fill);
-        card.append(head, bar, createBookText("small", "", progress.percent === 100 ? `${collection.reward?.label || "Collection reward"} unlocked` : `${progress.remaining} item${progress.remaining === 1 ? "" : "s"} remaining`));
+        card.append(head, bar, createBookText("small", "", progress.percent === 100 ? "Collection complete" : `${progress.remaining} item${progress.remaining === 1 ? "" : "s"} remaining`));
         return card;
       }));
 
@@ -14103,15 +14514,15 @@
         row.append(createBookText("span", "profile-match-result", resultLabel), opponent, createBookText("time", "", formatAccountDate(game.completedAt)));
         return row;
       }));
-      document.querySelectorAll("[data-profile-history-count]").forEach((target) => { target.textContent = records.length ? `${formatProfileNumber(records.length)} completed` : "No completed games"; });
+      document.querySelectorAll("[data-profile-history-count]").forEach((target) => { target.textContent = records.length ? `${formatProfileNumber(records.length)} saved locally` : "No saved reviews"; });
 
-      const seasonTarget = 1000;
-      const seasonXp = Math.max(0, Number(profile.xp) || 0);
-      const seasonPercent = Math.min(100, Math.round((seasonXp / seasonTarget) * 100));
-      document.querySelectorAll("[data-profile-season-xp]").forEach((target) => { target.textContent = `${formatProfileNumber(Math.min(seasonXp, seasonTarget))} / ${formatProfileNumber(seasonTarget)} XP`; });
-      document.querySelectorAll("[data-profile-season-fill]").forEach((target) => { target.style.width = `${seasonPercent}%`; });
-      document.querySelectorAll("[data-profile-season-label]").forEach((target) => { target.textContent = seasonXp >= seasonTarget ? "Season complete" : `${seasonPercent}% complete`; });
-      document.querySelectorAll("[data-profile-season-note]").forEach((target) => { target.textContent = seasonXp >= seasonTarget ? "You reached the current season milestone. Keep building your next streak." : "Profile XP counts toward this season track across games, puzzles, and lessons."; });
+      const milestoneTarget = 1000;
+      const profileXp = authenticated ? Math.max(0, Number(profile.xp) || 0) : null;
+      const milestonePercent = profileXp === null ? 0 : Math.min(100, Math.round((profileXp / milestoneTarget) * 100));
+      document.querySelectorAll("[data-profile-season-xp]").forEach((target) => { target.textContent = profileXp === null ? `— / ${formatProfileNumber(milestoneTarget)} XP` : `${formatProfileNumber(Math.min(profileXp, milestoneTarget))} / ${formatProfileNumber(milestoneTarget)} XP`; });
+      document.querySelectorAll("[data-profile-season-fill]").forEach((target) => { target.style.width = `${milestonePercent}%`; });
+      document.querySelectorAll("[data-profile-season-label]").forEach((target) => { target.textContent = profileXp === null ? "Not available" : `${milestonePercent}% of milestone`; });
+      document.querySelectorAll("[data-profile-season-note]").forEach((target) => { target.textContent = "A profile XP guidance target shown on this device; it is not a timed season or server achievement."; });
     }
 
     function getLearnerPuzzleRating() {
@@ -14127,6 +14538,57 @@
       const played = Math.max(0, Number(gameStats.played) || 0);
       const losses = Math.max(0, played - wins);
       return Math.max(400, 450 + (wins * 24) + (gameStats.cleanGames * 12) + (gameStats.endgameWins * 16) - (losses * 5));
+    }
+
+    function getProfileServerStatistics(profileData = applicationAuthAccount?.profileData, authenticated = isApplicationAuthenticated()) {
+      const unavailable = { gameRating: null, coins: null, xp: null, wins: null, losses: null, draws: null, gamesPlayed: null, winRate: null };
+      if (!authenticated || !profileData || typeof profileData !== "object") return unavailable;
+      const availability = profileData.profileMetricAvailability && typeof profileData.profileMetricAvailability === "object"
+        ? profileData.profileMetricAvailability
+        : {};
+      const read = (key) => {
+        if (availability[key] === false) return null;
+        const raw = profileData[key];
+        if ((typeof raw !== "number" && typeof raw !== "string") || (typeof raw === "string" && !raw.trim())) return null;
+        const value = Number(raw);
+        return Number.isFinite(value) && value >= 0 ? value : null;
+      };
+      const readWhole = (key) => {
+        const value = read(key);
+        return value !== null && Number.isSafeInteger(value) ? value : null;
+      };
+      const ratingValue = read("rating");
+      const gameRating = ratingValue !== null && ratingValue >= 400 && ratingValue <= 3000
+        ? Math.max(400, Math.round(ratingValue))
+        : null;
+      const wins = readWhole("wins");
+      const losses = readWhole("losses");
+      const draws = readWhole("draws");
+      const hasCompleteRecord = wins !== null && losses !== null && draws !== null;
+      const totalGames = hasCompleteRecord ? wins + losses + draws : null;
+      const gamesPlayed = Number.isSafeInteger(totalGames) ? totalGames : null;
+      return {
+        gameRating,
+        coins: readWhole("coins"),
+        xp: readWhole("xp"),
+        wins,
+        losses,
+        draws,
+        gamesPlayed,
+        winRate: gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : null
+      };
+    }
+
+    function getProfileLocalPracticeStatistics(authenticated = isApplicationAuthenticated()) {
+      if (!authenticated) return { attempts: null, solved: null, accuracy: null, bestStreak: null, score: null };
+      const attempts = Math.max(0, Number(puzzleAttempts) || 0, (Number(puzzleCorrect) || 0) + (Number(puzzleFailed) || 0));
+      return {
+        attempts,
+        solved: solvedPuzzles.size,
+        accuracy: attempts > 0 ? getPuzzleAccuracy(0) : null,
+        bestStreak: attempts > 0 ? Math.max(0, Number(bestPuzzleStreak) || 0) : null,
+        score: attempts > 0 ? getLearnerPuzzleRating() : null
+      };
     }
 
     function formatAccountDate(value) {
@@ -14260,6 +14722,9 @@
 
     function renderAccountVault(profile) {
       const account = getUserProfileSnapshot(profile);
+      const authenticated = isApplicationAuthenticated();
+      const serverStats = getProfileServerStatistics();
+      const practiceStats = getProfileLocalPracticeStatistics(authenticated);
       const setAccountText = (name, value) => {
         document.querySelectorAll(`[data-account-field="${name}"]`).forEach((element) => {
           element.textContent = value;
@@ -14267,21 +14732,32 @@
       };
       setAccountText("username", account.username);
       setAccountText("avatar", `${account.avatar.icon} ${account.avatar.label}`);
-      setAccountText("level", account.level);
-      setAccountText("title", account.title);
-      setAccountText("xp", `${formatProfileNumber(account.xp)} XP`);
-      setAccountText("streak", `${formatProfileNumber(account.currentStreak)} days`);
-      setAccountText("puzzleRating", account.puzzleRating);
-      setAccountText("gameRating", account.gameRating);
-      setAccountText("achievements", `${account.achievements.length}/${profile.achievements.length}`);
-      setAccountText("story", `${account.storyProgress.completed}/${account.storyProgress.total}`);
+      setAccountText("level", authenticated ? account.level : "—");
+      setAccountText("title", authenticated ? account.title : "—");
+      setAccountText("xp", authenticated ? `${formatProfileNumber(account.xp)} XP · this device` : "—");
+      setAccountText("streak", authenticated ? `${formatProfileNumber(account.currentStreak)} days · this device` : "—");
+      setAccountText("puzzleRating", practiceStats.score === null ? "—" : `${formatProfileNumber(practiceStats.score)} · device estimate, not Elo`);
+      setAccountText("gameRating", serverStats.gameRating === null ? "—" : `${formatProfileNumber(serverStats.gameRating)} Elo`);
+      setAccountText("achievements", authenticated ? `${account.achievements.length} local milestones` : "—");
+      setAccountText("story", authenticated ? `${account.storyProgress.completed}/${account.storyProgress.total} · this device` : "—");
       setAccountText("settings", `${account.settings.theme} / ${account.settings.board}`);
-      setAccountText("stats", `${formatProfileNumber(account.statistics.gamesPlayed)} games - ${formatProfileNumber(account.statistics.puzzlesSolved)} puzzles`);
-      setAccountText("joinDate", formatAccountDate(account.joinDate));
-      setAccountText("lastLogin", formatAccountDate(account.lastLogin));
+      setAccountText("stats", `${serverStats.gamesPlayed === null ? "—" : `${formatProfileNumber(serverStats.gamesPlayed)} account games`} · ${practiceStats.solved === null ? "—" : `${formatProfileNumber(practiceStats.solved)} local puzzles`}`);
+      setAccountText("joinDate", authenticated ? formatAccountDate(account.joinDate) : "—");
+      setAccountText("lastLogin", authenticated ? formatAccountDate(account.lastLogin) : "—");
+      document.querySelectorAll("[data-account-source-note]").forEach((note) => {
+        note.textContent = authenticated
+          ? "Ratings, account XP, coins, and game totals come from the signed-in profile when present. The separate device XP estimate, level progress, practice, milestones, streak, and story progress are local, not synced achievements or rewards."
+          : "Guest activity is not presented as account progress. Sign in to load profile-backed ratings, XP, wallet, and game totals.";
+      });
+      document.querySelectorAll("[data-account-vault-description]").forEach((note) => {
+        note.textContent = authenticated
+          ? "Your signed-in identity and profile-backed ratings, XP, wallet, and game totals appear here; device-only progress is identified separately."
+          : "Local preferences stay in this browser. Account-backed ratings, XP, wallet, and game totals appear after sign-in.";
+      });
     }
 
     function getDailyChallengeName() {
+      if (!dailyPuzzleLaunchEnabled) return "Puzzle practice";
       if (!Array.isArray(puzzles) || !puzzles.length) return "";
       const puzzle = puzzles[getDailyPuzzleIndex()];
       if (!puzzle) return "";
@@ -14940,7 +15416,12 @@
     }
 
     function rememberVisitSnapshot() {
-      writeJsonStorage(visitSnapshotStorageKey, getCurrentVisitSnapshot());
+      const snapshot = getCurrentVisitSnapshot();
+      // Do not recreate an empty account-scoped record when an untouched guest
+      // page exits after logout. Real guest activity still keeps its recap.
+      if (!isApplicationAuthenticated() && !["xp", "solved", "coins", "streak", "best", "lessons", "games"]
+        .some((key) => Number(snapshot[key]) > 0)) return;
+      writeJsonStorage(visitSnapshotStorageKey, snapshot);
     }
 
     function getMissionWeekKey(date = new Date()) {
@@ -15306,7 +15787,7 @@
       if (dailyGoal) {
         dailyGoal.textContent = dailyGoalProgress.complete
           ? "Daily complete"
-          : `Daily: ${dailyGoalProgress.doneCount}/${dailyGoalProgress.goals.length}`;
+          : `Today: ${dailyGoalProgress.doneCount}/${dailyGoalProgress.goals.length}`;
         dailyGoal.title = dailyGoalProgress.complete
           ? "All daily goals are complete."
           : `${dailyGoalProgress.goals.length - dailyGoalProgress.doneCount} daily ${dailyGoalProgress.goals.length - dailyGoalProgress.doneCount === 1 ? "goal" : "goals"} left.`;
@@ -15327,12 +15808,12 @@
         ? ["Practice one tactic pattern before playing. This stops free-piece losses fast.", "#puzzles", "Train tactics", "puzzle-plan", "Tactics"]
         : completedToday
           ? [`Open Lesson ${nextLesson} and learn one tiny rule.`, "#paths", "Continue learning", "", ""]
-          : ["Solve today's puzzle for XP and coins.", "#puzzles", "Start daily puzzle", "daily-puzzle", ""];
+          : ["Choose a puzzle to practice.", "#puzzles", "Practice puzzles", "puzzle-plan", "adaptive"];
       const onboardingPlan = authenticated && !safeGameStats.played && !lessonCount ? getOnboardingPlan(readLearnerProfile()) : null;
       const nextStep = onboardingPlan || defaultNextStep;
       const recommendations = [
         { label: `Continue Lesson ${nextLesson}`, href: "#paths" },
-        { label: completedToday ? "Continue Learning" : "Puzzle of the Day", href: "#puzzles", action: completedToday ? "" : "daily-puzzle" },
+        { label: completedToday ? "Continue Learning" : "Puzzle practice", href: "#puzzles", action: completedToday ? "" : "puzzle-plan", plan: "adaptive" },
         { label: needsTactics ? "Fork Practice" : focus.related, href: needsTactics ? "#puzzles" : focus.href, action: needsTactics || focus.href === "#puzzles" ? "puzzle-plan" : "", plan: focusPuzzlePlan },
         { label: "Practice Mistakes", href: "#play" }
       ];
@@ -15347,7 +15828,7 @@
       }
       setHomeStat("homeGamesPlayed", formatProfileNumber(safeGameStats.played), safeGameStats.played ? `${safeGameStats.wins || 0} wins recorded` : "Play one friendly AI game to start this stat.");
       setHomeStat("homeThemesMastered", formatProfileNumber(masteredThemes.length), masteredThemes.length ? masteredThemes.join(", ") : "Solve two puzzles from one theme to master it.");
-      setHomeStat("homeStreak", `${formatProfileNumber(currentStreak)} days`, currentStreak ? "Keep the tiny daily habit alive." : "Finish one daily puzzle to start a streak.");
+      setHomeStat("homeStreak", `${formatProfileNumber(currentStreak)} days`, currentStreak ? "Keep the tiny daily habit alive." : "Complete today's practice goals to start a streak.");
       setHomeStat("homeLearningTime", formatLearningTime(learningMinutes), "Estimated from completed lessons, puzzles, attempts, and games.");
       setHomeStat("homeSkillsUnlocked", formatProfileNumber(unlockedSkills.length), unlockedSkills.length ? unlockedSkills.join(", ") : "First unlock: solve one puzzle.");
       setHomeStat("homeXp", `${formatProfileNumber(profileSnapshot?.xp ?? safePuzzleXp)} XP`, `${lessonCount} lessons done`);
@@ -15478,8 +15959,8 @@
         winRatePill.textContent = "Win rate 0%";
         solvedPill.textContent = "Puzzles solved 0";
         bestPill.textContent = "Best streak 0";
-        dailyPill.textContent = "Daily challenge";
-        dailyStreakPill.textContent = "Current streak 0";
+        dailyPill.textContent = dailyPuzzleLaunchEnabled ? "Daily challenge" : "Daily Puzzle unavailable";
+        dailyStreakPill.textContent = dailyPuzzleLaunchEnabled ? "Current streak 0" : "Daily Puzzle streak unavailable";
         lessonPill.textContent = "Missions completed 0";
         openingPill.textContent = "Favorite opening: None";
         openingPill.title = "Sign in to track opening progress.";
@@ -15488,7 +15969,9 @@
         if (moveQualityPill) moveQualityPill.textContent = "Move quality 0%";
         if (puzzleRatingPill) puzzleRatingPill.textContent = "Puzzle rating 400";
         if (timePill) timePill.textContent = "Time: ready";
-        dailyReward.textContent = "Sign in to track daily progress.";
+        dailyReward.textContent = dailyPuzzleLaunchEnabled
+          ? "Sign in to track daily progress."
+          : "Daily Puzzle is unavailable until a rights-cleared production catalog is approved.";
         coach.textContent = "Sign in to save your coach plan and puzzle progress.";
         badges.replaceChildren();
         chart.replaceChildren();
@@ -15530,8 +16013,10 @@
       solvedPill.textContent = `Puzzles solved ${solvedPuzzles.size}`;
       bestPill.textContent = `Best streak ${bestPuzzleStreak}`;
       const dailyChallengeName = getDailyChallengeName();
-      dailyPill.textContent = completedToday ? "Daily challenge done" : dailyChallengeName ? `Daily: ${dailyChallengeName}` : "Daily challenge unavailable";
-      dailyStreakPill.textContent = `Current streak ${dailyHabit.streak}`;
+      dailyPill.textContent = dailyPuzzleLaunchEnabled
+        ? completedToday ? "Daily challenge done" : dailyChallengeName ? `Daily: ${dailyChallengeName}` : "Daily challenge unavailable"
+        : "Daily Puzzle unavailable";
+      dailyStreakPill.textContent = dailyPuzzleLaunchEnabled ? `Current streak ${dailyHabit.streak}` : "Daily Puzzle streak unavailable";
       lessonPill.textContent = `Missions completed ${lessonCount}`;
       const mostReviewedOpening = getMostReviewedOpening();
       openingPill.textContent = `Favorite opening: ${favoriteOpening}`;
@@ -15547,9 +16032,11 @@
       const weakTheme = getCoachWeakTheme();
       const nextLesson = getCoachNextLesson();
       const smart = getSmartPuzzleRecommendation();
-      dailyReward.textContent = completedToday
-        ? `Daily reward unlocked. Weekly ${weeklyXp}/120 XP. Monthly chests ${puzzleChests}.`
-        : `Daily mission: solve 1 ${smart.type} puzzle, then open ${nextLesson.label}. Weekly ${weeklyXp}/120 XP.`;
+      dailyReward.textContent = !dailyPuzzleLaunchEnabled
+        ? "Daily Puzzle is unavailable until a rights-cleared production catalog is approved."
+        : completedToday
+          ? `Daily reward unlocked. Weekly ${weeklyXp}/120 XP. Monthly chests ${puzzleChests}.`
+          : `Daily mission: solve 1 ${smart.type} puzzle, then open ${nextLesson.label}. Weekly ${weeklyXp}/120 XP.`;
       const activePuzzle = Array.isArray(puzzles) ? puzzles[currentPuzzle] : null;
       const homeCoachMessage = puzzleAttempts
         ? `Nice effort. ${activePuzzlePlan === "adaptive" ? `Adaptive is giving you ${smart.level} puzzles. ` : ""}${smart.message} One helpful idea: ${activePuzzle?.hint || "scan checks, captures, and threats."}`
@@ -15615,7 +16102,7 @@
     }
 
     function getDailyPuzzleIndex() {
-      if (!Array.isArray(puzzles) || !puzzles.length) return -1;
+      if (!dailyPuzzleLaunchEnabled || !Array.isArray(puzzles) || !puzzles.length) return -1;
       const today = new Date();
       const key = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
       return Math.floor(key / 86400000) % puzzles.length;
@@ -15625,7 +16112,7 @@
       const badge = document.getElementById("dailyPuzzleBadge");
       if (!badge) return;
 
-      badge.textContent = currentPuzzle === getDailyPuzzleIndex() ? getDailyChallengeName() : "Practice puzzle";
+      badge.textContent = dailyPuzzleLaunchEnabled && currentPuzzle === getDailyPuzzleIndex() ? getDailyChallengeName() : "Puzzle practice";
     }
 
     function getPuzzleSideColor(puzzle) {
@@ -16118,7 +16605,7 @@
       const next = getNextRecommendedPuzzle();
       const smart = getSmartPuzzleRecommendation();
       summary.textContent = `Accuracy ${accuracy}%. Time ${document.getElementById("puzzleClock").textContent}. Rating ${getPuzzleRating()}. Themes: ${tags}. ${getPuzzleRuleResultText()} Solution: ${getPuzzleLine().join(" ")}`;
-      explanation.textContent = `Why it works: ${puzzles[currentPuzzle].feedback} ${smart.message} Try next: ${next?.title || "Daily Puzzle"}.`;
+      explanation.textContent = `Why it works: ${puzzles[currentPuzzle].feedback} ${smart.message} Try next: ${next?.title || "another practice puzzle"}.`;
     }
 
     function scheduleNextPuzzle() {
@@ -16653,7 +17140,7 @@
       hard: { skill: 11, depth: 8, elo: 1750, uciElo: 1750, movetime: 360, nodes: 9000, label: "Hard engine" },
       expert: { skill: 15, depth: 10, elo: 1900, uciElo: 1900, movetime: 650, nodes: 22000, label: "Expert engine" },
       master: { skill: 20, depth: 13, elo: 2300, uciElo: 2300, movetime: 1600, nodes: 70000, label: "Master engine" },
-      strong: { skill: 20, depth: 13, elo: 2000, uciElo: 2000, movetime: 2200, nodes: 0, label: "2000 Elo engine" },
+      strong: { skill: 20, depth: 13, elo: 2000, uciElo: 2000, movetime: 2200, nodes: 0, label: "Stockfish challenge preset" },
       village1: { skill: 0, depth: 1, elo: 850, uciElo: 1320, movetime: 90, nodes: 220, label: "Village Guard" },
       village2: { skill: 1, depth: 2, elo: 950, uciElo: 1320, movetime: 130, nodes: 450, label: "Market Defender" },
       village3: { skill: 2, depth: 3, elo: 1050, uciElo: 1320, movetime: 180, nodes: 850, label: "Mayor's Helper" },
@@ -16682,7 +17169,7 @@
         elo: bot.elo,
         uciElo: 1320,
         movetime: bot.movetime,
-        nodes: 80 + bot.elo,
+        nodes: 0,
         label: bot.name,
         beginnerBot: true,
         blunder: bot.blunder
@@ -16750,6 +17237,9 @@
     let messagingRealtimeUnsubscribe = null;
     let messagingRealtimeSubscribing = false;
     let messagingRefreshPromise = null;
+    let messagingRefreshAccountId = "";
+    let messagingRequestGeneration = 0;
+    let messagingConversationRequest = 0;
     let messagingTypingTimer = 0;
     let messagingTypingStopTimer = 0;
     let messagingRemoteTypingTimer = 0;
@@ -16785,10 +17275,14 @@
     let publicProfileRequest = 0;
     let socialNotificationState = [];
     let socialNotificationRefreshPromise = null;
+    let socialNotificationRefreshAccountId = "";
+    let socialNotificationGeneration = 0;
     let socialNotificationUnsubscribe = null;
     let socialNotificationSubscribing = false;
     let socialActivityState = [];
     let socialActivityRefreshPromise = null;
+    let socialActivityRefreshAccountId = "";
+    let socialActivityGeneration = 0;
     let socialActivityUnsubscribe = null;
     let socialActivitySubscribing = false;
     let serverPrivacyHydratedFor = "";
@@ -16818,6 +17312,7 @@
     let friendIncomingNoticeCode = "";
     let friendUiAbortController = null;
     const friendActionLocks = new Map();
+    const friendRequestActionLocks = new Map();
     let coachPremove = null;
     let tournamentRuntime = { events: [], currentCode: "", refreshPromise: null, lastRefresh: 0, timer: 0, inviteResults: [], unsubscribe: null, subscribing: false, subscriptionGeneration: 0, launchingPairingId: "", launchTimer: 0, nextLaunchAt: 0, renderSignature: "", lastPresencePulse: 0, lastPresenceConnected: null };
     let chessRulesPromise = null;
@@ -16944,13 +17439,10 @@
         ? activeMatchReview
         : (Array.isArray(matchReviews) ? matchReviews.find((item) => item?.pgn === pgn) : null);
       const playerColor = coachPlayerColor === "b" ? "b" : "w";
-      const accuracy = playerColor === "b" ? review?.blackAccuracy : review?.whiteAccuracy;
-      const losses = (review?.moves || [])
-        .filter((move) => move?.color === playerColor && move?.engineVerified && Number.isFinite(Number(move.cpLoss)))
-        .map((move) => Number(move.cpLoss));
+      const metrics = getReviewMetricSummary(review, playerColor);
       return {
-        accuracy: Number.isFinite(Number(accuracy)) ? Math.round(Number(accuracy) * 10) / 10 : null,
-        averageCentipawnLoss: losses.length ? Math.round(losses.reduce((total, loss) => total + loss, 0) / losses.length) : null
+        engineCoverage: metrics ? `${metrics.checkedMoves}/${metrics.totalMoves}` : null,
+        averageCentipawnLoss: metrics?.averageCentipawnLoss ?? null
       };
     }
 
@@ -16989,7 +17481,7 @@
         rematch.textContent = "Rematch";
       }
       if (summary) summary.textContent = reasonText;
-      if (accuracy) accuracy.textContent = metrics.accuracy === null ? "Pending" : `${metrics.accuracy}%`;
+      if (accuracy) accuracy.textContent = metrics.engineCoverage === null ? "Not analyzed" : `${metrics.engineCoverage} moves`;
       if (movesStat) movesStat.textContent = String(moves);
       if (duration) duration.textContent = formatPostGameDuration(matchEndedElapsedMs);
       if (acplStat) acplStat.hidden = metrics.averageCentipawnLoss === null;
@@ -17116,7 +17608,7 @@
 
     function setCoachDifficulty(level) {
       coachDifficulty = level && (stockfishLevels[level] || getBeginnerBot(level)) ? level : "";
-      cancelStockfishSearch("Difficulty changed");
+      cancelStockfishSearch("Difficulty changed", true);
       if (coachThinking) {
         coachMoveToken += 1;
         coachThinking = false;
@@ -17127,11 +17619,16 @@
       document.querySelectorAll("[data-beginner-bot]").forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.beginnerBot === coachDifficulty));
       });
-      const labels = { beginner: "Beginner engine", easy: "Easy engine", medium: "Medium engine", hard: "Hard engine", expert: "Expert engine", master: "Master engine", strong: "2000 Elo bot" };
       const config = getCoachConfig();
-      document.getElementById("gameDifficultyBadge").textContent = coachDifficulty ? (labels[coachDifficulty] || config.label) : "No bot selected";
-      const gameEloBadge = document.getElementById("gameEloBadge");
-      if (gameEloBadge) gameEloBadge.textContent = coachDifficulty ? `${config.elo} Elo` : "— Elo";
+      const difficultyBadge = document.getElementById("gameDifficultyBadge");
+      if (difficultyBadge) difficultyBadge.textContent = coachDifficulty ? getCoachDifficultyDisplay() : "No bot selected";
+      const strengthBadge = document.getElementById("gameStrengthBadge");
+      if (strengthBadge) strengthBadge.textContent = coachDifficulty
+        ? config.beginnerBot ? "Practice model · no Elo rating" : `Skill setting ${config.skill}/20 · not rating-calibrated`
+        : "No calibrated rating";
+      const engineBadge = document.getElementById("playEngineBadge");
+      if (engineBadge) engineBadge.textContent = coachDifficulty ? getCoachEngineDisplay(config) : "Choose a bot";
+      stockfishInfo.lastMoveSource = "";
       stockfishInfo.depth = config.depth || stockfishInfo.depth;
       updateAiPlayerHeader();
       updateEnginePanel();
@@ -17148,7 +17645,41 @@
 
     function setFriendConnectionState(state = "idle", message = "") {
       friendConnectionState = { state, message };
+      updateFriendsHubRealtimeBadge();
       renderFriendConnectionStatus();
+    }
+
+    function updateFriendsHubRealtimeBadge() {
+      const badge = document.getElementById("friendsHubLiveStatus");
+      if (!badge) return;
+      const label = !isApplicationAuthenticated()
+        ? "Sign in for live presence"
+        : friendRealtimeReady
+          ? "Live updates connected"
+          : friendConnectionState.state === "reconnecting"
+            ? "Reconnecting"
+            : friendNetworkSubscribing
+              ? "Connecting"
+              : "Live updates unavailable";
+      const dot = badge.querySelector(".friend-status-dot");
+      if (dot) dot.classList.toggle("is-offline", !friendRealtimeReady);
+      badge.classList.toggle("is-offline", !friendRealtimeReady);
+      const text = badge.querySelector("[data-friends-live-label]");
+      if (text) text.textContent = label;
+      badge.setAttribute("aria-label", label);
+      badge.title = label;
+      const status = document.getElementById("friendsHubStatus");
+      if (status) {
+        status.textContent = !isApplicationAuthenticated()
+          ? "Sign in to connect your Friends network."
+          : friendRealtimeReady
+            ? `${friendNetworkState.directory.filter((friend) => friend.requestStatus === "accepted" && friend.online).length} online · live updates connected.`
+            : friendConnectionState.state === "reconnecting"
+              ? "Reconnecting to live presence."
+              : friendNetworkSubscribing
+                ? "Connecting to live presence."
+                : "Live presence unavailable.";
+      }
     }
 
     function getFriendConnectionStatus(state = friendChallengeState || readFriendChallengeState()) {
@@ -17243,9 +17774,11 @@
       updateAiPlayerHeader();
       updateCoachPanel();
       anchorActivePlayWorkspace();
-      window.requestAnimationFrame(() => {
-        if (document.getElementById("play")?.classList.contains("is-active-panel")) void initializeCoachEngine();
-      });
+      if (!getCoachConfig().beginnerBot) {
+        window.requestAnimationFrame(() => {
+          if (coachSessionActive && document.getElementById("play")?.classList.contains("is-active-panel")) void initializeCoachEngine();
+        });
+      }
     }
 
     function getCoachSkill() {
@@ -17255,13 +17788,14 @@
     function getCoachConfig(level = coachDifficulty) {
       const bot = getBeginnerBot(level);
       if (bot) {
-        const elo = Math.max(200, Number(bot.elo) || 1000);
         return normalizeStockfishConfig({
           ...bot,
-          label: bot.name + " engine",
-          uciElo: elo,
+          label: `${bot.name} · ${bot.engineRequired ? "Stockfish 16" : "local practice"}`,
+          uciElo: 1320,
           nodes: 0,
-          limitStrength: true
+          limitStrength: false,
+          beginnerBot: !bot.engineRequired,
+          engineRequired: bot.engineRequired
         });
       }
       return normalizeStockfishConfig(stockfishLevels[level] || stockfishLevels.easy);
@@ -17269,6 +17803,25 @@
 
     function getBeginnerBot(id = coachDifficulty) {
       return beginnerBots.find((bot) => bot.id === id) || null;
+    }
+
+    function getCoachDifficultyDisplay(level = coachDifficulty) {
+      const bot = getBeginnerBot(level);
+      if (bot) return `Level ${bot.difficultyIndex} · ${bot.category}`;
+      const labels = {
+        beginner: "Beginner engine",
+        easy: "Easy engine",
+        medium: "Medium engine",
+        hard: "Hard engine",
+        expert: "Expert engine",
+        master: "Master engine",
+        strong: "Stockfish challenge preset"
+      };
+      return labels[level] || getCoachConfig(level).label || "Choose a level";
+    }
+
+    function getCoachEngineDisplay(config = getCoachConfig()) {
+      return config.beginnerBot ? "Local practice model" : "Stockfish 16 Lite · WASM";
     }
 
     function pickBotLine(type, bot = getBeginnerBot()) {
@@ -17354,13 +17907,13 @@
         button.setAttribute("aria-pressed", String(coachDifficulty === bot.id));
         button.title = unlocked ? `${bot.bio} Favorite opening: ${bot.opening}.` : `Defeat ${beginnerBots[index - 1]?.name || "the previous bot"} to unlock.`;
         const copy = createBookText("span", "beginner-bot-copy", "");
-        const botName = createBookText("strong", "", `${bot.name} · ${bot.elo}`);
+        const botName = createBookText("strong", "", `${bot.name} · Level ${bot.difficultyIndex}`);
         copy.append(
           botName,
-          createBookText("small", "", unlocked ? `${bot.personality} · ${bot.opening}` : "Locked"),
+          createBookText("small", "", unlocked ? `${bot.category} · ${getCoachEngineDisplay(getCoachConfig(bot.id))}` : "Locked"),
           createBookText("small", "", unlocked ? `${bot.bio} · ${wins} win${wins === 1 ? "" : "s"} · +${bot.reward} coins` : "Beat the bot before this one")
         );
-        const botIdentity = getPlayerIdentityModel({ name: `${bot.name} · ${bot.elo}`, title: bot.personality, avatar: unlocked ? bot.avatar : "🔒", isPlayer: false }, { isPlayer: false, variant: "compact" });
+        const botIdentity = getPlayerIdentityModel({ name: `${bot.name} · Level ${bot.difficultyIndex}`, title: bot.personality, avatar: unlocked ? bot.avatar : "🔒", isPlayer: false }, { isPlayer: false, variant: "compact" });
         renderSharedIdentityLine(copy, botIdentity, { nameSelector: "strong", variant: "compact" });
         const botAvatar = createBookText("span", "beginner-bot-avatar player-identity-avatar", unlocked ? bot.avatar : "🔒");
         applySharedAvatarElement(botAvatar, botIdentity, { variant: "compact" });
@@ -17483,10 +18036,10 @@
         const query = search.value.trim().toLowerCase();
         const queryTerms = query.split(/\s+/).filter(Boolean);
         const matches = beginnerBots.filter((bot) => {
-          const words = [bot.name, bot.elo, bot.personality, bot.opening, bot.bio, bot.style, bot.category].join(" ").toLowerCase();
+          const words = [bot.name, bot.personality, bot.opening, bot.bio, bot.style, bot.category, bot.difficultyIndex].join(" ").toLowerCase();
           return (filter.value === "All" || bot.category === filter.value) && queryTerms.every((term) => words.includes(term));
         });
-        const hasCustomView = Boolean(query) || filter.value !== "All" || sort.value !== "rating-asc";
+        const hasCustomView = Boolean(query) || filter.value !== "All" || sort.value !== "difficulty-asc";
         if (results) {
           const levelCopy = filter.value === "All" ? "" : ` · ${filter.value}`;
           results.textContent = `${matches.length} of ${beginnerBots.length} opponents${levelCopy}`;
@@ -17499,9 +18052,9 @@
         }
         const groups = categories.map((category) => {
           const bots = matches.filter((bot) => bot.category === category).sort((a, b) => {
-            if (sort.value === "rating-desc") return b.elo - a.elo;
+            if (sort.value === "difficulty-desc") return b.difficultyIndex - a.difficultyIndex;
             if (sort.value === "name") return a.name.localeCompare(b.name);
-            return a.elo - b.elo;
+            return a.difficultyIndex - b.difficultyIndex;
           });
           if (!bots.length) return null;
           const section = document.createElement("section");
@@ -17527,9 +18080,9 @@
             copy.className = "ai-bot-card-copy";
             const meta = document.createElement("div");
             meta.className = "ai-bot-card-meta";
-            const elo = createBookText("span", "ai-bot-rating", `${bot.elo} Elo`);
+            const difficulty = createBookText("span", "ai-bot-rating", `Level ${bot.difficultyIndex} · ${bot.category}`);
             const identity = createBookText("span", "ai-bot-identity", `${bot.personality} · ${bot.opening}`);
-            meta.append(elo, identity);
+            meta.append(difficulty, identity);
             const nameLine = createBookText("span", "ai-bot-card-name-line", "");
             const botName = createBookText("strong", "", bot.name);
             nameLine.append(botName);
@@ -17549,7 +18102,7 @@
             const play = createBookText("button", "button", "Play");
             play.type = "button";
             play.dataset.aiBotPlay = bot.id;
-            play.setAttribute("aria-label", `Play ${bot.name}, ${bot.elo} Elo`);
+            play.setAttribute("aria-label", `Play ${bot.name}, practice level ${bot.difficultyIndex} of ${beginnerBots.length}, ${bot.category}`);
             card.append(avatar, copy, details, play);
             grid.append(card);
           });
@@ -17562,7 +18115,7 @@
       filter.addEventListener("change", render);
       sort.addEventListener("change", render);
       clear?.addEventListener("click", () => { search.value = ""; search.focus(); render(); });
-      reset?.addEventListener("click", () => { search.value = ""; filter.value = "All"; sort.value = "rating-asc"; search.focus(); render(); });
+      reset?.addEventListener("click", () => { search.value = ""; filter.value = "All"; sort.value = "difficulty-asc"; search.focus(); render(); });
       roster.addEventListener("click", (event) => { const button = event.target instanceof Element ? event.target.closest("[data-ai-bot-play]") : null; if (!button) return; const link = [...document.querySelectorAll('[data-site-tab="play"]')].find((item) => item.getAttribute("href") === "#play"); link?.click(); void initializeDeferredFeature("play").then(() => openAiGameReady(button.dataset.aiBotPlay, { trigger: button })); });
       const featuredPlay = document.getElementById("aiFeaturedCoachPlay");
       featuredPlay?.addEventListener("click", () => {
@@ -17587,10 +18140,10 @@
         .map((move) => ({ move, score: rankResponsiveCoachMove(move, earlyGame) }))
         .sort((a, b) => b.score - a.score);
       if (Math.random() < (config.blunder || 0.16) && scored.length > 2) {
-        const maxIndex = bot?.elo < 500 ? 5 : bot?.elo < 850 ? 3 : 2;
-        return scored[Math.min(scored.length - 1, 1 + Math.floor(Math.random() * maxIndex))].move;
+        const errorPool = Math.min(scored.length, Math.max(2, (bot?.practicePool || 1) + 2));
+        return scored[1 + Math.floor(Math.random() * Math.max(1, errorPool - 1))].move;
       }
-      const poolSize = bot?.elo < 500 ? 3 : bot?.elo < 850 ? 2 : 1;
+      const poolSize = Math.max(1, Number(bot?.practicePool) || 1);
       return scored[Math.floor(Math.random() * Math.min(poolSize, scored.length))].move;
     }
 
@@ -17695,7 +18248,7 @@
       updateMatchSeatLayout();
       const config = getCoachConfig();
       const ai = getAiHeaderProfile();
-      const displayRating = ai.isPlaceholder ? 0 : Math.max(400, Number(ai.rating) || Number(config.elo) || 450);
+      const displayRating = ai.isFriend ? Math.max(0, Number(ai.rating) || 0) : null;
       const isGameOver = coachGame && isCoachGameOver();
       const isMate = coachGame && callCoachRule(coachGame, "isCheckmate", "in_checkmate");
       const botColor = getCoachBotColor();
@@ -17716,23 +18269,29 @@
         renderSharedIdentityLine(aiLine, aiModel, { nameSelector: "#aiPlayerName", variant: "compact" });
       }
       document.getElementById("aiPlayerTitle").textContent = ai.title;
-      document.getElementById("aiPlayerRating").textContent = ai.isPlaceholder ? "—" : `${displayRating} Elo`;
+      document.getElementById("aiPlayerRating").textContent = ai.isPlaceholder
+        ? "Choose a difficulty"
+        : ai.isFriend
+          ? displayRating ? `${displayRating} Elo` : "Rating unavailable"
+          : getCoachDifficultyDisplay();
       const aiSide = card.querySelector("[data-ai-frame-side]");
       if (aiSide) aiSide.textContent = getCoachColorName(botColor);
       const selectedBot = getBeginnerBot();
       const botGames = selectedBot
         ? Math.max(0, Number(beginnerBotState.wins[selectedBot.id]) || 0) + Math.max(0, Number(beginnerBotState.losses[selectedBot.id]) || 0)
         : 0;
-      const botWins = selectedBot ? Math.max(0, Number(beginnerBotState.losses[selectedBot.id]) || 0) : 0;
+      const botWins = selectedBot ? Math.max(0, Number(beginnerBotState.wins[selectedBot.id]) || 0) : 0;
       const setFrameStat = (key, value) => {
         const field = card.querySelector(`[data-ai-stat="${key}"]`);
         if (field) field.textContent = value;
       };
-      setFrameStat("engine", ai.isPlaceholder ? "—" : ai.isFriend ? "Realtime match" : "Stockfish 16");
+      setFrameStat("engine", ai.isPlaceholder ? "—" : ai.isFriend ? "Realtime match" : getCoachEngineDisplay(config));
       setFrameStat("difficulty", ai.isPlaceholder ? "Choose a bot" : ai.isFriend ? (friendChallengeState?.gameType || "Casual") : config.label);
-      setFrameStat("rating", ai.isPlaceholder ? "—" : `${displayRating} Elo`);
+      setFrameStat("rating", ai.isPlaceholder ? "Choose a level" : ai.isFriend ? (displayRating ? `${displayRating} Elo` : "Rating unavailable") : getCoachDifficultyDisplay());
+      const ratingLabel = card.querySelector('[data-ai-stat="rating"]')?.previousElementSibling;
+      if (ratingLabel) ratingLabel.textContent = ai.isFriend ? "Rating" : "Practice level";
       setFrameStat("style", ai.isPlaceholder ? "Choose a bot" : ai.isFriend ? "Live player" : selectedBot?.style || selectedBot?.opening || "Balanced engine");
-      setFrameStat("strength", ai.isPlaceholder ? "—" : ai.isFriend ? "Player" : `Skill ${config.skill}/20`);
+      setFrameStat("strength", ai.isPlaceholder ? "—" : ai.isFriend ? "Player" : config.beginnerBot ? "Local practice profile" : `Skill setting ${config.skill}/20 · not Elo-calibrated`);
       setFrameStat("level", ai.isPlaceholder ? "Setup" : ai.title || "Opponent");
       const description = card.querySelector("[data-ai-description]");
       if (description) description.textContent = ai.isFriend
@@ -17751,12 +18310,12 @@
       document.getElementById("aiMoveIndicator").textContent = ai.isPlaceholder ? "—" : getCoachColorName(botColor);
       document.getElementById("aiPlayerStatus").textContent = ai.isFriend
         ? (!navigator.onLine || !ai.online ? "Offline" : isGameOver ? "Review" : coachGame?.turn() === botColor ? "Their turn" : "Online")
-        : ai.isPlaceholder ? "Waiting" : coachThinking ? "Thinking..." : isGameOver ? "Review" : "Online";
+        : ai.isPlaceholder ? "Waiting" : coachThinking ? "Thinking..." : isGameOver ? "Review" : stockfishInfo.lastMoveSource === "legal fallback" ? "Local fallback" : stockfishFailed && !config.beginnerBot ? "Engine unavailable" : config.beginnerBot ? "Local practice" : stockfishReady ? "Ready" : "Loading engine";
       document.getElementById("aiLastMove").textContent = `Last: ${coachLastMove?.san || "--"}`;
       card.title = ai.isFriend
         ? `${ai.name} - ${ai.title}. ${displayRating} Elo.`
         : ai.isPlaceholder ? "Choose an AI bot to start a game."
-          : `${ai.name}: ${ai.title}. Plays ${config.label}, depth ${config.depth}. Favorite openings: Italian, Queen's Gambit, Sicilian setups.`;
+          : `${ai.name}: ${ai.title}. ${getCoachEngineDisplay(config)} · ${getCoachDifficultyDisplay()}. Engine presets are not calibrated Elo ratings.`;
     }
 
     function getCoachStrengthProfile() {
@@ -18030,7 +18589,7 @@
       const selection = document.getElementById("aiGameReadySelection");
       const saved = document.getElementById("aiGameReadySaved");
       if (title) title.textContent = bot?.name || "your bot";
-      if (meta) meta.textContent = bot ? `${bot.name} · ${bot.elo} Elo` : "Bot selected";
+      if (meta) meta.textContent = bot ? `${bot.name} · ${getCoachDifficultyDisplay()}` : "Bot selected";
       if (avatar) avatar.textContent = bot?.avatar || "♞";
       if (colorSummary) colorSummary.textContent = `You play ${getCoachColorName(coachPlayerColor)}`;
       if (selection) selection.textContent = `${time.label} · ${time.detail}`;
@@ -18465,7 +19024,9 @@
           gameType: state.gameType || "casual",
           clock: state.clock || "none",
           serverRevision: state.serverRevision || 0,
-          completedAt: state.remoteUpdatedAt || state.updatedAt || new Date().toISOString()
+          completedAt: state.remoteUpdatedAt || state.updatedAt || new Date().toISOString(),
+          source: "server-authoritative",
+          authority: "server"
         }
       };
     }
@@ -18747,6 +19308,10 @@
       return (Number(config.skill) || 0) >= 7 || (Number(config.elo) || 0) >= 1450;
     }
 
+    function requiresStockfishCoachMove(config = getCoachConfig()) {
+      return Boolean(config.engineRequired || isStrictStockfishLevel(config));
+    }
+
     function isStrongStockfishBot(config = getCoachConfig()) {
       return coachDifficulty === "strong";
     }
@@ -18834,7 +19399,7 @@
       const panel = document.getElementById("enginePanel");
       if (panel) panel.hidden = true;
       if (panel) panel.classList.toggle("is-thinking", coachThinking);
-      rating.textContent = String(config.elo);
+      rating.textContent = String(config.skill);
       depth.textContent = String(stockfishInfo.depth || config.depth);
       thinking.textContent = coachThinking ? "Coach thinking" : stockfishInfo.status;
       evalText.textContent = stockfishInfo.evalText || "0.00";
@@ -18865,6 +19430,7 @@
         stockfishPending.analysis.scoreCp = whiteCp;
         stockfishPending.analysis.evalText = stockfishInfo.evalText;
         stockfishPending.analysis.mate = null;
+        stockfishPending.analysis.hasScore = true;
       } else if (mateMatch) {
         const rawMate = Number(mateMatch[1]) || 0;
         const whiteMate = stockfishPending.side === "w" ? rawMate : -rawMate;
@@ -18873,6 +19439,7 @@
         stockfishPending.analysis.scoreCp = stockfishInfo.scoreCp;
         stockfishPending.analysis.evalText = stockfishInfo.evalText;
         stockfishPending.analysis.mate = whiteMate;
+        stockfishPending.analysis.hasScore = true;
       }
       stockfishInfo.status = "Thinking...";
       scheduleEnginePanelUpdate();
@@ -18898,9 +19465,29 @@
         return;
       }
       if (line === "readyok" && stockfishPending?.stage === "config") {
-        stockfishPending.stage = "search";
-        sendStockfishCommand(stockfishWorker, `position fen ${stockfishPending.fen}`);
-        sendStockfishCommand(stockfishWorker, getStockfishGoCommand(stockfishPending.config));
+        const pending = stockfishPending;
+        pending.stage = "search";
+        if (Number.isFinite(pending.searchTimeoutMs)) {
+          window.clearTimeout(pending.timeout);
+          pending.timeout = window.setTimeout(() => {
+            if (stockfishPending !== pending) return;
+            try { sendStockfishCommand(stockfishWorker, "stop"); } catch {}
+            stockfishInfo.status = "Stopping search...";
+            scheduleEnginePanelUpdate();
+            pending.stopTimeout = window.setTimeout(() => {
+              if (stockfishPending !== pending) return;
+              stockfishPending = null;
+              stockfishFailed = true;
+              stockfishFailAt = Date.now();
+              stockfishInfo.status = "Engine restarted";
+              scheduleEnginePanelUpdate();
+              pending.resolve("");
+              releaseStockfishWorker();
+            }, 1200);
+          }, pending.searchTimeoutMs);
+        }
+        sendStockfishCommand(stockfishWorker, `position fen ${pending.fen}`);
+        sendStockfishCommand(stockfishWorker, getStockfishGoCommand(pending.config));
         return;
       }
       if (line.startsWith("bestmove ") && stockfishPending) {
@@ -19025,14 +19612,17 @@
         const boot = () => {
           try {
             stockfishWorker = createStockfishWorker(stockfishSources[stockfishSourceIndex]);
-            stockfishWorker.onmessage = (event) => {
+            const workerInstance = stockfishWorker;
+            workerInstance.onmessage = (event) => {
+              if (stockfishWorker !== workerInstance) return;
               String(event.data || "")
                 .split(/\r?\n/)
                 .map((line) => line.trim())
                 .filter(Boolean)
                 .forEach(handleStockfishLine);
             };
-            stockfishWorker.onerror = () => {
+            workerInstance.onerror = () => {
+              if (stockfishWorker !== workerInstance) return;
               if (!stockfishReady) {
                 failBoot();
                 return;
@@ -19041,6 +19631,7 @@
               stockfishFailAt = Date.now();
               stockfishInfo.status = "Engine failed";
               scheduleEnginePanelUpdate();
+              updateAiPlayerHeader();
               releaseStockfishWorker();
               if (stockfishPending) {
                 window.clearTimeout(stockfishPending.timeout);
@@ -19087,9 +19678,11 @@
       if (stockfishReady) return Promise.resolve(stockfishWorker);
       stockfishInfo.status = "Engine loading";
       scheduleEnginePanelUpdate();
+      updateAiPlayerHeader();
       return loadStockfishWorker().then((worker) => {
         stockfishInfo.status = worker ? "Engine ready" : "Engine failed";
         scheduleEnginePanelUpdate();
+        updateAiPlayerHeader();
         return worker;
       });
     }
@@ -19104,27 +19697,55 @@
       const fen = coachGame.fen();
       const searchId = ++stockfishSearchId;
       const uci = await new Promise((resolve) => {
+        const pending = {
+          id: searchId,
+          stage: "config",
+          fen,
+          side: coachGame.turn(),
+          config,
+          resolve,
+          timeout: 0,
+          stopTimeout: 0,
+          // The advertised move budget begins once the engine acknowledges
+          // its ready handshake and the search command is sent, not while
+          // WASM/engine configuration is still settling.
+          searchTimeoutMs: config.movetime + (isStrongStockfishBot(config) ? 1800 : 650)
+        };
         const timeout = window.setTimeout(() => {
           if (!stockfishPending || stockfishPending.id !== searchId) return;
+          if (stockfishPending.stage === "config") {
+            const stale = stockfishPending;
+            stockfishPending = null;
+            stockfishFailed = true;
+            stockfishFailAt = Date.now();
+            stockfishInfo.status = "Engine configuration timed out";
+            scheduleEnginePanelUpdate();
+            stale.resolve("");
+            releaseStockfishWorker();
+            return;
+          }
           try { sendStockfishCommand(worker, "stop"); } catch {}
           stockfishInfo.status = "Stopping search...";
           scheduleEnginePanelUpdate();
           stockfishPending.stopTimeout = window.setTimeout(() => {
             if (!stockfishPending || stockfishPending.id !== searchId) return;
-            const pending = stockfishPending;
+            const expired = stockfishPending;
             stockfishPending = null;
+            stockfishFailed = true;
+            stockfishFailAt = Date.now();
             stockfishInfo.status = "Engine restarted";
             scheduleEnginePanelUpdate();
-            pending.resolve("");
+            expired.resolve("");
             releaseStockfishWorker();
-          }, 320);
-        }, config.movetime + (isStrongStockfishBot(config) ? 1800 : 650));
+          }, 1200);
+        }, 10000);
+        pending.timeout = timeout;
         stockfishInfo.status = "Thinking...";
         stockfishInfo.depth = 0;
         stockfishInfo.bestMove = "--";
         stockfishInfo.lastConfig = `skill=${config.skill};depth=${config.depth};movetime=${config.movetime};nodes=${config.nodes};elo=${config.uciElo}`;
         scheduleEnginePanelUpdate();
-        stockfishPending = { id: searchId, stage: "config", fen, side: coachGame.turn(), config, resolve, timeout, stopTimeout: 0 };
+        stockfishPending = pending;
         configureStockfish(worker, config);
         if (!stockfishGamePrepared) {
           sendStockfishCommand(worker, "ucinewgame");
@@ -19193,7 +19814,8 @@
       return { ...config, reviewMode: deep ? "deep" : "quick" };
     }
     async function analyzeFenWithStockfish(fen, config = getReviewAnalysisConfig("quick")) {
-      const cacheKey = `${fen}|d${config.depth}|t${config.movetime}|n${config.nodes}`;
+      const reviewCacheVersion = config.reviewMode ? `|review-v${reviewAnalysisSchemaVersion}:${config.reviewMode}` : "";
+      const cacheKey = `${fen}|d${config.depth}|t${config.movetime}|n${config.nodes}${reviewCacheVersion}`;
       const cache = readReviewAnalysisCache();
       if (cache[cacheKey]) return cache[cacheKey];
       cancelStockfishSearch("Review analysis started");
@@ -19213,13 +19835,13 @@
           }, 260);
         }, config.movetime + 700);
         stockfishInfo.status = "Review analysis...";
-        stockfishPending = { id: searchId, purpose: "review", stage: "config", fen, side, config, resolve, timeout, stopTimeout: 0, analysis: { fen, scoreCp: 0, evalText: "0.00", pv: "", bestMove: "", depth: 0 } };
+        stockfishPending = { id: searchId, purpose: "review", stage: "config", fen, side, config, resolve, timeout, stopTimeout: 0, analysis: { fen, scoreCp: 0, evalText: "0.00", pv: "", bestMove: "", depth: 0, hasScore: false } };
         configureStockfish(worker, config);
         sendStockfishCommand(worker, "isready");
       });
       // Do not persist an interrupted/no-result search. Caching it would make
       // a later retry return the same empty result without asking Stockfish.
-      if (analysis?.bestMove && Number(analysis.depth) > 0) {
+      if (analysis?.bestMove && Number(analysis.depth) > 0 && analysis.hasScore === true) {
         cache[cacheKey] = analysis;
         writeReviewAnalysisCache(cache);
       }
@@ -19584,9 +20206,9 @@
       } catch {
         stockfishInfo.status = "Engine retrying";
       }
-      if (isStrongStockfishBot(config)) {
-        // A strong game must never silently downgrade to the lightweight
-        // material picker when Stockfish is unavailable.
+      if (requiresStockfishCoachMove(config)) {
+        // Engine-required levels must never silently downgrade to the local
+        // heuristic when Stockfish is unavailable or times out.
         stockfishInfo.status = stockfishFailed ? "Engine failed" : "Waiting for Stockfish";
         stockfishInfo.lastMoveSource = "";
         scheduleEnginePanelUpdate();
@@ -19950,9 +20572,70 @@
     let postGameDecisionPgn = "";
     let reviewSelfAnalysisState = null;
 
+    const REVIEW_SKILL_DEFINITIONS = Object.freeze([
+      { key: "foundations", label: "Board foundations", explanation: "Build a reliable board-and-piece habit." },
+      { key: "piece_activity", label: "Piece activity", explanation: "Improve pieces by using their natural routes." },
+      { key: "opening_principles", label: "Opening principles", explanation: "Control the center, develop, and make the king safer." },
+      { key: "king_safety", label: "King safety", explanation: "Recognize checks and make the king harder to attack." },
+      { key: "piece_safety", label: "Piece safety", explanation: "Spot loose pieces and answer threats before they cost material." },
+      { key: "tactics", label: "Tactics & calculation", explanation: "Practice forcing moves: checks, captures, and threats." },
+      { key: "pawn_play", label: "Pawn play", explanation: "Use pawn breaks, special moves, and promotion ideas with purpose." },
+      { key: "endgames", label: "Endgame foundations", explanation: "Activate the king and convert simple advantages." },
+      { key: "mating_patterns", label: "Mating patterns", explanation: "Learn how checks become a safe, forced finish." }
+    ]);
+
+    function normalizeReviewProvenance(review = {}) {
+      const source = review?.provenance?.source === "server-authoritative"
+        ? "server-authoritative"
+        : "local";
+      return source === "server-authoritative"
+        ? {
+          source,
+          label: "Server-synced game",
+          note: "Completed authenticated game.",
+          canonical: true
+        }
+        : {
+          source: "local",
+          label: "Local game review",
+          note: "Local only · no Elo or canonical progress changes.",
+          canonical: false
+        };
+    }
+
+    function getReviewLearningSignal(review = null) {
+      const primary = getReviewPrimaryMoment(review).move;
+      if (!primary || !primary.engineVerified) return null;
+      const text = `${primary.tactic || ""} ${primary.explanation || ""} ${primary.san || ""}`.toLowerCase();
+      const key = /mate|check/.test(text)
+        ? "mating_patterns"
+        : /fork|pin|skewer|discovered|double|sacrifice|threat/.test(text)
+          ? "tactics"
+          : /king|castle|back rank/.test(text)
+            ? "king_safety"
+            : /pawn|promotion|en passant/.test(text)
+              ? "pawn_play"
+              : /endgame|opposition|king walk/.test(text)
+                ? "endgames"
+                : /hanging|loose|defend|safety|capture/.test(text)
+                  ? "piece_safety"
+                  : /opening|develop|center/.test(text)
+                    ? "opening_principles"
+                    : "foundations";
+      const definition = REVIEW_SKILL_DEFINITIONS.find((skill) => skill.key === key) || REVIEW_SKILL_DEFINITIONS[0];
+      return {
+        key: definition.key,
+        label: definition.label,
+        explanation: definition.explanation,
+        move: primary.san,
+        evidence: `Engine-verified moment ${primary.ply}: ${primary.san}.`
+      };
+    }
+
     const reviewQualityMeta = {
       "Opening Book": { icon: "OB", color: "#82c9ff", cue: "menu" },
       Brilliant: { icon: "!!", color: "#ffd36b", cue: "brilliant" },
+      Checkmate: { icon: "#", color: "#ffd36b", cue: "check" },
       Best: { icon: "1", color: "#8be28b", cue: "correct" },
       Excellent: { icon: "!", color: "#9fe870", cue: "correct" },
       Great: { icon: "+", color: "#74d6ff", cue: "notification" },
@@ -19961,7 +20644,9 @@
       Mistake: { icon: "?", color: "#ff7d6a", cue: "illegal" },
       Blunder: { icon: "??", color: "#ff4f68", cue: "defeat" },
       "Missed Win": { icon: "MW", color: "#c58cff", cue: "puzzle-wrong" },
-      Forced: { icon: "F", color: "#d9d9d9", cue: "ui" }
+      Forced: { icon: "F", color: "#d9d9d9", cue: "ui" },
+      Unverified: { icon: "—", color: "#a9b4c6", cue: "ui" },
+      Unrated: { icon: "?", color: "#a9b4c6", cue: "ui" }
     };
 
     function getReviewQualityMeta(label = "Good") {
@@ -20024,10 +20709,30 @@
       }
     }
 
-    function getReviewCpLoss(move, beforeCp = 0, afterCp = 0) {
-      const before = Number(beforeCp) || 0;
-      const after = Number(afterCp) || 0;
-      return Math.round(Math.max(0, move.color === "w" ? before - after : after - before));
+    function getReviewCpLoss(move, before = null, after = null) {
+      if (!before?.hasScore || !after?.hasScore || before.mate != null || after.mate != null) return null;
+      if (!Number.isFinite(before.scoreCp) || !Number.isFinite(after.scoreCp)) return null;
+      const beforeCp = before.scoreCp;
+      const afterCp = after.scoreCp;
+      return Math.round(Math.max(0, move.color === "w" ? beforeCp - afterCp : afterCp - beforeCp));
+    }
+
+    function getReviewMetricSummary(review, color = null) {
+      if (Number(review?.analysis?.reviewModelVersion) !== reviewAnalysisSchemaVersion) return null;
+      const allMoves = Array.isArray(review?.moves) ? review.moves : [];
+      const moves = color ? allMoves.filter((move) => move?.color === color) : allMoves;
+      const checked = moves.filter((move) => move?.engineVerified);
+      const centipawnLosses = checked
+        .filter((move) => typeof move.cpLoss === "number" && Number.isFinite(move.cpLoss))
+        .map((move) => move.cpLoss);
+      return {
+        checkedMoves: checked.length,
+        totalMoves: moves.length,
+        centipawnScoredMoves: centipawnLosses.length,
+        averageCentipawnLoss: centipawnLosses.length
+          ? Math.round(centipawnLosses.reduce((sum, loss) => sum + loss, 0) / centipawnLosses.length)
+          : null
+      };
     }
 
     function getReviewPhase(fen = "", ply = 0) {
@@ -20086,32 +20791,33 @@
 
     function getReviewBestMoment(review = activeMatchReview) {
       const moves = Array.isArray(review?.moves) ? review.moves : [];
-      const labels = { Brilliant: 4, Best: 3, Excellent: 2, Great: 1 };
+      const labels = { Checkmate: 5, Brilliant: 4, Best: 3, Excellent: 2, Great: 1 };
       const ranked = moves
         .map((move, index) => ({ move, index }))
         .filter(({ move }) => move.color === getReviewPlayerColor())
         .sort((left, right) => (labels[right.move.label] || 0) - (labels[left.move.label] || 0) || (left.move.cpLoss || 0) - (right.move.cpLoss || 0));
-      return ranked.find(({ move }) => labels[move.label]) || ranked[0] || { index: -1, move: null };
+      return ranked.find(({ move }) => move.label === "Checkmate"
+        || (move.engineVerified && labels[move.label])) || { index: -1, move: null };
     }
 
     function getReviewEngineConfidence(review = activeMatchReview) {
       const analysis = review?.analysis || {};
       const depth = Math.max(0, Math.round(Number(analysis.averageDepth || analysis.requestedDepth) || 0));
       const mode = analysis.mode || "Quick engine";
-      if (!analysis.verifiedMoves) return `${mode} coverage limited`;
-      return `${mode} - depth ${depth || "--"}`;
+      const verified = Math.max(0, Number(analysis.verifiedMoves) || 0);
+      const total = Math.max(0, Number(analysis.totalMoves) || 0);
+      if (!verified) return `${mode} · no moves fully engine-verified`;
+      return `${mode} · ${verified}/${total} moves verified · depth ${depth || "--"}`;
     }
 
-    function classifyReviewMove({ move = {}, index = 0, cpLoss = 0, bestMove = null, legalCount = 0, opening = "Opening started", engineVerified = false, tactic = "" } = {}) {
+    function classifyReviewMove({ move = {}, cpLoss = null, bestMove = null, legalCount = 0, engineVerified = false } = {}) {
       const actualUci = moveToReviewUci(move);
       const bestUci = moveToReviewUci(bestMove || {});
+      if (move.san?.includes("#")) return "Checkmate";
       if (legalCount <= 1) return "Forced";
-      if (move.san?.includes("#")) return "Brilliant";
-      if (index < 8 && opening !== "Opening started" && (!engineVerified || cpLoss < 55)) return "Opening Book";
-      if (!engineVerified) return "Good";
-      if (engineVerified && bestUci && actualUci === bestUci) {
-        return /fork|skewer|discovered attack|sacrifice|mate threat/.test(tactic) ? "Brilliant" : move.captured || move.san?.includes("+") || move.promotion ? "Best" : "Excellent";
-      }
+      if (!engineVerified) return "Unverified";
+      if (bestUci && actualUci === bestUci) return "Best";
+      if (!Number.isFinite(cpLoss)) return "Unrated";
       if (move.captured && move.san?.includes("+") && cpLoss < 45) return "Great";
       if (cpLoss <= 15) return "Excellent";
       if (cpLoss <= 35) return "Great";
@@ -20225,6 +20931,9 @@
     }
 
     function buildReviewExplanation(move = {}, label = "Good", cpLoss = 0, best = "", pv = "", tactic = "safe improvement") {
+      if (label === "Checkmate") return "The chess rules confirm this move ends the game by checkmate.";
+      if (label === "Unverified") return "This is a legal move, but Stockfish did not return enough complete score data to rate it.";
+      if (label === "Unrated") return "Stockfish found a line, but mate scores cannot be compared as centipawn loss, so this move is not graded.";
       if (label === "Opening Book") return `Known opening idea. You followed the plan: center, development, and king safety.`;
       if (label === "Brilliant") return `Power move. This creates a forcing ${tactic} and leaves the opponent with no easy escape.`;
       if (label === "Best") return `Best move. It matches the engine's first choice and keeps the pressure.`;
@@ -20232,7 +20941,7 @@
       if (/Mistake|Blunder|Inaccuracy|Missed Win/.test(label)) {
         return `Nice try. The position changed by about ${cpLoss} centipawns. ${best ? `A stronger idea was ${best}.` : "Look for checks, captures, and threats first."}`;
       }
-      return `Solid move. Theme: ${tactic}. ${pv ? "The continuation confirms the idea." : "Keep asking what your opponent threatens."}`;
+      return `Solid move. Theme: ${tactic}. ${pv ? "The engine line supports the idea." : "Keep asking what your opponent threatens."}`;
     }
 
     function getReviewMoveText(move = {}) {
@@ -20269,19 +20978,44 @@
       const fill = document.getElementById("reviewEvalFill");
       const score = document.getElementById("reviewEvalScore");
       if (!rail || !fill) return;
-      const whitePercent = clampNumber(Number(move.eval) || 50, 5, 95);
-      const evalText = move.evalText || "0.00";
+      const evalText = String(move.evalText || "");
+      const hasEngineScore = Boolean(move.engineVerified && /^[+-](?:M\d+|\d+(?:\.\d+)?)$/i.test(evalText));
       rail.hidden = !activeMatchReview;
+      rail.dataset.evaluationAvailable = String(hasEngineScore);
+      if (!hasEngineScore) {
+        rail.style.setProperty("--review-white", "50%");
+        rail.dataset.advantage = "unavailable";
+        rail.dataset.orientation = coachFlipped ? "black" : "white";
+        rail.setAttribute("aria-label", "Engine evaluation unavailable; no position balance is inferred.");
+        if (score) score.textContent = "—";
+        return;
+      }
+      const whitePercent = clampNumber(Number(move.eval) || 50, 5, 95);
       rail.style.setProperty("--review-white", `${whitePercent}%`);
       rail.dataset.advantage = whitePercent > 54 ? "white" : whitePercent < 46 ? "black" : "equal";
       rail.dataset.orientation = coachFlipped ? "black" : "white";
-      rail.setAttribute("aria-label", `Evaluation ${evalText}. ${whitePercent > 54 ? "White is better" : whitePercent < 46 ? "Black is better" : "Position is balanced"}.`);
+      const mateScore = /M\d+/i.test(evalText);
+      rail.setAttribute("aria-label", mateScore
+        ? `Engine mate score ${evalText}. ${evalText.startsWith("+") ? "White" : "Black"} has a forced mate.`
+        : `Engine evaluation ${evalText}. ${whitePercent > 54 ? "White is better" : whitePercent < 46 ? "Black is better" : "Position is balanced"}.`);
       if (score) score.textContent = evalText;
     }
 
     function formatReviewAnalysisRemaining(milliseconds = 0) {
       const seconds = Math.max(1, Math.ceil(Number(milliseconds) / 1000));
       return seconds >= 60 ? `about ${Math.ceil(seconds / 60)} min left` : `about ${seconds}s left`;
+    }
+
+    function syncReviewNavigationControls(review = activeMatchReview) {
+      const moves = Array.isArray(review?.moves) ? review.moves : [];
+      const previous = document.getElementById("reviewPrev");
+      const next = document.getElementById("reviewNext");
+      const play = document.getElementById("reviewPlay");
+      const auto = document.getElementById("reviewAuto");
+      if (previous) previous.disabled = moves.length < 2 || reviewReplayIndex <= 0;
+      if (next) next.disabled = moves.length < 2 || reviewReplayIndex >= moves.length - 1;
+      if (play) play.disabled = moves.length < 2;
+      if (auto) auto.disabled = moves.length < 2;
     }
 
     function getReviewAnalysisTimeoutMs(config, moveCount) {
@@ -20310,12 +21044,12 @@
       if (summary) summary.textContent = message;
     }
 
-    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}, sourceGame = coachGame) {
+    async function buildMatchReview(analysisConfig = getReviewAnalysisConfig("quick"), isCurrent = () => true, onProgress = () => {}, sourceGame = coachGame, provenance = { source: "local", authority: "client" }, pgnOverride = "") {
       if (!sourceGame || !CoachChess) return null;
       const moves = sourceGame.history({ verbose: true });
       if (!moves.length) return null;
       const finalFen = sourceGame.fen();
-      const finalPgn = sourceGame.pgn();
+      const finalPgn = String(pgnOverride || sourceGame.pgn());
       const opening = getReviewOpeningName(moves.map((move) => move.san));
       const whiteLosses = [];
       const blackLosses = [];
@@ -20352,25 +21086,30 @@
           reportProgress(index, "before");
         }
         if (!isCurrent()) return null;
-        try { replay.move(move.san); } catch {}
+        let replayed;
+        try { replayed = replay.move(move.san); } catch { return null; }
+        if (!replayed || moveToReviewUci(replayed) !== moveToReviewUci(move)) return null;
         const fenAfter = replay.fen();
         const after = await analyzeFenWithStockfish(fenAfter, analysisConfig);
         completedSearches += 1;
         reportProgress(index, "after");
         if (!isCurrent()) return null;
         previousAfter = after;
-        const engineDataReady = Boolean(before?.bestMove && Number(before?.depth) > 0 && Number(after?.depth) > 0);
+        const engineDataReady = Boolean(before?.bestMove && Number(before?.depth) > 0 && Number(after?.depth) > 0 && before?.hasScore === true && after?.hasScore === true);
         if (engineDataReady) analysisDepths.push(Number(before.depth) || 0, Number(after.depth) || 0);
         const bestMove = engineDataReady ? getMoveFromFenUci(fenBefore, before.bestMove) : null;
         const engineVerified = Boolean(engineDataReady && bestMove);
         const pv = engineVerified ? pvUciToSan(fenBefore, before.pv || before.bestMove) : "";
-        const cpLoss = engineVerified ? getReviewCpLoss(move, before?.scoreCp, after?.scoreCp) : 0;
-        const tactic = detectReviewTactic(move, fenBefore, bestMove);
-        const label = classifyReviewMove({ move, index, cpLoss, bestMove, legalCount, opening, engineVerified, tactic });
+        const cpLoss = engineVerified ? getReviewCpLoss(move, before, after) : null;
+        const label = classifyReviewMove({ move, cpLoss, bestMove, legalCount, engineVerified });
+        const detectedTactic = detectReviewTactic(move, fenBefore, bestMove);
+        const tactic = engineVerified || label === "Checkmate"
+          ? detectedTactic
+          : detectedTactic === "safe improvement" ? "position awareness" : `possible ${detectedTactic}`;
         const bestSan = bestMove?.san || "";
         const explanation = buildReviewExplanation(move, label, cpLoss, bestSan, pv, tactic);
-        if (engineVerified && move.color === "w") whiteLosses.push(cpLoss);
-        else if (engineVerified) blackLosses.push(cpLoss);
+        if (engineVerified && cpLoss !== null && move.color === "w") whiteLosses.push(cpLoss);
+        else if (engineVerified && cpLoss !== null) blackLosses.push(cpLoss);
         reviewed.push({
           ply: index + 1,
           moveNumber: Math.ceil((index + 1) / 2),
@@ -20402,16 +21141,21 @@
           await new Promise((resolve) => window.requestAnimationFrame(resolve));
         }
       }
-      const accuracyFromLosses = (losses) => {
+      if (replay.history().length !== moves.length || replay.fen() !== finalFen) return null;
+      const averageCentipawnLoss = (losses) => {
         if (!losses.length) return null;
-        const avg = losses.reduce((sum, loss) => sum + clampNumber(loss / 3, 0, 95), 0) / losses.length;
-        return Math.round(clampNumber(100 - avg, 0, 100));
+        return Math.round(losses.reduce((sum, loss) => sum + loss, 0) / losses.length);
       };
       const playerMoves = reviewed.filter((move) => move.color === getReviewPlayerColor());
       const mistakes = playerMoves.filter(isReviewLearningMove).sort((left, right) => getReviewMomentScore(right) - getReviewMomentScore(left));
-      const mvp = playerMoves.find((move) => /Brilliant|Great|Best|Excellent/.test(move.label)) || playerMoves[0] || reviewed[0];
-      const turning = mistakes[0] || mvp || reviewed[0];
       const verifiedMoves = reviewed.filter((move) => move.engineVerified).length;
+      const mvp = playerMoves.find((move) => move.label === "Checkmate")
+        || playerMoves.find((move) => move.engineVerified && /Brilliant|Great|Best|Excellent/.test(move.label))
+        || null;
+      const turning = mistakes[0] || mvp || reviewed[0];
+      const criticalMoments = [...new Map([turning, mistakes[0], mvp]
+        .filter(Boolean)
+        .map((move) => [move.ply, move])).values()].slice(0, 3);
       const averageDepth = analysisDepths.length
         ? Math.round(analysisDepths.reduce((sum, depth) => sum + depth, 0) / analysisDepths.length)
         : 0;
@@ -20424,29 +21168,47 @@
         fen: finalFen,
         pgn: finalPgn,
         moves: reviewed,
-        whiteAccuracy: accuracyFromLosses(whiteLosses),
-        blackAccuracy: accuracyFromLosses(blackLosses),
+        whiteAverageCentipawnLoss: averageCentipawnLoss(whiteLosses),
+        blackAverageCentipawnLoss: averageCentipawnLoss(blackLosses),
         analysis: {
+          reviewModelVersion: reviewAnalysisSchemaVersion,
           requestedDepth: analysisConfig.depth,
           averageDepth,
           verifiedMoves,
           totalMoves: reviewed.length,
           mode: getReviewAnalysisModeLabel(analysisConfig.reviewMode)
         },
+        provenance: normalizeReviewProvenance({ provenance }),
+        criticalMoments,
         summary: {
           opening,
           turning: `${turning.ply}. ${turning.san} (${turning.label})`,
-          mvp: `${mvp.san} - ${mvp.tactic}`,
-          mistake: mistakes[0] ? `${mistakes[0].san}: ${mistakes[0].explanation}` : "No major mistake found.",
-          chances: mistakes.length ? `${mistakes.length} moment${mistakes.length > 1 ? "s" : ""} to review.` : "You kept the game steady.",
+          mvp: mvp
+            ? `${mvp.san} - ${mvp.label === "Checkmate" ? "rules-confirmed checkmate" : mvp.tactic}`
+            : "No engine-verified best move is available.",
+          mistake: mistakes[0]
+            ? `${mistakes[0].san}: ${mistakes[0].explanation}`
+            : verifiedMoves
+              ? "No engine-identified mistake in the checked moves."
+              : "Stockfish was unavailable; move quality was not rated.",
+          chances: mistakes.length
+            ? `${mistakes.length} engine-identified moment${mistakes.length > 1 ? "s" : ""} to review.`
+            : verifiedMoves
+              ? "No engine-identified missed chance in the checked moves."
+              : "No engine-verified missed-chance assessment is available.",
           result,
-          tip: mistakes[0] ? "Next game: check loose pieces before every capture." : "Keep using center, development, and king safety."
+          tip: mistakes[0]
+            ? "Next game: check loose pieces before every capture."
+            : verifiedMoves
+              ? "Keep using center, development, and king safety."
+              : "Try again when Stockfish is available for engine-backed move guidance."
         }
       };
     }
 
     function saveActiveMatchReview(review) {
       if (!review) return;
+      review = { ...review, provenance: normalizeReviewProvenance(review) };
       const existingIndex = matchReviews.findIndex((item) => item.pgn === review.pgn);
       if (existingIndex >= 0) {
         matchReviews[existingIndex] = review;
@@ -20477,15 +21239,19 @@
       graph.replaceChildren(...review.moves.map((move, index) => {
         const markerMeta = getReviewQualityMeta(move.label);
         const bar = document.createElement("span");
-        const evalDelta = (Number(move.eval) || 50) - 50;
+        const hasEvaluation = Boolean(move.engineVerified && Number.isFinite(move.eval) && move.evalText);
+        const evalDelta = hasEvaluation ? move.eval - 50 : 0;
         bar.style.setProperty("--review-marker", markerMeta.color);
-        bar.style.setProperty("--review-eval-height", `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%`);
+        bar.style.setProperty("--review-eval-height", hasEvaluation ? `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%` : "0%");
+        bar.dataset.evaluationAvailable = String(hasEvaluation);
         bar.dataset.reviewSide = evalDelta >= 0 ? "white" : "black";
         bar.title = `${move.ply}. ${move.san} ${move.label} ${move.evalText || ""}`;
         bar.setAttribute("role", "button");
         bar.tabIndex = 0;
         bar.setAttribute("aria-current", String(index === reviewReplayIndex));
-        bar.setAttribute("aria-label", `Jump to ${move.ply}. ${move.san}, ${move.label}`);
+        bar.setAttribute("aria-label", hasEvaluation
+          ? `Jump to ${move.ply}. ${move.san}, ${move.label}, engine evaluation ${move.evalText}`
+          : `Jump to ${move.ply}. ${move.san}, ${move.label}, engine evaluation unavailable`);
         bar.addEventListener("click", () => showReviewPly(index));
         bar.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -20506,10 +21272,10 @@
       const playerRating = Math.max(400, Number(getLearnerGameRating()) || 400);
       const opponentRating = Math.max(400, Number(opponent?.rating || getCoachConfig()?.elo) || 400);
       const playerIsWhite = coachPlayerColor !== "b";
-      const playerAccuracy = playerIsWhite ? review.whiteAccuracy : review.blackAccuracy;
-      const opponentAccuracy = playerIsWhite ? review.blackAccuracy : review.whiteAccuracy;
-      const playerAccuracyText = Number.isFinite(playerAccuracy) ? `${playerAccuracy}%` : "--";
-      const opponentAccuracyText = Number.isFinite(opponentAccuracy) ? `${opponentAccuracy}%` : "--";
+      const playerMetrics = getReviewMetricSummary(review, playerIsWhite ? "w" : "b");
+      const opponentMetrics = getReviewMetricSummary(review, playerIsWhite ? "b" : "w");
+      const playerLossText = Number.isFinite(playerMetrics?.averageCentipawnLoss) ? `${playerMetrics.averageCentipawnLoss} cp` : "—";
+      const opponentLossText = Number.isFinite(opponentMetrics?.averageCentipawnLoss) ? `${opponentMetrics.averageCentipawnLoss} cp` : "—";
       const result = String(review.summary?.result || "Game complete.");
       const won = /^You won/i.test(result);
       const drew = /peacefully|draw/i.test(result);
@@ -20521,11 +21287,11 @@
       setReviewDashboardText("reviewOutcomeKicker", outcomeKicker);
       setReviewDashboardText("reviewOutcomeTitle", outcomeTitle);
       setReviewDashboardText("reviewOutcomeCopy", review.summary?.tip || result);
-      setReviewDashboardText("reviewPlayerAccuracy", playerAccuracyText);
+      setReviewDashboardText("reviewPlayerAccuracy", playerLossText);
       setReviewDashboardText("reviewPlayerName", playerName);
-      setReviewDashboardText("reviewOpponentAccuracy", opponentAccuracyText);
+      setReviewDashboardText("reviewOpponentAccuracy", opponentLossText);
       setReviewDashboardText("reviewOpeningName", review.summary?.opening || "Opening started");
-      setReviewDashboardText("reviewCenterEval", active?.evalText || "0.00");
+      setReviewDashboardText("reviewCenterEval", active?.engineVerified && active.evalText ? active.evalText : "—");
       setReviewDashboardText("reviewPlayerIdentity", playerName);
       setReviewDashboardText("reviewOpponentName", opponentName);
       setReviewDashboardText("reviewPlayerRating", `${playerRating} Elo`);
@@ -20543,9 +21309,11 @@
 
       const scoreRing = document.getElementById("reviewPlayerScoreRing");
       if (scoreRing) {
-        const score = Number.isFinite(playerAccuracy) ? clampNumber(playerAccuracy, 0, 100) : 0;
-        scoreRing.style.setProperty("--review-score", `${score}%`);
-        scoreRing.setAttribute("aria-label", Number.isFinite(playerAccuracy) ? `Your accuracy: ${playerAccuracy}%` : "Your accuracy is unavailable");
+        // This card displays CP loss, not a percentage score. Keep its
+        // decorative progress track neutral; engine coverage has its own
+        // explicitly labeled metric below.
+        scoreRing.style.setProperty("--review-score", "0%");
+        scoreRing.setAttribute("aria-label", `Average centipawn loss ${Number.isFinite(playerMetrics?.averageCentipawnLoss) ? `${playerMetrics.averageCentipawnLoss} centipawns` : "unavailable"}; engine checked ${playerMetrics?.checkedMoves || 0} of ${playerMetrics?.totalMoves || 0} moves.`);
       }
 
       const playerMoves = review.moves.filter((move) => move.color === (playerIsWhite ? "w" : "b"));
@@ -20554,49 +21322,41 @@
         ["Middlegame", playerMoves.filter((move) => move.phase === "Middlegame")],
         ["Endgame", playerMoves.filter((move) => move.phase === "Endgame")]
       ];
-      const phaseScore = (moves) => {
+      const phaseLoss = (moves) => {
         const verified = moves.filter((move) => move.engineVerified);
         if (!verified.length) return null;
-        const averageLoss = verified.reduce((sum, move) => sum + clampNumber(Number(move.cpLoss) || 0, 0, 300), 0) / verified.length;
-        return Math.round(clampNumber(100 - averageLoss / 3, 0, 100));
+        const losses = verified.filter((move) => typeof move.cpLoss === "number" && Number.isFinite(move.cpLoss));
+        if (!losses.length) return null;
+        return Math.round(losses.reduce((sum, move) => sum + move.cpLoss, 0) / losses.length);
       };
-      const phaseScores = phaseGroups.map(([, moves]) => phaseScore(moves));
+      const phaseLosses = phaseGroups.map(([, moves]) => phaseLoss(moves));
       const verifiedPlayerMoves = playerMoves.filter((move) => move.engineVerified);
       const tacticalErrors = verifiedPlayerMoves.filter((move) => /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label)).length;
-      const tacticsScore = verifiedPlayerMoves.length
-        ? Math.round(clampNumber(100 - (tacticalErrors / verifiedPlayerMoves.length) * 60, 0, 100))
-        : null;
-      const knownPhaseScores = phaseScores.filter(Number.isFinite);
-      const bestPhaseIndex = knownPhaseScores.length ? phaseScores.indexOf(Math.max(...knownPhaseScores)) : -1;
-      const performanceScore = Number.isFinite(playerAccuracy)
-        ? playerAccuracy
-        : knownPhaseScores.length
-          ? Math.round(knownPhaseScores.reduce((sum, score) => sum + score, 0) / knownPhaseScores.length)
-          : null;
-      const performanceLabel = !Number.isFinite(performanceScore)
-        ? "Analysis pending"
-        : performanceScore >= 90 ? "Excellent control"
-          : performanceScore >= 75 ? "Strong performance"
-            : performanceScore >= 60 ? "Solid foundation"
-              : "Useful lessons found";
-      const performanceNote = Number.isFinite(performanceScore)
-        ? bestPhaseIndex >= 0
-          ? `Quick estimate. Your best phase: ${phaseGroups[bestPhaseIndex][0]}.`
-          : "Quick estimate based on the moves the engine could evaluate."
-        : "The engine did not return enough data for phase scores.";
-      setReviewDashboardText("reviewPerformanceScore", Number.isFinite(performanceScore) ? String(performanceScore) : "--");
+      const coverage = getReviewMetricSummary(review);
+      const knownPhaseLosses = phaseLosses.filter(Number.isFinite);
+      const bestPhaseIndex = knownPhaseLosses.length ? phaseLosses.indexOf(Math.min(...knownPhaseLosses)) : -1;
+      const coverageText = coverage ? `${coverage.checkedMoves}/${coverage.totalMoves}` : "—";
+      const coveragePercent = coverage?.totalMoves ? Math.round((coverage.checkedMoves / coverage.totalMoves) * 100) : 0;
+      const performanceLabel = coverage
+        ? `${coverage.checkedMoves} of ${coverage.totalMoves} moves have engine scores`
+        : "Engine evidence unavailable";
+      const performanceNote = bestPhaseIndex >= 0
+        ? `Lowest average CP loss: ${phaseGroups[bestPhaseIndex][0]}. This is not a standardized accuracy rating.`
+        : "Centipawn loss is shown only where the engine returned comparable scores; mate lines are excluded.";
+      setReviewDashboardText("reviewPerformanceScore", coverageText);
       setReviewDashboardText("reviewPerformanceLabel", performanceLabel);
       setReviewDashboardText("reviewPerformanceNote", performanceNote);
       ["reviewOpeningPhase", "reviewMiddlegamePhase", "reviewEndgamePhase"].forEach((id, index) => {
-        const score = phaseScores[index];
-        setReviewDashboardText(id, Number.isFinite(score) ? String(score) : "--");
+        const loss = phaseLosses[index];
+        setReviewDashboardText(id, Number.isFinite(loss) ? `${loss} cp` : "—");
       });
-      setReviewDashboardText("reviewTacticsPhase", Number.isFinite(tacticsScore) ? String(tacticsScore) : "--");
+      setReviewDashboardText("reviewTacticsPhase", verifiedPlayerMoves.length ? `${tacticalErrors} / ${verifiedPlayerMoves.length}` : "—");
       const performanceRing = document.getElementById("reviewPerformanceRing");
       if (performanceRing) {
-        const score = Number.isFinite(performanceScore) ? clampNumber(performanceScore, 0, 100) : 0;
-        performanceRing.style.setProperty("--review-performance", `${score}%`);
-        performanceRing.setAttribute("aria-label", Number.isFinite(performanceScore) ? `Overall performance: ${performanceScore} out of 100` : "Overall performance is unavailable");
+        performanceRing.style.setProperty("--review-performance", `${coveragePercent}%`);
+        performanceRing.setAttribute("aria-label", coverage
+          ? `Engine evaluated ${coverage.checkedMoves} of ${coverage.totalMoves} moves`
+          : "Engine analysis coverage is unavailable");
       }
 
       const totalMoves = playerMoves.length;
@@ -20605,8 +21365,10 @@
       if (qualityBreakdown) {
         const groups = [
           ["Brilliant", ["Brilliant"]],
+          ["Checkmates", ["Checkmate"]],
           ["Best moves", ["Best", "Excellent", "Great", "Forced", "Opening Book"]],
           ["Good moves", ["Good"]],
+          ["Not rated", ["Unverified", "Unrated"]],
           ["Inaccuracies", ["Inaccuracy"]],
           ["Mistakes", ["Mistake", "Missed Win"]],
           ["Blunders", ["Blunder"]]
@@ -20658,22 +21420,31 @@
       const repair = document.getElementById("reviewGrowthRepair");
       const progress = document.getElementById("reviewGrowthProgress");
       if (!habit || !repair || !progress) return;
+      const provenance = normalizeReviewProvenance(review);
       const playerMoves = (review?.moves || []).filter((move) => move.color === getReviewPlayerColor());
       const strongest = [...playerMoves]
         .filter((move) => ["Brilliant", "Best", "Excellent", "Great", "Good", "Opening Book"].includes(move.label))
         .sort((left, right) => (Number(right.eval) || 50) - (Number(left.eval) || 50))[0];
       const primary = getReviewPrimaryMoment(review).move;
-      const habitTheme = strongest?.tactic || (strongest ? "steady decision-making" : "checking loose pieces");
+      const habitTheme = strongest?.tactic || (strongest ? "steady decision-making" : "");
       const repairTheme = primary?.tactic || "piece safety";
-      const recurring = [review, ...matchReviews.filter((item) => item?.pgn !== review?.pgn)]
+      const recurring = [review, ...matchReviews.filter((item) => item?.pgn !== review?.pgn
+        && Number(item?.analysis?.reviewModelVersion) === reviewAnalysisSchemaVersion)]
         .flatMap((item) => item?.moves || [])
         .filter((move) => move.tactic === repairTheme && /Inaccuracy|Mistake|Blunder|Missed Win/.test(move.label)).length;
       const reliableMoves = playerMoves.filter((move) => move.engineVerified && ["Brilliant", "Best", "Excellent", "Great", "Good", "Opening Book"].includes(move.label)).length;
-      habit.textContent = `Best habit: ${habitTheme}.`;
-      repair.textContent = `Repair next: ${repairTheme}.`;
+      const engineCheckedMoves = playerMoves.filter((move) => move.engineVerified).length;
+      habit.textContent = strongest
+        ? `Engine-checked strength: ${habitTheme}.`
+        : engineCheckedMoves ? "No clear strength pattern in the engine-checked moves." : "Engine analysis unavailable; no move-quality pattern is claimed.";
+      repair.textContent = primary?.engineVerified || ["Checkmate", "Forced"].includes(primary?.label)
+        ? `Review next: ${repairTheme}.`
+        : primary ? `Practice candidate: ${repairTheme} · not engine-rated.` : "No review pattern is available.";
       progress.textContent = recurring > 1
-        ? `${recurring} reviewed moments point to this pattern. Retry it once, then train it.`
-        : `${reliableMoves}/${playerMoves.length || 0} of your moves were reliable. Turn this new clue into a habit.`;
+        ? `${recurring} ${provenance.source === "server-authoritative" ? "server-synced" : "local"} review moments point to this pattern. Retry it once, then train it.`
+        : engineCheckedMoves
+          ? `${reliableMoves}/${engineCheckedMoves} engine-checked moves were rated reliable in this ${provenance.source === "server-authoritative" ? "server-synced game" : "local game"}.`
+          : "No engine-scored moves are available, so move reliability cannot be estimated.";
     }
 
     function cancelActiveReviewAnalysis(reason = "Review closed") {
@@ -20830,6 +21601,10 @@
     function suspendGameReviewWorkspaceForNavigation() {
       const reviewPage = document.getElementById("gameReview");
       if (!reviewPage?.classList.contains("is-review-page") || isGameReviewRoute()) return;
+      // Leaving Review transfers ownership to the destination route.  A
+      // late Stockfish result must not repaint the next screen or repopulate
+      // a review that the player has already abandoned.
+      cancelActiveReviewAnalysis("Review route changed");
       clearAllAnalysisOverlays();
       window.clearInterval(reviewReplayTimer);
       reviewReplayTimer = 0;
@@ -20885,28 +21660,60 @@
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
       mountGameReviewWorkspace();
       const active = review.moves[reviewReplayIndex] || review.moves[0];
+      syncReviewNavigationControls(review);
+      const provenance = normalizeReviewProvenance(review);
+      const learningSignal = getReviewLearningSignal(review);
       const oneMoment = getReviewOneMoment(review);
       const oneMomentMove = oneMoment.move;
       const oneMomentTitle = document.getElementById("reviewOneMomentTitle");
       const oneMomentCopy = document.getElementById("reviewOneMomentCopy");
+      const oneMomentHeading = document.querySelector("#reviewOneMoment .review-one-moment-copy > span");
       const reviewTone = getCoachTone();
       const reviewPattern = oneMomentMove?.tactic || "piece safety";
       const reviewExplanation = oneMomentMove?.explanation || "Understand the idea, then train the pattern once."
+      const oneMomentEngineVerified = Boolean(oneMomentMove?.engineVerified);
+      const oneMomentRuleVerified = ["Checkmate", "Forced"].includes(oneMomentMove?.label);
+      if (oneMomentHeading) oneMomentHeading.textContent = oneMomentEngineVerified
+        ? "Engine-verified moment"
+        : oneMomentRuleVerified ? "Rules-confirmed moment" : "Practice candidate · not engine-rated";
       if (oneMomentTitle) oneMomentTitle.textContent = oneMomentMove ? `Move ${oneMomentMove.ply}: ${oneMomentMove.san}` : "One useful pattern";
       if (oneMomentCopy) {
-        const defaultCopy = oneMomentMove ? reviewExplanation + " Practice: " + reviewPattern + "." : "Understand one idea, then train it once.";
-        oneMomentCopy.textContent = reviewTone === "quiet"
+        const defaultCopy = oneMomentMove
+          ? oneMomentEngineVerified || oneMomentRuleVerified
+            ? `${reviewExplanation} Practice: ${reviewPattern}.`
+            : `Stockfish did not return complete scores. ${reviewExplanation} The pattern note is a practice prompt, not an engine verdict.`
+          : "Understand one idea, then train it once.";
+        oneMomentCopy.textContent = reviewTone === "quiet" && (oneMomentEngineVerified || oneMomentRuleVerified)
           ? "Pattern: " + reviewPattern + ". Practice it once."
-          : reviewTone === "hype"
+          : reviewTone === "hype" && (oneMomentEngineVerified || oneMomentRuleVerified)
             ? defaultCopy + " You found a real training clue - carry it into your next game."
             : defaultCopy;
       }
       const practiceRecommendationTitle = document.getElementById("reviewPracticeRecommendationTitle");
       const practiceRecommendationCopy = document.getElementById("reviewPracticeRecommendationCopy");
-      if (practiceRecommendationTitle) practiceRecommendationTitle.textContent = `Practice ${reviewPattern}`;
-      if (practiceRecommendationCopy) practiceRecommendationCopy.textContent = oneMomentMove
-        ? `Train ${reviewPattern} from move ${oneMomentMove.ply}.`
-        : "Train the pattern from this game once.";
+      const practiceRecommendation = document.getElementById("reviewPracticeRecommendation");
+      if (practiceRecommendation) {
+        const useLessonPath = Boolean(learningSignal && learningSignal.key !== "tactics");
+        practiceRecommendation.href = useLessonPath ? "#paths" : "#puzzles";
+        if (useLessonPath) {
+          practiceRecommendation.dataset.siteTab = "paths";
+          practiceRecommendation.dataset.sitePanel = "paths";
+        } else {
+          practiceRecommendation.dataset.siteTab = "puzzles";
+          practiceRecommendation.dataset.sitePanel = "puzzles";
+        }
+        practiceRecommendation.dataset.reviewSkill = learningSignal?.key || "";
+      }
+      if (practiceRecommendationTitle) practiceRecommendationTitle.textContent = learningSignal
+        ? `${learningSignal.key === "tactics" ? "Practice" : "Study"} ${learningSignal.label}`
+        : `Practice ${reviewPattern}`;
+      if (practiceRecommendationCopy) practiceRecommendationCopy.textContent = learningSignal
+        ? `${learningSignal.evidence} Use the existing ${learningSignal.key === "tactics" ? "Trainer" : "lesson path"} next.`
+        : oneMomentMove
+          ? `Train ${reviewPattern} from move ${oneMomentMove.ply}.`
+          : "Train the pattern from this game once.";
+      panel.dataset.reviewProvenance = provenance.source;
+      panel.dataset.reviewCanonical = String(provenance.canonical);
       renderReviewRetryControls(review);
       renderReviewSelfAnalysisControls(review);
       if (!active?.engineVerified) reviewCompareMode = "your";
@@ -20920,14 +21727,12 @@
         void focusCard.offsetWidth;
       }
       updateReviewEvalRail(active);
-      document.getElementById("reviewSummaryLine").textContent = `${review.summary.opening} - one move at a time.`;
-      const playerIsWhite = coachPlayerColor !== "b";
-      const playerAccuracy = playerIsWhite ? review.whiteAccuracy : review.blackAccuracy;
-      const opponentAccuracy = playerIsWhite ? review.blackAccuracy : review.whiteAccuracy;
-      const accuracyText = Number.isFinite(playerAccuracy) && Number.isFinite(opponentAccuracy)
-        ? "You " + playerAccuracy + "% · Opponent " + opponentAccuracy + "%"
-        : "Accuracy pending";
-      document.getElementById("reviewAccuracyBadge").textContent = `Move ${reviewReplayIndex + 1}/${review.moves.length} - ${accuracyText}`;
+      document.getElementById("reviewSummaryLine").textContent = `${provenance.label} · ${review.summary.opening} - one move at a time.`;
+      const coverage = getReviewMetricSummary(review);
+      const coverageText = coverage
+        ? `Engine checks ${coverage.checkedMoves}/${coverage.totalMoves}`
+        : "Engine coverage unavailable";
+      document.getElementById("reviewAccuracyBadge").textContent = `Move ${reviewReplayIndex + 1}/${review.moves.length} · ${coverageText}`;
       setReviewDashboardText("reviewCurrentMoveStatus", active ? `Move ${active.ply}: ${active.san}, ${active.label}. ${getReviewMoveText(active)}` : "Review ready.");
       const deepButton = document.getElementById("reviewDeepAnalysis");
       const reviewIsDeep = review.analysis?.mode === "Deep engine";
@@ -20938,10 +21743,16 @@
       }
       const qualityBadge = document.getElementById("reviewQualityBadge");
       const confidence = getReviewEngineConfidence(review);
-      setReviewDashboardText("reviewEngineConfidence", confidence);
+      setReviewDashboardText("reviewEngineConfidence", `${confidence} · ${provenance.note}`);
       if (qualityBadge && active) qualityBadge.textContent = `${meta.icon} ${active.label}`;
       const evalBadge = document.getElementById("reviewEvalBadge");
-      if (evalBadge && active) evalBadge.textContent = active.cpLoss ? `Eval change: -${active.cpLoss} cp` : "Eval steady";
+      if (evalBadge && active) {
+        evalBadge.textContent = typeof active.cpLoss === "number" && Number.isFinite(active.cpLoss)
+          ? `CP loss: ${active.cpLoss} cp`
+          : active.engineVerified && (String(active.evalBeforeText || "") + String(active.evalText || "")).includes("M")
+            ? "Mate score · CP loss n/a"
+            : "Engine score unavailable";
+      }
       const focusMove = document.getElementById("reviewFocusMove");
       if (focusMove && active) focusMove.textContent = `${active.ply}. ${active.san}`;
       const focusSummary = document.getElementById("reviewFocusSummary");
@@ -20964,14 +21775,19 @@
         keyRow.hidden = false;
         const primaryMoment = getReviewPrimaryMoment(review);
         const bestMoment = getReviewBestMoment(review);
-        const mistakeIndex = primaryMoment.index;
-        const bestIndex = bestMoment.index;
-        const keys = [
-          ["Focus", mistakeIndex >= 0 ? mistakeIndex : bestIndex],
-          ["Best", bestIndex],
-          ["Critical", mistakeIndex],
+        const fallbackKeys = [
+          ["Focus", primaryMoment.index >= 0 ? primaryMoment.index : bestMoment.index],
+          ["Best", bestMoment.index],
           ["Finish", review.moves.length - 1]
-        ].filter(([, index], position, list) => index >= 0 && list.findIndex(([, candidate]) => candidate === index) === position);
+        ];
+        const criticalIndices = (Array.isArray(review.criticalMoments) ? review.criticalMoments : [])
+          .map((moment) => review.moves.findIndex((move) => move?.ply === moment?.ply))
+          .filter((index, position, list) => index >= 0 && list.indexOf(index) === position)
+          .slice(0, 3);
+        const keys = (criticalIndices.length
+          ? criticalIndices.map((index, position) => [["Focus", "Critical", "Best"][position] || "Moment", index])
+          : fallbackKeys)
+          .filter(([, index], position, list) => index >= 0 && list.findIndex(([, candidate]) => candidate === index) === position);
         keyRow.replaceChildren(...keys.map(([label, index]) => {
           const move = review.moves[index];
           const keyMeta = getReviewQualityMeta(move.label);
@@ -20998,15 +21814,19 @@
       graph.replaceChildren(...review.moves.map((move, index) => {
         const markerMeta = getReviewQualityMeta(move.label);
         const bar = document.createElement("span");
-        const evalDelta = (Number(move.eval) || 50) - 50;
+        const hasEvaluation = Boolean(move.engineVerified && Number.isFinite(move.eval) && move.evalText);
+        const evalDelta = hasEvaluation ? move.eval - 50 : 0;
         bar.style.setProperty("--review-marker", markerMeta.color);
-        bar.style.setProperty("--review-eval-height", `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%`);
+        bar.style.setProperty("--review-eval-height", hasEvaluation ? `${clampNumber(Math.abs(evalDelta) * 1.65, 7, 47)}%` : "0%");
+        bar.dataset.evaluationAvailable = String(hasEvaluation);
         bar.dataset.reviewSide = evalDelta >= 0 ? "white" : "black";
-        bar.title = `${move.ply}. ${move.san} ${move.label} ${move.evalText || ""}`;
+        bar.title = `${move.ply}. ${move.san} ${move.label} · ${hasEvaluation ? `Engine evaluation ${move.evalText}` : "Engine evaluation unavailable"}`;
         bar.setAttribute("role", "button");
         bar.tabIndex = 0;
         bar.setAttribute("aria-current", String(index === reviewReplayIndex));
-        bar.setAttribute("aria-label", `Jump to ${move.ply}. ${move.san}, ${move.label}`);
+        bar.setAttribute("aria-label", hasEvaluation
+          ? `Jump to ${move.ply}. ${move.san}, ${move.label}, engine evaluation ${move.evalText}`
+          : `Jump to ${move.ply}. ${move.san}, ${move.label}, engine evaluation unavailable`);
         bar.addEventListener("click", () => showReviewPly(index));
         bar.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -21220,7 +22040,9 @@
 
     function stepReview(delta) {
       if (!activeMatchReview) return;
-      showReviewPly(reviewReplayIndex + delta);
+      const nextIndex = reviewReplayIndex + delta;
+      if (nextIndex < 0 || nextIndex >= activeMatchReview.moves.length) return;
+      showReviewPly(nextIndex);
     }
 
     function toggleReviewPlayback() {
@@ -21234,6 +22056,8 @@
         if (autoButton) autoButton.textContent = "Auto Review";
         return;
       }
+      if (!activeMatchReview || activeMatchReview.moves.length < 2) return;
+      if (reviewReplayIndex >= activeMatchReview.moves.length - 1) showReviewPly(0);
       if (button) button.textContent = "Pause";
       if (autoButton) autoButton.textContent = "Pause";
       reviewReplayTimer = window.setInterval(() => {
@@ -21866,10 +22690,13 @@
       else playWorkspace?.removeAttribute("inert");
     }
 
-    function hidePostGameDecision() {
+    let postGameDecisionReturnFocus = null;
+    function hidePostGameDecision({ restoreFocus = true } = {}) {
       const dialog = getPostGameDecisionDialog();
       dialog?.setAttribute("hidden", "");
       setPostGameDecisionModalState(false);
+      if (restoreFocus) postGameDecisionReturnFocus?.focus?.({ preventScroll: true });
+      postGameDecisionReturnFocus = null;
     }
 
     function showPostGameDecision() {
@@ -21879,6 +22706,7 @@
       const alreadyShown = Boolean(pgn) && postGameDecisionPgn === pgn;
       if (pgn) postGameDecisionPgn = pgn;
       if (alreadyShown) return;
+      postGameDecisionReturnFocus = document.activeElement;
       dialog.hidden = false;
       setPostGameDecisionModalState(true);
       window.requestAnimationFrame(() => {
@@ -21889,8 +22717,48 @@
     function renderPostGameFlow() {
       document.getElementById("postGameFlow")?.setAttribute("hidden", "");
     }
+    function createValidatedReviewGame(review) {
+      if (!CoachChess || !Array.isArray(review?.moves) || !review.moves.length) return null;
+      try {
+        const game = new CoachChess();
+        for (const move of review.moves) {
+          if (!move?.from || !move?.to || (move.fenBefore && move.fenBefore !== game.fen())) return null;
+          const applied = game.move({ from: move.from, to: move.to, ...(move.promotion ? { promotion: move.promotion } : {}) });
+          if (!applied || (move.san && applied.san !== move.san) || (move.fenAfter && move.fenAfter !== game.fen())) return null;
+        }
+        if (game.history().length !== review.moves.length || (review.fen && review.fen !== game.fen())) return null;
+        const pgn = String(review.pgn || "").trim();
+        if (pgn) {
+          const pgnGame = new CoachChess();
+          const loaded = typeof pgnGame.loadPgn === "function" ? pgnGame.loadPgn(pgn) : pgnGame.load_pgn?.(pgn);
+          const pgnMoves = pgnGame.history({ verbose: true });
+          const replayMoves = game.history({ verbose: true });
+          if (loaded === false || pgnMoves.length !== replayMoves.length
+            || pgnMoves.some((move, index) => moveToReviewUci(move) !== moveToReviewUci(replayMoves[index]) || move.san !== replayMoves[index].san)
+            || pgnGame.fen() !== game.fen()) return null;
+        }
+        return game;
+      } catch {
+        return null;
+      }
+    }
+
     function openSavedMatchReview(review) {
       if (!review?.moves?.length || !CoachChess) return;
+      const game = createValidatedReviewGame(review);
+      if (!game) return;
+      if (Number(review.analysis?.reviewModelVersion) !== reviewAnalysisSchemaVersion) {
+        openPostGameReview({
+          force: true,
+          mode: review.analysis?.mode === "Deep engine" ? "deep" : "quick",
+          analysisSnapshot: {
+            game,
+            pgn: String(review.pgn || game.pgn()),
+            provenance: normalizeReviewProvenance(review)
+          }
+        });
+        return;
+      }
       reviewRequestedPgn = review.pgn || "";
       reviewAnalysisMode = review.analysis?.mode === "Deep engine" ? "deep" : "quick";
       activeMatchReview = review;
@@ -21944,13 +22812,10 @@
       const opponentName = friendGame
         ? String(friendChallengeState?.targetName || "a friend")
         : String(getAiHeaderProfile().name || "the Nschess coach");
-      const review = activeMatchReview?.pgn === coachGame.pgn() ? activeMatchReview : matchReviews.find((item) => item.pgn === coachGame.pgn());
-      const accuracy = Number(review?.summary?.accuracy ?? review?.accuracy);
       const result = draw ? "drew" : playerWon ? "won" : "finished";
-      const accuracyText = Number.isFinite(accuracy) ? ` Accuracy: ${Math.round(accuracy)}%.` : "";
       const payload = {
         title: "My Nschess game",
-        text: `I ${result} a ${friendGame ? "friend" : "coach"} game against ${opponentName} in ${Math.ceil(history.length / 2)} moves on Nschess.${accuracyText}`,
+        text: `I ${result} a ${friendGame ? "friend" : "coach"} game against ${opponentName} in ${Math.ceil(history.length / 2)} moves on Nschess.`,
         url: `${window.location.href.split("#")[0]}#play`
       };
       const original = button?.textContent || "Share Game";
@@ -21983,36 +22848,34 @@
       if (friendChallengeState?.remote) {
         const friendSnapshot = getFriendCanonicalReviewSnapshot(friendChallengeState);
         if (friendSnapshot && (friendChallengeState.status === "completed" || getFriendGameOutcome(friendChallengeState))) {
-          return { game: friendSnapshot.game, pgn: friendSnapshot.pgn, metadata: friendSnapshot.metadata };
+          return {
+            game: friendSnapshot.game,
+            pgn: friendSnapshot.pgn,
+            metadata: friendSnapshot.metadata,
+            provenance: { source: "server-authoritative", authority: "server", gameCode: friendSnapshot.metadata?.code || "" }
+          };
         }
       }
       if (coachGame && (isCoachGameOver() || coachDrawAgreed)) {
-        return { game: coachGame, pgn: coachGame.pgn() };
+        return { game: coachGame, pgn: coachGame.pgn(), provenance: { source: "local", authority: "client" } };
       }
       const savedReview = activeMatchReview;
       const pgn = String(savedReview?.pgn || "").trim();
       if (!pgn || !CoachChess) return null;
       try {
-        const moves = Array.isArray(savedReview?.moves) ? savedReview.moves : [];
-        if (moves.length) {
-          const game = new CoachChess();
-          for (const move of moves) {
-            const applied = game.move({ from: move.from, to: move.to, ...(move.promotion ? { promotion: move.promotion } : {}) });
-            if (!applied) return null;
-          }
-          if (game.history().length === moves.length) return { game, pgn };
-        }
+        const savedGame = createValidatedReviewGame(savedReview);
+        if (savedGame) return { game: savedGame, pgn, provenance: normalizeReviewProvenance(savedReview) };
         const game = new CoachChess();
         const loaded = typeof game.loadPgn === "function" ? game.loadPgn(pgn) : game.load_pgn?.(pgn);
         if (loaded === false || !game.history().length) return null;
-        return { game, pgn: game.pgn() };
+        return { game, pgn: game.pgn(), provenance: { source: "local", authority: "client" } };
       } catch {
         return null;
       }
     }
 
     function openPostGameReview(options = {}) {
-      const analysisSnapshot = getReviewAnalysisSnapshot();
+      const analysisSnapshot = options?.analysisSnapshot || getReviewAnalysisSnapshot();
       if (!analysisSnapshot) return;
       const mode = options?.mode === "deep" ? "deep" : "quick";
       const force = Boolean(options?.force);
@@ -22023,7 +22886,7 @@
       reviewRequestedPgn = pgn;
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
       const requestedLabel = getReviewAnalysisModeLabel(mode);
-      if (cached && !force && (cached.analysis?.mode || "Quick engine") === requestedLabel) return openSavedMatchReview(cached);
+      if (cached && !force && Number(cached.analysis?.reviewModelVersion) === reviewAnalysisSchemaVersion && (cached.analysis?.mode || "Quick engine") === requestedLabel) return openSavedMatchReview(cached);
       const panel = document.getElementById("premiumReview");
       if (panel) {
         mountGameReviewWorkspace();
@@ -22058,7 +22921,7 @@
       const requestedLabel = getReviewAnalysisModeLabel(mode);
       const pgn = analysisSnapshot.pgn;
       const cached = activeMatchReview?.pgn === pgn ? activeMatchReview : matchReviews.find((review) => review.pgn === pgn);
-      if (cached && !force && (cached.analysis?.mode || "Quick engine") === requestedLabel) {
+      if (cached && !force && Number(cached.analysis?.reviewModelVersion) === reviewAnalysisSchemaVersion && (cached.analysis?.mode || "Quick engine") === requestedLabel) {
         if (reviewRequestedPgn === pgn) openSavedMatchReview(cached);
         return;
       }
@@ -22087,7 +22950,7 @@
         const label = mode === "deep" ? "Deep Review" : "Game Review";
         showReviewAnalysisError(token, `${label} stopped waiting for Stockfish. Try again to restart the engine.`);
       }, analysisTimeoutMs);
-      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && reviewRequestedPgn === pgn, updateAnalysisProgress, gameAtAnalysis)
+      buildMatchReview(analysisConfig, () => reviewAnalysisToken === token && reviewRequestedPgn === pgn, updateAnalysisProgress, gameAtAnalysis, analysisSnapshot.provenance, pgn)
         .then((review) => {
           window.clearTimeout(reviewWatchdog);
           if (!review || reviewAnalysisToken !== token || review.pgn !== pgn) return;
@@ -22429,7 +23292,11 @@
       // workspace or Game Review.
       play.classList.toggle("play-lobby", isPreGame);
       play.classList.remove("is-pre-game");
-      play.classList.toggle("is-active-game", !isPreGame && !inReview && !isSpecialLobby);
+      // Friend/tournament routes are lobbies only until their remote game is
+      // active. Keep completed games visible for the existing result/review UI.
+      const hasSpecialGame = Boolean(friendChallengeState?.active
+        || (friendChallengeState?.remote && friendChallengeState.status === "completed"));
+      play.classList.toggle("is-active-game", !isPreGame && !inReview && (!isSpecialLobby || hasSpecialGame));
       if (!isPreGame) setupPlayAuthPrompt.close?.();
       syncPlayLobbyGuestPlacement(isPreGame);
 
@@ -22465,7 +23332,9 @@
       const description = document.getElementById("playLobbyBotDescription");
       if (difficulty) difficulty.textContent = selectedBot ? config.label : "Choose a bot";
       if (style) style.textContent = selectedBot?.style || selectedBot?.personality || "—";
-      if (strength) strength.textContent = selectedBot ? `${Math.max(400, Number(config.elo) || 0)} Elo` : "—";
+      if (strength) strength.textContent = selectedBot
+        ? config.beginnerBot ? "Local practice profile · not rating-calibrated" : `Stockfish skill ${config.skill}/20 · not Elo-calibrated`
+        : "—";
       if (description) description.textContent = selectedBot?.bio || "Choose an AI opponent to see their play style and challenge.";
       const ratingNote = document.getElementById("playLobbyRatingNote");
       if (ratingNote) ratingNote.hidden = true;
@@ -22540,6 +23409,31 @@
       } else {
         statusBadge.textContent = coachBotPaused ? "Free play" : isCoachCheck() ? "Check" : "Playing";
         coach.textContent = coachMessage;
+      }
+      const liveStatus = document.getElementById("playLiveStatus");
+      const liveStatusTitle = document.getElementById("playLiveStatusTitle");
+      const liveStatusDetail = document.getElementById("playLiveStatusDetail");
+      if (liveStatus && liveStatusTitle && liveStatusDetail) {
+        const yourTurn = !waitingForSetup && !gameFinished && !coachThinking && coachGame.turn() === coachPlayerColor;
+        const statusTitle = waitingForSetup
+          ? "Ready to play"
+          : gameFinished
+            ? statusBadge.textContent || "Game complete"
+            : coachThinking
+              ? "Opponent is thinking"
+              : yourTurn
+                ? "Your turn"
+                : `${turn} to move`;
+        liveStatus.hidden = waitingForSetup;
+        liveStatusTitle.textContent = statusTitle;
+        liveStatusDetail.textContent = gameFinished
+          ? `${statusBadge.textContent || "Game complete"}. Review the game or start another.`
+          : coachThinking
+            ? coachMessage
+            : coachMessage || `${turn} to move.`;
+        liveStatus.classList.toggle("is-your-turn", yourTurn);
+        liveStatus.classList.toggle("is-thinking", Boolean(coachThinking));
+        liveStatus.classList.toggle("is-complete", Boolean(gameFinished));
       }
       coach.textContent = coachMemoryLine(coach.textContent);
       if (gameFinished) playCoachEndSound(isMate, Boolean(terminalOutcome?.result === "draw" || isDrawn));
@@ -24033,6 +24927,12 @@
         return;
       }
 
+      if (coachSelected) {
+        coachMessage = `${square} is not a legal destination. ${coachSelected} stays selected; choose a highlighted square.`;
+        scheduleCoachPanelUpdate();
+        return;
+      }
+
       coachSelected = "";
       coachLegalMoves = [];
       coachMessage = coachBotPaused
@@ -24043,7 +24943,7 @@
 
     function queueCoachReply() {
       const botColor = getCoachBotColor();
-      if (!coachSessionActive || coachBotPaused || isCoachGameOver() || coachGame.turn() !== botColor) return;
+      if (!coachSessionActive || coachThinking || coachBotPaused || isCoachGameOver() || coachGame.turn() !== botColor) return;
       const token = ++coachMoveToken;
       coachThinking = true;
       coachLearnerMoveScores = { fen: "", scored: [], pending: false };
@@ -24064,17 +24964,20 @@
           const replyUci = reply && `${reply.from}${reply.to}${reply.promotion || ""}`;
           const config = getCoachConfig();
             const safeReply = legalReplies.find((move) => `${move.from}${move.to}${move.promotion || ""}` === replyUci)
-              || (isStrongStockfishBot(config) ? null : getReliableCoachFallback(legalReplies));
+              || (requiresStockfishCoachMove(config) ? null : getReliableCoachFallback(legalReplies));
           const move = safeReply && coachGame.move(toCoachMoveInput(safeReply));
           if (move) {
             clearCoachTemporaryAnalysis();
             coachLastMove = move;
             advanceMatchClock(move.color);
             playCoachMoveSound(move, "bot");
-            coachMessage = `${explainCoachMove(move)}${getBeginnerBot() ? ` ${pickBotLine("inGame")}` : ""}`;
+            const fallbackNote = stockfishInfo.lastMoveSource === "legal fallback"
+              ? " Stockfish was unavailable, so this reply used a lighter local fallback."
+              : "";
+            coachMessage = `${explainCoachMove(move)}${getBeginnerBot() ? ` ${pickBotLine("inGame")}` : ""}${fallbackNote}`;
           } else {
-            coachMessage = isStrictStockfishLevel(config)
-              ? `${config.label} needs Stockfish before moving. Refresh or switch to Beginner/Easy while the engine reloads.`
+            coachMessage = requiresStockfishCoachMove(config)
+              ? `${config.label} is unavailable. No weaker move was substituted; choose a lower level, then retry the reply.`
               : "Stockfish did not return a move. Beginner backup is available, or try Free Play while the engine reloads.";
       reviewRetryState = null;
             stockfishInfo.status = stockfishFailed ? "Engine failed" : "No best move";
@@ -24086,6 +24989,7 @@
           scheduleEnginePanelUpdate();
         }
         coachThinking = false;
+        updateAiPlayerHeader();
         if (completeCoachGame()) return;
         scheduleCoachBoardRender();
         scheduleEnginePanelUpdate();
@@ -24129,6 +25033,7 @@
       const gameShouldRun = coachSessionActive || Boolean(friendChallengeState?.active) || Boolean(reviewSelfAnalysisState) || Boolean(reviewRetryState);
       clearAnalysisArrows("game-restart", document.getElementById("coachBoard"));
       coachMoveToken += 1;
+      cancelStockfishSearch("Starting a new game", true);
       cancelActiveReviewAnalysis("Starting a new game");
       window.clearInterval(reviewReplayTimer);
       reviewSelfAnalysisState = null;
@@ -24561,12 +25466,31 @@
       const messageStamp = remote.messages.map((message) => `${message.id || ""}:${message.createdAt || message.created_at || ""}`).join("|");
       const revision = getFriendChallengeRevision(remote);
       const unchanged = previous?.remote && previous.remoteId === remote.id && previous.remoteRevision === revision && previous.remoteMessageStamp === messageStamp;
-      if (unchanged && !boardNeedsRestore) return true;
+      // A completed challenge can be rehydrated from the same account-scoped
+      // snapshot after A → B → A.  The remote row is unchanged, but the
+      // account boundary intentionally cleared the post-game decision state;
+      // let the authoritative completion pass through once so Review can
+      // reopen without creating another server result.
+      const needsCompletedDecision = remote.status === "completed"
+        && !completedGameSignature
+        && !postGameDecisionPgn;
+      if (unchanged && !boardNeedsRestore && !needsCompletedDecision) return true;
       const next = normalizeFriendChallengeState(toFriendChallengeState(remote));
       let restoredFriendGame = null;
       if (boardNeedsRestore) {
         restoredFriendGame = buildFriendChallengeGameFromMoves(next);
         next.historyBasePly = restoredFriendGame ? 0 : getFriendMoveCount(remote);
+      }
+      // A completed friend result can be rehydrated after an account
+      // boundary.  Do not let a terminal signature from the previous
+      // session suppress the post-game decision for this fresh authoritative
+      // payload; duplicate payloads for the same mounted result still retain
+      // their existing idempotency guard.
+      const freshCompletedHydration = remote.status === "completed"
+        && (!previous?.remote || previous.remoteId !== remote.id);
+      if (freshCompletedHydration) {
+        completedGameSignature = "";
+        postGameDecisionPgn = "";
       }
       if (remote.status === "completed") {
         // The authoritative payload closes any locally persisted terminal
@@ -25171,6 +26095,7 @@
       if (!friendNetworkSubscriptionUserId) return;
       friendNetworkSubscribing = true;
       friendRealtimeReady = false;
+      updateFriendsHubRealtimeBadge();
       Promise.resolve(provider.subscribeFriendChallenges((event) => handleFriendRealtimeEvent(event, generation)))
         .then((unsubscribe) => {
           if (generation !== friendNetworkSubscriptionGeneration) {
@@ -25215,21 +26140,59 @@
 
     async function setFriendRequest(friend, action) {
       const provider = getFriendProvider();
-      if (!provider || !friend?.id) {
+      const accountId = String(getFriendCurrentUserId() || "");
+      if (!provider || !friend?.id || !isApplicationAuthenticated() || !accountId) {
         setFriendChallengeStatus("Sign in to manage friends.");
         return;
       }
-      try {
-        if (action === "send") await provider.sendFriendRequest(friend.id);
-        if (action === "accept") await provider.respondFriendRequest(friend.requestId, true);
-        if (action === "decline") await provider.respondFriendRequest(friend.requestId, false);
-        if (action === "cancel") await provider.cancelFriendRequest(friend.requestId);
-        if (action === "remove") await provider.removeFriend(friend.id);
-        await refreshFriendNetwork();
-        if (action === "send") setFriendChallengeStatus(`Friend request sent to ${friend.name}.`);
-      } catch (error) {
-        setFriendChallengeStatus(error?.message || "That friend action did not finish.");
-      }
+      const targetId = String(friend.requestId || friend.id);
+      const lockKey = `friendship:${accountId}:${targetId}`;
+      return runFriendRequestAction(lockKey, async () => {
+        try {
+          if (action === "send") await provider.sendFriendRequest(friend.id);
+          if (action === "accept") await provider.respondFriendRequest(friend.requestId, true);
+          if (action === "decline") await provider.respondFriendRequest(friend.requestId, false);
+          if (action === "cancel") await provider.cancelFriendRequest(friend.requestId);
+          if (action === "remove") await provider.removeFriend(friend.id);
+          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId() || "") !== accountId) return;
+          await refreshFriendNetwork();
+          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId() || "") !== accountId) return;
+          const messages = {
+            send: `Friend request sent to ${friend.name}.`,
+            accept: `You and ${friend.name} are now friends.`,
+            decline: `Friend request from ${friend.name} declined.`,
+            cancel: `Friend request to ${friend.name} cancelled.`,
+            remove: `${friend.name} removed from your friends.`
+          };
+          if (messages[action]) setFriendChallengeStatus(messages[action]);
+        } catch (error) {
+          if (isApplicationAuthenticated() && String(getFriendCurrentUserId() || "") === accountId) {
+            setFriendChallengeStatus(error?.message || "That friend action did not finish.");
+          }
+        }
+      });
+    }
+
+    function runFriendRequestAction(key, task) {
+      const active = friendRequestActionLocks.get(key);
+      if (active) return active;
+      const request = Promise.resolve().then(task);
+      friendRequestActionLocks.set(key, request);
+      request.finally(() => {
+        if (friendRequestActionLocks.get(key) === request) friendRequestActionLocks.delete(key);
+      }).catch(() => {});
+      return request;
+    }
+
+    function invokeFriendRequestAction(button, friend, action) {
+      if (!button || button.disabled) return;
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      void setFriendRequest(friend, action).finally(() => {
+        if (!button.isConnected) return;
+        button.removeAttribute("aria-busy");
+        button.disabled = action === "send" && friend.requestDirection === "outgoing";
+      });
     }
 
     function createFriendCard(friend, mode = "search") {
@@ -25257,22 +26220,22 @@
         const challenge = createBookText("button", "button", "Challenge");
         add.type = "button";
         challenge.type = "button";
-        add.addEventListener("click", () => void setFriendRequest(friend, "send"));
+        add.addEventListener("click", () => invokeFriendRequestAction(add, friend, "send"));
         challenge.addEventListener("click", () => void sendFriendChallenge(friend));
         actions.append(challenge, add);
       } else if (mode === "outgoing") {
         actions.append(createBookText("span", "badge", "Pending"));
         const cancel = createBookText("button", "button secondary", "Cancel");
         cancel.type = "button";
-        cancel.addEventListener("click", () => void setFriendRequest(friend, "cancel"));
+        cancel.addEventListener("click", () => invokeFriendRequestAction(cancel, friend, "cancel"));
         actions.append(cancel);
       } else if (mode === "incoming") {
         const accept = createBookText("button", "button", "Accept");
         const decline = createBookText("button", "button secondary", "Decline");
         accept.type = "button";
         decline.type = "button";
-        accept.addEventListener("click", () => void setFriendRequest(friend, "accept"));
-        decline.addEventListener("click", () => void setFriendRequest(friend, "decline"));
+        accept.addEventListener("click", () => invokeFriendRequestAction(accept, friend, "accept"));
+        decline.addEventListener("click", () => invokeFriendRequestAction(decline, friend, "decline"));
         actions.append(accept, decline);
       } else {
         const challenge = createBookText("button", "button", "Challenge");
@@ -25280,7 +26243,7 @@
         challenge.type = "button";
         remove.type = "button";
         challenge.addEventListener("click", () => void sendFriendChallenge(friend));
-        remove.addEventListener("click", () => void setFriendRequest(friend, "remove"));
+        remove.addEventListener("click", () => invokeFriendRequestAction(remove, friend, "remove"));
         actions.append(challenge, remove);
       }
       card.append(avatar, main, dot, actions);
@@ -25308,7 +26271,7 @@
           patchKeyedChildren(results, matches, (friend) => friend.id, (friend) => createFriendCard(friend, "search"), (friend) => JSON.stringify([friend.id, friend.name, friend.title, friend.rating, friend.online, friend.requestStatus, friend.requestDirection]));
         } else {
           const emptyKey = "friend-search-empty";
-          const empty = results.firstElementChild?.dataset?.renderKey === emptyKey ? results.firstElementChild : (() => { const node = createBookText("p", "", !provider ? "Sign in to search registered players." : query ? "No registered player matched that search." : "Type a registered username to find players."); node.dataset.renderKey = emptyKey; return node; })();
+          const empty = results.firstElementChild?.dataset?.renderKey === emptyKey ? results.firstElementChild : (() => { const node = createBookText("p", "", !provider ? "Sign in to search registered players." : query.length === 1 ? "Enter at least 2 characters to search." : query ? "No registered player matched that search." : "Type a registered username to find players."); node.dataset.renderKey = emptyKey; return node; })();
           results.replaceChildren(empty);
         }
       }
@@ -25883,6 +26846,7 @@
       });
       dialog.addEventListener("click", (event) => { if (event.target === dialog) closeResignConfirmation(); });
       document.addEventListener("keydown", (event) => {
+        if (!dialog.hidden && trapDialogFocus(event, dialog)) return;
         if (event.key === "Escape" && !dialog.hidden) {
           event.preventDefault();
           closeResignConfirmation();
@@ -26883,6 +27847,7 @@
       window.clearTimeout(friendNetworkRefreshTimer);
       window.clearTimeout(friendRealtimeReconnectTimer);
       window.clearTimeout(friendSearchTimer);
+      window.clearTimeout(friendHubSearchTimer);
       friendNetworkTimer = 0;
       friendChallengeSyncTimer = 0;
       friendNetworkRefreshTimer = 0;
@@ -26890,6 +27855,7 @@
       friendRealtimeReconnectTimer = 0;
       friendRealtimeReconnectAttempts = 0;
       friendSearchTimer = 0;
+      friendHubSearchTimer = 0;
       friendSearchRequest += 1;
       friendNetworkState.search = [];
       friendHubRenderSignature = "";
@@ -26910,6 +27876,7 @@
       friendNetworkUnsubscribe = null;
       friendNetworkSubscribing = false;
       friendRealtimeReady = false;
+      updateFriendsHubRealtimeBadge();
       stopSocialPresenceRealtime();
       try { void getFriendProvider()?.stopSocialPresence?.(); } catch {}
       stopMessagingRealtime();
@@ -27160,6 +28127,19 @@
       const friendsVisible = activePanel === "friends";
       const reviewVisible = activePanel === "gameReview";
       const tournamentVisible = playVisible && activeTab === "tournaments";
+      if (!playVisible && coachSessionActive && !friendChallengeState?.active && coachThinking) {
+        coachMoveToken += 1;
+        coachThinking = false;
+        cancelStockfishSearch("AI game paused while Play is closed", true);
+        stockfishInfo.status = "Reply paused";
+        coachMessage = "Game paused while you were away. Return to Play to continue.";
+        scheduleCoachBoardRender();
+        scheduleCoachPanelUpdate();
+        scheduleEnginePanelUpdate();
+      } else if (playVisible && coachSessionActive && !friendChallengeState?.active && !coachBotPaused
+        && coachGame && coachGame.turn() === getCoachBotColor() && !coachThinking && !isCoachGameOver()) {
+        queueCoachReply();
+      }
       if (playVisible || friendsVisible) {
         startFriendNetworkSync();
         if (playVisible && isRealtimeMatchActive()) startRealtimeMatchLifecycle();
@@ -27178,7 +28158,8 @@
       else stopMatchPlayerTimer();
       if (activePanel === "puzzles") {
         resumePuzzleTimer();
-        if (realPuzzleStartedAt && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+        if ((realPuzzleStartedAt || realPuzzleElapsedMs > 0) && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+        else if (realPuzzleMode === "Rush" && realPuzzleRushStarted) resumeRealPuzzleRushClock();
       } else {
         stopPuzzleTimer();
         stopRealPuzzleTimer();
@@ -27277,6 +28258,9 @@
         const query = String(event.target?.value || "");
         writeJsonStorage(friendDirectoryStorageKey, { ...state, lastSearch: query });
         window.clearTimeout(friendSearchTimer);
+        friendSearchRequest += 1;
+        friendNetworkState.search = [];
+        renderFriendDirectory();
         friendSearchTimer = window.setTimeout(() => void searchFriendPlayers(query), 220);
       });
       listen("friendStart", "click", () => {
@@ -27366,11 +28350,12 @@
       renderGuidedGameReview(false);
       coachMessage = "Undo complete. Try a calmer move and check what is attacked.";
       renderCoachBoard();
+      scheduleCoachPanelUpdate();
     }
 
     function askCoachWhy() {
       coachMessage = coachWhyText;
-      renderCoachBoard();
+      scheduleCoachPanelUpdate();
     }
 
     function replayCoachMistake() {
@@ -28072,18 +29057,124 @@
     }
 
     function getRealPuzzleAccuracy() {
-      return realPuzzleAttempts ? Math.round((realPuzzleCorrect / realPuzzleAttempts) * 100) : 100;
+      return realPuzzleAttempts ? Math.round((realPuzzleCorrect / realPuzzleAttempts) * 100) : null;
     }
 
-    function getRealPuzzleRecommendation() {
-      const solvedThemes = new Map();
-      realPuzzleBank.forEach((puzzle) => {
-        if (!realPuzzleSolved.has(puzzle.id)) return;
-        getRealPuzzleThemes(puzzle).forEach((theme) => solvedThemes.set(theme, (solvedThemes.get(theme) || 0) + 1));
-      });
-      const unsolved = realPuzzleValidIndexes.map((index) => realPuzzleBank[index]).filter((puzzle) => !realPuzzleSolved.has(puzzle.id));
-      const pick = unsolved.sort((a, b) => (solvedThemes.get(a.theme) || 0) - (solvedThemes.get(b.theme) || 0))[0];
-      return pick?.theme || "Tactics";
+    function updateRealPuzzleProgressStats() {
+      const progress = realPuzzleManager.progress();
+      const counter = document.getElementById("realPuzzleCounter");
+      const solved = document.getElementById("realPuzzleSolved");
+      const accuracy = document.getElementById("realPuzzleAccuracy");
+      const streakValue = document.getElementById("realPuzzleStreak");
+      const rating = document.getElementById("realPuzzleRating");
+      const rushScore = document.getElementById("realPuzzleRushScore");
+      if (counter) counter.textContent = getRealPuzzlePositionLabel();
+      if (solved) solved.textContent = `${progress.solved}/${progress.total}`;
+      if (accuracy) {
+        const value = getRealPuzzleAccuracy();
+        accuracy.textContent = value === null ? "—" : `${value}%`;
+        accuracy.setAttribute("aria-label", value === null ? "Practice accuracy unavailable; no attempts yet" : `Practice accuracy ${value} percent`);
+      }
+      if (streakValue) streakValue.textContent = `${realPuzzleStreak}/${realPuzzleBestStreak}`;
+      if (rating) rating.textContent = String(realPuzzleRating);
+      if (rushScore) {
+        rushScore.textContent = String(realPuzzleRushScore);
+        const card = rushScore.closest(".real-puzzle-card");
+        if (card) card.hidden = realPuzzleMode !== "Rush";
+      }
+    }
+
+    function getRealPuzzleModeDescription() {
+      if (realPuzzleMode === "Rush") {
+        if (realPuzzleRushFinished) return `Rush complete · ${realPuzzleRushScore} solved in three minutes. Start a new run when ready.`;
+        if (realPuzzleRushStarted) return `Three-minute Rush · ${realPuzzleRushScore} solved. The clock pauses while you leave Puzzles.`;
+        return "Three-minute Rush · solve as many as you can. The clock starts when you first select a piece.";
+      }
+      if (realPuzzleMode === "Streak") return "Streak · solve consecutive positions. A miss or manual skip resets the current chain.";
+      if (realPuzzleMode === "Battle") return "Solo Battle · a wrong guess costs 10 local practice-rating points. No online opponent or bonus reward.";
+      return "Trainer · no time pressure. Study the full line; the solved explanation stays until you choose another position.";
+    }
+
+    function renderRealPuzzleModeStatus() {
+      const description = document.getElementById("realPuzzleModeDescription");
+      if (description) {
+        const nextDescription = getRealPuzzleModeDescription();
+        if (description.textContent !== nextDescription) description.textContent = nextDescription;
+      }
+      const restart = document.getElementById("realPuzzleBoardRestart");
+      if (restart) {
+        const label = realPuzzleMode === "Rush" && realPuzzleRushFinished ? "New Rush" : "Restart position";
+        if (restart.textContent !== label) restart.textContent = label;
+      }
+      const timer = document.getElementById("realPuzzleTimer");
+      if (timer) {
+        const label = realPuzzleMode === "Rush" ? "Rush time remaining" : "Time spent on this position";
+        if (timer.getAttribute("aria-label") !== label) timer.setAttribute("aria-label", label);
+      }
+    }
+
+    function getRealPuzzleRushRemainingMs() {
+      return Math.max(0, realPuzzleRushRemainingMs - (realPuzzleRushSegmentStartedAt ? Date.now() - realPuzzleRushSegmentStartedAt : 0));
+    }
+
+    function pauseRealPuzzleRushClock() {
+      if (realPuzzleRushSegmentStartedAt) {
+        realPuzzleRushRemainingMs = getRealPuzzleRushRemainingMs();
+        realPuzzleRushSegmentStartedAt = 0;
+      }
+      window.clearInterval(realPuzzleRushTimerId);
+      realPuzzleRushTimerId = 0;
+      renderRealPuzzleModeStatus();
+      updateRealPuzzleClock();
+    }
+
+    function resumeRealPuzzleRushClock() {
+      if (realPuzzleMode !== "Rush" || !realPuzzleRushStarted || realPuzzleRushFinished || realPuzzleRushTimerId) return;
+      if (realPuzzleRushRemainingMs <= 0) {
+        finishRealPuzzleRush();
+        return;
+      }
+      realPuzzleRushSegmentStartedAt = Date.now();
+      realPuzzleRushTimerId = window.setInterval(updateRealPuzzleClock, 250);
+      updateRealPuzzleClock();
+    }
+
+    function resetRealPuzzleRushSession() {
+      window.clearInterval(realPuzzleRushTimerId);
+      realPuzzleRushTimerId = 0;
+      realPuzzleRushSegmentStartedAt = 0;
+      realPuzzleRushRemainingMs = realPuzzleRushDurationMs;
+      realPuzzleRushScore = 0;
+      realPuzzleRushStarted = false;
+      realPuzzleRushFinished = false;
+      updateRealPuzzleProgressStats();
+      renderRealPuzzleModeStatus();
+      updateRealPuzzleClock();
+      syncRealPuzzleInterface();
+    }
+
+    function finishRealPuzzleRush() {
+      if (realPuzzleMode !== "Rush" || realPuzzleRushFinished) return;
+      realPuzzleRushRemainingMs = 0;
+      realPuzzleRushSegmentStartedAt = 0;
+      realPuzzleRushFinished = true;
+      window.clearInterval(realPuzzleRushTimerId);
+      realPuzzleRushTimerId = 0;
+      window.clearTimeout(realPuzzleAutoNextTimer);
+      realPuzzleAutoNextTimer = 0;
+      cancelPendingRealPuzzleReply();
+      clearPromotionPicker({ cancel: false });
+      boardInteractionEngine.cancel(document.getElementById("realPuzzleBoard"), { type: "rush-timeout" });
+      realPuzzleSelected = "";
+      realPuzzleLegalMoves = [];
+      stopRealPuzzleTimer({ pauseRush: false });
+      renderRealPuzzleModeStatus();
+      updateRealPuzzleProgressStats();
+      const feedback = document.getElementById("realPuzzleFeedback");
+      if (feedback) feedback.textContent = `Time. Rush complete — ${realPuzzleRushScore} puzzle${realPuzzleRushScore === 1 ? "" : "s"} solved. Start a new Rush to play again.`;
+      syncRealPuzzleInterface();
+      renderRealPuzzleBoard();
+      saveRealPuzzleState();
     }
 
     function updateRealPuzzleRating(delta) {
@@ -28116,12 +29207,13 @@
 
     function autoAdvanceRealPuzzleIfNeeded() {
       window.clearTimeout(realPuzzleAutoNextTimer);
-      // Daily deliberately stays on its one daily position. Every other mode
-      // advances after a short celebration without a manual Next click.
-      if (realPuzzleMode === "Daily" || getRealPuzzleIndexes().length < 2) return;
+      // Trainer and Solo Battle preserve the solved line for study; Rush and
+      // Streak are the only modes that advance automatically.
+      if (!["Rush", "Streak"].includes(realPuzzleMode) || realPuzzleRushFinished || getRealPuzzleIndexes().length < 2) return;
       realPuzzleAutoNextTimer = window.setTimeout(() => {
+        if (realPuzzleMode === "Rush" && realPuzzleRushFinished) return;
         realPuzzleManager.advance();
-      }, 900);
+      }, realPuzzleMode === "Rush" ? 700 : 1100);
     }
 
     function getRealAchievementDefs() {
@@ -28154,31 +29246,47 @@
         return badge;
       });
       row.replaceChildren(...badges);
-      if (newlyUnlocked.length) showCelebration("Achievement unlocked!", "+3 coins", newlyUnlocked[0], { subtle: true });
+      if (newlyUnlocked.length) showCelebration("Practice milestone", "Saved on this device", newlyUnlocked[0], { subtle: true });
     }
 
     function updateRealPuzzleClock() {
       const timer = document.getElementById("realPuzzleTimer");
-      if (timer) timer.textContent = formatPuzzleTime(realPuzzleStartedAt ? Date.now() - realPuzzleStartedAt : 0);
+      const rushMode = realPuzzleMode === "Rush";
+      const elapsed = realPuzzleElapsedMs + (realPuzzleStartedAt ? Date.now() - realPuzzleStartedAt : 0);
+      const remaining = rushMode ? getRealPuzzleRushRemainingMs() : 0;
+      if (timer) {
+        timer.textContent = formatPuzzleTime(rushMode ? remaining : elapsed);
+      }
+      if (rushMode && realPuzzleRushStarted && remaining <= 0 && !realPuzzleRushFinished) finishRealPuzzleRush();
+      if (rushMode) renderRealPuzzleModeStatus();
     }
 
     function startRealPuzzleTimer() {
       if (!realPuzzleStartedAt) realPuzzleStartedAt = Date.now();
       window.clearInterval(realPuzzleTimerId);
       realPuzzleTimerId = window.setInterval(updateRealPuzzleClock, 500);
+      if (realPuzzleMode === "Rush") {
+        realPuzzleRushStarted = true;
+        resumeRealPuzzleRushClock();
+      }
       updateRealPuzzleClock();
     }
 
-    function stopRealPuzzleTimer() {
+    function stopRealPuzzleTimer({ pauseRush = true } = {}) {
       window.clearInterval(realPuzzleTimerId);
       realPuzzleTimerId = 0;
+      if (realPuzzleStartedAt) {
+        realPuzzleElapsedMs += Math.max(0, Date.now() - realPuzzleStartedAt);
+        realPuzzleStartedAt = 0;
+      }
+      if (pauseRush) pauseRealPuzzleRushClock();
       updateRealPuzzleClock();
     }
 
     function syncRealPuzzleInterface() {
       const root = document.getElementById("realPuzzles");
       const board = document.getElementById("realPuzzleBoard");
-      const acceptingMove = realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying;
+      const acceptingMove = realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying && !realPuzzleRushFinished;
       if (root) root.dataset.puzzlePhase = realPuzzlePhase;
       if (board) {
         board.setAttribute("aria-busy", String(!acceptingMove));
@@ -28187,10 +29295,13 @@
           if (!acceptingMove) square.draggable = false;
         });
       }
-      ["realPuzzleHintButton", "realPuzzleReplay"].forEach((id) => {
-        const button = document.getElementById(id);
-        if (button) button.disabled = !acceptingMove;
-      });
+      const hint = document.getElementById("realPuzzleHintButton");
+      if (hint) hint.disabled = !acceptingMove;
+      const replay = document.getElementById("realPuzzleReplay");
+      if (replay) replay.disabled = !realPuzzleGame || realPuzzleReplaying || realPuzzleRushFinished
+        || !["PlayerTurn", "Completed"].includes(realPuzzlePhase);
+      const next = document.getElementById("realPuzzleBoardNext");
+      if (next) next.disabled = realPuzzleRushFinished;
     }
 
     function setRealPuzzlePhase(phase) {
@@ -28216,10 +29327,11 @@
       realPuzzleStep = 0;
       realPuzzleHintStep = 0;
       realPuzzleStartedAt = 0;
+      realPuzzleElapsedMs = 0;
       realPuzzleMistakes = 0;
       realPuzzleMoveSans = [];
       realPuzzleReplaying = false;
-      stopRealPuzzleTimer();
+      stopRealPuzzleTimer({ pauseRush: false });
       try {
         realPuzzleEngine = loadRealPuzzleEngine(puzzle);
         realPuzzleGame = realPuzzleEngine.game;
@@ -28248,11 +29360,13 @@
       for (let offset = 1; offset < indexes.length; offset += 1) {
         const candidate = indexes[(position + delta * offset + indexes.length) % indexes.length];
         if (candidates.has(candidate) && getRealPuzzleTacticalKey(realPuzzleBank[candidate]) !== currentTactic) {
+          if (realPuzzleMode === "Streak") realPuzzleStreak = 0;
           realPuzzleIndex = candidate;
           renderRealPuzzle();
           return;
         }
       }
+      if (realPuzzleMode === "Streak") realPuzzleStreak = 0;
       realPuzzleIndex = indexes.find((index) => candidates.has(index) && index !== realPuzzleIndex)
         ?? indexes[(position + delta + indexes.length) % indexes.length];
       renderRealPuzzle();
@@ -28311,16 +29425,11 @@
     }
 
     const realPuzzleManager = Object.freeze({
-      restart() { renderRealPuzzle(); },
+      restart() {
+        if (realPuzzleMode === "Rush" && realPuzzleRushFinished) resetRealPuzzleRushSession();
+        renderRealPuzzle();
+      },
       next(delta = 1) { stepRealPuzzle(delta); },
-      random() {
-        realPuzzleIndex = chooseRandomRealPuzzle();
-        renderRealPuzzle();
-      },
-      nextUnsolved() {
-        realPuzzleIndex = chooseNextUnsolvedRealPuzzle();
-        renderRealPuzzle();
-      },
       advance() {
         realPuzzleIndex = realPuzzleMode === "Streak" ? chooseNextUnsolvedRealPuzzle() : chooseRandomRealPuzzle();
         renderRealPuzzle();
@@ -28330,8 +29439,7 @@
 
     function renderRealPuzzleSelectors(indexes = getRealPuzzleIndexes()) {
       const select = document.getElementById("realPuzzleSelect");
-      const list = document.getElementById("realPuzzleNameList");
-      if (!select || !list) return;
+      if (!select) return;
       const position = Math.max(0, indexes.indexOf(realPuzzleIndex));
       const selectorIndexes = indexes.slice(Math.max(0, position - 16), position + 17);
       select.replaceChildren(...selectorIndexes.map((index) => {
@@ -28342,19 +29450,6 @@
         return option;
       }));
       select.value = String(realPuzzleIndex);
-      list.replaceChildren(...selectorIndexes.slice(0, 12).map((index) => {
-        const puzzle = realPuzzleBank[index];
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = puzzle.title;
-        button.setAttribute("aria-pressed", String(index === realPuzzleIndex));
-        button.title = `${getRealPuzzleDifficulty(puzzle)} ${puzzle.rating} - ${getRealPuzzleThemes(puzzle).join(", ")}`;
-        button.addEventListener("click", () => {
-          realPuzzleIndex = index;
-          renderRealPuzzle();
-        });
-        return button;
-      }));
     }
 
     function syncRealPuzzleAnalysisControls() {
@@ -28394,7 +29489,7 @@
         },
         canDrag(from) { return Boolean(board.querySelector(`[data-square="${from}"]`)?.draggable); },
         onDragStart(from, event) {
-          if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
+          if (!realPuzzleGame || realPuzzleReplaying || realPuzzleRushFinished || realPuzzlePhase !== "PlayerTurn") return;
           realPuzzleSelected = from;
           realPuzzleLegalMoves = realPuzzleGame.moves({ square: from, verbose: true });
           board.querySelector(`[data-square="${from}"]`)?.classList.add("dragging");
@@ -28498,7 +29593,7 @@
           lastSquares.includes(squareNameValue) ? "last move" : "",
           squareNameValue === checkedKing ? "in check" : ""
         ]));
-        square.disabled = realPuzzlePhase !== "PlayerTurn" || realPuzzleReplaying;
+        square.disabled = realPuzzlePhase !== "PlayerTurn" || realPuzzleReplaying || realPuzzleRushFinished;
         square.draggable = Boolean(piece && piece.color === realPuzzleGame?.turn() && !square.disabled);
       });
       if (animateEffect && realPuzzleLastMove) animateBoardPieceTransition(board, realPuzzleLastMove, { fade: false });
@@ -28553,27 +29648,14 @@
       document.getElementById("realPuzzleDifficulty").textContent = `${getRealPuzzleDifficulty(puzzle)} ${puzzle.rating}`;
       document.getElementById("realPuzzleSide").textContent = `${realPuzzleSide === "w" ? "White" : "Black"} to move`;
       document.getElementById("realPuzzleTheme").textContent = getRealPuzzleThemes(puzzle).join(" / ");
-      document.getElementById("realPuzzleCounter").textContent = getRealPuzzlePositionLabel();
-      const progress = realPuzzleManager.progress();
-      document.getElementById("realPuzzleSolved").textContent = `${progress.solved}/${progress.total}`;
-      document.getElementById("realPuzzleCoins").textContent = String(realPuzzleCoinsEarned);
-      document.getElementById("realPuzzleBest").textContent = realPuzzleBestSeconds ? formatPuzzleTime(realPuzzleBestSeconds * 1000) : "--";
-      document.getElementById("realPuzzleAccuracy").textContent = `${getRealPuzzleAccuracy()}%`;
-      document.getElementById("realPuzzleStreak").textContent = `${realPuzzleStreak}/${realPuzzleBestStreak}`;
+      updateRealPuzzleProgressStats();
       document.getElementById("realPuzzleRating").textContent = String(realPuzzleRating);
-      document.getElementById("realPuzzleRecommend").textContent = getRealPuzzleRecommendation();
       document.getElementById("realPuzzleTitle").textContent = puzzle.title;
       document.getElementById("realPuzzlePrompt").textContent = puzzle.prompt;
       document.getElementById("realPuzzleHint").textContent = puzzle.note || "Use a hint when you want a gentle nudge.";
       scheduleRealPuzzlePrefetch();
-      const modeNote = {
-        Daily: "Daily puzzle: one focused win today.",
-        Trainer: "Trainer: learn the full line at your pace.",
-        Rush: "Rush: solve and the next puzzle starts automatically.",
-        Streak: "Streak: keep the chain alive with clean solves.",
-        Battle: "Battle: mistakes cost more rating, rewards hit harder."
-      }[realPuzzleMode] || "Choose a piece.";
-      document.getElementById("realPuzzleFeedback").textContent = `${modeNote} Take a breath, then make your move.`;
+      renderRealPuzzleModeStatus();
+      document.getElementById("realPuzzleFeedback").textContent = `${realPuzzleMode} ready. Choose a piece to begin.`;
       document.getElementById("realPuzzleMoves").textContent = "";
       document.getElementById("realPuzzles")?.setAttribute("data-loading", "false");
       updateRealPuzzleClock();
@@ -28622,21 +29704,28 @@
       const puzzle = realPuzzleBank[realPuzzleIndex];
       const completionId = realPuzzleTransitionId;
       if (!puzzle || realPuzzleCompletionTransitionId === completionId || realPuzzlePhase === "Completed") return;
+      if (realPuzzleMode === "Rush" && realPuzzleRushStarted && getRealPuzzleRushRemainingMs() <= 0) {
+        finishRealPuzzleRush();
+        return;
+      }
       realPuzzleCompletionTransitionId = completionId;
+      if (realPuzzleMode === "Trainer") recordDailyPracticeCompletion("puzzle");
       cancelPendingRealPuzzleReply();
       clearRealPuzzleAnalysisArrows();
-      const startedAt = realPuzzleStartedAt || Date.now();
-      const seconds = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
+      const elapsedMs = realPuzzleElapsedMs + (realPuzzleStartedAt ? Date.now() - realPuzzleStartedAt : 0);
+      const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
       const firstSolve = !realPuzzleSolved.has(puzzle.id);
-      stopRealPuzzleTimer();
+      const repeatedStreakPosition = realPuzzleMode === "Streak" && !firstSolve;
+      stopRealPuzzleTimer({ pauseRush: false });
       realPuzzleSelected = "";
       realPuzzleLegalMoves = [];
       let completionMessage = "Puzzle complete.";
       try {
         realPuzzleAttempts += 1;
         realPuzzleCorrect += 1;
-        realPuzzleStreak += 1;
+        if (!repeatedStreakPosition) realPuzzleStreak += 1;
         realPuzzleBestStreak = Math.max(realPuzzleBestStreak, realPuzzleStreak);
+        if (realPuzzleMode === "Rush") realPuzzleRushScore += 1;
         updateRealPuzzleRating(Math.max(4, Math.round((puzzle.rating - realPuzzleRating) / 24) + (realPuzzleMistakes ? 3 : 10)));
         if (firstSolve) {
           realPuzzleSolved.add(puzzle.id);
@@ -28651,9 +29740,12 @@
           renderPlayerProfile();
           playPuzzleTone("milestone");
           publishLearningActivity("puzzle_solved", `real-puzzle:${puzzle.id}`, { puzzleId: puzzle.id, theme: puzzle.theme || "", rating: puzzle.rating || null });
-          showCelebration("Real puzzle solved!", formatRewardText(reward), xpResult.levelUp ? "New level!" : puzzle.theme);
+          const rewardMessage = isApplicationAuthenticated()
+            ? "Practice saved on this device. No account XP, coins, or rating were awarded."
+            : `Device-local ${formatRewardText(reward)}`;
+          showCelebration("Puzzle solved", rewardMessage, xpResult.levelUp ? "Practice level up" : puzzle.theme);
         }
-        completionMessage = `Solved in ${formatPuzzleTime(seconds * 1000)}. Line: ${realPuzzleMoveSans.join(" ")}. ${puzzle.note}`;
+        completionMessage = `Solved in ${formatPuzzleTime(seconds * 1000)}.${repeatedStreakPosition ? " This position was already solved, so it did not extend your Streak." : ""} Line: ${realPuzzleMoveSans.join(" ")}. ${puzzle.note}`;
       } catch (error) {
         console.warn("[Nschess Puzzles] Completion side effect failed.", error);
         completionMessage = "Puzzle solved. Your progress has been saved; choose the next challenge when ready.";
@@ -28670,6 +29762,8 @@
         const moves = document.getElementById("realPuzzleMoves");
         if (feedback) feedback.textContent = completionMessage;
         if (moves) moves.textContent = realPuzzleMoveSans.join(" ");
+        updateRealPuzzleProgressStats();
+        renderRealPuzzleModeStatus();
         try {
           renderRealPuzzleAchievements();
           renderRealPuzzleBoard();
@@ -28681,13 +29775,14 @@
     }
 
     async function finishRealPuzzleMove(move) {
-      if (!realPuzzleGame || realPuzzlePhase !== "PlayerTurn") return;
+      if (!realPuzzleGame || realPuzzlePhase !== "PlayerTurn" || realPuzzleRushFinished) return;
       const transitionId = realPuzzleTransitionId;
       setRealPuzzlePhase("Validate");
       const playedUci = moveToUci(move).toLowerCase();
       const expected = String(realPuzzleEngine?.line?.[realPuzzleEngine?.step] || "").trim().toLowerCase();
       const expectedMove = getRealPuzzleEngineMove();
       if (playedUci !== expected || !expectedMove) {
+        const brokenStreak = realPuzzleStreak;
         realPuzzleMistakes += 1;
         realPuzzleAttempts += 1;
         realPuzzleFailed += 1;
@@ -28695,7 +29790,16 @@
         updateRealPuzzleRating(realPuzzleMode === "Battle" ? -10 : -6);
         realPuzzleSelected = "";
         realPuzzleLegalMoves = [];
-        document.getElementById("realPuzzleFeedback").textContent = "Nice try. Look for a forcing check, capture, or threat, then try again.";
+        const message = realPuzzleMode === "Streak"
+          ? `Streak broken${brokenStreak ? ` at ${brokenStreak}` : ""}. Solve this position to start a new chain.`
+          : realPuzzleMode === "Rush"
+            ? "Not quite. Rush is still live—look for a forcing move and try again before time runs out."
+            : realPuzzleMode === "Battle"
+              ? "Wrong move. Your local practice rating lost 10 points; try another forcing idea."
+              : "Nice try. Find a forcing move and try again; the full line stays here when you solve it.";
+        document.getElementById("realPuzzleFeedback").textContent = message;
+        updateRealPuzzleProgressStats();
+        renderRealPuzzleModeStatus();
         playPuzzleTone("wrong");
         flashPuzzleBoard("is-wrong", "realPuzzleBoard");
         setRealPuzzlePhase("PlayerTurn");
@@ -28751,12 +29855,12 @@
     }
 
     function handleRealPuzzleSquare(square) {
-      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return false;
-      startRealPuzzleTimer();
+      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn" || realPuzzleRushFinished) return false;
       const piece = realPuzzleGame.get(square);
       if (realPuzzleSelected && square !== realPuzzleSelected) {
         const legalMoves = realPuzzleGame.moves({ square: realPuzzleSelected, verbose: true }).filter((move) => move.to === square);
         if (legalMoves.length) {
+          startRealPuzzleTimer();
           const expected = String(realPuzzleEngine?.line?.[realPuzzleEngine?.step] || "").trim().toLowerCase();
           const selectedMove = legalMoves.find((candidate) => moveToUci(candidate).toLowerCase() === expected)
             || legalMoves.find((move) => move.promotion === "q")
@@ -28788,6 +29892,7 @@
         }
       }
       if (piece && piece.color === realPuzzleGame.turn()) {
+        startRealPuzzleTimer();
         realPuzzleSelected = square;
         realPuzzleLegalMoves = realPuzzleGame.moves({ square, verbose: true });
         document.getElementById("realPuzzleFeedback").textContent = `${realPuzzleLegalMoves.length} legal move${realPuzzleLegalMoves.length === 1 ? "" : "s"} highlighted.`;
@@ -28807,12 +29912,14 @@
       const puzzle = realPuzzleBank[realPuzzleIndex];
       realPuzzleHintStep = Math.min(realPuzzleHintStep + 1, puzzle.hints.length);
       document.getElementById("realPuzzleHint").textContent = puzzle.hints[realPuzzleHintStep - 1] || puzzle.note;
-      document.getElementById("realPuzzleFeedback").textContent = realPuzzleHintStep >= 3 ? `Full line: ${puzzle.moves.join(" ")}` : "Hint opened. Reward is a little smaller, but learning still counts.";
+      document.getElementById("realPuzzleFeedback").textContent = realPuzzleHintStep >= 3
+        ? `Full line: ${puzzle.moves.join(" ")}`
+        : "Hint opened. It may reduce the device-local practice bonus; account rewards are never affected.";
       playAudioCue("hint");
     }
 
     async function replayRealPuzzleSolution() {
-      if (!realPuzzleGame || realPuzzleReplaying || realPuzzlePhase !== "PlayerTurn") return;
+      if (!realPuzzleGame || realPuzzleReplaying || realPuzzleRushFinished || !["PlayerTurn", "Completed"].includes(realPuzzlePhase)) return;
       resetRealPuzzleGame();
       const transitionId = realPuzzleTransitionId;
       setRealPuzzlePhase("Loading");
@@ -28896,27 +30003,37 @@
       refreshPuzzleCollectionStatus();
       document.querySelectorAll("[data-real-mode]").forEach((button) => {
         button.addEventListener("click", () => {
-          realPuzzleMode = button.dataset.realMode || "Trainer";
-          realPuzzleIndex = realPuzzleMode === "Daily" ? getRealDailyIndex(getRealPuzzleIndexes()) : getRealPuzzleIndexes()[0] || 0;
+          const requestedMode = button.dataset.realMode || "Trainer";
+          if (!realPuzzleModes.includes(requestedMode)) return;
+          if (requestedMode === realPuzzleMode) return;
+          resetRealPuzzleRushSession();
+          realPuzzleMode = requestedMode;
+          if (requestedMode === "Streak") realPuzzleStreak = 0;
+          realPuzzleIndex = requestedMode === "Streak"
+            ? chooseNextUnsolvedRealPuzzle()
+            : (getRealPuzzleIndexes()[0] || 0);
           renderRealPuzzle();
         });
       });
       document.querySelectorAll("[data-real-difficulty]").forEach((button) => {
         button.addEventListener("click", () => {
-          realPuzzleDifficulty = button.dataset.realDifficulty || "All";
-          realPuzzleIndex = getRealPuzzleIndexes()[0] || 0;
+          const requestedDifficulty = button.dataset.realDifficulty || "All";
+          if (requestedDifficulty === realPuzzleDifficulty) return;
+          if (realPuzzleMode === "Rush") resetRealPuzzleRushSession();
+          realPuzzleDifficulty = requestedDifficulty;
+          if (realPuzzleMode === "Streak") realPuzzleStreak = 0;
+          realPuzzleIndex = realPuzzleMode === "Streak"
+            ? chooseNextUnsolvedRealPuzzle()
+            : (getRealPuzzleIndexes()[0] || 0);
           renderRealPuzzle();
         });
       });
       document.getElementById("realPuzzleSelect")?.addEventListener("change", (event) => {
+        if (realPuzzleMode === "Streak" && Number(event.target.value) !== realPuzzleIndex) realPuzzleStreak = 0;
         realPuzzleIndex = Number(event.target.value) || 0;
         renderRealPuzzle();
       });
-      document.getElementById("realPuzzlePrev")?.addEventListener("click", () => realPuzzleManager.next(-1));
-      document.getElementById("realPuzzleNext")?.addEventListener("click", () => realPuzzleManager.next(1));
       document.getElementById("realPuzzleBoardNext")?.addEventListener("click", () => realPuzzleManager.next(1));
-      document.getElementById("realPuzzleRandom")?.addEventListener("click", () => realPuzzleManager.random());
-      document.getElementById("realPuzzleRestart")?.addEventListener("click", () => realPuzzleManager.restart());
       document.getElementById("realPuzzleBoardRestart")?.addEventListener("click", () => realPuzzleManager.restart());
       document.getElementById("realPuzzleHintButton")?.addEventListener("click", showRealPuzzleHint);
       document.getElementById("realPuzzleReplay")?.addEventListener("click", replayRealPuzzleSolution);
@@ -28928,7 +30045,6 @@
         realPuzzleFlipped = !realPuzzleFlipped;
         renderRealPuzzleBoard();
       });
-      document.getElementById("realPuzzleNextUnsolved")?.addEventListener("click", () => realPuzzleManager.nextUnsolved());
       renderRealPuzzle();
     }
 
@@ -29016,12 +30132,13 @@
           const wasRealtimeMatch = isRealtimeMatchActive();
           setCoachDifficulty(button.dataset.gameDifficulty);
           if (wasRealtimeMatch) startSoloCoachGame();
-          const label = getCoachConfig().label || coachDifficulty;
+          const label = getCoachDifficultyDisplay();
           coachMessage = getCoachSkill() >= 15
             ? `${label} ready. No pressure: try to survive, ask Why, and learn one idea.`
             : `Difficulty set to ${label}. Keep it friendly and focus on one idea.`;
           renderCoachBoard();
           updateCoachPanel();
+          if (!wasRealtimeMatch && coachSessionActive && !coachBotPaused && coachGame?.turn() === getCoachBotColor() && !coachThinking) queueCoachReply();
         });
       });
       document.querySelectorAll("[data-coach-side]").forEach((button) => {
@@ -29083,13 +30200,17 @@
       document.getElementById("aiPlayerCard")?.addEventListener("click", () => {
         const ai = getAiHeaderProfile();
         const config = getCoachConfig();
-        coachMessage = `${ai.name}, ${ai.title}. Playstyle: ${config.elo >= 2000 ? "deep calculation, opening discipline, and counterattack pressure" : config.elo >= 1500 ? "active pieces, tactics, and king safety" : "simple development and safe captures"}. Strength: depth ${config.depth}. Weakness: lower levels still miss long plans.`;
+        coachMessage = config.beginnerBot
+          ? `${ai.name}, ${ai.title}. This level uses the local practice model, with a distinct candidate pool and mistake rate. It is not an Elo-calibrated opponent.`
+          : `${ai.name}, ${ai.title}. This level uses Stockfish 16 Lite with skill setting ${config.skill}/20 and a bounded search time. It is not Elo-calibrated.`;
         renderCoachBoard();
+        updateCoachPanel();
       });
       document.getElementById("undoGame").addEventListener("click", undoCoachMove);
       document.getElementById("toggleBot").addEventListener("click", () => {
         coachBotPaused = !coachBotPaused;
         coachMoveToken += 1;
+        cancelStockfishSearch(coachBotPaused ? "Bot paused" : "Bot resumed", true);
         coachThinking = false;
         coachSelected = "";
         coachLegalMoves = [];
@@ -29124,6 +30245,18 @@
         hidePostGameDecision();
         openPostGameReview();
       });
+      const postGameDecisionDialog = document.getElementById("postGameDecision");
+      if (postGameDecisionDialog && !postGameDecisionDialog.dataset.accessibilityReady) {
+        postGameDecisionDialog.dataset.accessibilityReady = "true";
+        document.addEventListener("keydown", (event) => {
+          if (postGameDecisionDialog.hidden) return;
+          if (trapDialogFocus(event, postGameDecisionDialog)) return;
+          if (event.key === "Escape") {
+            event.preventDefault();
+            hidePostGameDecision();
+          }
+        });
+      }
       document.getElementById("postGameNextBot")?.addEventListener("click", playNextCoachOpponent);
       document.getElementById("postGameNew")?.addEventListener("click", () => {
         startSoloCoachGame();
@@ -29548,7 +30681,9 @@
       admin: "admin"
     });
     const routeModulePromises = new Map();
+    const routeModuleRetries = new Map();
     let routeModuleActivationGeneration = 0;
+    let siteNavigationGeneration = 0;
 
     function getRouteModuleName(panel, tab = "") {
       if (panel === "gameReview") return routeModuleNames.gameReview;
@@ -29567,10 +30702,13 @@
       // every lazy route fails before its module is even requested. Resolve
       // against the document so this also works when the site is hosted under
       // a repository sub-path (for example GitHub Pages).
-      const href = new URL(
+      const routeUrl = new URL(
         `./assets/routes/${encodeURIComponent(name)}.js?v=${encodeURIComponent(routeModuleVersion)}`,
         document.baseURI
-      ).href;
+      );
+      const retry = routeModuleRetries.get(name) || 0;
+      if (retry) routeUrl.searchParams.set("retry", String(retry));
+      const href = routeUrl.href;
       const task = import(href).catch((error) => {
         console.warn(`[Nschess] Route module ${name} failed to load.`, error);
         return { routeError: true, routeName: name, features: [], styles: [] };
@@ -29625,13 +30763,16 @@
           if (featureName.startsWith("route:")) {
             const routeName = featureName.slice("route:".length);
             routeModulePromises.delete(routeName);
+            // Browsers remember failed module imports too. Explicit retry
+            // needs a new URL rather than the already rejected module.
+            routeModuleRetries.set(routeName, (routeModuleRetries.get(routeName) || 0) + 1);
             routeModuleActivationGeneration += 1;
             initializePanelFeatures(panel.id, panel.dataset.routeTab || "");
             return;
           }
           deferredFeaturePromises.delete(featureName);
           void initializeDeferredFeature(featureName).then((ok) => {
-            if (!ok) showRouteFeatureFailure(panel, featureName);
+            if (ok === false) showRouteFeatureFailure(panel, featureName);
             sharedInteractiveBoardWorkspace.sync();
           });
         };
@@ -29820,6 +30961,7 @@
       });
 
       function showHome(shouldScroll = false) {
+        siteNavigationGeneration += 1;
         releaseActivePlayScrollAnchor();
         boardInteractionEngine.cancelAll({ type: "routechange" });
         cancelCoachPremove();
@@ -29860,6 +31002,7 @@
       }
 
       function activateSiteTab(config, shouldScroll = true) {
+        siteNavigationGeneration += 1;
         if (!config) {
           showHome(shouldScroll);
           return;
@@ -29921,6 +31064,7 @@
         if (panelInitFrame) window.cancelAnimationFrame(panelInitFrame);
         panelInitFrame = window.requestAnimationFrame(() => {
           panelInitFrame = 0;
+          if (config.panel === "plan") renderDailyPracticeHub();
           initializePanelFeatures(config.panel, config.tab);
           if (config.profileId) {
             window.requestAnimationFrame(() => {
@@ -29986,6 +31130,33 @@
         link.addEventListener("click", (event) => {
           if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           event.preventDefault();
+
+          const sameDestination = window.location.hash === href && (isHomeLink
+            ? !document.body.classList.contains("site-tab-mode") && homeLink?.classList.contains("is-active-tab")
+            : activePanel?.id === config.panel && links.find((item) => item.dataset.siteTab === config.tab)?.classList.contains("is-active-tab"));
+          if (sameDestination) {
+            // A same-page navigation should still close menus and preserve the
+            // usual scroll/focus/audio feedback, but must not re-run route
+            // lifecycle work or append a duplicate history entry.
+            closeNavMenus();
+            if (isHomeLink) {
+              playAudioCue("page-home");
+              window.scrollTo({ top: 0, behavior: "auto" });
+            } else {
+              const panel = document.getElementById(config.panel);
+              const activeLink = links.find((item) => item.dataset.siteTab === config.tab);
+              if (activeLink?.closest(".nav-links")) {
+                activeLink.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+              }
+              playSitePageSound(config.tab);
+              window.requestAnimationFrame(() => {
+                const target = document.getElementById(config.focus) || panel;
+                target?.scrollIntoView({ behavior: "auto", block: "start" });
+                panel?.focus({ preventScroll: true });
+              });
+            }
+            return;
+          }
 
           if (window.history?.pushState) {
             window.history.pushState(null, "", href);
@@ -30543,8 +31714,26 @@
     function normalizeSupabaseProfileData(profile = {}) {
       const source = profile && typeof profile === "object" ? profile : {};
       const friendSource = source.friends && typeof source.friends === "object" && !Array.isArray(source.friends) ? source.friends : {};
+      const existingAvailability = source.profileMetricAvailability && typeof source.profileMetricAvailability === "object"
+        ? source.profileMetricAvailability
+        : {};
+      const hasNumericValue = (key) => {
+        if (typeof existingAvailability[key] === "boolean") return existingAvailability[key];
+        const value = source[key];
+        return (typeof value === "number" || typeof value === "string")
+          && !(typeof value === "string" && !value.trim())
+          && Number.isFinite(Number(value)) && Number(value) >= 0;
+      };
       return {
         ...source,
+        profileMetricAvailability: {
+          rating: hasNumericValue("rating") && Number(source.rating) >= 400,
+          coins: hasNumericValue("coins"),
+          xp: hasNumericValue("xp"),
+          wins: hasNumericValue("wins"),
+          losses: hasNumericValue("losses"),
+          draws: hasNumericValue("draws")
+        },
         avatar: String(source.avatar || "auto"),
         countryFlag: normalizeCountryFlagValue(source.countryFlag || source.country_flag || ""),
         rating: Math.max(400, Number(source.rating) || 450),
@@ -30574,6 +31763,8 @@
       const isLoopback = ["localhost", "127.0.0.1", "::1"].includes(host);
       if ((location.protocol !== "https:" && !isLoopback) || host.endsWith(".github.io")) return baseProvider;
       let configPromise = null;
+      let configRetryAt = 0;
+      let configLastError = null;
       let cachedAccount = null;
       let supabaseClientPromise = null;
       let supabaseLibraryPromise = null;
@@ -30684,6 +31875,10 @@
       const startSessionRefresh = (client) => client?.auth?.startAutoRefresh?.();
 
       const getConfig = async () => {
+        // Several lazy surfaces request auth together. Share a brief failure
+        // cooldown as well as the in-flight request instead of hammering an
+        // unavailable configuration endpoint on every render.
+        if (!configPromise && Date.now() < configRetryAt) throw configLastError;
         if (!configPromise) {
           configPromise = fetch("/api/auth-config", { cache: "no-store" })
             .then(async (response) => {
@@ -30701,6 +31896,8 @@
             })
             .catch((error) => {
               configPromise = null;
+              configLastError = error;
+              configRetryAt = Date.now() + 3000;
               throw error;
             });
         }
@@ -30786,7 +31983,9 @@
         }
         stopSessionRefresh();
         if (clearAuthStorage) clearSupabaseBrowserAuthStorage();
-        writeJsonStorage(authPreferencesStorageKey, { ...readJsonStorage(authPreferencesStorageKey, {}), currentEmail: "", rememberEmail: "" });
+        // Session cleanup can arrive after the workspace reset. Remove the
+        // account-owned record rather than recreating it in the guest workspace.
+        try { localStorage.removeItem(authPreferencesStorageKey); } catch {}
       };
 
       const safeAuthMetadataUsername = (user) => {
@@ -30880,10 +32079,7 @@
       // Both paths use Supabase's shared data; profiles are a read-only recovery source.
       let leaderboardApiAvailable = typeof baseProvider?.getLeaderboard === "function";
       const toLeaderboardEntry = (row = {}) => {
-        const wins = Math.max(0, Number(row.wins) || 0);
-        const losses = Math.max(0, Number(row.losses) || 0);
-        const draws = Math.max(0, Number(row.draws) || 0);
-        const rating = Math.max(400, Math.min(3000, Number(row.rating || row.game_rating || row.puzzle_rating) || 400));
+        const metrics = getLeaderboardMetrics(row);
         return {
           publicId: String(row.public_id || row.publicId || row.id || ""),
           username: normalizeAuthUsername(row.username),
@@ -30894,17 +32090,20 @@
           avatar: String(row.avatar || "auto"),
           countryFlag: normalizeCountryFlagValue(row.country_flag || row.countryFlag || ""),
           title: String(row.title || ""),
-          puzzleRating: Math.max(400, Number(row.puzzle_rating || row.puzzleRating) || rating),
-          gameRating: Math.max(400, Number(row.game_rating || row.gameRating) || rating),
+          puzzleRating: metrics.puzzleRating,
+          gameRating: metrics.gameRating,
           achievements: Array.isArray(row.achievements) ? row.achievements : [],
-          statistics: row.statistics && typeof row.statistics === "object" ? row.statistics : {
-            gamesPlayed: wins + losses + draws,
-            wins,
-            puzzlesSolved: 0,
-            puzzleAccuracy: 0,
-            lessonsCompleted: 0,
-            cleanGames: 0,
-            bossClears: 0
+          statistics: {
+            ...(row.statistics && typeof row.statistics === "object" ? row.statistics : {}),
+            gamesPlayed: metrics.gamesPlayed,
+            wins: metrics.wins,
+            losses: metrics.losses,
+            draws: metrics.draws,
+            puzzlesSolved: metrics.puzzlesSolved,
+            puzzleAccuracy: metrics.puzzleAccuracy,
+            lessonsCompleted: metrics.lessonsCompleted,
+            cleanGames: metrics.cleanGames,
+            bossClears: metrics.bossClears
           },
           updatedAt: row.updated_at || row.updatedAt || ""
         };
@@ -31284,7 +32483,7 @@
           if (generation !== authGeneration) return null;
           cachedAccount = {
             ...account,
-            profileData: normalizeSupabaseProfileData(saved ? { ...row, ...saved } : row)
+            profileData: normalizeSupabaseProfileData({ ...(account.profileData || {}), ...row, ...(saved || {}) })
           };
           return cachedAccount;
         },
@@ -31998,6 +33197,19 @@
       renderStore();
     }
 
+    function reopenAccountReviewWhenReady(savedReview, accountId) {
+      const navigationGeneration = siteNavigationGeneration;
+      const accountGeneration = socialNotificationGeneration;
+      void initializeDeferredFeature("play").then((ok) => {
+        if (ok === false || navigationGeneration !== siteNavigationGeneration
+          || accountGeneration !== socialNotificationGeneration
+          || !isApplicationAuthenticated()
+          || normalizeAccountWorkspaceId(applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId) !== accountId
+          || !matchReviews.includes(savedReview)) return;
+        if (isGameReviewRoute() && !document.getElementById("gameReview")?.classList.contains("is-review-page")) openSavedMatchReview(savedReview);
+      });
+    }
+
     function applyAuthenticatedAccount(account, { status = "signed_out" } = {}) {
       if (!account?.username) {
         // A profile/network error is not a logout. Preserve the live account
@@ -32013,6 +33225,7 @@
         // the active browser workspace truly anonymous before any route can
         // paint another identity.
         resetApplicationAccountState(previousAccountId, { status: nextStatus, render: true });
+        if (document.getElementById("plan")?.classList.contains("is-active-panel")) renderDailyPracticeHub();
         return;
       }
       const previousAccountId = applicationAuthAccount?.authUserId || applicationAuthAccount?.publicId || "";
@@ -32043,17 +33256,14 @@
           savedReview = matchReviews.find((review) => review?.moves?.length && review?.summary);
         }
         if (savedReview) {
-          void initializeDeferredFeature("play").then(() => {
-            if (isGameReviewRoute() && !document.getElementById("gameReview")?.classList.contains("is-review-page")) {
-              openSavedMatchReview(savedReview);
-            }
-          });
+          reopenAccountReviewWhenReady(savedReview, accountId);
         }
       }
       applicationAuthState = "authenticated";
       applicationAuthAccount = account;
       setStoreAuthState("authenticated", account.authUserId || account.publicId || "");
       activateSupabaseProfile(account);
+      if (document.getElementById("plan")?.classList.contains("is-active-panel")) renderDailyPracticeHub();
       void refreshServerStoreState().catch(() => {});
       void refreshStoreGiftInbox();
       startFriendPresence();
@@ -33082,14 +34292,48 @@
       if (!shell || setupSettingsPage.ready) return;
       setupSettingsPage.ready = true;
 
-      shell.querySelectorAll("[data-settings-tab]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const tab = button.dataset.settingsTab;
-          shell.querySelectorAll("[data-settings-tab]").forEach((item) => item.setAttribute("aria-selected", String(item === button)));
-          shell.querySelectorAll("[data-settings-page]").forEach((page) => page.classList.toggle("is-active", page.dataset.settingsPage === tab));
-          playAudioCue("menu");
+      const tablist = shell.querySelector("[role='tablist']");
+      const tabs = [...shell.querySelectorAll("[role='tab'][data-settings-tab]")];
+      const pages = [...shell.querySelectorAll("[role='tabpanel'][data-settings-page]")];
+      const orientationQuery = window.matchMedia?.("(max-width: 980px)");
+      const syncTabOrientation = () => tablist?.setAttribute("aria-orientation", orientationQuery?.matches ? "horizontal" : "vertical");
+      const activateTab = (button, { focus = false, playSound = true } = {}) => {
+        const tab = button?.dataset?.settingsTab;
+        if (!tabs.includes(button) || !tab) return;
+        tabs.forEach((item) => {
+          const selected = item === button;
+          item.setAttribute("aria-selected", String(selected));
+          item.tabIndex = selected ? 0 : -1;
         });
+        pages.forEach((page) => {
+          const active = page.dataset.settingsPage === tab;
+          page.classList.toggle("is-active", active);
+          page.hidden = !active;
+        });
+        if (focus) button.focus({ preventScroll: true });
+        if (playSound) playAudioCue("menu");
+      };
+      syncTabOrientation();
+      window.addEventListener("resize", syncTabOrientation, { passive: true });
+      tabs.forEach((button) => {
+        button.addEventListener("click", () => activateTab(button));
       });
+      tablist?.addEventListener("keydown", (event) => {
+        const current = tabs.indexOf(event.target.closest?.("[role='tab']"));
+        if (current < 0) return;
+        const vertical = tablist.getAttribute("aria-orientation") === "vertical";
+        let next = current;
+        if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = tabs.length - 1;
+        else if (vertical && event.key === "ArrowDown") next = (current + 1) % tabs.length;
+        else if (vertical && event.key === "ArrowUp") next = (current - 1 + tabs.length) % tabs.length;
+        else if (!vertical && event.key === "ArrowRight") next = (current + 1) % tabs.length;
+        else if (!vertical && event.key === "ArrowLeft") next = (current - 1 + tabs.length) % tabs.length;
+        else return;
+        event.preventDefault();
+        activateTab(tabs[next], { focus: true });
+      });
+      activateTab(tabs.find((button) => button.getAttribute("aria-selected") === "true") || tabs[0], { playSound: false });
 
       shell.addEventListener("input", (event) => {
         const field = event.target instanceof HTMLElement ? event.target : null;
@@ -33369,6 +34613,291 @@
       return state.lastMistake?.date === getTodayKey() ? state.lastMistake : null;
     }
 
+    const dailyPracticeActivityKeys = Object.freeze(["lesson", "puzzle", "botGame"]);
+    const dailyPracticeStorageKey = "checkmateQuest.dailyPractice.v1";
+
+    function getDailyPracticeUtcDate(date = new Date()) {
+      return date.toISOString().slice(0, 10);
+    }
+
+    function normalizeDailyPracticeState(saved, now = new Date()) {
+      if (!saved || typeof saved !== "object" || Array.isArray(saved) || saved.version !== 1
+        || !saved.days || typeof saved.days !== "object" || Array.isArray(saved.days)) {
+        return { version: 1, days: {} };
+      }
+      const days = {};
+      Object.entries(saved.days).forEach(([date, value]) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        const parsed = new Date(`${date}T00:00:00.000Z`);
+        if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date
+          || !value || typeof value !== "object" || Array.isArray(value)) return;
+        const activityKeys = new Set(dailyPracticeActivityKeys);
+        const optionalKeys = new Set([...dailyPracticeActivityKeys, "review"]);
+        const validKeys = (items, allowed) => Array.isArray(items)
+          ? [...new Set(items.filter((item) => typeof item === "string" && allowed.has(item)))].slice(0, allowed.size)
+          : [];
+        days[date] = {
+          started: validKeys(value.started, optionalKeys),
+          skipped: validKeys(value.skipped, optionalKeys),
+          completed: validKeys(value.completed, activityKeys),
+          reviewOpened: value.reviewOpened === true,
+          reflectionMarked: value.reflectionMarked === true
+        };
+      });
+      const today = getDailyPracticeUtcDate(now);
+      const oldest = new Date(now);
+      oldest.setUTCHours(0, 0, 0, 0);
+      oldest.setUTCDate(oldest.getUTCDate() - 13);
+      const oldestDate = getDailyPracticeUtcDate(oldest);
+      const recentDates = Object.keys(days).filter((date) => date >= oldestDate && date <= today).sort();
+      return { version: 1, days: Object.fromEntries(recentDates.map((date) => [date, days[date]])) };
+    }
+
+    function readDailyPracticeState() {
+      return normalizeDailyPracticeState(readJsonStorage(dailyPracticeStorageKey, null));
+    }
+
+    function writeDailyPracticeState(state) {
+      try {
+        localStorage.setItem(dailyPracticeStorageKey, JSON.stringify(normalizeDailyPracticeState(state)));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function updateDailyPracticeDay(update) {
+      const state = readDailyPracticeState();
+      const date = getDailyPracticeUtcDate();
+      const current = state.days[date] || { started: [], skipped: [], completed: [], reviewOpened: false, reflectionMarked: false };
+      const next = update({ ...current, started: [...current.started], skipped: [...current.skipped], completed: [...current.completed] });
+      state.days[date] = next;
+      return writeDailyPracticeState(state);
+    }
+
+    function recordDailyPracticeStart(activity) {
+      if (![...dailyPracticeActivityKeys, "review"].includes(activity)) return false;
+      return updateDailyPracticeDay((day) => ({
+        ...day,
+        started: [...new Set([...day.started, activity])],
+        skipped: day.skipped.filter((item) => item !== activity),
+        ...(activity === "review" ? { reviewOpened: true } : {})
+      }));
+    }
+
+    function recordDailyPracticeCompletion(activity) {
+      if (!dailyPracticeActivityKeys.includes(activity)) return false;
+      return updateDailyPracticeDay((day) => ({
+        ...day,
+        started: [...new Set([...day.started, activity])],
+        skipped: day.skipped.filter((item) => item !== activity),
+        completed: [...new Set([...day.completed, activity])]
+      }));
+    }
+
+    function setDailyPracticeSkipped(activity, skipped) {
+      if (![...dailyPracticeActivityKeys, "review"].includes(activity)) return false;
+      return updateDailyPracticeDay((day) => ({
+        ...day,
+        skipped: skipped
+          ? [...new Set([...day.skipped, activity])]
+          : day.skipped.filter((item) => item !== activity)
+      }));
+    }
+
+    function getDailyPracticeReview() {
+      return matchReviews.find((review) => review?.moves?.length && review?.summary && typeof review.pgn === "string" && review.pgn.trim()) || null;
+    }
+
+    function renderDailyPracticeHub() {
+      const tasksRoot = document.getElementById("dailyPracticeTasks");
+      if (!tasksRoot) return;
+      const state = readDailyPracticeState();
+      const today = getDailyPracticeUtcDate();
+      const day = state.days[today] || { started: [], skipped: [], completed: [], reviewOpened: false, reflectionMarked: false };
+      const tasks = [
+        { key: "lesson", title: "Learn one idea", detail: "Finish an interactive lesson: play its board task and answer the check-in.", action: "Start a lesson", route: "tutorial" },
+        { key: "puzzle", title: "Solve one Trainer puzzle", detail: "Work through a legal tactical line at your own pace.", action: "Open Trainer", route: "puzzles" },
+        { key: "botGame", title: "Finish a game vs a bot", detail: "Play a complete AI game. Wins are not required.", action: "Choose a bot", route: "bots" }
+      ];
+      const completed = new Set(day.completed);
+      const skipped = new Set(day.skipped);
+      const started = new Set(day.started);
+      const nextTask = tasks.find((task) => !completed.has(task.key) && !skipped.has(task.key));
+      const completedCount = tasks.filter((task) => completed.has(task.key)).length;
+      const dateNode = document.getElementById("dailyPracticeDate");
+      const countNode = document.getElementById("dailyPracticeCount");
+      const statusNode = document.getElementById("dailyPracticeStatus");
+      const resetButton = document.getElementById("dailyPracticeReset");
+      if (dateNode) dateNode.textContent = `${today} · UTC`;
+      if (countNode) countNode.textContent = `${completedCount} / ${tasks.length}`;
+      if (statusNode) {
+        statusNode.textContent = completedCount === tasks.length
+          ? "Your three practice steps are complete for this UTC day. Review is optional; there is no reward or synced streak."
+          : nextTask
+            ? `Next up: ${nextTask.title}. Stop or skip any time; only completed activities count.`
+            : "You have skipped the remaining steps for today. You can undo a skip whenever you like.";
+      }
+      if (resetButton) resetButton.disabled = !day.started.length && !day.skipped.length && !day.completed.length && !day.reviewOpened && !day.reflectionMarked;
+
+      tasksRoot.replaceChildren(...tasks.map((task, index) => {
+        const isComplete = completed.has(task.key);
+        const isSkipped = skipped.has(task.key) && !isComplete;
+        const isStarted = started.has(task.key) && !isComplete && !isSkipped;
+        const status = isComplete ? "Completed today" : isSkipped ? "Skipped" : isStarted ? "In progress" : "Not started";
+        const card = document.createElement("article");
+        card.className = `daily-practice-task${isComplete ? " is-complete" : ""}${task === nextTask ? " is-next" : ""}`;
+        const marker = createBookText("span", "daily-practice-task-number", isComplete ? "✓" : String(index + 1));
+        marker.setAttribute("aria-hidden", "true");
+        const copy = document.createElement("div");
+        copy.className = "daily-practice-task-copy";
+        const heading = document.createElement("div");
+        heading.className = "daily-practice-task-heading";
+        heading.append(createBookText("strong", "", task.title), createBookText("span", "daily-practice-task-state", status));
+        copy.append(heading, createBookText("p", "", task.detail));
+        const actions = document.createElement("div");
+        actions.className = "daily-practice-task-actions";
+        if (!isComplete && !isSkipped) {
+          const button = createBookText("button", "button daily-practice-start", isStarted ? "Continue" : task.action);
+          button.type = "button";
+          button.dataset.dailyPracticeStart = task.key;
+          actions.appendChild(button);
+          const skip = createBookText("button", "daily-practice-skip", "Skip today");
+          skip.type = "button";
+          skip.dataset.dailyPracticeSkip = task.key;
+          actions.appendChild(skip);
+        } else if (isSkipped) {
+          const undo = createBookText("button", "daily-practice-skip", "Undo skip");
+          undo.type = "button";
+          undo.dataset.dailyPracticeUnskip = task.key;
+          actions.appendChild(undo);
+        } else {
+          const done = createBookText("span", "daily-practice-done", "Done for today");
+          actions.appendChild(done);
+        }
+        card.append(marker, copy, actions);
+        return card;
+      }));
+
+      const reflectionRoot = document.getElementById("dailyPracticeReflection");
+      if (reflectionRoot) {
+        const review = getDailyPracticeReview();
+        const reflection = document.createElement("div");
+        reflection.className = "daily-practice-reflection-card";
+        const copy = document.createElement("div");
+        copy.append(
+          createBookText("span", "daily-practice-optional", "OPTIONAL"),
+          createBookText("strong", "", "Review one moment"),
+          createBookText("p", "", review
+            ? "A saved Review is available on this device. Look at one move that changed the game, then mark your own reflection if useful."
+            : "No saved, playable Review is available here yet. This step is optional and does not affect the three-step routine.")
+        );
+        const actions = document.createElement("div");
+        actions.className = "daily-practice-task-actions";
+        const reviewSkipped = day.skipped.includes("review");
+        if (!review) {
+          actions.appendChild(createBookText("span", "daily-practice-task-state", "Unavailable"));
+        } else if (day.reflectionMarked) {
+          actions.appendChild(createBookText("span", "daily-practice-task-state", "Self-marked · device only"));
+        } else if (reviewSkipped) {
+          const undo = createBookText("button", "daily-practice-skip", "Undo skip");
+          undo.type = "button";
+          undo.dataset.dailyPracticeUnskip = "review";
+          actions.appendChild(undo);
+        } else {
+          const open = createBookText("button", "button secondary", day.reviewOpened ? "Open saved Review again" : "Open saved Review");
+          open.type = "button";
+          open.dataset.dailyPracticeReviewOpen = "true";
+          actions.appendChild(open);
+          if (day.reviewOpened) {
+            const mark = createBookText("button", "daily-practice-skip", "I reviewed one move");
+            mark.type = "button";
+            mark.dataset.dailyPracticeReflection = "true";
+            actions.appendChild(mark);
+          }
+          const skip = createBookText("button", "daily-practice-skip", "Skip");
+          skip.type = "button";
+          skip.dataset.dailyPracticeSkip = "review";
+          actions.appendChild(skip);
+        }
+        reflection.append(copy, actions);
+        reflectionRoot.replaceChildren(reflection);
+      }
+    }
+
+    function handleDailyPracticeClick(event) {
+      const target = event.target instanceof Element ? event.target.closest("button") : null;
+      if (!target) return;
+      const skipKey = target.dataset.dailyPracticeSkip;
+      const unskipKey = target.dataset.dailyPracticeUnskip;
+      if (skipKey) {
+        const saved = setDailyPracticeSkipped(skipKey, true);
+        renderDailyPracticeHub();
+        const status = document.getElementById("dailyPracticeStatus");
+        if (status) status.textContent = saved ? "Marked skipped on this device. You can undo this any time." : "This browser could not save the skip; your practice data is unchanged.";
+        return;
+      }
+      if (unskipKey) {
+        const saved = setDailyPracticeSkipped(unskipKey, false);
+        renderDailyPracticeHub();
+        const status = document.getElementById("dailyPracticeStatus");
+        if (status) status.textContent = saved ? "Skip removed. Choose this step whenever you are ready." : "This browser could not save that change.";
+        return;
+      }
+      if (target.dataset.dailyPracticeReflection) {
+        if (!getDailyPracticeReview()) return;
+        const saved = updateDailyPracticeDay((day) => ({ ...day, reflectionMarked: true }));
+        renderDailyPracticeHub();
+        const status = document.getElementById("dailyPracticeStatus");
+        if (status) status.textContent = saved ? "Reflection self-marked on this device. It is not a verified or synced completion." : "This browser could not save your reflection mark.";
+        return;
+      }
+      if (target.dataset.dailyPracticeReviewOpen) {
+        const review = getDailyPracticeReview();
+        if (!review) return;
+        recordDailyPracticeStart("review");
+        renderDailyPracticeHub();
+        openStoredMatchReview(review);
+        return;
+      }
+      const activity = target.dataset.dailyPracticeStart;
+      if (!activity) return;
+      recordDailyPracticeStart(activity);
+      renderDailyPracticeHub();
+      if (activity === "lesson") {
+        const done = new Set(beginnerTutorialState.completed || []);
+        currentTutorialLesson = beginnerTutorialLessons.findIndex((lesson) => !done.has(lesson.id));
+        if (currentTutorialLesson < 0) currentTutorialLesson = 0;
+        saveBeginnerTutorialState({});
+        if (window.location.hash === "#tutorial") renderBeginnerTutorial(true);
+        else window.location.hash = "#tutorial";
+        return;
+      }
+      if (activity === "puzzle") {
+        document.querySelector('[data-site-tab="puzzles"]')?.click();
+        void initializeDeferredFeature("puzzles").then((ready) => {
+          if (ready === false) return;
+          const trainer = document.querySelector('[data-real-mode="Trainer"]');
+          if (trainer && realPuzzleMode !== "Trainer") trainer.click();
+          openRealPuzzleExperience("Trainer");
+        });
+        return;
+      }
+      if (activity === "botGame") document.querySelector('[data-site-tab="bots"]')?.click();
+    }
+
+    function resetDailyPracticeMarks() {
+      const state = readDailyPracticeState();
+      const days = { ...state.days };
+      delete days[getDailyPracticeUtcDate()];
+      const saved = writeDailyPracticeState({ version: 1, days });
+      renderDailyPracticeHub();
+      const status = document.getElementById("dailyPracticeStatus");
+      if (status) status.textContent = saved
+        ? "Today's routine marks were reset on this device. Lesson, puzzle, and game records were not changed."
+        : "This browser could not reset today's marks.";
+    }
+
     function buildDailyTrainingPlan(state) {
       const level = state.level || "Beginner";
       const minutes = Math.max(15, Math.min(60, Number(state.minutes) || 25));
@@ -33494,7 +35023,7 @@
       return selected.length ? selected : ["tactics"];
     }
 
-    function renderDailyTraining() {
+    function renderLegacyDailyTraining() {
       const output = document.getElementById("dailyTrainingOutput");
       if (!output) return;
 
@@ -33603,41 +35132,18 @@
     }
 
     function setupDailyTraining() {
-      const form = document.getElementById("dailyTrainingForm");
-      const minutes = document.getElementById("trainingMinutes");
-      const minutesLabel = document.getElementById("trainingMinutesLabel");
-      const resetButton = document.getElementById("resetTraining");
-      if (!form) return;
+      const hub = document.getElementById("dailyPracticeHub");
+      if (!hub) return;
+      if (!setupDailyTraining.ready) {
+        hub.addEventListener("click", handleDailyPracticeClick);
+        document.getElementById("dailyPracticeReset")?.addEventListener("click", resetDailyPracticeMarks);
+        setupDailyTraining.ready = true;
+      }
+      renderDailyPracticeHub();
+    }
 
-      const state = readDailyTrainingState();
-      syncDailyTrainingForm(state);
-      renderDailyTraining();
-
-      minutes?.addEventListener("input", () => {
-        if (minutesLabel) minutesLabel.textContent = `${minutes.value} min`;
-      });
-
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const nextState = {
-          date: getTodayKey(),
-          level: document.getElementById("trainingLevel").value,
-          minutes: Number(document.getElementById("trainingMinutes").value) || 31,
-          goal: document.getElementById("trainingGoal").value,
-          weaknesses: getSelectedTrainingWeaknesses(),
-          completed: []
-        };
-
-        saveDailyTrainingState(nextState);
-        syncDailyTrainingForm(readDailyTrainingState());
-        renderDailyTraining();
-      });
-
-      resetButton?.addEventListener("click", () => {
-        const current = readDailyTrainingState();
-        saveDailyTrainingState({ ...current, completed: [] });
-        renderDailyTraining();
-      });
+    function renderDailyTraining() {
+      renderDailyPracticeHub();
     }
 
     function readCustomBooks() {
@@ -36145,7 +37651,8 @@
           if (activePanel === "play" || activePanel === "gameReview") startMatchPlayerTimer();
           if (activePanel === "puzzles") {
             resumePuzzleTimer();
-            if (realPuzzleStartedAt && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+            if ((realPuzzleStartedAt || realPuzzleElapsedMs > 0) && realPuzzlePhase === "PlayerTurn" && !realPuzzleReplaying) startRealPuzzleTimer();
+            else if (realPuzzleMode === "Rush" && realPuzzleRushStarted) resumeRealPuzzleRushClock();
           }
         }
       });
@@ -36165,6 +37672,7 @@
         stopMatchPlayerTimer();
         window.clearInterval(puzzleTimerId);
         window.clearInterval(realPuzzleTimerId);
+        window.clearInterval(realPuzzleRushTimerId);
       }, { once: true });
     }
 
@@ -36403,6 +37911,61 @@
       render();
     }
 
+    function getSocialNotificationDestination(notification = {}) {
+      const type = String(notification.type || "");
+      const entityCode = String(notification.entityCode || notification.entity_code || "").trim();
+      if (type === "friend_request") return { tab: "friends", href: "#friends", friendView: "requests" };
+      if (type === "friend_accepted" || type === "friend_declined") return { tab: "friends", href: "#friends", friendView: "all" };
+      if (type === "message_received" && !entityCode) return { tab: "friends", href: "#friends", friendView: "messages", entityId: String(notification.entityId || notification.entity_id || "") };
+      if (type === "gift_received") return { tab: "store", href: "#store", action: "giftInbox" };
+      if (type === "achievement_earned") return { tab: "login", href: "#login" };
+      if (["challenge_received", "challenge_accepted", "challenge_declined", "message_received", "game_invite", "spectator_joined"].includes(type)) {
+        return { tab: "friendChallenge", href: "#play?mode=friend" };
+      }
+      return { tab: "friends", href: "#friends", friendView: "notifications" };
+    }
+
+    function getDistinctUnreadSocialCount(notifications = [], incomingRequests = 0, unreadMessages = 0) {
+      const nonMessageUpdates = (Array.isArray(notifications) ? notifications : [])
+        // Friend requests and direct messages already have authoritative
+        // unread counters of their own; don't count their notification copies
+        // a second time in the combined navigation badge.
+        .filter((note) => !note?.readAt && !["friend_request", "message_received"].includes(note?.type)).length;
+      const safeCount = (value) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+      return nonMessageUpdates + safeCount(incomingRequests) + safeCount(unreadMessages);
+    }
+
+    function routeToSocialNotification(notification, route = (tab, href) => {
+      const link = [...document.querySelectorAll("[data-site-tab]")].find((item) => item.dataset.siteTab === tab && item.getAttribute("href") === href)
+        || [...document.querySelectorAll("[data-site-tab]")].find((item) => item.dataset.siteTab === tab);
+      if (link) link.click();
+      else window.location.hash = href;
+    }) {
+      const destination = getSocialNotificationDestination(notification);
+      if (destination.friendView) saveFriendHubState({ view: destination.friendView, search: "" });
+      route(destination.tab, destination.href);
+      const navigationGeneration = siteNavigationGeneration;
+      const notificationGeneration = socialNotificationGeneration;
+      const userId = String(getFriendCurrentUserId() || "");
+      const isCurrent = () => navigationGeneration === siteNavigationGeneration
+        && notificationGeneration === socialNotificationGeneration
+        && userId === String(getFriendCurrentUserId() || "");
+      if (destination.friendView === "messages" && destination.entityId) {
+        window.setTimeout(() => {
+          if (!isCurrent()) return;
+          void refreshMessaging().then(() => {
+            if (!isCurrent()) return;
+            const conversation = messagingHubState.conversations.find((item) => item.id === destination.entityId);
+            if (conversation) void selectMessagingConversation(conversation, { open: false });
+          }).catch(() => {});
+        }, 120);
+      }
+      if (destination.action === "giftInbox") window.setTimeout(() => {
+        if (isCurrent()) document.getElementById("storeGiftOpen")?.click();
+      }, 120);
+      return destination;
+    }
+
     function socialNotificationLabel(notification = {}) {
       const isDirectMessage = notification.type === "message_received" && !String(notification.entityCode || notification.entity_code || "").trim();
       const labels = {
@@ -36434,7 +37997,7 @@
           return `Last seen ${minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`}`;
         }
       }
-      return labels[friend.presenceStatus] || (friend.online ? "Online" : "Offline");
+      return labels[friend.presenceStatus] || (friend.presenceConfirmed ? (friend.online ? "Online" : "Offline") : labels.unknown);
     }
 
     function friendPresenceClass(friend = {}) {
@@ -36566,19 +38129,29 @@
     async function refreshSocialActivity({ rerender = true } = {}) {
       const provider = getFriendProvider();
       if (!provider?.getSocialActivityFeed) return [];
-      if (socialActivityRefreshPromise) return socialActivityRefreshPromise;
       const expectedUserId = String(getFriendCurrentUserId?.() || "");
-      socialActivityRefreshPromise = provider.getSocialActivityFeed(40)
+      if (!isApplicationAuthenticated() || !expectedUserId) return [];
+      if (socialActivityRefreshPromise && socialActivityRefreshAccountId === expectedUserId) return socialActivityRefreshPromise;
+      const requestGeneration = socialActivityGeneration;
+      let request;
+      request = Promise.resolve().then(() => provider.getSocialActivityFeed(40))
         .then((rows) => {
-          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialActivityState;
+          if (requestGeneration !== socialActivityGeneration || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialActivityState;
           socialActivityState = (Array.isArray(rows) ? rows : []).map(normalizeSocialActivity).filter((row) => row.id && row.type);
           if (rerender) window.refreshSiteNotifications?.({ skipServer: true });
           if (friendHubState.view !== "messages") renderFriendsHub();
           return socialActivityState;
         })
         .catch(() => [])
-        .finally(() => { socialActivityRefreshPromise = null; });
-      return socialActivityRefreshPromise;
+        .finally(() => {
+          if (socialActivityRefreshPromise === request) {
+            socialActivityRefreshPromise = null;
+            socialActivityRefreshAccountId = "";
+          }
+        });
+      socialActivityRefreshAccountId = expectedUserId;
+      socialActivityRefreshPromise = request;
+      return request;
     }
 
     function publishLearningActivity(activityType, dedupeKey, payload = {}) {
@@ -36591,25 +38164,37 @@
 
     async function ensureSocialActivityRealtime() {
       const provider = getFriendProvider();
-      if (!provider?.subscribeSocialActivity || socialActivityUnsubscribe || socialActivitySubscribing) return;
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
+      if (!provider?.subscribeSocialActivity || !isApplicationAuthenticated() || !expectedUserId || socialActivityUnsubscribe || socialActivitySubscribing) return;
+      const requestGeneration = socialActivityGeneration;
       socialActivitySubscribing = true;
       try {
-        socialActivityUnsubscribe = await provider.subscribeSocialActivity(() => { void refreshSocialActivity(); });
+        const unsubscribe = await provider.subscribeSocialActivity(() => {
+          if (requestGeneration === socialActivityGeneration && isApplicationAuthenticated() && String(getFriendCurrentUserId?.() || "") === expectedUserId) void refreshSocialActivity();
+        });
+        if (requestGeneration !== socialActivityGeneration || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) {
+          try { unsubscribe?.(); } catch {}
+          return;
+        }
+        socialActivityUnsubscribe = typeof unsubscribe === "function" ? unsubscribe : null;
       } catch {
-        socialActivityUnsubscribe = null;
+        if (requestGeneration === socialActivityGeneration) socialActivityUnsubscribe = null;
       } finally {
-        socialActivitySubscribing = false;
+        if (requestGeneration === socialActivityGeneration) socialActivitySubscribing = false;
       }
     }
 
     async function refreshSocialNotifications({ rerender = true } = {}) {
       const provider = getFriendProvider();
       if (!provider?.getSocialNotifications) return [];
-      if (socialNotificationRefreshPromise) return socialNotificationRefreshPromise;
       const expectedUserId = String(getFriendCurrentUserId?.() || "");
-      socialNotificationRefreshPromise = provider.getSocialNotifications(40)
+      if (!isApplicationAuthenticated() || !expectedUserId) return [];
+      if (socialNotificationRefreshPromise && socialNotificationRefreshAccountId === expectedUserId) return socialNotificationRefreshPromise;
+      const requestGeneration = socialNotificationGeneration;
+      let request;
+      request = Promise.resolve().then(() => provider.getSocialNotifications(40))
         .then((rows) => {
-          if (!isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialNotificationState;
+          if (requestGeneration !== socialNotificationGeneration || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return socialNotificationState;
           socialNotificationState = (Array.isArray(rows) ? rows : []).map((row) => ({
             id: String(row?.id || ""),
             type: String(row?.type || ""),
@@ -36628,28 +38213,68 @@
           return socialNotificationState;
         })
         .catch(() => [])
-        .finally(() => { socialNotificationRefreshPromise = null; });
-      return socialNotificationRefreshPromise;
+        .finally(() => {
+          if (socialNotificationRefreshPromise === request) {
+            socialNotificationRefreshPromise = null;
+            socialNotificationRefreshAccountId = "";
+          }
+        });
+      socialNotificationRefreshAccountId = expectedUserId;
+      socialNotificationRefreshPromise = request;
+      return request;
     }
 
     async function markSocialNotificationsRead(ids = null) {
-      const normalized = Array.isArray(ids) ? ids.map((id) => String(id || "")).filter(Boolean) : null;
-      socialNotificationState = socialNotificationState.map((row) => (!normalized || normalized.includes(row.id) ? { ...row, readAt: row.readAt || new Date().toISOString() } : row));
+      const normalized = Array.isArray(ids) ? [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))] : null;
+      if (Array.isArray(ids) && !normalized.length) return false;
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
+      if (!expectedUserId || !isApplicationAuthenticated()) return false;
+      const requestGeneration = socialNotificationGeneration;
       const provider = getFriendProvider();
-      try { await provider?.markSocialNotificationsRead?.(normalized); } catch {}
-      window.refreshSiteNotifications?.({ skipServer: true });
+      if (typeof provider?.markSocialNotificationsRead !== "function") return false;
+      try {
+        await provider.markSocialNotificationsRead(normalized);
+        if (requestGeneration !== socialNotificationGeneration
+          || !isApplicationAuthenticated()
+          || String(getFriendCurrentUserId?.() || "") !== expectedUserId) return false;
+        const readAt = new Date().toISOString();
+        socialNotificationState = socialNotificationState.map((row) => (!normalized || normalized.includes(row.id) ? { ...row, readAt: row.readAt || readAt } : row));
+        window.refreshSiteNotifications?.({ skipServer: true });
+        if (!document.getElementById("friends")?.hidden) renderFriendsHub();
+        return true;
+      } catch {
+        if (requestGeneration === socialNotificationGeneration
+          && isApplicationAuthenticated()
+          && String(getFriendCurrentUserId?.() || "") === expectedUserId) {
+          const message = "Could not update notification. It remains unread; try again.";
+          const status = document.getElementById("friendsHubStatus");
+          if (status && !document.getElementById("friends")?.hidden) status.textContent = message;
+          const dialogStatus = document.getElementById("siteNotificationsStatus");
+          if (dialogStatus && !document.getElementById("siteNotificationsDialog")?.hidden) dialogStatus.textContent = message;
+        }
+        return false;
+      }
     }
 
     async function ensureSocialNotificationRealtime() {
       const provider = getFriendProvider();
-      if (!provider?.subscribeSocialNotifications || socialNotificationUnsubscribe || socialNotificationSubscribing) return;
+      const expectedUserId = String(getFriendCurrentUserId?.() || "");
+      if (!provider?.subscribeSocialNotifications || !isApplicationAuthenticated() || !expectedUserId || socialNotificationUnsubscribe || socialNotificationSubscribing) return;
+      const requestGeneration = socialNotificationGeneration;
       socialNotificationSubscribing = true;
       try {
-        socialNotificationUnsubscribe = await provider.subscribeSocialNotifications(() => { void refreshSocialNotifications(); });
+        const unsubscribe = await provider.subscribeSocialNotifications(() => {
+          if (requestGeneration === socialNotificationGeneration && isApplicationAuthenticated() && String(getFriendCurrentUserId?.() || "") === expectedUserId) void refreshSocialNotifications();
+        });
+        if (requestGeneration !== socialNotificationGeneration || !isApplicationAuthenticated() || String(getFriendCurrentUserId?.() || "") !== expectedUserId) {
+          try { unsubscribe?.(); } catch {}
+          return;
+        }
+        socialNotificationUnsubscribe = typeof unsubscribe === "function" ? unsubscribe : null;
       } catch {
-        socialNotificationUnsubscribe = null;
+        if (requestGeneration === socialNotificationGeneration) socialNotificationUnsubscribe = null;
       } finally {
-        socialNotificationSubscribing = false;
+        if (requestGeneration === socialNotificationGeneration) socialNotificationSubscribing = false;
       }
     }
 
@@ -36775,8 +38400,8 @@
       const block = document.getElementById("friendsHubProfileBlock");
       const report = document.getElementById("friendsHubProfileReport");
       const isFriend = friend.requestStatus === "accepted";
-      if (add) { add.hidden = isOwner || isFriend || friend.requestDirection === "outgoing"; add.textContent = friend.requestDirection === "outgoing" ? "Request pending" : "Add Friend"; add.disabled = friend.requestDirection === "outgoing"; add.onclick = () => void setFriendRequest(friend, "send"); }
-      if (remove) { remove.hidden = !isFriend; remove.onclick = () => void setFriendRequest(friend, "remove"); }
+      if (add) { add.hidden = isOwner || isFriend || friend.requestDirection === "outgoing"; add.textContent = friend.requestDirection === "outgoing" ? "Request pending" : "Add Friend"; add.disabled = friend.requestDirection === "outgoing"; add.onclick = () => invokeFriendRequestAction(add, friend, "send"); }
+      if (remove) { remove.hidden = !isFriend; remove.onclick = () => invokeFriendRequestAction(remove, friend, "remove"); }
       if (watch) { watch.hidden = !friend.inGame; watch.onclick = async () => { try { const code = await getFriendProvider()?.getActiveFriendGame?.(friend.id); if (code) await openFriendSpectator(code); else document.getElementById("friendsHubStatus").textContent = "That game is no longer available to watch."; } catch (error) { document.getElementById("friendsHubStatus").textContent = error?.message || "Spectating is unavailable."; } }; }
       if (block) { block.hidden = isOwner; block.onclick = () => { blockNschessUser({ id: friend.id, name: friend.name }); setFriendHubProfile(null); renderFriendsHub(); }; }
       if (report) { report.hidden = isOwner; report.onclick = () => openSafetyReport({ userId: friend.id, username: friend.name, contextType: "profile", contextId: friend.id }); }
@@ -36901,16 +38526,16 @@
       if (mode === "incoming") {
         const accept = createBookText("button", "button", "Accept");
         accept.type = "button";
-        accept.addEventListener("click", () => void setFriendRequest(friend, "accept"));
+        accept.addEventListener("click", () => invokeFriendRequestAction(accept, friend, "accept"));
         const decline = createBookText("button", "button secondary", "Decline");
         decline.type = "button";
-        decline.addEventListener("click", () => void setFriendRequest(friend, "decline"));
+        decline.addEventListener("click", () => invokeFriendRequestAction(decline, friend, "decline"));
         actions.append(accept, decline);
       } else if (mode === "outgoing") {
         actions.append(createBookText("span", "badge", "Pending"));
         const cancel = createBookText("button", "button secondary", "Cancel");
         cancel.type = "button";
-        cancel.addEventListener("click", () => void setFriendRequest(friend, "cancel"));
+        cancel.addEventListener("click", () => invokeFriendRequestAction(cancel, friend, "cancel"));
         actions.append(cancel);
       } else if (mode === "search" || mode === "friend") {
         const challenge = createBookText("button", "button", "Challenge");
@@ -37069,13 +38694,18 @@
 
     async function retryMessagingMessage(message) {
       const provider = getFriendProvider();
-      if (!provider?.sendDirectMessage) return;
+      const accountId = String(getFriendCurrentUserId() || "");
+      if (!provider?.sendDirectMessage || !isApplicationAuthenticated() || !accountId) return;
+      const requestGeneration = messagingRequestGeneration;
+      const conversationId = String(message?.conversation_id || "");
+      if (!conversationId || conversationId !== messagingHubState.conversationId) return;
       const pending = normalizeDirectMessage({ ...message, status: "sending" });
       pending.localId = message.localId || message.id;
       messagingHubState.pending.set(pending.localId, pending);
       patchMessagingMessageNode(pending);
       try {
         const saved = normalizeDirectMessage(await provider.sendDirectMessage(pending.conversation_id, pending.body));
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
         if (!saved.id) throw new Error("Message acknowledgement was incomplete. Try again.");
         saved.status = "sent";
         const settled = { ...saved, localId: pending.localId };
@@ -37083,6 +38713,7 @@
         patchMessagingMessageNode(settled);
         messagingHubState.pending.delete(pending.localId);
       } catch {
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
         pending.status = "failed";
         messagingHubState.pending.set(pending.localId, pending);
         messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === pending.localId ? pending : item);
@@ -37090,24 +38721,47 @@
       }
     }
 
+    function isCurrentMessagingContext(requestGeneration, expectedUserId, conversationId = "") {
+      return requestGeneration === messagingRequestGeneration
+        && isApplicationAuthenticated()
+        && String(getFriendCurrentUserId() || "") === String(expectedUserId || "")
+        && (!conversationId || String(messagingHubState.conversationId || "") === String(conversationId));
+    }
+
     async function refreshMessaging({ selectFirst = false } = {}) {
       const provider = getFriendProvider();
       if (!provider?.listConversations) return [];
-      if (messagingRefreshPromise) return messagingRefreshPromise;
-      messagingRefreshPromise = provider.listConversations(40).then(async (rows) => {
+      const expectedUserId = String(getFriendCurrentUserId() || "");
+      if (!isApplicationAuthenticated() || !expectedUserId) return [];
+      if (messagingRefreshPromise && messagingRefreshAccountId === expectedUserId) return messagingRefreshPromise;
+      const requestGeneration = messagingRequestGeneration;
+      let request;
+      request = Promise.resolve().then(() => provider.listConversations(40)).then(async (rows) => {
+        if (!isCurrentMessagingContext(requestGeneration, expectedUserId)) return messagingHubState.conversations;
         messagingHubState.conversations = (Array.isArray(rows) ? rows : []).map(normalizeConversation).filter((item) => item.id && item.participantId);
         if (selectFirst && !messagingHubState.conversationId) messagingHubState.conversationId = messagingHubState.conversations[0]?.id || "";
         renderFriendsHub();
         const selected = messagingHubState.conversations.find((item) => item.id === messagingHubState.conversationId);
-        if (selectFirst && selected) await selectMessagingConversation(selected, { open: false });
+        if (selectFirst && friendHubState.view === "messages" && selected) await selectMessagingConversation(selected, { open: false });
         return messagingHubState.conversations;
-      }).catch(() => []).finally(() => { messagingRefreshPromise = null; });
-      return messagingRefreshPromise;
+      }).catch(() => []).finally(() => {
+        if (messagingRefreshPromise === request) {
+          messagingRefreshPromise = null;
+          messagingRefreshAccountId = "";
+        }
+      });
+      messagingRefreshAccountId = expectedUserId;
+      messagingRefreshPromise = request;
+      return request;
     }
 
     async function selectMessagingConversation(conversation, { open = true } = {}) {
       if (!conversation?.id) return;
       const provider = getFriendProvider();
+      const accountId = String(getFriendCurrentUserId() || "");
+      if (!isApplicationAuthenticated() || !accountId) return;
+      const requestGeneration = messagingRequestGeneration;
+      const conversationRequest = ++messagingConversationRequest;
       const previousConversationId = messagingHubState.conversationId;
       if (previousConversationId && previousConversationId !== conversation.id) {
         const stopPreviousTyping = provider?.setConversationTyping?.(previousConversationId, false);
@@ -37124,20 +38778,26 @@
       if (!provider?.getConversationMessages) return renderFriendsHub();
       try {
         const rows = await provider.getConversationMessages(conversation.id, null, 80);
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.messages = (Array.isArray(rows) ? rows : []).reverse();
         messagingHubState.olderCursor = messagingHubState.messages[0]?.created_at || messagingHubState.messages[0]?.createdAt || null;
         messagingHubState.hasOlder = Array.isArray(rows) && rows.length >= 80;
         await provider.markConversationRead?.(conversation.id);
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.conversations = messagingHubState.conversations.map((item) => item.id === conversation.id ? { ...item, unread: 0 } : item);
       } catch {
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.messages = [];
       }
       try {
         const typingRows = await provider.getConversationTyping?.(conversation.id);
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.typing = (Array.isArray(typingRows) ? typingRows : []).filter((row) => row?.is_typing && Date.now() - Date.parse(row.updated_at || "") < 12000);
       } catch {
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
         messagingHubState.typing = [];
       }
+      if (!isCurrentMessagingContext(requestGeneration, accountId, conversation.id) || conversationRequest !== messagingConversationRequest) return;
       renderFriendsHub();
     }
 
@@ -37231,11 +38891,17 @@
         older.hidden = !active || !messagingHubState.hasOlder;
         older.onclick = async () => {
           if (!active || !messagingHubState.olderCursor) return;
+          const accountId = String(getFriendCurrentUserId() || "");
+          const requestGeneration = messagingRequestGeneration;
+          const conversationId = String(active.id);
+          const cursor = messagingHubState.olderCursor;
+          if (!isApplicationAuthenticated() || !accountId) return;
           older.disabled = true;
           try {
             const previousHeight = messageList?.scrollHeight || 0;
             const previousTop = messageList?.scrollTop || 0;
-            const rows = await getFriendProvider()?.getConversationMessages?.(active.id, messagingHubState.olderCursor, 80);
+            const rows = await getFriendProvider()?.getConversationMessages?.(conversationId, cursor, 80);
+            if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
             const next = (Array.isArray(rows) ? rows : []).reverse();
             messagingHubState.messages = [...next, ...messagingHubState.messages];
             messagingHubState.olderCursor = next[0]?.created_at || next[0]?.createdAt || messagingHubState.olderCursor;
@@ -37243,7 +38909,7 @@
             renderMessagingPanel();
             if (messageList) messageList.scrollTop = messageList.scrollHeight - previousHeight + previousTop;
           } catch {}
-          finally { older.disabled = false; }
+          finally { if (older.isConnected) older.disabled = false; }
         };
       }
       const newMessages = document.getElementById("friendsHubNewMessages");
@@ -37280,11 +38946,14 @@
     async function recoverMessagingConversation() {
       const provider = getFriendProvider();
       const conversationId = messagingHubState.conversationId;
-      if (!provider?.getConversationMessagesSince || !conversationId) return;
+      const accountId = String(getFriendCurrentUserId() || "");
+      const requestGeneration = messagingRequestGeneration;
+      if (!provider?.getConversationMessagesSince || !conversationId || !isApplicationAuthenticated() || !accountId) return;
       const persisted = messagingHubState.messages.filter((message) => message.id && message.id !== message.localId);
       const latest = persisted[persisted.length - 1]?.created_at || null;
       try {
         const rows = await provider.getConversationMessagesSince(conversationId, latest, 200);
+        if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
         (Array.isArray(rows) ? rows : []).forEach((row) => {
           const message = normalizeDirectMessage(row);
           const isOpen = message.conversation_id === messagingHubState.conversationId && !document.getElementById("friendsHubConversation")?.hidden;
@@ -37298,7 +38967,8 @@
       }
     }
 
-    async function handleMessagingRealtimeEvent(event = {}) {
+    async function handleMessagingRealtimeEvent(event = {}, requestGeneration = messagingRequestGeneration, expectedUserId = getFriendCurrentUserId()) {
+      if (!isCurrentMessagingContext(requestGeneration, expectedUserId)) return;
       if (event.type === "status") {
         if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(event.status)) {
           messagingHubState.reconnecting = true;
@@ -37312,7 +38982,7 @@
             try { messagingRealtimeUnsubscribe?.(); } catch {}
             messagingRealtimeUnsubscribe = null;
             messagingRealtimeSubscribing = false;
-            void ensureMessagingRealtime();
+            if (isCurrentMessagingContext(requestGeneration, expectedUserId)) void ensureMessagingRealtime();
           }, 1200);
         } else if (event.status === "SUBSCRIBED") {
           messagingHubState.reconnecting = false;
@@ -37376,18 +39046,35 @@
 
     async function ensureMessagingRealtime() {
       const provider = getFriendProvider();
-      if (!provider?.subscribeMessaging || messagingRealtimeUnsubscribe || messagingRealtimeSubscribing) return;
+      const accountId = String(getFriendCurrentUserId() || "");
+      if (!provider?.subscribeMessaging || !isApplicationAuthenticated() || !accountId || messagingRealtimeUnsubscribe || messagingRealtimeSubscribing) return;
+      const requestGeneration = messagingRequestGeneration;
       messagingRealtimeSubscribing = true;
-      try { messagingRealtimeUnsubscribe = await provider.subscribeMessaging(handleMessagingRealtimeEvent); }
+      try {
+        const unsubscribe = await provider.subscribeMessaging((event) => {
+          if (isCurrentMessagingContext(requestGeneration, accountId)) void handleMessagingRealtimeEvent(event, requestGeneration, accountId);
+        });
+        if (!isCurrentMessagingContext(requestGeneration, accountId)) {
+          try { unsubscribe?.(); } catch {}
+          return;
+        }
+        messagingRealtimeUnsubscribe = typeof unsubscribe === "function" ? unsubscribe : null;
+      }
       catch {
+        if (!isCurrentMessagingContext(requestGeneration, accountId)) return;
         messagingRealtimeUnsubscribe = null;
         window.clearTimeout(messagingReconnectTimer);
-        messagingReconnectTimer = window.setTimeout(() => { messagingReconnectTimer = 0; void ensureMessagingRealtime(); }, 1500);
+        messagingReconnectTimer = window.setTimeout(() => {
+          messagingReconnectTimer = 0;
+          if (isCurrentMessagingContext(requestGeneration, accountId)) void ensureMessagingRealtime();
+        }, 1500);
       }
-      finally { messagingRealtimeSubscribing = false; }
+      finally { if (requestGeneration === messagingRequestGeneration) messagingRealtimeSubscribing = false; }
     }
 
     function stopMessagingRealtime() {
+      messagingRequestGeneration += 1;
+      messagingConversationRequest += 1;
       try { messagingRealtimeUnsubscribe?.(); } catch {}
       window.clearTimeout(messagingReconnectTimer);
       window.clearTimeout(messagingTypingTimer);
@@ -37396,6 +39083,8 @@
       messagingLastTypingSentAt = 0;
       messagingRealtimeUnsubscribe = null;
       messagingRealtimeSubscribing = false;
+      messagingRefreshPromise = null;
+      messagingRefreshAccountId = "";
       messagingHubState = { conversations: [], conversationId: "", messages: [], typing: [], muted: false, olderCursor: null, hasOlder: false, readAtByConversation: {}, pending: new Map(), reconnecting: false };
     }
 
@@ -37408,6 +39097,9 @@
         event.preventDefault();
         const text = String(input?.value || "").trim();
         if (!text || !messagingHubState.conversationId) return;
+        const accountId = String(getFriendCurrentUserId() || "");
+        const requestGeneration = messagingRequestGeneration;
+        if (!isApplicationAuthenticated() || !accountId) return;
         const conversationId = messagingHubState.conversationId;
         const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const optimistic = normalizeDirectMessage({ localId, id: localId, conversation_id: conversationId, sender_id: getFriendCurrentUserId(), sender_username: getFriendProvider()?.getCachedAccount?.()?.username || "You", body: text, created_at: new Date().toISOString(), status: "sending" });
@@ -37417,12 +39109,14 @@
         input.value = "";
         try {
           const saved = normalizeDirectMessage(await getFriendProvider()?.sendDirectMessage?.(conversationId, text));
+          if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
           if (!saved.id) throw new Error("Message acknowledgement was incomplete. Try again.");
           saved.status = "sent";
           messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === localId || item.id === localId ? { ...saved, localId } : item);
           messagingHubState.pending.delete(localId);
           patchMessagingMessageNode({ ...saved, localId });
         } catch (error) {
+          if (!isCurrentMessagingContext(requestGeneration, accountId, conversationId)) return;
           optimistic.status = "failed";
           messagingHubState.pending.set(localId, optimistic);
           messagingHubState.messages = messagingHubState.messages.map((item) => item.localId === localId ? optimistic : item);
@@ -37456,6 +39150,7 @@
       const root = document.getElementById("friends");
       const list = document.getElementById("friendsHubList");
       if (!root || !list) return;
+      updateFriendsHubRealtimeBadge();
       const conversationPanel = document.getElementById("friendsHubConversation");
       if (conversationPanel) conversationPanel.hidden = friendHubState.view !== "messages";
       const directory = (friendNetworkState.directory || []).filter((friend) => !isNschessUserBlocked(friend.id, friend.name));
@@ -37507,11 +39202,16 @@
       [["friendsHubRequestsBadge", incoming.length], ["friendsHubSentBadge", outgoing.length], ["friendsHubNotificationsBadge", socialNotificationState.filter((note) => !note.readAt).length], ["friendsHubActivityBadge", socialActivityState.length], ["friendsHubMessagesBadge", unreadMessages]].forEach(([id, count]) => { const el = document.getElementById(id); if (el) { el.textContent = count; el.hidden = !count; } });
       const navBadge = document.getElementById("friendsNavBadge");
       const mobileBadge = document.getElementById("friendsMobileBadge");
-      const unread = incoming.length + socialNotificationState.filter((note) => !note.readAt).length + unreadMessages;
+      const unread = getDistinctUnreadSocialCount(socialNotificationState, incoming.length, unreadMessages);
       [navBadge, mobileBadge].forEach((el) => { if (el) { el.textContent = unread; el.hidden = !unread; } });
       root.querySelectorAll("[data-friend-hub-view]").forEach((button) => { const selected = button.dataset.friendHubView === friendHubState.view; button.classList.toggle("is-active", selected); button.setAttribute("aria-selected", String(selected)); });
       const status = document.getElementById("friendsHubStatus");
-      if (status) status.textContent = getFriendProvider() ? `${accepted.filter((friend) => friend.online).length} online · updates arrive live` : "Sign in to connect your Friends network.";
+      if (status) {
+        const onlineCount = accepted.filter((friend) => friend.online).length;
+        status.textContent = !isApplicationAuthenticated()
+          ? "Sign in to connect your Friends network."
+          : `${onlineCount} online · ${friendRealtimeReady ? "live updates connected" : friendConnectionState.state === "reconnecting" ? "reconnecting to live updates" : "live updates unavailable"}.`;
+      }
       if (friendHubState.view === "messages") {
         renderMessagingPanel();
         return;
@@ -37520,7 +39220,7 @@
         list.replaceChildren(...(socialActivityState.length ? socialActivityState.map(createSocialActivityCard) : [createBookText("div", "friends-hub-empty", "No activity yet. Solve a puzzle, complete a lesson, or start a game to build your feed.")]));
       } else if (friendHubState.view === "notifications" && !query) {
         const notes = socialNotificationState;
-          list.replaceChildren(...(notes.length ? notes.map((note) => { const copy = socialNotificationLabel(note); const button = createBookText("button", `friends-hub-notification${note.readAt ? " is-read" : ""}`, ""); button.type = "button"; button.append(createBookText("strong", "", copy.title), createBookText("small", "", copy.detail)); button.addEventListener("click", () => { void markSocialNotificationsRead([note.id]); if (note.type === "message_received" && !String(note.entityCode || "").trim()) { saveFriendHubState({ view: "messages", search: "" }); void refreshMessaging().then(() => { const conversation = messagingHubState.conversations.find((item) => item.id === note.entityId); if (conversation) void selectMessagingConversation(conversation, { open: false }); }); } else if (note.type === "message_received") { openTab("friendChallenge", "#play?mode=friend"); } }); return button; }) : [createBookText("div", "friends-hub-empty", "No notifications yet.")]));
+          list.replaceChildren(...(notes.length ? notes.map((note) => { const copy = socialNotificationLabel(note); const button = createBookText("button", `friends-hub-notification${note.readAt ? " is-read" : ""}`, ""); button.type = "button"; button.append(createBookText("strong", "", copy.title), createBookText("small", "", copy.detail)); button.addEventListener("click", () => { void markSocialNotificationsRead([note.id]); routeToSocialNotification(note); }); return button; }) : [createBookText("div", "friends-hub-empty", "No notifications yet.")]));
       } else {
         if (records.length) {
           patchKeyedChildren(
@@ -37542,7 +39242,7 @@
             node.className = "friends-hub-empty";
             node.append(
               createBookText("strong", "", guest ? "Connect to find players" : query ? "No players found" : friendHubState.view === "online" ? "No friends are online" : "Nothing here yet"),
-              createBookText("span", "", guest ? "Sign in to search, message, and challenge players." : query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")
+              createBookText("span", "", guest ? "Sign in to search, message, and challenge players." : query.length === 1 ? "Enter at least 2 characters to search." : query ? "Try a different username." : "Search for a player or open the challenge board to invite someone.")
             );
             if (guest) {
               const signIn = document.createElement("a");
@@ -37564,9 +39264,24 @@
       if (selected) setFriendHubProfile(selected);
     }
 
+    function ensureFriendsHubViewServices() {
+      if (friendHubState.view === "messages") {
+        void refreshMessaging({ selectFirst: true });
+        ensureMessagingRealtime();
+      } else if (friendHubState.view === "activity") {
+        void refreshSocialActivity();
+        ensureSocialActivityRealtime();
+      }
+    }
+
     function setupFriendsHub() {
       const root = document.getElementById("friends");
-      if (!root || friendHubReady) { renderFriendsHub(); return; }
+      if (!root) return;
+      if (friendHubReady) {
+        renderFriendsHub();
+        ensureFriendsHubViewServices();
+        return;
+      }
       friendHubReady = true;
       friendHubState = readFriendHubState();
       setupFriendsHubMessaging();
@@ -37576,8 +39291,25 @@
       const maxRating = document.getElementById("friendHubMaxRating");
       if (minRating) minRating.value = friendHubState.minRating;
       if (maxRating) maxRating.value = friendHubState.maxRating;
-      root.querySelectorAll("[data-friend-hub-view]").forEach((button) => button.addEventListener("click", () => { saveFriendHubState({ view: button.dataset.friendHubView, search: "" }); if (input) input.value = ""; renderFriendsHub(); if (button.dataset.friendHubView === "messages") { void refreshMessaging({ selectFirst: true }); ensureMessagingRealtime(); } if (button.dataset.friendHubView === "activity") { void refreshSocialActivity(); ensureSocialActivityRealtime(); } }));
-      input?.addEventListener("input", () => { window.clearTimeout(friendHubSearchTimer); saveFriendHubState({ search: input.value }); if (friendHubState.view === "messages") { renderFriendsHub(); return; } friendHubSearchTimer = window.setTimeout(() => void searchFriendPlayers(input.value).then(renderFriendsHub), 220); renderFriendsHub(); });
+      root.querySelectorAll("[data-friend-hub-view]").forEach((button) => button.addEventListener("click", () => {
+        window.clearTimeout(friendHubSearchTimer);
+        friendSearchRequest += 1;
+        friendNetworkState.search = [];
+        saveFriendHubState({ view: button.dataset.friendHubView, search: "" });
+        if (input) input.value = "";
+        renderFriendsHub();
+        if (button.dataset.friendHubView === "messages") { void refreshMessaging({ selectFirst: true }); ensureMessagingRealtime(); }
+        if (button.dataset.friendHubView === "activity") { void refreshSocialActivity(); ensureSocialActivityRealtime(); }
+      }));
+      input?.addEventListener("input", () => {
+        window.clearTimeout(friendHubSearchTimer);
+        friendSearchRequest += 1;
+        friendNetworkState.search = [];
+        saveFriendHubState({ search: input.value });
+        if (friendHubState.view === "messages") { renderFriendsHub(); return; }
+        friendHubSearchTimer = window.setTimeout(() => { friendHubSearchTimer = 0; void searchFriendPlayers(input.value).then(renderFriendsHub); }, 220);
+        renderFriendsHub();
+      });
       const runPlayerSearch = () => { saveFriendHubState({ minRating: minRating?.value || "", maxRating: maxRating?.value || "" }); return searchFriendPlayers(input?.value || "", { minRating: minRating?.value, maxRating: maxRating?.value }).then(renderFriendsHub); };
       document.getElementById("friendHubSearchButton")?.addEventListener("click", () => friendHubState.view === "messages" ? renderFriendsHub() : void runPlayerSearch());
       [minRating, maxRating].forEach((field) => field?.addEventListener("change", () => { if (friendHubState.view !== "messages") void runPlayerSearch(); }));
@@ -37588,25 +39320,28 @@
       renderFriendsHub();
       void refreshFriendNetwork(true).then(renderFriendsHub);
       void refreshSocialNotifications().then(renderFriendsHub);
-      void refreshSocialActivity().then(renderFriendsHub);
-      void refreshMessaging({ selectFirst: true });
       ensureFriendRealtime();
       ensureSocialNotificationRealtime();
-      ensureSocialActivityRealtime();
-      ensureMessagingRealtime();
+      ensureFriendsHubViewServices();
     }
 
     function stopSocialNotificationRealtime() {
+      socialNotificationGeneration += 1;
       try { socialNotificationUnsubscribe?.(); } catch {}
       socialNotificationUnsubscribe = null;
       socialNotificationSubscribing = false;
+      socialNotificationRefreshPromise = null;
+      socialNotificationRefreshAccountId = "";
       socialNotificationState = [];
     }
 
     function stopSocialActivityRealtime() {
+      socialActivityGeneration += 1;
       try { socialActivityUnsubscribe?.(); } catch {}
       socialActivityUnsubscribe = null;
       socialActivitySubscribing = false;
+      socialActivityRefreshPromise = null;
+      socialActivityRefreshAccountId = "";
       socialActivityState = [];
     }
 
@@ -37665,12 +39400,7 @@
             detail: copy.detail,
             run: () => {
               void markSocialNotificationsRead([notification.id]);
-              if (notification.type === "gift_received") openTab("store", "#store");
-              else if (notification.type === "message_received" && !String(notification.entityCode || "").trim()) {
-                openTab("friends", "#friends");
-                window.setTimeout(() => { saveFriendHubState({ view: "messages", search: "" }); void refreshMessaging().then(() => { const conversation = messagingHubState.conversations.find((item) => item.id === notification.entityId); if (conversation) void selectMessagingConversation(conversation, { open: false }); }); }, 120);
-              } else if (notification.type === "message_received") openTab("friendChallenge", "#play?mode=friend");
-              else openTab("friendChallenge", "#play?mode=friend");
+              routeToSocialNotification(notification, openTab);
             }
           });
         });

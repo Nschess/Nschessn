@@ -4018,3 +4018,34 @@ html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-bo
     grid-template-areas: "review" "again" "next" "new" "history" "share" "home" !important;
   }
 }
+
+/* Touch quality pass: the final board utility rule remains 44px on phone
+   and tablet layouts even after the compact desktop edge-rail rules above. */
+@media (max-width: 700px) {
+  html body #play#play:not(.is-review-mode) .play-board-wrap > :is(.interactive-board-actions, .play-lobby-board-actions) > [data-board-fullscreen-action] {
+    inline-size: 44px !important;
+    min-inline-size: 44px !important;
+    block-size: 44px !important;
+    min-block-size: 44px !important;
+  }
+
+  /* Keep the larger touch target clear of the lower-right resize handle.
+     The reserved stage padding keeps this button below the square; the
+     left anchor leaves the resize gesture's corner unobstructed. */
+  html body #play#play:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions {
+    inset: auto 0 -52px auto !important;
+    inline-size: 44px !important;
+    min-inline-size: 44px !important;
+    block-size: 44px !important;
+    min-block-size: 44px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0 !important;
+    margin: 0 !important;
+  }
+
+  html body #play#play:not(.is-review-mode) .play-board-wrap > .play-lobby-board-actions > [data-board-fullscreen-action] {
+    position: static !important;
+    inset: auto !important;
+  }
+}

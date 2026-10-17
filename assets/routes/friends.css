@@ -5,6 +5,7 @@
 .friends-hub-page .friends-hub-header p { max-width:42rem; margin:0; color:var(--text-muted,#a7b4cb); }
 .friends-hub-page .friends-hub-header-actions { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; justify-content:flex-end; }
 .friends-hub-page .friends-hub-live { display:inline-flex; align-items:center; gap:.45rem; color:#9ee7c2; font-size:.8rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.friends-hub-page .friends-hub-live.is-offline { color:#9aa8c5; }
 .friends-hub-page .friends-hub-layout { display:grid; grid-template-columns:minmax(180px,.72fr) minmax(320px,1.65fr) minmax(230px,.9fr); gap:1rem; align-items:start; }
 .friends-hub-page .friends-hub-nav,
 .friends-hub-page .friends-hub-main,
@@ -113,12 +114,18 @@
   .friends-hub-page .friends-hub-main,
   .friends-hub-page .friends-hub-profile { width:100%; }
   .friends-hub-page .friends-hub-nav-list { display:flex; gap:.35rem; overflow:auto; padding-bottom:.2rem; }
-  .friends-hub-page .friends-hub-nav-list button { flex:0 0 auto; min-height:2.4rem; }
+  .friends-hub-page .friends-hub-nav-list button { flex:0 0 auto; min-height:44px; }
   .friends-hub-page .friends-hub-nav-list button span { white-space:nowrap; }
   .friends-hub-page .friends-hub-nav-foot { display:none; }
   .friends-hub-page .friends-hub-main { min-height:22rem; padding:.8rem; }
   .friends-hub-page .friends-hub-main-head { align-items:stretch; flex-direction:column; }
   .friends-hub-page .friends-hub-search { min-width:0; width:100%; }
+  .friends-hub-page .friends-hub-search input,
+  .friends-hub-page .friends-hub-search button,
+  .friends-hub-page .friends-hub-card-actions .button,
+  .friends-hub-page .friends-hub-profile-actions .button,
+  .friends-hub-page .friends-hub-message-form .button { min-height:44px; }
+  .friends-hub-page .friends-hub-search button { width:44px; }
   .friends-hub-page .friends-hub-list { max-height:24rem; }
   .friends-hub-page .friends-hub-conversation { min-height:23rem; }
   .friends-hub-page .friends-hub-card { grid-template-columns:auto minmax(0,1fr); }

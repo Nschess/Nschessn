@@ -831,10 +831,10 @@ function runStaticChecks(full) {
   ];
   if (full) {
     checks.push(
-      ["deploy assets", () => runNode("scripts/check-deploy-assets.js")],
+      ["static build", () => runNode("scripts/build-pages.js")],
+      ["deploy assets", () => runNode("scripts/check-deploy-assets.js", ["dist"])],
       ["multiplayer regression", () => runNode("scripts/multiplayer-regression.js")],
-      ["matchmaking regression", () => runNode("scripts/matchmaking-regression.js")],
-      ["static build", () => runNode("scripts/build-pages.js")]
+      ["matchmaking regression", () => runNode("scripts/matchmaking-regression.js")]
     );
   }
   for (const [name, task] of checks) {
@@ -856,6 +856,31 @@ async function createBrowser() {
   const launchOptions = { headless: process.env.E2E_HEADLESS !== "0" };
   if (process.env.E2E_CHROMIUM_PATH) launchOptions.executablePath = process.env.E2E_CHROMIUM_PATH;
   return chromium.launch(launchOptions);
+}
+
+// Playwright 1.62 waitForFunction tests a Promise's truthiness before it
+// resolves. Async RPC/session predicates require explicit awaited polling.
+async function waitForAsyncPagePredicate(page, predicate, arg, { timeout = 30000 } = {}) {
+  const deadline = Date.now() + timeout;
+  let stopped = false;
+  let timer;
+  const timeoutError = () => new Error(`Async browser readiness timed out after ${timeout}ms.`);
+  const poll = async () => {
+    while (!stopped) {
+      const value = await page.evaluate(predicate, arg);
+      if (value) return value;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw timeoutError();
+      await new Promise((resolve) => setTimeout(resolve, Math.min(250, remaining)));
+    }
+    throw timeoutError();
+  };
+  try {
+    return await Promise.race([poll(), new Promise((_, reject) => { timer = setTimeout(() => reject(timeoutError()), timeout); })]);
+  } finally {
+    stopped = true;
+    clearTimeout(timer);
+  }
 }
 
 async function gotoHash(page, baseUrl, hash) {
@@ -1087,6 +1112,11 @@ async function checkVisualSnapshot(page, name, selector = ".site-header") {
       element.style.setProperty("display", "none", "important");
     });
   });
+  // Make the existing baseline's interaction state explicit. The reviewed
+  // 768px baseline includes the profile-chip hover; the others are neutral.
+  // Never inherit Chromium's pointer position from the previous context.
+  await page.mouse.move(0, (page.viewportSize()?.height || 900) - 1);
+  if (page.viewportSize()?.width === 768) await page.locator('.player-flex-chip').hover();
   await canonicalizeVisualIcons(page);
   // Freeze composited effects before taking a baseline. The header uses a
   // backdrop over animated page-aura pseudo-elements, so Playwright's
@@ -1338,7 +1368,7 @@ async function submitE2ePasswordLogin(page, { email, password, label }) {
     await page.locator("#authLoginPassword").fill(password);
     await page.locator("#authLoginForm button[type='submit']").click();
     try {
-      await page.waitForFunction(async () => {
+      await waitForAsyncPagePredicate(page, async () => {
         const status = document.getElementById("authStatus");
         const client = window.CheckmateQuestSupabaseClient?.client;
         const sessionResult = await client?.auth?.getSession?.().catch(() => null);
@@ -1385,7 +1415,7 @@ async function assertIsolationGuestState(page, label, priorIdentity = {}) {
       "checkmateQuest.progressBackup.v1", "checkmateQuest.realPuzzles.v1", "checkmateQuest.progressAutosave.v1",
       "checkmateQuest.visitSnapshot.v1", "checkmateQuest.sound.v1", "checkmateQuest.beginnerTutorial.v1",
       "checkmateQuest.academy.v1", "checkmateQuestBeginnerBots", "checkmateQuest.bookReader.v1",
-      "checkmateQuest.localBooks.v1", "checkmateQuest.dailyTraining.v1", "checkmateQuest.gentleStart.v1",
+      "checkmateQuest.localBooks.v1", "checkmateQuest.dailyTraining.v1", "checkmateQuest.dailyPractice.v1", "checkmateQuest.gentleStart.v1",
       "checkmateQuest.firstTimeTour.v1", "checkmateQuest.firstVisitSetup.v1", "checkmateQuest.story.v1",
       "checkmateQuest.preferences.v1", "checkmateQuest.profile.v1", "checkmateQuest.authPreferences.v1",
       "checkmateQuest.dragonProfile.v1", "checkmateQuest.friendChallenge.v1", "checkmateQuest.friends.v1",
@@ -1690,8 +1720,8 @@ async function runGuestBrowserTests(browser, baseUrl, viewports) {
   const routes = [
     ["home", "#top", "#top"],
     ["profile", "#login", "#loginDisplayName"],
-    ["play", "#play", "#coachBoard"],
-    ["tournaments", "#play?mode=tournament", "#coachBoard"],
+    ["play", "#play", "#humanPlayEntry"],
+    ["tournaments", "#play?mode=tournament", "#tournamentLobby"],
     ["puzzles", "#puzzles", "#realPuzzleBoard"],
     ["openings", "#openings", "#openingExplorerBoard"],
     ["store", "#store", "#storeGrid"],
@@ -1732,37 +1762,31 @@ async function runGuestBrowserTests(browser, baseUrl, viewports) {
         }
       }
       if (name === "play") {
-        const playSetup = await page.evaluate(() => {
-          const board = document.querySelector("#coachBoard");
-          const rect = board?.getBoundingClientRect();
+        const playEntry = await page.evaluate(() => {
+          const entry = document.querySelector("#humanPlayEntry");
+          const rect = entry?.getBoundingClientRect();
+          const actions = [...(entry?.querySelectorAll(".human-play-entry-option") || [])].map((link) => ({
+            text: link.querySelector("strong")?.textContent.trim() || "",
+            href: link.getAttribute("href") || ""
+          }));
+          const botPractice = [...(entry?.querySelectorAll("a") || [])].find((link) => link.getAttribute("href") === "#bots");
           return {
-            opponent: document.querySelector("#aiPlayerName")?.textContent.trim() || "",
-            selected: [...document.querySelectorAll("[data-beginner-bot], [data-game-difficulty]")]
-              .filter((button) => button.getAttribute("aria-pressed") === "true")
-              .map((button) => button.dataset.beginnerBot || button.dataset.gameDifficulty),
-            playerClock: document.querySelector("[data-match-timer]")?.textContent.trim() || "",
-            opponentClock: document.querySelector("#aiPlayerTimer")?.textContent.trim() || "",
-            status: document.querySelector("#gameStatusBadge")?.textContent.trim() || "",
-            turn: document.querySelector("#gameTurnBadge")?.textContent.trim() || "",
-            startDisabled: Boolean(document.querySelector("#restartGame")?.disabled),
-            draggable: [...(board?.querySelectorAll("[data-square]") || [])].some((square) => square.draggable),
-            boardWidth: rect?.width || 0,
-            boardHeight: rect?.height || 0,
+            width: rect?.width || 0,
+            height: rect?.height || 0,
+            actions,
+            botPracticeHref: botPractice?.getAttribute("href") || "",
             horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
           };
         });
-        assert(!/Nova Rookie|Club Tutor/i.test(playSetup.opponent), `${name}@${width}: Play mounted a default bot: ${JSON.stringify(playSetup)}`);
-        assert(playSetup.selected.length === 0, `${name}@${width}: Play marked a bot or difficulty selected before user action: ${JSON.stringify(playSetup)}`);
-        assert(playSetup.playerClock === "--:--" && playSetup.opponentClock === "--:--", `${name}@${width}: Play clock started before setup: ${JSON.stringify(playSetup)}`);
-        assert(/Choose a bot|Waiting/i.test(playSetup.status) && /Waiting|start/i.test(playSetup.turn), `${name}@${width}: Play did not expose its idle setup state: ${JSON.stringify(playSetup)}`);
-        assert(playSetup.startDisabled && !playSetup.draggable, `${name}@${width}: Play exposed active game controls before bot selection: ${JSON.stringify(playSetup)}`);
-        assert(Math.abs(playSetup.boardWidth - playSetup.boardHeight) < 1 && playSetup.boardWidth > 0, `${name}@${width}: Play board geometry is invalid: ${JSON.stringify(playSetup)}`);
-        assert(!playSetup.horizontalOverflow, `${name}@${width}: Play introduced horizontal overflow: ${JSON.stringify(playSetup)}`);
-        if (width >= 1181) assert(playSetup.boardWidth >= 720, `${name}@${width}: desktop Play board was silently reduced: ${JSON.stringify(playSetup)}`);
+        assert(playEntry.width > 0 && playEntry.height > 0, "Play entry has no visible content.");
+        assert(playEntry.actions.some((action) => /Play Now/i.test(action.text) && action.href === "#play?mode=quick"), "Play entry is missing its Quick Match action.");
+        assert(playEntry.actions.some((action) => /Play a Friend/i.test(action.text) && action.href === "#play?mode=friend"), "Play entry is missing its friend challenge action.");
+        assert(playEntry.actions.some((action) => /Challenge a Player/i.test(action.text) && action.href === "#friends"), "Play entry is missing its player search action.");
+        assert(playEntry.botPracticeHref === "#bots", "Play entry is missing its AI bot link.");
+        assert(!playEntry.horizontalOverflow, "Play entry introduced horizontal overflow.");
       }
       await auditIdentity(page, `${name}@${width}`);
       await auditVisibleBoards(page, `${name}@${width}`);
-      if (name === "home") await checkVisualSnapshot(page, `navbar-${width}`, ".site-header");
     }
     await gotoHash(page, baseUrl, "#puzzles");
     await drawAndToggleManualArrow(page, "#realPuzzleBoard", `puzzles@${width}`);
@@ -1857,7 +1881,7 @@ async function readStorePurchaseSettlementDiagnostics(page, itemId, runtimeTrace
 
 async function waitForStorePurchaseSettlement(page, itemId, runtimeTrace) {
   // A successfully purchased item is equipped immediately.  Regular items
-  // expose a disabled "Equipped" action; Name Styles intentionally expose an
+  // expose a disabled "Equipped" action; Name Styles and Last Move highlights intentionally expose an
   // enabled "Unequip" action so the user can switch styles.  Accept both
   // authoritative settled states while still requiring the transaction lock
   // and pending markers to be cleared.
@@ -1867,7 +1891,7 @@ async function waitForStorePurchaseSettlement(page, itemId, runtimeTrace) {
       const action = card?.querySelector("[data-store-item-action]");
       const status = document.getElementById("storeStatus");
       const regularEquippedAction = action?.disabled && /equipped/i.test(action.textContent || "");
-      const nameStyleUnequipAction = card?.classList.contains("is-name-style")
+      const reversibleUnequipAction = (card?.classList.contains("is-name-style") || card?.classList.contains("is-highlight"))
         && !action?.disabled
         && /^unequip$/i.test(String(action.textContent || "").trim());
       return Boolean(
@@ -1879,7 +1903,7 @@ async function waitForStorePurchaseSettlement(page, itemId, runtimeTrace) {
         && action
         && !action.classList.contains("is-pending")
         && action.getAttribute("aria-busy") !== "true"
-        && (regularEquippedAction || nameStyleUnequipAction)
+        && (regularEquippedAction || reversibleUnequipAction)
         && status?.dataset.storePendingItem !== id
         && status?.getAttribute("aria-busy") !== "true"
       );
@@ -1911,6 +1935,18 @@ function selectE2eStoreItem(state, preferredId = "", excludedIds = []) {
     .sort((left, right) => Number(left.cost_coins || left.cost || 0) - Number(right.cost_coins || right.cost || 0))[0]
     || purchasable.sort((left, right) => Number(left.cost_coins || left.cost || 0) - Number(right.cost_coins || right.cost || 0))[0];
   return preferred || fallback || null;
+}
+
+function assertAnonymousProfileMetrics(metrics, label) {
+  // renderPlayerProfile intentionally withholds authenticated statistics for
+  // guests; invented initial ratings are not the anonymous display contract.
+  assert(metrics.name === "Guest Explorer" && metrics.rank === "Guest profile"
+    && metrics.gameRating === "—" && metrics.puzzleRating === "—"
+    && metrics.gamesPlayed === "— games" && metrics.winRate === "—"
+    && metrics.streak === "—" && metrics.xp === "—" && metrics.tokens === "—"
+    && metrics.achievements === "0/0 on this device"
+    && (!metrics.storeCoins || metrics.storeCoins === "0"),
+    `${label} retained authenticated profile metrics after logout: ${JSON.stringify(metrics)}`);
 }
 
 async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, secondState) {
@@ -2099,14 +2135,24 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         const identityText = [...document.querySelectorAll(
           '.player-identity-line[data-identity-owner="player"], .player-flex-chip, #authAccountPanel, .login-pass, .player-profile-title'
         )].map((element) => String(element.innerText || element.textContent || "")).join("\n");
-        const values = [prior.name, prior.flag, prior.rating, prior.avatar, prior.nameStyle]
+        const values = [prior.name, prior.flag, prior.rating]
           .map((value) => String(value || "").trim())
           // A value that deliberately represents both accounts (for example
           // the free Explorer rank) cannot prove leakage. Account IDs,
           // account-distinct fields, equipped style, wallet, inventory, and
           // workspace ownership remain independently asserted.
           .filter((value) => value && !neutralValues.test(value) && !sharedCurrentValues.has(value));
-        return values.filter((value) => identityText.includes(value));
+        const leaks = values.filter((value) => identityText.includes(value));
+        // A cosmetic glyph can also be a shared currency/decorative symbol.
+        // Inspect avatar fields and style attributes, not unrelated chip text.
+        if (prior.avatar && prior.avatar !== current.avatar && !neutralValues.test(prior.avatar)) {
+          const avatars = [...document.querySelectorAll('.player-profile-avatar, #authAccountAvatar')];
+          if (avatars.some((element) => element.textContent.trim() === prior.avatar)) leaks.push(prior.avatar);
+        }
+        if (prior.nameStyle && prior.nameStyle !== current.nameStyle
+          && [...document.querySelectorAll('.player-identity-line[data-identity-owner="player"]')]
+            .some((element) => element.dataset.identityNameStyle === prior.nameStyle)) leaks.push(prior.nameStyle);
+        return leaks;
       }, { prior: priorIdentity, current: currentIdentity });
       const leakedAccountA = await getDistinctPriorIdentityLeaks(isolationPage, accountAIdentity, accountBIdentity);
       assert(!leakedAccountA.length, `Account A identity remained visible after Account B login: ${JSON.stringify({ accountAIdentity, accountBIdentity, accountBAccountState, leaked: leakedAccountA })}`);
@@ -2345,7 +2391,7 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
         "checkmateQuest.progressBackup.v1", "checkmateQuest.realPuzzles.v1", "checkmateQuest.progressAutosave.v1",
         "checkmateQuest.visitSnapshot.v1", "checkmateQuest.sound.v1", "checkmateQuest.beginnerTutorial.v1",
         "checkmateQuest.academy.v1", "checkmateQuestBeginnerBots", "checkmateQuest.bookReader.v1",
-        "checkmateQuest.localBooks.v1", "checkmateQuest.dailyTraining.v1", "checkmateQuest.gentleStart.v1",
+        "checkmateQuest.localBooks.v1", "checkmateQuest.dailyTraining.v1", "checkmateQuest.dailyPractice.v1", "checkmateQuest.gentleStart.v1",
         "checkmateQuest.firstTimeTour.v1", "checkmateQuest.firstVisitSetup.v1", "checkmateQuest.authPreferences.v1",
         "checkmateQuest.story.v1", "checkmateQuest.preferences.v1", "checkmateQuest.profile.v1",
         "checkmateQuest.dragonProfile.v1", "checkmateQuest.friendChallenge.v1", "checkmateQuest.friends.v1",
@@ -2405,12 +2451,7 @@ async function runAuthenticatedBrowserTests(browser, baseUrl, primaryState, seco
       `${label} did not clear the Supabase session and browser auth state: ${JSON.stringify(state)}`);
     assert(!state.staleIdentityInNavbar && !state.staleIdentityVisible,
       `${label} left the previous authenticated identity visible after logout: ${JSON.stringify({ previousIdentity, chipText: state.chipText, staleIdentityInNavbar: state.staleIdentityInNavbar, staleIdentityVisible: state.staleIdentityVisible, staleElements: state.staleElements })}`);
-    const metrics = state.guestMetrics;
-    assert(metrics.name === "Guest Explorer" && /Explorer/i.test(metrics.rank) && /450\s*Elo/i.test(metrics.gameRating)
-      && metrics.puzzleRating === "400" && /(?:No games yet|0\s+games)/i.test(metrics.gamesPlayed) && /0/.test(metrics.streak)
-      && metrics.xp === "0" && metrics.tokens === "0" && metrics.achievements === "0/0 unlocked"
-      && (!metrics.storeCoins || metrics.storeCoins === "0"),
-      `${label} retained authenticated profile metrics after logout: ${JSON.stringify(metrics)}`);
+    assertAnonymousProfileMetrics(state.guestMetrics, label);
     pass(`browser: ${label}`);
   };
 
@@ -2719,7 +2760,7 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
     assert(await page.locator("#coachBoard [data-square]").count() === 64, label + " did not render all 64 shared-board squares.");
   };
   const waitForRemoteStatus = async (page, expectedStatus, label) => {
-    await page.waitForFunction(async ({ challengeCode, status }) => {
+    await waitForAsyncPagePredicate(page, async ({ challengeCode, status }) => {
       const provider = window.CheckmateQuestAuthProvider;
       if (!provider?.getFriendChallenge) return false;
       try {
@@ -2732,7 +2773,7 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
     pass(label);
   };
   const waitForFriendStartReady = async (page, challengeCode, label) => {
-    await page.waitForFunction(async (expectedCode) => {
+    await waitForAsyncPagePredicate(page, async (expectedCode) => {
       const start = document.getElementById("friendStart");
       if (!start || start.disabled) return false;
       if (document.documentElement.dataset.authState !== "authenticated"
@@ -2831,7 +2872,7 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
     assert(accountA && accountB && accountA !== accountB, "live-game E2E accounts did not resolve to distinct authenticated users.");
 
     const waitForSocialNotification = async (page, expected, label) => {
-      await page.waitForFunction(async (criteria) => {
+      await waitForAsyncPagePredicate(page, async (criteria) => {
         const provider = window.CheckmateQuestAuthProvider;
         if (!provider?.getSocialNotifications) return false;
         try {
@@ -2857,7 +2898,7 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
       pass(label);
     };
     const waitForFriendDirectory = async (page, targetId, expectedStatus, label) => {
-      await page.waitForFunction(async ({ target, status }) => {
+      await waitForAsyncPagePredicate(page, async ({ target, status }) => {
         const provider = window.CheckmateQuestAuthProvider;
         if (!provider?.getFriendDirectory) return false;
         try {
@@ -2914,7 +2955,7 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
       pageA.evaluate(() => window.CheckmateQuestAuthProvider?.setFriendPresenceStatus?.("online", true)),
       pageB.evaluate(() => window.CheckmateQuestAuthProvider?.setFriendPresenceStatus?.("online", true))
     ]);
-    await pageA.waitForFunction(async (targetId) => {
+    await waitForAsyncPagePredicate(pageA, async (targetId) => {
       const directory = await window.CheckmateQuestAuthProvider?.getFriendDirectory?.();
       const friend = Array.isArray(directory) && directory.find((item) => String(item?.public_id || item?.id || "") === targetId);
       return friend?.online === true;
@@ -3007,6 +3048,8 @@ async function runLiveMultiplayerE2E(browser, baseUrl, primaryState, secondState
     pass("browser: route/reload recovery restored live FEN, moves, and turn state");
 
     await pageB.locator("#resignGame").click();
+    await pageB.locator("#resignConfirmDialog").waitFor({ state: "visible", timeout: 5000 });
+    await pageB.locator("#resignConfirmButton").click();
     await Promise.all([
       waitForRemoteStatus(pageA, "completed", "browser: Account A received the completed shared result"),
       waitForRemoteStatus(pageB, "completed", "browser: completion settled exactly once on the server")
@@ -3754,7 +3797,7 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
     assert(await page.locator("#coachBoard [data-square]").count() === 64, `${label} did not render the shared multiplayer board.`);
   };
   const waitForRemoteStatus = async (page, code, expectedStatus, label) => {
-    await page.waitForFunction(async ({ challengeCode, status }) => {
+    await waitForAsyncPagePredicate(page, async ({ challengeCode, status }) => {
       try {
         const remote = await window.CheckmateQuestAuthProvider?.getFriendChallenge?.(challengeCode);
         return String(remote?.status || "") === status;
@@ -3819,7 +3862,7 @@ async function runLiveMatchmakingE2E(browser, baseUrl, primaryState, secondState
     }
     await pageA.waitForTimeout(250);
     assert(leaveCalls.a.length >= 1 && leaveCalls.a[0], "cancelling a live Quick Match search did not call the server queue-leave RPC with a ticket.");
-    await pageA.waitForFunction(async (ticketId) => {
+    await waitForAsyncPagePredicate(pageA, async (ticketId) => {
       try {
         const status = await window.CheckmateQuestAuthProvider?.getMatchmakingStatus?.(ticketId);
         return String(status?.status || "") === "expired";
@@ -4024,7 +4067,27 @@ async function runDeepAuthenticatedQa(browser, baseUrl, primaryState) {
       await waitForAuthenticatedHydration(page, `deep ${label}@${width}`);
       await waitForStoreHydration(page, `deep ${label}@${width}`);
       const state = await readIdentityVisualState(page);
-      assertIdentityVisualConsistency(state, `deep ${label}@${width}`, expectedStyle);
+      const compactLobby = width <= 430;
+      if (compactLobby && state.player.length === 0) {
+        // The compact navbar hides player-name text to keep mobile routes clear;
+        // the profile chip must remain visible and accessible as the account entry.
+        const profileControl = await page.evaluate(() => {
+          const element = document.querySelector(".player-flex-chip");
+          const rect = element?.getBoundingClientRect();
+          const style = element ? getComputedStyle(element) : null;
+          return {
+            visible: Boolean(element && rect?.width > 0 && rect?.height > 0 && style?.visibility !== "hidden" && Number(style?.opacity || 0) > 0),
+            identifiesCurrentAccount: Boolean(document.documentElement.dataset.authState === "authenticated"
+              && element?.querySelector("[data-profile-field=name]")?.textContent.trim()
+              && element.getAttribute("aria-label")?.startsWith(`Open profile for ${element.querySelector("[data-profile-field=name]").textContent.trim()},`)),
+            href: element?.getAttribute("href") || ""
+          };
+        });
+        assert(profileControl.visible && profileControl.identifiesCurrentAccount && profileControl.href === "#login", `deep ${label}@${width}: compact account control is not visible, named, and linked to the profile route.`);
+        assert(state.scrollWidth <= width + 1, `deep ${label}@${width}: compact lobby has horizontal overflow.`);
+      } else {
+        assertIdentityVisualConsistency(state, `deep ${label}@${width}`, expectedStyle);
+      }
     }
     await context.close();
     pass(`browser: deep identity route audit @ ${width}px (${routes.length} routes)`);
@@ -4173,6 +4236,7 @@ async function runVisualSmokeTests(browser, baseUrl) {
     await stabilizeVisualContext(context);
     const page = await context.newPage();
     await gotoHash(page, baseUrl, "#top");
+    await waitForAuthHydration(page, `visual@${width}`);
     await auditIdentity(page, `visual@${width}`);
     await checkVisualSnapshot(page, `navbar-${width}`, ".site-header");
     await context.close();
@@ -4203,6 +4267,9 @@ async function runBrowserTests() {
     server.stdout.on("data", (chunk) => process.stdout.write(`[e2e-server] ${chunk}`));
     server.stderr.on("data", (chunk) => process.stderr.write(`[e2e-server] ${chunk}`));
     browser = await createBrowser();
+    // Keep pixel baselines in isolated, deterministic contexts; the route matrix
+    // below separately audits navigation and visible identity on each route.
+    if (mode === "full") await runVisualSmokeTests(browser, baseUrl);
     if (visualOnly) {
       await runVisualSmokeTests(browser, baseUrl);
       return;

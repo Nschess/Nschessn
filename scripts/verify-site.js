@@ -84,26 +84,21 @@ const prohibitedStaticMarkup = [
 for (const [label, pattern] of prohibitedStaticMarkup) {
   if (pattern.test(html)) throw new Error("Forbidden legacy markup: " + label + ".");
 }
-const aiRoster = [...appScript.matchAll(/\["(bot-[^"]+)",\s*"[^"]+",\s*(?:"[^"]+",\s*)?(\d{3,4}),/g)]
-  .map((match) => ({ id: match[1], elo: Number(match[2]) }));
-if (!aiRoster.length) throw new Error("Missing AI roster entries.");
-const expectedAiBotConfigs = aiRoster.map((bot) => ({
-  ...bot,
-  skill: Math.max(0, Math.min(20, Math.round((bot.elo - 200) / 130))),
-  depth: Math.max(1, Math.min(15, Math.ceil((bot.elo - 100) / 200))),
-  movetime: Math.max(45, Math.min(3000, 45 + Math.round((bot.elo - 200) * 1.1))),
-  uciElo: Math.max(1320, Math.min(3190, bot.elo)),
-  fallback: bot.elo >= 2400 ? "strong" : "responsive"
-}));
-if (expectedAiBotConfigs.some((config) => !Number.isInteger(config.skill) || !Number.isInteger(config.depth) || !Number.isInteger(config.movetime) || !Number.isInteger(config.uciElo))) {
-  throw new Error("AI roster runtime profile derivation failed.");
+const aiRosterMarkup = html.match(/<section id="bots"[\s\S]*?<section id="friends"/)?.[0] || "";
+const aiRosterRenderer = appScript.match(/function setupAiBotRoster\(\) \{[\s\S]*?\n    \}/)?.[0] || "";
+if (!aiRosterMarkup || !aiRosterRenderer || !/const localPracticeBotCount = 14;/.test(appScript)) {
+  throw new Error("The AI roster and its difficulty profiles must be present.");
 }
-const protectedHighEloBots = expectedAiBotConfigs.filter((config) => config.elo >= 2460 && config.elo <= 2800);
-if (protectedHighEloBots.length !== 5 || protectedHighEloBots.some((config) => config.fallback !== "strong" || config.skill < 17 || config.uciElo < 2460)) {
-  throw new Error("High-Elo AI bots must retain strong fallback profiles.");
+if (!/bot\.difficultyIndex = index \+ 1;[\s\S]*?bot\.category = getAiBotCategory\(index\);[\s\S]*?bot\.engineRequired = index >= localPracticeBotCount;[\s\S]*?bot\.skill = Math\.round\(\(index \/ Math\.max\(1, beginnerBots\.length - 1\)\) \* 20\);/.test(appScript)) {
+  throw new Error("AI difficulty must use explicit ordered practice levels, not claimed Elo calibration.");
 }
-if (expectedAiBotConfigs.filter((config) => config.elo < 2400).some((config) => config.fallback !== "responsive")) {
-  throw new Error("Lower-rated AI bots must retain responsive fallback profiles.");
+if (/\b\d{3,4}\s*Elo\b|\b\d{3,4}\s+Elo\s+AI\b/i.test(aiRosterMarkup) || /bot\.elo/.test(aiRosterRenderer)) {
+  throw new Error("The AI roster must not publish internal matchmaking scores as bot ratings.");
+}
+if (!/function requiresStockfishCoachMove\(config = getCoachConfig\(\)\) \{\s*return Boolean\(config\.engineRequired \|\| isStrictStockfishLevel\(config\)\);\s*\}/.test(appScript)
+  || !/async function chooseCoachMoveAsync\(\) \{[\s\S]*?if \(requiresStockfishCoachMove\(config\)\) \{[\s\S]*?return null;\s*\}[\s\S]*?const fallback = getReliableCoachFallback\(moves\);/.test(appScript)
+  || !/const safeReply = legalReplies\.find\([\s\S]*?\|\| \(requiresStockfishCoachMove\(config\) \? null : getReliableCoachFallback\(legalReplies\)\)/.test(appScript)) {
+  throw new Error("Engine-required bots must fail closed instead of silently receiving a weaker move.");
 }
 
 const requiredRegressionContracts = [
@@ -182,7 +177,8 @@ const requiredRegressionContracts = [
   ["configurable review analysis profile", /function getReviewAnalysisConfig\(mode = "quick"\) \{[\s\S]*?const deep = mode === "deep";[\s\S]*?skill: deep \? \(lowPerformance \? 14 : 18\) : lowPerformance \? 6 : 10,[\s\S]*?depth: deep \? \(lowPerformance \? 7 : 10\) : lowPerformance \? 3 : 5,[\s\S]*?reviewMode: deep \? "deep" : "quick"/],
   ["deep review timeout recovery", /function getReviewAnalysisTimeoutMs\([\s\S]*?function showReviewAnalysisError\([\s\S]*?panel\?\.removeAttribute\("aria-busy"\)[\s\S]*?showReviewAnalysisError\(token, `\$\{label\} stopped waiting for Stockfish\. Try again to restart the engine\.`\)/],
   ["review cancellation and focus return", /function cancelActiveReviewAnalysis\([\s\S]*?cancelStockfishSearch\(reason\)[\s\S]*?function exitGameReview\([\s\S]*?renderPostGameFlow\(true\)[\s\S]*?postGameDecisionReview"\) \|\| returnFocus/],
-  ["review growth trail", /id="reviewGrowthTrail"[\s\S]*?id="reviewGrowthHabit"[\s\S]*?function renderReviewGrowthTrail\([\s\S]*?Repair next:/],
+  ["review growth trail markup", /id="reviewGrowthTrail"[\s\S]*?id="reviewGrowthHabit"[\s\S]*?id="reviewGrowthRepair">Repair next:[\s\S]*?id="reviewGrowthProgress"/],
+  ["review growth trail renderer", /function renderReviewGrowthTrail\([\s\S]*?getElementById\("reviewGrowthHabit"\)[\s\S]*?getElementById\("reviewGrowthRepair"\)[\s\S]*?getElementById\("reviewGrowthProgress"\)[\s\S]*?repair\.textContent[\s\S]*?Review next:/],
   ["advanced self-analysis tools", /id="reviewSelfEngineEnabled"[\s\S]*?id="reviewSelfEngineMode"[\s\S]*?id="reviewSelfOpeningRefresh"[\s\S]*?id="reviewSelfTablebaseCheck"[\s\S]*?function lookupReviewSelfOpening\([\s\S]*?explorer\.lichess\.org[\s\S]*?function lookupReviewSelfTablebase\([\s\S]*?tablebase\.lichess\.ovh/],
   ["review keyboard access", /id="reviewCurrentMoveStatus"[\s\S]*?event\.key === "Escape"[\s\S]*?event\.key\.toLowerCase\(\) === "z"/],
   ["local-only product signals", /const productSignalsStorageKey = "nschess\.productSignals\.v1";[\s\S]*?function trackProductSignal\(/],
@@ -194,7 +190,7 @@ const requiredRegressionContracts = [
   ["active coach tone", /data-profile-setting="coachTone"[\s\S]*?function getCoachTone\([\s\S]*?function getPremiumSessionVoice\([\s\S]*?function getPremiumMomentumCopy\(/],
   ["premium home reduced motion", /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-session-ritual-item[\s\S]*?\.home-momentum-milestone[\s\S]*?\.home-momentum-meter span/],
   ["cacheable application asset split", /href="assets\/app\.css(?:\?v=[^"]+)?"[\s\S]*?src="assets\/app\.js(?:\?v=[^"]+)?"/],
-  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v\d+-[^"]+";[\s\S]*?"\.\/assets\/app\.css\?v=review-v\d+-[^"]+"[\s\S]*?"\.\/assets\/app\.js\?v=(?:review-v\d+-[^"]+|play-human-entry-v\d+|play-human-matchmaking-v\d+|play-tournament-discovery-v\d+|play-tournament-live-priority-v\d+|play-tournament-density-v\d+|play-multiplayer-truth-v\d+)"[\s\S]*?isReviewShellAsset/],
+  ["offline shell application cache", /const CACHE_NAME = "nschess-shell-v\d+-[^"]+";[\s\S]*?"\.\/assets\/app\.css\?v=mobile-board-focus-v3"[\s\S]*?"\.\/assets\/app\.js\?v=(?:review-v\d+-[^"]+|play-human-entry-v\d+|play-human-matchmaking-v\d+|play-tournament-discovery-v\d+|play-tournament-live-priority-v\d+|play-tournament-density-v\d+|play-multiplayer-truth-v\d+|daily-practice-v\d+)"[\s\S]*?function savePublicAsset[\s\S]*?cache\.put\(request, response\)[\s\S]*?isReviewShellAsset[\s\S]*?caches\.match\(request\)\.then\(\(cached\) => cached \|\| fetch\(request\)[\s\S]*?savePublicAsset\(request, copy\)/],
   ["tournament discovery-first destination", /id="tournamentLiveList"[\s\S]*?id="tournamentStartingSoonList"[\s\S]*?id="tournamentUpcomingList"[\s\S]*?id="tournamentCreateDisclosure"[\s\S]*?function getTournamentDiscoveryGroups\([\s\S]*?function formatTournamentFormat\([\s\S]*?function canJoinTournament\([\s\S]*?function createTournamentDiscoveryCard\([\s\S]*?function createTournamentEmptyState\(/],
   ["friend challenge create and join tabs", /id="friendCreateTab"[\s\S]*?aria-controls="friendCreatePanel"[\s\S]*?id="friendJoinTab"[\s\S]*?aria-controls="friendJoinPanel"/],
   ["friend challenge valid default clock", /function normalizeFriendChallengeClock\(value\)[\s\S]*?"5\+0"[\s\S]*?function getFriendInviteLink\([\s\S]*?clock: source\.clock/],
@@ -215,8 +211,8 @@ const requiredRegressionContracts = [
   ["premium motion and accessibility safeguards", /Premium redesign: interaction quality, accessibility, and motion restraint[\s\S]*?@media \(prefers-contrast: more\)[\s\S]*?@media \(forced-colors: active\)[\s\S]*?@media \(prefers-reduced-motion: reduce\)/],
   ["deferred video embeds", /<iframe loading="lazy" data-src="https:\/\/www\.youtube-nocookie\.com\/embed\/[\s\S]*?function setupVideoTheater\([\s\S]*?iframe\.dataset\.src \|\| iframe\.getAttribute\("src"\)[\s\S]*?if \(!src\) return;/],
   ["video modal watch fallback", /id="videoOpenExternal"[\s\S]*?function buildVideoWatchUrl\([\s\S]*?externalLink\.href = watchUrl/],
-  ["AI roster strength mapping", /beginnerBots\.forEach\(\(bot, index\) => \{[\s\S]*?bot\.skill = Math\.max\(0, Math\.min\(20, Math\.round\(\(bot\.elo - 200\) \/ 130\)\)\);[\s\S]*?bot\.depth = Math\.max\(1, Math\.min\(15, Math\.ceil\(\(bot\.elo - 100\) \/ 200\)\)\);[\s\S]*?bot\.movetime = Math\.max\(45, Math\.min\(3000, 45 \+ Math\.round\(\(bot\.elo - 200\) \* 1\.1\)\)\);[\s\S]*?function setCoachDifficulty\(level\) \{[\s\S]*?stockfishLevels\[level\] \|\| getBeginnerBot\(level\)[\s\S]*?function getCoachConfig\(level = coachDifficulty\) \{[\s\S]*?const bot = getBeginnerBot\(level\);[\s\S]*?label: bot\.name \+ " engine",[\s\S]*?uciElo: elo/],
-  ["AI roster high-strength fallback boundary", /function getCoachSkill\(\) \{\s*return Number\(getCoachConfig\(\)\.skill\) \|\| 0;[\s\S]*?function usesHighStrengthCoachFallback\(config = getCoachConfig\(\)\) \{[\s\S]*?getBeginnerBot\(coachDifficulty\)[\s\S]*?Number\(config\.elo\) >= 2400[\s\S]*?function getReliableCoachFallback\([\s\S]*?usesHighStrengthCoachFallback\(config\)[\s\S]*?chooseStrongCoachMove\(moves\)[\s\S]*?: chooseResponsiveCoachFallback\(moves\)/],
+  ["AI bot difficulty and engine disclosure", /const localPracticeBotCount = 14;[\s\S]*?bot\.engineRequired = index >= localPracticeBotCount;[\s\S]*?function getCoachDifficultyDisplay\([\s\S]*?Level \$\{bot\.difficultyIndex\}[\s\S]*?function getCoachEngineDisplay\([\s\S]*?Local practice model[\s\S]*?Stockfish 16 Lite/],
+  ["AI high-level engine failure is explicit", /function requiresStockfishCoachMove\([\s\S]*?config\.engineRequired[\s\S]*?async function chooseCoachMoveAsync\([\s\S]*?Engine-required levels must never silently downgrade[\s\S]*?return null;[\s\S]*?const fallback = getReliableCoachFallback/],
   ["narrow video modal action bar", /\.video-modal-title \{[\s\S]*?min-width: 0;[\s\S]*?text-overflow: ellipsis;[\s\S]*?\.video-modal-actions \{[\s\S]*?flex: 0 0 auto;[\s\S]*?@media \(max-width: 420px\) \{[\s\S]*?\.video-modal \{[\s\S]*?padding: 12px;/],
   ["profile rating-history disclosure", /<details class="profile-optional-detail">[\s\S]*?data-profile-history-status[\s\S]*?data-profile-rating-history/],
   ["Game Review restores every mounted source", /function restoreGameReviewWorkspace\([\s\S]*?\[\.\.\.origins\.values\(\)\]\.reverse\(\)\.forEach/],

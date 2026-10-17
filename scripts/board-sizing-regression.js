@@ -11,11 +11,23 @@ const http = require("node:http");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const { chromium } = require("playwright");
-const { installOfflineSupabaseFixture } = require("./e2e-runtime-fixtures.cjs");
+const { installOfflineSupabaseFixture, installOptionalCdnFixtures } = require("./e2e-runtime-fixtures.cjs");
 
 const root = path.resolve(__dirname, "..");
 const port = Number(process.env.E2E_PORT || 4174);
 const baseUrl = `http://127.0.0.1:${port}`;
+
+// Chromium can leave the native fullscreen promise pending in restricted
+// headless environments.  Invoke the browser transition without returning
+// that promise to Playwright; the assertions below still wait for the actual
+// DOM/fullscreen state transition and report a bounded failure if it never
+// arrives.
+async function requestExitFullscreen(page) {
+  await page.evaluate(() => {
+    if (!document.fullscreenElement || typeof document.exitFullscreen !== "function") return;
+    try { void document.exitFullscreen(); } catch {}
+  }).catch(() => {});
+}
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -90,9 +102,9 @@ function staticContract() {
     "The first-time resize discovery cue styling is missing.");
   assert.match(css, /\.interactive-board-stage-tools\s*\{[\s\S]*display:\s*none\s*!important/,
     "The legacy board control strip must remain globally hidden.");
-  assert.match(css, /Review board contract:[\s\S]*?#gameReview\.is-review-page #reviewBoardSlot\s*\{[\s\S]*?grid-template-columns:\s*28px minmax\(0, 1fr\);[\s\S]*?gap:\s*0 8px;/,
-    "Review must keep its evaluation rail and board in explicit layout tracks.");
-  assert.match(css, /Review board contract:[\s\S]*?#gameReview\.is-review-page #reviewBoardSlot > \.play-board-wrap\s*\{[\s\S]*?grid-area:\s*auto\s*!important;[\s\S]*?grid-column:\s*2\s*!important;/,
+  assert.match(css, /Review board contract:[\s\S]*?#gameReview\.is-review-page #reviewBoardSlot\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);[\s\S]*?gap:\s*0 8px;/,
+    "Review's slot must keep a single explicit wrapper track; the rail is inside that wrapper.");
+  assert.match(css, /Review board contract:[\s\S]*?#gameReview\.is-review-page #reviewBoardSlot > \.play-board-wrap\s*\{[\s\S]*?grid-area:\s*auto\s*!important;[\s\S]*?grid-column:\s*1\s*!important;/,
     "Review board placement must not fall back to an implicit grid area.");
   assert.equal((app.match(/new ResizeObserver\(/g) || []).length, 1,
     "The global board sizing controller must keep one shared ResizeObserver.");
@@ -243,6 +255,7 @@ async function waitForRouteStylesheet(page, name) {
 
 async function setBoardScale(page, value) {
   await openRoute(page, "#settings");
+  await page.locator('#settingsTablist[aria-orientation]').waitFor({ state: "visible" });
   await page.locator('[data-settings-tab="gameplay"]').click();
   await page.waitForFunction(() => document.querySelector('[data-settings-page="gameplay"]')?.classList.contains("is-active"), null, { timeout: 5000 });
   const slider = page.locator('input[data-pref-setting="boardScale"]');
@@ -375,7 +388,7 @@ async function verifyPointerResizeAndFullscreen(page, selector) {
   assert.equal(await fullscreenHandle.boundingBox(), null,
     `${selector}: normal-mode resize handle remained visible in fullscreen.`);
 
-  await page.evaluate(() => document.exitFullscreen());
+  await requestExitFullscreen(page);
   await page.waitForFunction((target) => {
     const stageElement = document.querySelector(target)?.parentElement;
     return !document.fullscreenElement
@@ -416,6 +429,7 @@ async function runRuntimeContract(browser) {
     serviceWorkers: "block"
   });
   await installOfflineSupabaseFixture(context);
+  await installOptionalCdnFixtures(context);
   // The required chess module is local. Abort every jsDelivr request so this
   // test proves the board does not silently fall back to a CDN.
   await context.route("https://cdn.jsdelivr.net/**", (route) => route.abort());
@@ -527,7 +541,7 @@ async function runRuntimeContract(browser) {
 }
 
 async function runResponsiveBoardContract(browser) {
-  const cases = [[1366, 768], [1366, 900], [1024, 768], [768, 1024], [624, 900], [390, 844]];
+  const cases = [[1366, 768], [1366, 900], [1024, 768], [768, 1024], [624, 900], [390, 844], [320, 844], [375, 844], [430, 844]];
   const routes = [
     ["#tutorial", "#tutorialBoard"],
     ["#adventures", "#adventureBoard"],
@@ -537,6 +551,7 @@ async function runResponsiveBoardContract(browser) {
   for (const [width, height] of cases) {
     const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
     await installOfflineSupabaseFixture(context);
+    await installOptionalCdnFixtures(context);
     const page = await context.newPage();
     try {
       for (const [hash, selector] of routes) {
@@ -633,11 +648,12 @@ async function readFullscreenBoardState(page) {
 }
 
 async function runFullscreenResponsiveContract(browser) {
-  const cases = [[1920, 1080], [1440, 900], [1366, 768], [1024, 768], [1009, 1074], [957, 956], [949, 1080], [768, 1024], [624, 844], [390, 844]];
+  const cases = [[1920, 1080], [1440, 900], [1366, 768], [1024, 768], [1009, 1074], [957, 956], [949, 1080], [768, 1024], [624, 844], [390, 844], [320, 844], [375, 844], [430, 844]];
   const measurements = [];
   for (const [width, height] of cases) {
     const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
     await installOfflineSupabaseFixture(context);
+    await installOptionalCdnFixtures(context);
     const page = await context.newPage();
     try {
       await openRoute(page, "#bots");
@@ -657,7 +673,7 @@ async function runFullscreenResponsiveContract(browser) {
         // Use the semantic locator to derive the current hit target, then
         // click that target without letting locator.click() perform a second
         // nearest-edge scroll beneath the sticky header.
-        const box = await fullscreenButton.boundingBox();
+        const box = await fullscreenButton.boundingBox({ timeout: 3000 });
         assert(box, "Fullscreen control lost its measurable hit area after centering.");
         await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       };
@@ -671,11 +687,24 @@ async function runFullscreenResponsiveContract(browser) {
         // A prior context can leave Chromium's first fullscreen activation
         // request rejected even though the real button is present. Retry the
         // same user-facing control once before classifying the browser run.
+        const buttonStillAvailable = await fullscreenButton.isVisible().catch(() => false);
+        if (!buttonStillAvailable) {
+          const state = await page.evaluate(() => ({
+            fullscreen: Boolean(document.fullscreenElement),
+            fullscreenHost: document.fullscreenElement?.className || null,
+            activeClass: document.body.classList.contains("interactive-board-fullscreen-active"),
+            requestedSize: Number(document.querySelector("#coachBoard")?.parentElement?.dataset.boardFullscreenSize || 0)
+          }));
+          throw new Error(`Fullscreen did not become ready and its control disappeared: ${JSON.stringify(state)}. ${error.message}`);
+        }
         await clickFullscreen();
         await fullscreenReady().catch(() => { throw error; });
       }
       const focused = await readFullscreenBoardState(page);
-      const minimumBoard = width >= 1800 ? 700 : width >= 1000 ? 480 : width >= 600 ? 480 : 300;
+      // At 320px the existing safe edges leave 284px, so a fixed 300px floor
+      // cannot fit. The separate maxSafeBoard assertion still requires filling
+      // the measured safe square; wider viewports retain their original floor.
+      const minimumBoard = width >= 1800 ? 700 : width >= 1000 ? 480 : width >= 600 ? 480 : Math.min(300, width - 36);
       assert(Math.abs(focused.boardWidth - focused.boardHeight) < 1,
         `fullscreen ${width}x${height}: board is not square: ${JSON.stringify(focused)}.`);
       assert(focused.boardWidth >= minimumBoard,
@@ -733,7 +762,7 @@ async function runFullscreenResponsiveContract(browser) {
       assert.equal(await fullscreenHandle.boundingBox(), null,
         `fullscreen ${width}x${height}: normal-mode resize handle remained visible in fullscreen.`);
 
-      await page.evaluate(() => document.exitFullscreen());
+      await requestExitFullscreen(page);
       await page.waitForFunction((expected) => !document.fullscreenElement
         && !document.body.classList.contains("interactive-board-fullscreen-active")
         && Number(document.querySelector("#coachBoard")?.parentElement?.dataset.boardRequestedSize || 0) === expected,
@@ -753,9 +782,7 @@ async function runFullscreenResponsiveContract(browser) {
       await page.waitForFunction((previous) => Number(document.querySelector("#coachBoard")?.parentElement?.dataset.boardRequestedSize || 0) < previous,
         postFullscreenRequested, { timeout: 5000 });
     } finally {
-      if (await page.evaluate(() => Boolean(document.fullscreenElement)).catch(() => false)) {
-        await page.evaluate(() => document.exitFullscreen()).catch(() => {});
-      }
+      if (await page.evaluate(() => Boolean(document.fullscreenElement)).catch(() => false)) await requestExitFullscreen(page);
       await context.close();
     }
   }

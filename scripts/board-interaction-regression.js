@@ -97,7 +97,7 @@ const requiredAppContracts = [
   ["Store purchase reports exact failures", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?reportStorePurchaseDiagnostic\("NO_ITEM"[\s\S]*?reportStorePurchaseDiagnostic\("RPC_FAILED"[\s\S]*?reportStorePurchaseDiagnostic\("INVENTORY_REFRESH_FAILED"/],
   ["Protected RPC validates Supabase user", /const callFriendRpc = async \(name, args = \{\}\) => \{[\s\S]*?supabase\.auth\.getUser\(\)[\s\S]*?supabase\.rpc\(name, args\)/],
   ["Purchase hydrates returned server balance", /purchaseResult = await getAuthProvider\(\)\.purchaseCosmetic[\s\S]*?returnedCoins[\s\S]*?refreshServerStoreState\(\{ rerender: false \}\)/],
-  ["Store actions lock duplicate clicks", /const storeActionLocks = new Set\(\)[\s\S]*?async function runStoreItemAction\(itemId\)[\s\S]*?storeActionLocks\.has\(id\)[\s\S]*?setStoreItemPending\(id, true\)/],
+  ["Store actions lock duplicate clicks", /const storeActionLocks = new Map\(\)[\s\S]*?async function runStoreItemAction\(itemId\)[\s\S]*?storeActionLocks\.has\(id\)[\s\S]*?storeActionLocks\.set\(id, actionGeneration\)[\s\S]*?setStoreItemPending\(id, true\)/],
   ["Store purchase patches mounted cards", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?refreshStoreItemCards\(\[previouslyEquippedId, item\.id\]\)/],
   ["Store purchase does not rebuild catalog", /async function buyOrEquipStoreItem\(itemId\)[\s\S]*?refreshStoreItemCards\(\[previouslyEquippedId, item\.id\]\)[\s\S]*?renderBeginnerProgress\(\)/],
   ["Auth lifecycle updates Store authority", /function applyAuthenticatedAccount\(account,\s*\{ status = "signed_out" \}[\s\S]*?const nextStatus = \["unknown", "error", "signed_out"\][\s\S]*?setStoreAuthState\("authenticated"/],
@@ -317,9 +317,9 @@ assert.equal((app.match(/window\.addEventListener\("blur", onWindowBlur\)/g) || 
 assert.equal((app.match(/document\.addEventListener\("visibilitychange", onVisibilityChange\)/g) || []).length, 1, "Duplicate visibility listener registration");
 assert.match(app, /activeRegistrations\.delete\(registration\)/, "Detached boards must leave the active registration set");
 
-const cacheName = "nschess-shell-v189-multiplayer-truth";
-const shellCssVersion = "review-v219-multiplayer-truth";
-const shellAppVersion = "play-multiplayer-truth-v239";
+const cacheName = "nschess-shell-v201-play-lobby-loading";
+const shellCssVersion = "mobile-board-focus-v3";
+const shellAppVersion = "daily-practice-v3";
 const routeModuleVersion = "review-v226-startup-performance";
 assert.match(html, new RegExp(shellCssVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current stylesheet version");
 assert.match(html, new RegExp(shellAppVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "HTML does not use the current application version");
@@ -327,10 +327,15 @@ assert.match(app, new RegExp(routeModuleVersion.replace(/[.*+?^${}()|[\]\\]/g, "
 assert.match(worker, new RegExp(shellCssVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell stylesheet is not current");
 assert.match(worker, new RegExp(shellAppVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker shell application is not current");
 assert.match(worker, new RegExp(cacheName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "Service worker cache name is not current");
+assert.match(app, /let cachedViewportSize = null;[\s\S]*?function viewportSize\(\)[\s\S]*?if \(cachedViewportSize\) return cachedViewportSize;[\s\S]*?cachedViewportSize = Object\.freeze/,
+  "Board syncs must share a viewport snapshot instead of rereading dimensions for each mounted board.");
+assert.match(app, /function handleViewportResize\(\)[\s\S]*?cachedViewportSize = null;[\s\S]*?scheduleSync\(\)[\s\S]*?window\.visualViewport\?\.addEventListener\("resize", handleViewportResize/,
+  "Viewport changes must invalidate the shared dimensions before the next board sync.");
 const installShell = worker.slice(worker.indexOf("const APP_SHELL"), worker.indexOf('self.addEventListener("install"'));
 assert.doesNotMatch(installShell, /assets\/vendor\/chess\.js-1\.0\.0\.mjs/, "Route-specific chess.js vendor module must not block first shell install");
 assert.match(worker, /caches\.match\(request\)\.then\(\(cached\) => cached \|\| fetch\(request\)/, "Route-specific assets must remain cacheable after first request");
-assert.match(worker, /isStoreAudioAsset[\s\S]*?assets\/audio[\s\S]*?cache\.put/, "Store piano recordings must be cacheable after first preview");
+assert.match(worker, /isStoreAudioAsset[\s\S]*?assets\/audio[\s\S]*?savePublicAsset\(request, copy\)/, "Store piano recordings must be cacheable after first preview");
+assert.match(worker, /function savePublicAsset[\s\S]*?cache\.put\(request, response\)/, "The bounded public cache writer must persist the response");
 assert.match(pianoMigration, /music-quiet-calculation[\s\S]*?music-rising-position[\s\S]*?music-midnight-strategy[\s\S]*?music-beyond-the-board[\s\S]*?music-subtle-triumph[\s\S]*?CC0 1\.0 Universal/);
 assert.match(pianoMigration, /set active = false[\s\S]*?music-calm[\s\S]*?sfx-classic/);
 assert.match(app, /const sourceNameStyle = source\.nameStyle \|\| source\.name_style \|\| source\.equippedNameStyle/, "Identity model must accept the authoritative remote Name Style payload");
