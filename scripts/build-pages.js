@@ -6,6 +6,7 @@ const projectDir = path.resolve(__dirname, "..");
 const outputDir = path.join(projectDir, "dist");
 const staticEntries = [
   "index.html",
+  "googled51416fcf448d3ef.html",
   "privacy.html",
   "terms.html",
   "account-deletion.html",
