@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://nschessn.vercel.app/sitemap.xml

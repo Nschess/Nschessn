@@ -14,6 +14,7 @@ const staticEntries = [
   "favicon.svg",
   "site.webmanifest",
   "robots.txt",
+  "sitemap.xml",
   ".nojekyll",
   "assets",
   "data",
